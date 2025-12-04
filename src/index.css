@@ -1,0 +1,67 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Melhorias de acessibilidade */
+*:focus-visible {
+  outline: 2px solid var(--mantine-color-teal-6);
+  outline-offset: 2px;
+}
+
+/* Suporte a motion reducido */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Skip link para navegação por teclado */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--mantine-color-teal-6);
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+  z-index: 9999;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Melhor contraste para textos */
+.mantine-Text-root[data-dimmed] {
+  color: #6c757d !important;
+}
+
+/* Espaçamento consistente */
+.mantine-Stack-root {
+  gap: var(--mantine-spacing-md);
+}
+
+/* Botões mais acessíveis */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
