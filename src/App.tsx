@@ -25,7 +25,7 @@ function App() {
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route 
-            path="/" 
+            path="/dashboard" 
             element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} 
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
