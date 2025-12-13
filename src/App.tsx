@@ -1,9 +1,12 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
 import { theme } from './themes/theme';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import { Login } from './components/Auth/Login';
+import { Cadastro } from './components/Auth/Cadastro';
+import { EsqueciSenha } from './components/Auth/EsqueciSenha';
 
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
@@ -11,12 +14,21 @@ function App() {
     defaultValue: 'light',
   });
 
+  const isAuthenticated = !!localStorage.getItem('token');
+
   return (
     <MantineProvider theme={theme} forceColorScheme={colorScheme}>
       <Notifications position="top-right" />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Cadastro />} />
+          <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
+          <Route 
+            path="/" 
+            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} 
+          />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </MantineProvider>
