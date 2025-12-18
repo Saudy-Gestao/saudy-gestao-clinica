@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
 import { EsqueciSenha } from './components/Auth/EsqueciSenha';
+import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
 
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
@@ -27,6 +28,11 @@ function App() {
           <Route 
             path="/dashboard" 
             element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} 
+          />
+          <Route 
+            path="/pre-agendamento" 
+            // element={isAuthenticated ? <PreAgendamento /> : <Navigate to="/login" replace />} 
+            element={<PreAgendamento />} 
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
