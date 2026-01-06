@@ -1,4 +1,5 @@
 import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon } from '@mantine/core';
+import { useNavigate } from 'react-router-dom';
 import {
   UserPlus,
   Calendar,
@@ -17,12 +18,13 @@ import {
 import { DARK_BLUE } from '../../themes/theme';
 
 export function WorkflowSections() {
+  const navigate = useNavigate();
   const sections = [
     {
       title: 'Fluxo do Paciente',
       items: [
-        { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro' },
-        { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames' },
+        { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento' },
+        { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento' },
         { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico' },
         { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais' },
       ]
@@ -54,7 +56,13 @@ export function WorkflowSections() {
           <Text fw={600} size="lg" c="dimmed" mb="md">{section.title}</Text>
           <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
             {section.items.map((item, i) => (
-              <Paper key={i} p="md" withBorder style={{ cursor: 'pointer', borderColor: DARK_BLUE }}>
+              <Paper 
+                key={i} 
+                p="md" 
+                withBorder 
+                style={{ cursor: item.route ? 'pointer' : 'default', borderColor: DARK_BLUE }}
+                onClick={() => item.route && navigate(item.route)}
+              >
                 <Group justify="space-between" align="flex-start">
                   <Group>
                     <ThemeIcon size="xl" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${DARK_BLUE}`, borderRadius: '8px' }}>
@@ -65,7 +73,7 @@ export function WorkflowSections() {
                       <Text size="xs" c="dimmed">{item.desc}</Text>
                     </Box>
                   </Group>
-                  <ChevronRight size={16} color="#cbd5e0" />
+                  {item.route && <ChevronRight size={16} color="#cbd5e0" />}
                 </Group>
               </Paper>
             ))}
