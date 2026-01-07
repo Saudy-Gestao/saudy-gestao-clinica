@@ -6,7 +6,6 @@ import {
   Text,
   TextInput,
   Button,
-  Table,
   Modal,
   Stack,
   Textarea,
@@ -19,7 +18,7 @@ import {
 } from '@mantine/core';
 import { DateInput, TimeInput, Calendar as MantineCalendar } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, Edit2, ChevronLeft, Calendar, Clock } from 'lucide-react';
+import { Search, Plus, ChevronLeft, Calendar, Clock } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { DARK_BLUE } from '../../themes/theme';
@@ -211,98 +210,39 @@ export function Agendamento() {
     ));
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Confirmado': return '#28a745';
-      case 'Pendente': return '#ffc107';
-      case 'Cancelado': return '#dc3545';
-      default: return '#6c757d';
-    }
-  };
-
   const rows = filteredAgendamentos.map((agendamento) => (
-    <Table.Tr key={agendamento.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-      <Table.Td>
-        <Group gap={isMobile ? "xs" : "sm"}>
-          {!isMobile && (
-            <Box
-              bg={DARK_BLUE}
-              w={32}
-              h={32}
-              style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-            >
-              <Text c="white" fw={600} size="sm">
-                {agendamento.pacienteNome.charAt(0).toUpperCase()}
-              </Text>
-            </Box>
-          )}
-          <Box>
-            <Text fw={500} size={isMobile ? "xs" : "sm"}>
-              {agendamento.pacienteNome}
-            </Text>
-            {isMobile && (
-              <Text size="xs" c="dimmed">
-                {agendamento.pacienteCPF}
-              </Text>
-            )}
-          </Box>
-        </Group>
-      </Table.Td>
-      {!isMobile && (
-        <Table.Td>
-          <Text size="sm">{agendamento.pacienteCPF}</Text>
-        </Table.Td>
-      )}
-      {!isTablet && (
-        <Table.Td>
-          <Text size="sm">{agendamento.medicoNome}</Text>
-          <Text size="xs" c="dimmed">{agendamento.especialidade}</Text>
-        </Table.Td>
-      )}
-      <Table.Td>
-        <Group gap="xs">
-          <Calendar size={16} />
-          <Text size="sm">{new Date(agendamento.data).toLocaleDateString('pt-BR')}</Text>
-        </Group>
-        <Group gap="xs" mt="xs">
-          <Clock size={16} />
-          <Text size="sm">{agendamento.hora}</Text>
-        </Group>
-      </Table.Td>
-      {!isTablet && (
-        <Table.Td>
-          <Text size="sm">{agendamento.tipoConsulta}</Text>
-        </Table.Td>
-      )}
-      <Table.Td>
-        <Select
-          data={[
-            { value: 'Pendente', label: 'Pendente' },
-            { value: 'Confirmado', label: 'Confirmado' },
-            { value: 'Cancelado', label: 'Cancelado' },
-          ]}
-          value={agendamento.status}
-          onChange={(value) => handleStatusChange(agendamento.id, value || 'Pendente')}
-          size="xs"
-          radius="md"
-          w={140}
-          styles={{
-            input: {
-              color: getStatusColor(agendamento.status),
-              fontWeight: 500,
-              fontSize: '0.875rem',
-            },
-          }}
-        />
-      </Table.Td>
-      <Table.Td>
-        <Group gap={4} justify="flex-end">
-          <ActionIcon size="md" variant="subtle" color="blue" onClick={() => handleEditAgendamento(agendamento)}>
-            <Edit2 size={20} />
-          </ActionIcon>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
+    <Box key={agendamento.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #e9ecef' }}>
+      {/* Time column - centered */}
+      <Box style={{ minWidth: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Text size="sm" fw={400} style={{ color: '#495057' }}>{agendamento.hora}</Text>
+      </Box>
+
+      {/* Vertical separator and main content */}
+      <Box onClick={() => handleEditAgendamento(agendamento)} style={{ borderLeft: !isMobile ? '1px solid #e9ecef' : 'none', paddingLeft: !isMobile ? 16 : 0, flex: 1, cursor: 'pointer' }}>
+        <Text fw={600} size="sm">{agendamento.pacienteNome}</Text>
+        <Text size="xs" c="dimmed" mt={6}>
+          {agendamento.tipoConsulta} {" | "} {agendamento.especialidade} {" | "} Dr(a): {agendamento.medicoNome}
+        </Text>
+      </Box>
+
+      {/* Right aligned status */}
+      <Box style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Box style={{ minWidth: 140 }}>
+          <Select
+            data={[
+              { value: 'Pendente', label: 'Pendente' },
+              { value: 'Confirmado', label: 'Confirmado' },
+              { value: 'Cancelado', label: 'Cancelado' },
+            ]}
+            value={agendamento.status}
+            onChange={(value) => handleStatusChange(agendamento.id, value || 'Pendente')}
+            size="xs"
+            radius="md"
+            w={120}
+          />
+        </Box>
+      </Box>
+    </Box>
   ));
 
   return (
@@ -329,7 +269,7 @@ export function Agendamento() {
         <Box mb={isMobile ? 20 : 30}>
           <Group gap="md" align="flex-end" wrap="nowrap">
             {/* Filtros */}
-            <Box className="floating-field" style={{ flexShrink: 0 }}>
+            <Box className="floating-field">
               <input
                 type="text"
                 value={especialidade}
@@ -339,7 +279,7 @@ export function Agendamento() {
               <label>Especialidade</label>
             </Box>
 
-            <Box className="floating-field" style={{ flexShrink: 0 }}>
+            <Box className="floating-field">
               <input
                 type="text"
                 value={convenio}
@@ -373,7 +313,6 @@ export function Agendamento() {
                   leftSection={<Calendar size={16} />}
                   readOnly
                   variant="unstyled"
-                  style={{ flexShrink: 0, minWidth: 120 }}
                 />
               </Popover.Target>
               <Popover.Dropdown p={0}>
@@ -509,7 +448,6 @@ export function Agendamento() {
               value={turno}
               onChange={(value) => setTurno(value || '')}
               clearable
-              style={{ flexShrink: 0, minWidth: 120 }}
             />
 
             {/* Search Bar */}
@@ -520,7 +458,7 @@ export function Agendamento() {
               onChange={(e) => setSearchValue(e.currentTarget.value)}
               radius="md"
               size={isMobile ? "sm" : "md"}
-              style={{ flex: 1 }}
+              style={{ flex: 2 }}
             />
 
             {/* Add Agendamento Button */}
@@ -534,7 +472,7 @@ export function Agendamento() {
               px={isMobile ? "sm" : "xl"}
               style={{ flexShrink: 0 }}
             >
-              {isMobile ? <Plus size={16} /> : "Novo agendamento"}
+              {isMobile ? <Plus size={16} /> : "Novo"}
             </Button>
           </Group>
         </Box>
@@ -545,30 +483,11 @@ export function Agendamento() {
           </Text>
         )}
 
-        {/* Agendamentos Table */}
-        <Box bg="#f8f9fa" style={{ overflowX: 'auto' }}>
-          <Table horizontalSpacing={isMobile ? "sm" : "md"} verticalSpacing={isMobile ? "sm" : "md"}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: '2px solid #e9ecef' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 500 }}>Paciente</Table.Th>
-                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>CPF</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Médico</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 500 }}>Data/Hora</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Tipo</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 500 }}>Status</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {rows.length > 0 ? rows : (
-                <Table.Tr>
-                  <Table.Td colSpan={7}>
-                    <Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
+        {/* Agendamentos List */}
+        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6}}>
+          <Box>
+            {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+          </Box>
         </Box>
       </Box>
 
