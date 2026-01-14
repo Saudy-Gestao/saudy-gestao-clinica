@@ -268,7 +268,7 @@ export function PreAtendimento() {
             </Box>
           )}
           <Box>
-            <Text fw={500} size={isMobile ? "xs" : "sm"}>
+            <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>
               {patient.nomeCompleto}
             </Text>
             {isMobile && (
@@ -281,34 +281,36 @@ export function PreAtendimento() {
       </Table.Td>
       {!isMobile && (
         <Table.Td>
-          <Text size={isMobile ? "xs" : "sm"}>{patient.totem}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.totem}</Text>
         </Table.Td>
       )}
       {!isMobile && (
         <Table.Td>
-          <Text size={isMobile ? "xs" : "sm"} c="#495057">{patient.status}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }} c="#495057">{patient.status}</Text>
         </Table.Td>
       )}
       {!isTablet && (
         <Table.Td>
-          <Text size={isMobile ? "xs" : "sm"}>{patient.fila}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.fila}</Text>
         </Table.Td>
       )}
       {!isTablet && (
         <Table.Td>
-          <Text size={isMobile ? "xs" : "sm"}>{patient.tipoFila}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.tipoFila}</Text>
         </Table.Td>
       )}
       {!isTablet && (
         <Table.Td>
-          <Text size={isMobile ? "xs" : "sm"}>{patient.agenda}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.agenda}</Text>
         </Table.Td>
       )}
       <Table.Td>
-        <Group gap={4} justify="flex-end">
-          <ActionIcon size="md" variant="subtle" color="blue" onClick={() => handleEditPatient(patient)}>
-            <Edit2 size={20} />
+        <Group gap={4} justify="flex-end" align="center">
+          <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
+          <ActionIcon size="sm" variant="subtle" style={{ color: '#001F54' }} onClick={() => handleEditPatient(patient)}>
+            <Edit2 size={18} />
           </ActionIcon>
+          <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
         </Group>
       </Table.Td>
     </Table.Tr>
@@ -365,17 +367,17 @@ export function PreAtendimento() {
         </Box>
 
         {/* Patients Table */}
-        <Box bg="#f8f9fa" style={{ overflowX: 'auto' }}>
+        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
           <Table horizontalSpacing={isMobile ? "sm" : "md"} verticalSpacing={isMobile ? "sm" : "md"}>
             <Table.Thead>
-              <Table.Tr style={{ borderBottom: '2px solid #e9ecef' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 500 }}>Nome</Table.Th>
-                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Totem</Table.Th>}
-                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Status</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Fila</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Tipo Fila</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.875rem', fontWeight: 500 }}>Agenda</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.75rem' : '0.875rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
+              <Table.Tr style={{ borderBottom: 'none' }}>
+                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Totem</Table.Th>}
+                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Fila</Table.Th>}
+                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo Fila</Table.Th>}
+                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Agenda</Table.Th>}
+                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>{rows.length > 0 ? rows : <Table.Tr><Table.Td colSpan={7}><Text ta="center" c="dimmed">Nenhum paciente encontrado</Text></Table.Td></Table.Tr>}</Table.Tbody>

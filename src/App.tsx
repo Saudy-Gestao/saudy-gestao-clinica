@@ -9,6 +9,7 @@ import { Cadastro } from './components/Auth/Cadastro';
 import { EsqueciSenha } from './components/Auth/EsqueciSenha';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
+import { Consulta } from './components/Consulta/Consulta';
 
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
@@ -38,7 +39,13 @@ function App() {
             path="/agendamento" 
             // element={isAuthenticated ? <Agendamento /> : <Navigate to="/login" replace />} 
             element={<Agendamento />} 
-          />          <Route path="*" element={<Navigate to="/login" replace />} />
+          />
+          <Route 
+            path="/consulta" 
+            // element={isAuthenticated ? <Consulta /> : <Navigate to="/login" replace />} 
+            element={<Consulta />} 
+          />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </MantineProvider>

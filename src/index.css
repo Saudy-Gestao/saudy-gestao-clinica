@@ -23,33 +23,41 @@ body {
   border: none;
   border-bottom: 1px solid #dee2e6;
   border-radius: 0;
-  padding: 14px 0 10px 0;
+  padding: 10px 0 6px 0;
   background: transparent;
-  font-size: 1rem;
+  font-size: 0.875rem;
+  color: #212529;
 }
 
 .floating-field input:focus {
   outline: none;
   border-bottom: 2px solid #0B2E5D; /* DARK_BLUE */
-  padding-bottom: 9px;
+  padding-bottom: 5px;
 }
 
 .floating-field label {
   position: absolute;
   left: 0;
-  top: 12px;
+  top: 8px;
   color: #6c757d;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   transition: transform 160ms ease, font-size 160ms ease, top 160ms ease, color 160ms ease;
   pointer-events: none;
 }
 
 .floating-field input:focus + label,
 .floating-field input:not(:placeholder-shown) + label {
-  top: -4px;
-  font-size: 0.75rem;
+  top: -6px;
+  font-size: 0.7rem;
   color: #0B2E5D; /* DARK_BLUE */
 }
+
+.floating-field input[disabled] + label,
+.floating-field input[readonly] + label {
+  color: #adb5bd;
+  opacity: 0.9;
+}
+
 
 .auth-actions {
   display: flex;
