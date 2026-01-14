@@ -11,39 +11,43 @@ import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = !!localStorage.getItem('token');
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
     key: 'mantine-color-scheme',
     defaultValue: 'light',
   });
 
-  const isAuthenticated = !!localStorage.getItem('token');
-
   return (
     <MantineProvider theme={theme} forceColorScheme={colorScheme}>
       <Notifications position="top-right" />
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/login" 
+            element={!!localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Login />} 
+          />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route 
             path="/dashboard" 
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} 
+            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
           />
           <Route 
             path="/pre-atendimento" 
-            // element={isAuthenticated ? <PreAgendamento /> : <Navigate to="/login" replace />} 
-            element={<PreAtendimento />} 
-          />          <Route 
+            element={<ProtectedRoute><PreAtendimento /></ProtectedRoute>} 
+          />
+          <Route 
             path="/agendamento" 
-            // element={isAuthenticated ? <Agendamento /> : <Navigate to="/login" replace />} 
-            element={<Agendamento />} 
+            element={<ProtectedRoute><Agendamento /></ProtectedRoute>} 
           />
           <Route 
             path="/consulta" 
-            // element={isAuthenticated ? <Consulta /> : <Navigate to="/login" replace />} 
-            element={<Consulta />} 
+            element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

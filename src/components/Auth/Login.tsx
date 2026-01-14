@@ -5,6 +5,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconCalendar, IconUsers, IconFileText, IconUser, IconBuilding } from '@tabler/icons-react';
 import { DARK_BLUE } from '../../themes/theme';
+import authService from '../../services/authService';
 
 export function Login() {
   const navigate = useNavigate();
@@ -15,6 +16,37 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Preencha todos os campos',
+        color: 'red',
+      });
+      return;
+    }
+
+    console.log("entrei");
+    setLoading(true);
+    try {
+      await authService.login({ email, password });
+      notifications.show({
+        title: 'Sucesso',
+        message: 'Login realizado com sucesso',
+        color: 'green',
+      });
+      navigate('/dashboard');
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.message || 'Erro ao fazer login',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Drag to scroll logic for mobile carousel on desktop
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -50,43 +82,6 @@ export function Login() {
     { icon: IconUsers, title: 'Pacientes', description: 'Cadastro completo', active: true },
     { icon: IconFileText, title: 'Prontuário', description: 'Histórico detalhado' },
   ];
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      notifications.show({
-        title: 'Erro',
-        message: 'Preencha todos os campos',
-        color: 'red',
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Simular chamada de API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Salvar token e usuário no localStorage
-      localStorage.setItem('token', 'mock-token-123');
-      localStorage.setItem('user', JSON.stringify({ email, name: isEmpresa ? 'Empresa' : 'Paciente' }));
-      
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Login realizado com sucesso!',
-        color: 'green',
-      });
-      
-      navigate('/dashboard');
-    } catch (error) {
-      notifications.show({
-        title: 'Erro',
-        message: 'Erro ao fazer login',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!loginType) {
     return (
@@ -471,7 +466,7 @@ export function Login() {
                   borderWidth: '2px',
                 }
               }}
-              onClick={() => navigate('/cadastro')}
+              onClick={() => navigate('/cadastro', { state: { loginType } })}
             >
               Criar conta
             </Button>

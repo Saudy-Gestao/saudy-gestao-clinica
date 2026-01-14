@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -9,14 +9,19 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
+import AuthService from '../../services/authService';
 
 export function Cadastro() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const loginType = location.state?.loginType || 'paciente'; // default to paciente if not specified
+  const isEmpresa = loginType === 'empresa';
+  
   const isMobile = useMediaQuery('(max-width: 799px)');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    cpf: '',
+    documento: '', // CPF for paciente, CNPJ for empresa
     password: '',
     confirmPassword: '',
   });
@@ -26,9 +31,9 @@ export function Cadastro() {
   };
 
   const handleCadastro = async () => {
-    const { email, cpf, password, confirmPassword } = formData;
+    const { email, documento, password, confirmPassword } = formData;
 
-    if (!email || !cpf || !password || !confirmPassword) {
+    if (!email || !documento || !password || !confirmPassword) {
       notifications.show({
         title: 'Erro',
         message: 'Preencha todos os campos',
@@ -48,8 +53,47 @@ export function Cadastro() {
 
     setLoading(true);
     try {
-      // Simular chamada de API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (isEmpresa) {
+        // Registro de empresa - chamada para API saudy-ms-auth
+        const companyData = {
+          company: {
+            cnpj: documento,
+            legalName: 'Empresa Teste', // TODO: adicionar campo no formulário
+            tradeName: 'Empresa Teste', // TODO: adicionar campo no formulário
+            address: 'Endereço padrão', // TODO: adicionar campo no formulário
+            phone: '11999999999', // TODO: adicionar campo no formulário
+          },
+          branch: {
+            socialName: 'Filial Principal',
+            tradeName: 'Filial Principal',
+            address: 'Endereço padrão',
+            phone: '11999999999',
+          },
+          sector: {
+            name: 'Administração',
+            description: 'Setor de administração',
+          },
+          user: {
+            name: 'Administrador', // TODO: adicionar campo no formulário
+            birthDate: '1990-01-01', // TODO: adicionar campo no formulário
+            email,
+            password,
+            phone: '11999999999', // TODO: adicionar campo no formulário
+            address: 'Endereço padrão', // TODO: adicionar campo no formulário
+          },
+          accesses: [
+            {
+              description: 'Acesso completo ao sistema',
+            },
+          ],
+        };
+
+        await AuthService.registerCompany(companyData);
+      } else {
+        // Registro de paciente - por enquanto simula
+        // TODO: implementar registro de paciente quando houver endpoint
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
       notifications.show({
         title: 'Sucesso',
@@ -58,10 +102,11 @@ export function Cadastro() {
       });
       
       navigate('/login');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erro no registro:', error);
       notifications.show({
         title: 'Erro',
-        message: 'Erro ao criar conta',
+        message: error.response?.data?.message || 'Erro ao criar conta',
         color: 'red',
       });
     } finally {
@@ -126,7 +171,7 @@ export function Cadastro() {
                 Você acessou como:
               </Text>
               <Text size="2rem" fw={600} style={{ lineHeight: 1.2 }}>
-                Paciente
+                {isEmpresa ? 'Empresa' : 'Paciente'}
               </Text>
             </Box>
 
@@ -144,12 +189,12 @@ export function Cadastro() {
             <Box className="floating-field">
               <input
                 type="text"
-                value={formData.cpf}
-                onChange={(e) => handleChange('cpf', e.target.value)}
+                value={formData.documento}
+                onChange={(e) => handleChange('documento', e.target.value)}
                 placeholder=" "
-                aria-label="CPF"
+                aria-label={isEmpresa ? "CNPJ" : "CPF"}
               />
-              <label>CPF</label>
+              <label>{isEmpresa ? 'CNPJ' : 'CPF'}</label>
             </Box>
 
             <Box className="floating-field">

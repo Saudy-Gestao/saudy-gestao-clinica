@@ -2,6 +2,7 @@ import api from './api';
 import type { 
   LoginCredentials, 
   RegisterData, 
+  CompanyRegisterData,
   AuthResponse, 
   ResetPasswordData,
   User 
@@ -12,7 +13,7 @@ class AuthService {
    * Login do usuário
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/login', credentials);
+    const response = await api.post<AuthResponse>('/login', credentials);
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
@@ -27,6 +28,20 @@ class AuthService {
    */
   async register(data: RegisterData): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>('/auth/register', data);
+    
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    
+    return response.data;
+  }
+
+  /**
+   * Registro de empresa completa
+   */
+  async registerCompany(data: CompanyRegisterData): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/register', data);
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);

@@ -21,6 +21,37 @@ export interface RegisterData {
   confirmPassword: string;
 }
 
+export interface CompanyRegisterData {
+  company: {
+    cnpj: string;
+    legalName: string;
+    tradeName: string;
+    address: string;
+    phone: string;
+  };
+  branch: {
+    socialName: string;
+    tradeName: string;
+    address: string;
+    phone: string;
+  };
+  sector: {
+    name: string;
+    description: string;
+  };
+  user: {
+    name: string;
+    birthDate: string;
+    email: string;
+    password: string;
+    phone: string;
+    address: string;
+  };
+  accesses: {
+    description: string;
+  }[];
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
