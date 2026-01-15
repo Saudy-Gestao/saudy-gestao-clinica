@@ -80,6 +80,30 @@ export function Consulta() {
     setModalOpen(true);
   };
 
+  const openNovaConsulta = () => {
+    setTriagemData({
+      nome: '',
+      convenio: '',
+      pressaoArterial: '',
+      frequenciaCardiaca: '',
+      temperatura: '',
+      saturacao: '',
+      peso: '',
+      altura: '',
+      glicemia: '',
+      imc: '',
+      anamnese: '',
+      queixaPrincipal: '',
+      historiaDoenca: '',
+      alergias: '',
+      medicamentos: '',
+      antecedentes: '',
+      gestante: '',
+      observacoesTriagem: '',
+    });
+    setModalOpen(true);
+  };
+
   return (
     <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
       <Header />
@@ -117,7 +141,7 @@ export function Consulta() {
               bg={DARK_BLUE}
               c="white"
               leftSection={isMobile ? undefined : <Plus size={18} />}
-              onClick={() => setModalOpen(true)}
+              onClick={openNovaConsulta}
               size={isMobile ? 'sm' : 'md'}
               fw={600}
               px={isMobile ? 'sm' : 'xl'}

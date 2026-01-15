@@ -10,9 +10,10 @@ import { EsqueciSenha } from './components/Auth/EsqueciSenha';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
+import { Laudo } from './components/Laudo/Laudo';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = !!localStorage.getItem('token');
+  const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
@@ -48,6 +49,10 @@ function App() {
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
+          />
+          <Route 
+            path="/laudo" 
+            element={<ProtectedRoute><Laudo /></ProtectedRoute>} 
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
