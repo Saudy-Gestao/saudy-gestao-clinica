@@ -11,7 +11,7 @@ import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
-
+import { Envelopamento } from './components/Envelopamento/Envelopamento';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -30,7 +30,7 @@ function App() {
         <Routes>
           <Route 
             path="/login" 
-            element={!!localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Login />} 
+            element={localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Login />} 
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
@@ -50,9 +50,13 @@ function App() {
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
           />
-          <Route 
-            path="/laudo" 
-            element={<ProtectedRoute><Laudo /></ProtectedRoute>} 
+          <Route
+            path="/laudo"
+            element={<ProtectedRoute><Laudo /></ProtectedRoute>}
+          />
+          <Route
+            path="/Envelopamento"
+            element={<ProtectedRoute><Envelopamento /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
