@@ -12,6 +12,7 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
 import { Envelopamento } from './components/Envelopamento/Envelopamento';
+import { SettingsPage } from './components/Settings/SettingsPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -37,6 +38,10 @@ function App() {
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+          />
+          <Route 
+            path="/settings" 
+            element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} 
           />
           <Route 
             path="/pre-atendimento" 

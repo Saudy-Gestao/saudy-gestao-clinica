@@ -1,6 +1,6 @@
 import { Box, Group, Text } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { User, LogOut } from 'lucide-react';
+import { UserMenu } from './UserMenu';
 import { DARK_BLUE } from '../../themes/theme';
 
 export function Header() {
@@ -24,13 +24,7 @@ export function Header() {
         <Group gap="xl">
           {!isMobile && <Text size="sm">{timeStr} | {dateStr}</Text>}
           <Group gap="xs">
-            <User size={20} />
-            {!isMobile && (
-              <>
-                <Text>|</Text>
-                <LogOut size={20} />
-              </>
-            )}
+            <UserMenu />
           </Group>
         </Group>
       </Group>

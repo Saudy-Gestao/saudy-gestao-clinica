@@ -5,6 +5,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Search, Plus, Edit2, ChevronLeft, Lock } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import { FloatingInput } from '../common/FloatingInput';
 
 interface PatientRow {
   id: number;
@@ -254,62 +255,39 @@ export function Consulta() {
           </Group>
 
           <Stack gap={4}>
-            <Box className="floating-field">
-              <input type="text" value={triagemData.nome} placeholder=" " readOnly disabled style={{ color: '#adb5bd' }} />
-              <label>Nome</label>
-              <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />
-            </Box>
+            <FloatingInput 
+              label="Nome" 
+              value={triagemData.nome} 
+              readOnly 
+              disabled 
+              style={{ color: '#adb5bd' }} 
+              rightSection={<Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+            />
 
-            <Box className="floating-field">
-              <input type="text" value={triagemData.convenio} placeholder=" " readOnly disabled style={{ color: '#adb5bd' }} />
-              <label>Convênio</label>
-              <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />
-            </Box>
+            <FloatingInput 
+              label="Convênio" 
+              value={triagemData.convenio} 
+              readOnly 
+              disabled 
+              style={{ color: '#adb5bd' }} 
+              rightSection={<Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+            />
 
             <Group grow gap="xs" wrap="wrap">
-              <Box className="floating-field">
-                <input type="text" value={triagemData.pressaoArterial} onChange={(e) => setTriagemData({ ...triagemData, pressaoArterial: e.currentTarget.value })} placeholder=" " />
-                <label>PA (mmHg)</label>
-              </Box>
-
-              <Box className="floating-field">
-                <input type="text" value={triagemData.frequenciaCardiaca} onChange={(e) => setTriagemData({ ...triagemData, frequenciaCardiaca: e.currentTarget.value })} placeholder=" " />
-                <label>FC (bmp)</label>
-              </Box>
-
-              <Box className="floating-field">
-                <input type="text" value={triagemData.temperatura} onChange={(e) => setTriagemData({ ...triagemData, temperatura: e.currentTarget.value })} placeholder=" " />
-                <label>Temp (°C)</label>
-              </Box>
+              <FloatingInput label="PA (mmHg)" value={triagemData.pressaoArterial} onChange={(e) => setTriagemData({ ...triagemData, pressaoArterial: e.currentTarget.value })} />
+              <FloatingInput label="FC (bmp)" value={triagemData.frequenciaCardiaca} onChange={(e) => setTriagemData({ ...triagemData, frequenciaCardiaca: e.currentTarget.value })} />
+              <FloatingInput label="Temp (°C)" value={triagemData.temperatura} onChange={(e) => setTriagemData({ ...triagemData, temperatura: e.currentTarget.value })} />
             </Group>
 
             <Group grow gap="xs" wrap="wrap">
-              <Box className="floating-field">
-                <input type="text" value={triagemData.saturacao} onChange={(e) => setTriagemData({ ...triagemData, saturacao: e.currentTarget.value })} placeholder=" " />
-                <label>SpO2 (%)</label>
-              </Box>
-
-              <Box className="floating-field">
-                <input type="text" value={triagemData.peso} onChange={(e) => setTriagemData({ ...triagemData, peso: e.currentTarget.value })} placeholder=" " />
-                <label>Peso (kg)</label>
-              </Box>
-
-              <Box className="floating-field">
-                <input type="text" value={triagemData.altura} onChange={(e) => setTriagemData({ ...triagemData, altura: e.currentTarget.value })} placeholder=" " />
-                <label>Altura (cm)</label>
-              </Box>
+              <FloatingInput label="SpO2 (%)" value={triagemData.saturacao} onChange={(e) => setTriagemData({ ...triagemData, saturacao: e.currentTarget.value })} />
+              <FloatingInput label="Peso (kg)" value={triagemData.peso} onChange={(e) => setTriagemData({ ...triagemData, peso: e.currentTarget.value })} />
+              <FloatingInput label="Altura (cm)" value={triagemData.altura} onChange={(e) => setTriagemData({ ...triagemData, altura: e.currentTarget.value })} />
             </Group>
 
             <Group grow gap="xs" wrap="wrap">
-              <Box className="floating-field">
-                <input type="text" value={triagemData.glicemia} onChange={(e) => setTriagemData({ ...triagemData, glicemia: e.currentTarget.value })} placeholder=" " />
-                <label>Glicemia</label>
-              </Box>
-
-              <Box className="floating-field">
-                <input type="text" value={triagemData.imc} onChange={(e) => setTriagemData({ ...triagemData, imc: e.currentTarget.value })} placeholder=" " />
-                <label>IMC</label>
-              </Box>
+              <FloatingInput label="Glicemia" value={triagemData.glicemia} onChange={(e) => setTriagemData({ ...triagemData, glicemia: e.currentTarget.value })} />
+              <FloatingInput label="IMC" value={triagemData.imc} onChange={(e) => setTriagemData({ ...triagemData, imc: e.currentTarget.value })} />
             </Group>
 
             <Group align="center" gap="xs" my={5}>
@@ -317,46 +295,17 @@ export function Consulta() {
               <Box style={{ borderBottom: '1px solid #dee2e6', flex: 1 }} />
             </Group>
 
-            <Box className="floating-field">
-              <input type="text" value={triagemData.anamnese} onChange={(e) => setTriagemData({ ...triagemData, anamnese: e.currentTarget.value })} placeholder=" " />
-              <label>Anamnese</label>
-            </Box>
+            <FloatingInput label="Anamnese" value={triagemData.anamnese} onChange={(e) => setTriagemData({ ...triagemData, anamnese: e.currentTarget.value })} />
+            <FloatingInput label="Queixa principal" value={triagemData.queixaPrincipal} onChange={(e) => setTriagemData({ ...triagemData, queixaPrincipal: e.currentTarget.value })} />
+            <FloatingInput label="História da Doença" value={triagemData.historiaDoenca} onChange={(e) => setTriagemData({ ...triagemData, historiaDoenca: e.currentTarget.value })} />
+            <FloatingInput label="Alergias" value={triagemData.alergias} onChange={(e) => setTriagemData({ ...triagemData, alergias: e.currentTarget.value })} />
+            <FloatingInput label="Medicamentos" value={triagemData.medicamentos} onChange={(e) => setTriagemData({ ...triagemData, medicamentos: e.currentTarget.value })} />
+            <FloatingInput label="Antecedentes" value={triagemData.antecedentes} onChange={(e) => setTriagemData({ ...triagemData, antecedentes: e.currentTarget.value })} />
+            <FloatingInput label="Gestante" value={triagemData.gestante} onChange={(e) => setTriagemData({ ...triagemData, gestante: e.currentTarget.value })} />
+            <FloatingInput label="Observação" value={triagemData.observacoesTriagem} onChange={(e) => setTriagemData({ ...triagemData, observacoesTriagem: e.currentTarget.value })} />
 
-            <Box className="floating-field">
-              <input type="text" value={triagemData.queixaPrincipal} onChange={(e) => setTriagemData({ ...triagemData, queixaPrincipal: e.currentTarget.value })} placeholder=" " />
-              <label>Queixa principal</label>
-            </Box>
-
-            <Box className="floating-field">
-              <input type="text" value={triagemData.historiaDoenca} onChange={(e) => setTriagemData({ ...triagemData, historiaDoenca: e.currentTarget.value })} placeholder=" " />
-              <label>História da Doença</label>
-            </Box>
-
-            <Box className="floating-field">
-              <input type="text" value={triagemData.alergias} onChange={(e) => setTriagemData({ ...triagemData, alergias: e.currentTarget.value })} placeholder=" " />
-              <label>Alergias</label>
-            </Box>
-
-            <Box className="floating-field">
-              <input type="text" value={triagemData.medicamentos} onChange={(e) => setTriagemData({ ...triagemData, medicamentos: e.currentTarget.value })} placeholder=" " />
-              <label>Medicamentos</label>
-            </Box>
-
-            <Box className="floating-field">
-              <input type="text" value={triagemData.antecedentes} onChange={(e) => setTriagemData({ ...triagemData, antecedentes: e.currentTarget.value })} placeholder=" " />
-              <label>Antecedentes</label>
-            </Box>
-
-            <Box className="floating-field">
-              <input type="text" value={triagemData.gestante} onChange={(e) => setTriagemData({ ...triagemData, gestante: e.currentTarget.value })} placeholder=" " />
-              <label>Gestante</label>
-            </Box>
-
-            <Box className="floating-field">
-              <input type="text" value={triagemData.observacoesTriagem} onChange={(e) => setTriagemData({ ...triagemData, observacoesTriagem: e.currentTarget.value })} placeholder=" " />
-              <label>Observação</label>
-            </Box>
             <Text size="xs" c="dimmed" style={{ marginTop: 6 }}>Observação editada por: Enfer. Luisa Machado</Text>
+
 
             <Group justify="flex-end" mt={8} gap={8}>
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>

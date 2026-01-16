@@ -18,6 +18,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Search, Plus, Edit2, ChevronLeft, Lock } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import { FloatingInput } from '../common/FloatingInput';
 
 interface Patient extends NovoPatiente {
   id: number;
@@ -420,48 +421,36 @@ export function PreAtendimento() {
 
           <Tabs.Panel value="dados-pessoais">
             <Stack gap={isMobile ? "sm" : "md"} mih={isMobile ? undefined : 750}>
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.nomeCompleto}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, nomeCompleto: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                  disabled={isEditing}
-                  style={isEditing ? { color: '#adb5bd' } : {}}
-                />
-                <label>Nome completo</label>
-                {isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
-              </Box>
+              <FloatingInput
+                label="Nome completo"
+                value={novoPaciente.nomeCompleto}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, nomeCompleto: e.currentTarget.value })
+                }
+                disabled={isEditing}
+                style={isEditing ? { color: '#adb5bd' } : {}}
+                rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+              />
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.cpf}
-                    onChange={(e) => setNovoPaciente({ ...novoPaciente, cpf: e.currentTarget.value })}
-                    placeholder=" "
-                    disabled={isEditing}
-                    style={isEditing ? { color: '#adb5bd' } : {}}
-                  />
-                  <label>CPF</label>
-                  {isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.dataNascimento}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, dataNascimento: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                    disabled={isEditing}
-                    style={isEditing ? { color: '#adb5bd' } : {}}
-                  />
-                  <label>Data de nascimento</label>
-                  {isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
-                </Box>
+                <FloatingInput
+                  label="CPF"
+                  value={novoPaciente.cpf}
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, cpf: e.currentTarget.value })}
+                  disabled={isEditing}
+                  style={isEditing ? { color: '#adb5bd' } : {}}
+                  rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+                />
+                <FloatingInput
+                  label="Data de nascimento"
+                  value={novoPaciente.dataNascimento}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, dataNascimento: e.currentTarget.value })
+                  }
+                  disabled={isEditing}
+                  style={isEditing ? { color: '#adb5bd' } : {}}
+                  rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+                />
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
@@ -480,38 +469,27 @@ export function PreAtendimento() {
                     }
                   />
                 </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.telefone}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, telefone: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Telefone</label>
-                </Box>
+                <FloatingInput
+                  label="Telefone"
+                  value={novoPaciente.telefone}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, telefone: e.currentTarget.value })
+                  }
+                />
               </Group>
 
-              <Box className="floating-field">
-                <input
-                  type="email"
-                  value={novoPaciente.email}
-                  onChange={(e) => setNovoPaciente({ ...novoPaciente, email: e.currentTarget.value })}
-                  placeholder=" "
-                />
-                <label>E-mail</label>
-              </Box>
+              <FloatingInput
+                type="email"
+                label="E-mail"
+                value={novoPaciente.email}
+                onChange={(e) => setNovoPaciente({ ...novoPaciente, email: e.currentTarget.value })}
+              />
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.endereco}
-                  onChange={(e) => setNovoPaciente({ ...novoPaciente, endereco: e.currentTarget.value })}
-                  placeholder=" "
-                />
-                <label>Endereço</label>
-              </Box>
+              <FloatingInput
+                label="Endereço"
+                value={novoPaciente.endereco}
+                onChange={(e) => setNovoPaciente({ ...novoPaciente, endereco: e.currentTarget.value })}
+              />
 
               <Textarea
                 label="Observações"
@@ -527,54 +505,38 @@ export function PreAtendimento() {
 
           <Tabs.Panel value="convenio">
             <Stack gap={isMobile ? "sm" : "md"} mih={isMobile ? undefined : 750}>
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.convenio}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, convenio: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Nome convênio</label>
-              </Box>
+              <FloatingInput
+                label="Nome convênio"
+                value={novoPaciente.convenio}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, convenio: e.currentTarget.value })
+                }
+              />
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.tipoConvenio}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, tipoConvenio: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Tipo</label>
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.validadeConvenio}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, validadeConvenio: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Validade</label>
-                </Box>
+                <FloatingInput
+                  label="Tipo"
+                  value={novoPaciente.tipoConvenio}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, tipoConvenio: e.currentTarget.value })
+                  }
+                />
+                <FloatingInput
+                  label="Validade"
+                  value={novoPaciente.validadeConvenio}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, validadeConvenio: e.currentTarget.value })
+                  }
+                />
               </Group>
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.numCarteira}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, numCarteira: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Número (ID beneficiário)</label>
-              </Box>
+              <FloatingInput
+                label="Número (ID beneficiário)"
+                value={novoPaciente.numCarteira}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, numCarteira: e.currentTarget.value })
+                }
+              />
 
               <Box>
                 <Select
@@ -607,200 +569,138 @@ export function PreAtendimento() {
           <Tabs.Panel value="triagem">
             <Stack gap="xs" mih={isMobile ? undefined : 750}>
               <Group grow>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.nomeCompleto}
-                    readOnly
-                    disabled
-                    placeholder=" "
-                    style={{ color: '#adb5bd' }}
-                  />
-                  <label>Nome</label>
-                  {isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.convenio}
-                    readOnly
-                    disabled
-                    placeholder=" "
-                    style={{ color: '#adb5bd' }}
-                  />
-                  <label>Convênio</label>
-                  {isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
-                </Box>
+                <FloatingInput
+                  label="Nome"
+                  value={novoPaciente.nomeCompleto}
+                  readOnly
+                  disabled
+                  placeholder=" "
+                  style={{ color: '#adb5bd' }}
+                  rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+                />
+                <FloatingInput
+                  label="Convênio"
+                  value={novoPaciente.convenio}
+                  readOnly
+                  disabled
+                  placeholder=" "
+                  style={{ color: '#adb5bd' }}
+                  rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
+                />
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.pressaoArterial}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, pressaoArterial: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>PA (mmHg)</label>
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.frequenciaCardiaca}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, frequenciaCardiaca: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>FC (bmp)</label>
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.temperatura}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, temperatura: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Temp (°C)</label>
-                </Box>
+                <FloatingInput
+                  label="PA (mmHg)"
+                  value={novoPaciente.pressaoArterial}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, pressaoArterial: e.currentTarget.value })
+                  }
+                />
+                <FloatingInput
+                  label="FC (bmp)"
+                  value={novoPaciente.frequenciaCardiaca}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, frequenciaCardiaca: e.currentTarget.value })
+                  }
+                />
+                <FloatingInput
+                  label="Temp (°C)"
+                  value={novoPaciente.temperatura}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, temperatura: e.currentTarget.value })
+                  }
+                />
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.saturacao}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, saturacao: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>SpO2 (%)</label>
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.peso}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, peso: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Peso (kg)</label>
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.altura}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, altura: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Altura (cm)</label>
-                </Box>
+                <FloatingInput
+                  label="SpO2 (%)"
+                  value={novoPaciente.saturacao}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, saturacao: e.currentTarget.value })
+                  }
+                />
+                <FloatingInput
+                  label="Peso (kg)"
+                  value={novoPaciente.peso}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, peso: e.currentTarget.value })
+                  }
+                />
+                <FloatingInput
+                  label="Altura (cm)"
+                  value={novoPaciente.altura}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, altura: e.currentTarget.value })
+                  }
+                />
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.glicemia}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, glicemia: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>Glicemia</label>
-                </Box>
-                <Box className="floating-field">
-                  <input
-                    type="text"
-                    value={novoPaciente.imc}
-                    onChange={(e) =>
-                      setNovoPaciente({ ...novoPaciente, imc: e.currentTarget.value })
-                    }
-                    placeholder=" "
-                  />
-                  <label>IMC</label>
-                </Box>
+                <FloatingInput
+                  label="Glicemia"
+                  value={novoPaciente.glicemia}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, glicemia: e.currentTarget.value })
+                  }
+                />
+                <FloatingInput
+                  label="IMC"
+                  value={novoPaciente.imc}
+                  onChange={(e) =>
+                    setNovoPaciente({ ...novoPaciente, imc: e.currentTarget.value })
+                  }
+                />
               </Group>
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.queixaPrincipal}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, queixaPrincipal: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Queixa principal</label>
-              </Box>
+              <FloatingInput
+                label="Queixa principal"
+                value={novoPaciente.queixaPrincipal}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, queixaPrincipal: e.currentTarget.value })
+                }
+              />
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.historiaDoenca}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, historiaDoenca: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>História da Doença</label>
-              </Box>
+              <FloatingInput
+                label="História da Doença"
+                value={novoPaciente.historiaDoenca}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, historiaDoenca: e.currentTarget.value })
+                }
+              />
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.alergias}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, alergias: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Alergias</label>
-              </Box>
+              <FloatingInput
+                label="Alergias"
+                value={novoPaciente.alergias}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, alergias: e.currentTarget.value })
+                }
+              />
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.medicamentos}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, medicamentos: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Medicamentos</label>
-              </Box>
+              <FloatingInput
+                label="Medicamentos"
+                value={novoPaciente.medicamentos}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, medicamentos: e.currentTarget.value })
+                }
+              />
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.antecedentes}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, antecedentes: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Antecedentes</label>
-              </Box>
+              <FloatingInput
+                label="Antecedentes"
+                value={novoPaciente.antecedentes}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, antecedentes: e.currentTarget.value })
+                }
+              />
 
-              <Box className="floating-field">
-                <input
-                  type="text"
-                  value={novoPaciente.observacoesTriagem}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, observacoesTriagem: e.currentTarget.value })
-                  }
-                  placeholder=" "
-                />
-                <label>Observação</label>
-              </Box>
+              <FloatingInput
+                label="Observação"
+                value={novoPaciente.observacoesTriagem}
+                onChange={(e) =>
+                  setNovoPaciente({ ...novoPaciente, observacoesTriagem: e.currentTarget.value })
+                }
+              />
 
               <Group justify="flex-end" gap="md" mt={isMobile ? "sm" : "lg"}>
                 <Button variant="default" onClick={() => setModalOpen(false)}>
