@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Lock, Eye } from 'lucide-react';
+import { Search, Plus, ChevronLeft, Lock, Eye, EyeOff } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 
@@ -174,68 +174,79 @@ export function Laudo() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {filtered.map((r) => (
-                <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                  <Table.Td>
-                    <Group gap={isMobile ? "xs" : "sm"}>
-                      {!isMobile && (
-                        <Box
-                          bg={DARK_BLUE}
-                          w={32}
-                          h={32}
-                          style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                        >
-                          <Text c="white" fw={600} size="sm">
-                            {r.nomeCompleto.charAt(0).toUpperCase()}
-                          </Text>
-                        </Box>
-                      )}
-                      <Box>
-                        <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.nomeCompleto}</Text>
-                        {isMobile && (
-                          <Text size="xs" c="dimmed">Exame: {r.exame}</Text>
+              {filtered.map((r) => {
+                const canView = (r.status || '').toLowerCase() === 'laudado';
+                return (
+                  <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                    <Table.Td>
+                      <Group gap={isMobile ? "xs" : "sm"}>
+                        {!isMobile && (
+                          <Box
+                            bg={DARK_BLUE}
+                            w={32}
+                            h={32}
+                            style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          >
+                            <Text c="white" fw={600} size="sm">
+                              {r.nomeCompleto.charAt(0).toUpperCase()}
+                            </Text>
+                          </Box>
                         )}
-                      </Box>
-                    </Group>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.status}</Text>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.agendadoPara}</Text>
-                  </Table.Td>
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.medicoResponsavel}</Text>
+                        <Box>
+                          <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.nomeCompleto}</Text>
+                          {isMobile && (
+                            <Text size="xs" c="dimmed">Exame: {r.exame}</Text>
+                          )}
+                        </Box>
+                      </Group>
                     </Table.Td>
-                  )}
 
-                  {!isTablet && (
                     <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.exame}</Text>
+                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.status}</Text>
                     </Table.Td>
-                  )}
 
-                  {!isTablet && (
                     <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.observacao}</Text>
+                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.agendadoPara}</Text>
                     </Table.Td>
-                  )}
 
-                  <Table.Td>
-                    <Group gap={4} justify="center" align="center">
-                      <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
-                      <ActionIcon size="sm" variant="subtle" style={{ color: '#001F54' }} onClick={() => openNovoLaudo(r as PatientRow)}>
-                        <Eye size={18} />
-                      </ActionIcon>
-                      <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.medicoResponsavel}</Text>
+                      </Table.Td>
+                    )}
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.exame}</Text>
+                      </Table.Td>
+                    )}
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.observacao}</Text>
+                      </Table.Td>
+                    )}
+
+                    <Table.Td>
+                      <Group gap={4} justify="center" align="center">
+                        <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          disabled={!canView}
+                          onClick={canView ? () => openNovoLaudo(r as PatientRow) : undefined}
+                          style={{ color: canView ? '#001F54' : '#adb5bd', cursor: canView ? 'pointer' : 'not-allowed' }}
+                          title={canView ? 'Ver laudo' : 'Laudo não disponível'}
+                          aria-label={canView ? 'Ver laudo' : 'Laudo não disponível'}
+                        >
+                          {canView ? <Eye size={18} /> : <EyeOff size={18} />}
+                        </ActionIcon>
+                        <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
             </Table.Tbody>
           </Table>
         </Box>
