@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { DateInput, TimeInput, Calendar as MantineCalendar } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Calendar, Clock } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Calendar, Clock, LayoutGrid, List } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { DARK_BLUE } from '../../themes/theme';
@@ -59,7 +59,7 @@ const INITIAL_AGENDAMENTOS: Agendamento[] = [
     data: '2026-01-15',
     hora: '09:00',
     tipoConsulta: 'Consulta de rotina',
-    status: 'Confirmado',
+    status: 'Agendado',
     observacoes: 'Paciente com histórico de hipertensão',
     totem: 23,
   },
@@ -87,7 +87,7 @@ const INITIAL_AGENDAMENTOS: Agendamento[] = [
     data: '2026-01-17',
     hora: '11:00',
     tipoConsulta: 'Primeira consulta',
-    status: 'Confirmado',
+    status: 'Agendado',
     observacoes: '',
     totem: 25,
   },
@@ -118,7 +118,17 @@ export function Agendamento() {
   const [editingAgendamentoId, setEditingAgendamentoId] = useState<number | null>(null);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  
+  const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('list');
+  // State to track expanded cards (ids)
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
+
+  // Calendar state
+  const [currentMonth, setCurrentMonth] = useState(() => dayjs().startOf('month').toDate());
+  // Selected day for calendar (uses same shape as dataHoraFiltro)
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  // Modal for showing appointments on a selected day
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState('');
   const [convenio, setConvenio] = useState('');
@@ -231,7 +241,7 @@ export function Agendamento() {
           <Select
             data={[
               { value: 'Pendente', label: 'Pendente' },
-              { value: 'Confirmado', label: 'Confirmado' },
+              { value: 'Agendado', label: 'Agendado' },
               { value: 'Cancelado', label: 'Cancelado' },
             ]}
             value={agendamento.status}
@@ -244,6 +254,12 @@ export function Agendamento() {
       </Box>
     </Box>
   ));
+
+  const uniqueDates = Array.from(new Set(filteredAgendamentos.map(a => a.data))).sort();
+  const agendamentosByDate = uniqueDates.reduce<Record<string, Agendamento[]>>((acc, date) => {
+    acc[date] = filteredAgendamentos.filter(a => a.data === date).sort((x, y) => x.hora.localeCompare(y.hora));
+    return acc;
+  }, {});
 
   return (
     <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
@@ -465,7 +481,7 @@ export function Agendamento() {
             <Button
               bg={DARK_BLUE}
               c="white"
-              leftSection={isMobile ? undefined : <Plus size={18} />}
+              leftSection={isMobile ? undefined : <Plus size={16} />}
               onClick={() => setModalOpen(true)}
               size={isMobile ? "sm" : "md"}
               fw={600}
@@ -475,6 +491,36 @@ export function Agendamento() {
               {isMobile ? <Plus size={16} /> : "Novo"}
             </Button>
           </Group>
+
+          {/* Layout switch icons (Lista / Grade / Calendário) */}
+          <Box mt={8} mb={8} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Group gap="xm">
+              <ActionIcon
+                variant={layout === 'list' ? 'filled' : 'subtle'}
+                color={layout === 'list' ? 'darkBlue' : undefined}
+                onClick={() => setLayout('list')}
+                title="Lista"
+              >
+                <List size={16} />
+              </ActionIcon>
+              <ActionIcon
+                variant={layout === 'grid' ? 'filled' : 'subtle'}
+                color={layout === 'grid' ? 'darkBlue' : undefined}
+                onClick={() => setLayout('grid')}
+                title="Grade"
+              >
+                <LayoutGrid size={16} />
+              </ActionIcon>
+              <ActionIcon
+                variant={layout === 'calendar' ? 'filled' : 'subtle'}
+                color={layout === 'calendar' ? 'darkBlue' : undefined}
+                onClick={() => setLayout('calendar')}
+                title="Calendário"
+              >
+                <Calendar size={16} />
+              </ActionIcon>
+            </Group>
+          </Box>
         </Box>
 
         {dataHoraFiltro && (
@@ -485,9 +531,191 @@ export function Agendamento() {
 
         {/* Agendamentos List */}
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6}}>
-          <Box>
-            {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
-          </Box>
+          {/* LIST */}
+          {layout === 'list' && (
+            <Box>
+              {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+            </Box>
+          )}
+
+          {/* GRID */}
+          {layout === 'grid' && (
+            <Box p="md">
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                {filteredAgendamentos.length > 0 ? filteredAgendamentos.map(a => {
+                  const isExpanded = expandedIds.includes(a.id);
+                  return (
+                    <Box key={a.id} p="md" style={{ border: '1px solid #e9ecef', borderRadius: 8 }}>
+                      <Group justify="apart" align="flex-start">
+                        <Box>
+                          <Text fw={700}>{a.pacienteNome || '—'}</Text>
+                          <Text size="xs" c="dimmed">{a.hora} • {a.tipoConsulta}</Text>
+                        </Box>
+                        <Text size="xs" style={{ color: a.status ? '#16a34a' : '#6c757d' }}>{a.status || '—'}</Text>
+                      </Group>
+
+                      {!isExpanded ? (
+                        <Group mt={8} justify="apart">
+                          <Text size="sm">{a.especialidade || '—'}</Text>
+                          <Button size="xs" variant="outline" onClick={() => setExpandedIds(prev => prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id])}>
+                            Ver mais
+                          </Button>
+                        </Group>
+                      ) : (
+                        <Box mt={8}>
+                          <Text size="sm"><strong>Especialidade:</strong> {a.especialidade || '—'}</Text>
+                          <Text size="sm" mt={6}><strong>Profissional:</strong> {a.medicoNome || '—'}</Text>
+                          <Button size="xs" variant="outline" mt={8} onClick={() => setExpandedIds(prev => prev.filter(id => id !== a.id))}>
+                            Ver menos
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                }) : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+              </SimpleGrid>
+            </Box>
+          )}
+
+          {/* CALENDAR */}
+          {layout === 'calendar' && (
+            <Box p="md">
+              {/* Calendar header */}
+              <Group justify="apart" align="center" mb={8}>
+                <Group gap="xs">
+                  <ActionIcon variant="subtle" onClick={() => setCurrentMonth(d => dayjs(d).subtract(1, 'month').toDate())}>
+                    <ChevronLeft size={18} />
+                  </ActionIcon>
+                  <Text fw={700}>{dayjs(currentMonth).format('MMMM YYYY')}</Text>
+                  <ActionIcon variant="subtle" onClick={() => setCurrentMonth(d => dayjs(d).add(1, 'month').toDate())}>
+                    <ChevronRight size={18} />
+                  </ActionIcon>
+                </Group>
+                <Group>
+                  <Button size="xs" variant={selectedDay ? 'outline' : 'filled'} onClick={() => { setSelectedDay(null); setDataHoraFiltro(null); }}>
+                    Limpar seleção
+                  </Button>
+                </Group>
+              </Group>
+
+              {/* Weekdays */}
+              <SimpleGrid cols={7} spacing={0} mb={8}>
+                {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d) => (
+                  <Box key={d} style={{ textAlign: 'center', padding: '6px 0' }}>
+                    <Text size="xs" c="dimmed" fw={600}>{d}</Text>
+                  </Box>
+                ))}
+              </SimpleGrid>
+
+              {/* Days grid */}
+              <SimpleGrid cols={7} spacing="xs">
+                {(() => {
+                  const startOfMonth = dayjs(currentMonth).startOf('month');
+                  // Monday-first: compute start date to show (previous Monday)
+                  const startDay = startOfMonth.startOf('week').add(1, 'day');
+                  // adjust if startDay is after startOfMonth (works with sunday-first)
+                  const start = startDay.isAfter(startOfMonth) ? startDay.subtract(7, 'day') : startDay;
+                  const days = [] as dayjs.Dayjs[];
+                  for (let i = 0; i < 42; i++) {
+                    days.push(dayjs(start).add(i, 'day'));
+                  }
+
+                  // Map appointments by date
+                  const apptMap = filteredAgendamentos.reduce<Record<string, number>>((acc, a) => {
+                    acc[a.data] = (acc[a.data] || 0) + 1;
+                    return acc;
+                  }, {});
+
+                  return days.map((d) => {
+                    const key = d.format('YYYY-MM-DD');
+                    const isCurrentMonth = d.month() === dayjs(currentMonth).month();
+                    const isSelected = selectedDay ? dayjs(selectedDay).isSame(d, 'day') : false;
+                    const isToday = d.isSame(dayjs(), 'day');
+                    const count = apptMap[d.format('YYYY-MM-DD')] || 0;
+
+                    return (
+                      <Box
+                        key={key}
+                        onClick={() => {
+                          setSelectedDay(d.toDate());
+                          setDataHoraFiltro(d.toDate());
+                          if (count > 0) {
+                            setCalendarModalOpen(true);
+                          } else {
+                            setCalendarModalOpen(false);
+                          }
+                        }}
+                        style={{
+                          padding: 8,
+                          minHeight: 64,
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          background: isSelected ? DARK_BLUE : 'transparent',
+                          color: isSelected ? 'white' : isCurrentMonth ? undefined : '#adb5bd',
+                          boxShadow: isSelected ? '0 6px 18px rgba(0,0,0,0.06)' : undefined,
+                          border: isToday && !isSelected ? '1px solid #dee2e6' : undefined,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
+                        }}
+                        title={d.format('DD/MM/YYYY')}
+                      >
+                        <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text fw={600} size="sm">{d.date()}</Text>
+                          {count > 0 && (
+                            <Box style={{ width: 8, height: 8, borderRadius: 8, background: isSelected ? 'white' : DARK_BLUE }} />
+                          )}
+                        </Box>
+
+                        {/* small list of appointments (one line) */}
+                        <Box style={{ marginTop: 6 }}>
+                          {count > 0 && (
+                            <Text size="xs" style={{ opacity: 0.9 }}>{count} agendamento{count > 1 ? 's' : ''}</Text>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  });
+                })()}
+              </SimpleGrid>
+
+              {/* Selected day details shown in modal when there are appointments */}
+              <Modal
+                opened={calendarModalOpen}
+                onClose={() => setCalendarModalOpen(false)}
+                title={selectedDay ? `Agendamentos — ${dayjs(selectedDay).format('DD [de] MMMM [de] YYYY')}` : 'Agendamentos'}
+                size={isMobile ? '100%' : 'lg'}
+                centered
+                fullScreen={isMobile}
+              >
+                <Stack gap={8}>
+                  {selectedDay && (agendamentosByDate[dayjs(selectedDay).format('YYYY-MM-DD')] || []).length > 0 ? (
+                    (agendamentosByDate[dayjs(selectedDay).format('YYYY-MM-DD')] || []).map(a => (
+                      <Box key={a.id} style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, border: '1px solid #e9ecef', marginBottom: 8 }}>
+                        <Group align="center" style={{ width: '100%' }}>
+                          <Box style={{ flex: 1 }}>
+                            <Text fw={600}>{a.hora} — {a.pacienteNome || '—'}</Text>
+                            <Text size="xs" c="dimmed">{a.especialidade} | Dr(a). {a.medicoNome}</Text>
+                          </Box>
+                          <Box style={{ marginLeft: 12 }}>
+                            <Button size="xs" onClick={() => { handleEditAgendamento(a); setCalendarModalOpen(false); }}>
+                              Editar
+                            </Button>
+                          </Box>
+                        </Group>
+                      </Box>
+                    ))
+                  ) : (
+                    <Text size="sm" c="dimmed">Nenhum agendamento neste dia</Text>
+                  )}
+
+                  <Group justify="right">
+                    <Button variant="default" onClick={() => setCalendarModalOpen(false)}>Fechar</Button>
+                  </Group>
+                </Stack>
+              </Modal>
+            </Box>
+          )}
         </Box>
       </Box>
 
