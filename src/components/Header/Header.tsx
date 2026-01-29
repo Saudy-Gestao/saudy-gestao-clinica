@@ -1,6 +1,6 @@
-import { Box, Group, Text } from '@mantine/core';
+import { Box, Group, Text, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { UserMenu } from './UserMenu';
+import { User, ExternalLink } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 
 export function Header() {
@@ -24,7 +24,13 @@ export function Header() {
         <Group gap="xl">
           {!isMobile && <Text size="sm">{timeStr} | {dateStr}</Text>}
           <Group gap="xs">
-            <UserMenu />
+            <ActionIcon variant="subtle" color="white" size="sm">
+              <User size={16} color="white" />
+            </ActionIcon>
+            <Text c="white" size="xs">|</Text>
+            <ActionIcon variant="subtle" color="white" size="sm">
+              <ExternalLink size={16} color="white" />
+            </ActionIcon>
           </Group>
         </Group>
       </Group>

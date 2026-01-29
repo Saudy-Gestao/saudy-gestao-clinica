@@ -16,6 +16,7 @@ import { Entrega } from './components/Entrega/Entrega';
 import { Estoque } from './components/Estoque/Estoque';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { Financeiro } from './Financeiro/Financeiro';
+import { Faturamento } from './Faturamento/Faturamento';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -77,6 +78,10 @@ function App() {
           <Route
             path="/financeiro"
             element={<ProtectedRoute><Financeiro /></ProtectedRoute>}
+          />
+          <Route
+            path="/faturamento"
+            element={<ProtectedRoute><Faturamento /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

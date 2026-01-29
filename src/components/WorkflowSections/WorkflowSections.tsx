@@ -25,26 +25,26 @@ export function WorkflowSections() {
       items: [
         { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento' },
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento' },
-        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico' },
-        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais' },
+        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/consulta' },
+        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/consulta' },
       ]
     },
     {
       title: 'Suporte Clínico',
       items: [
-        { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico' },
-        { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos' },
-        { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs' },
+        { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta' },
+        { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo' },
+        { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento' },
         { icon: Folder, label: 'Documentos', desc: 'Gestão documental' },
       ]
     },
     {
       title: 'Administrativo',
       items: [
-        { icon: Package, label: 'Entrega', desc: 'Controle de entregas' },
-        { icon: Warehouse, label: 'Estoque', desc: 'Materiais e insumos' },
-        { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira' },
-        { icon: DollarSign, label: 'Faturamento', desc: 'Cobranças e NFs' },
+        { icon: Package, label: 'Entrega', desc: 'Controle de entregas', route: '/entrega' },
+        { icon: Warehouse, label: 'Estoque', desc: 'Materiais e insumos', route: '/estoque' },
+        { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira', route: '/financeiro' },
+        { icon: DollarSign, label: 'Faturamento', desc: 'Cobranças e NFs', route: '/faturamento' },
       ]
     }
   ];

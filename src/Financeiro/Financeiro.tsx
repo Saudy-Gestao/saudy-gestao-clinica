@@ -38,6 +38,7 @@ interface Lancamento {
   valor: number;
   desconto: number;
   valorTotal: number;
+  metodoPagamento?: string;
 }
 
 export function Financeiro() {
@@ -60,6 +61,7 @@ export function Financeiro() {
       valor: 350.0,
       desconto: 0,
       valorTotal: 350.0,
+      metodoPagamento: 'Cartão de Crédito',
     },
     {
       id: 2,
@@ -71,6 +73,7 @@ export function Financeiro() {
       valor: 40.0,
       desconto: 10,
       valorTotal: 36.0,
+      metodoPagamento: 'PIX',
     },
     {
       id: 3,
@@ -82,6 +85,7 @@ export function Financeiro() {
       valor: 60.0,
       desconto: 10,
       valorTotal: 54.0,
+      metodoPagamento: 'Dinheiro',
     },
   ]);
 
@@ -192,6 +196,7 @@ export function Financeiro() {
       <Table.Td>R${lancamento.valor.toFixed(2)}</Table.Td>
       <Table.Td>{lancamento.desconto > 0 ? `${lancamento.desconto}%` : '-'}</Table.Td>
       <Table.Td fw={600}>R${lancamento.valorTotal.toFixed(2)}</Table.Td>
+      <Table.Td>{lancamento.metodoPagamento || '-'}</Table.Td>
       <Table.Td>
         <Menu position="bottom-end" shadow="md">
           <Menu.Target>
@@ -286,6 +291,7 @@ export function Financeiro() {
                 <Table.Th>Valor</Table.Th>
                 <Table.Th>Desconto</Table.Th>
                 <Table.Th>Valor Total</Table.Th>
+                <Table.Th>Método Pagamento</Table.Th>
                 <Table.Th>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
