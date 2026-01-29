@@ -12,7 +12,10 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
 import { Envelopamento } from './components/Envelopamento/Envelopamento';
+import { Entrega } from './components/Entrega/Entrega';
+import { Estoque } from './components/Estoque/Estoque';
 import { SettingsPage } from './components/Settings/SettingsPage';
+import { Financeiro } from './Financeiro/Financeiro';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -60,8 +63,20 @@ function App() {
             element={<ProtectedRoute><Laudo /></ProtectedRoute>}
           />
           <Route
-            path="/Envelopamento"
+            path="/envelopamento"
             element={<ProtectedRoute><Envelopamento /></ProtectedRoute>}
+          />
+          <Route
+            path="/entrega"
+            element={<ProtectedRoute><Entrega /></ProtectedRoute>}
+          />
+          <Route
+            path="/estoque"
+            element={<ProtectedRoute><Estoque /></ProtectedRoute>}
+          />
+          <Route
+            path="/financeiro"
+            element={<ProtectedRoute><Financeiro /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

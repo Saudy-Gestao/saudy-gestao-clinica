@@ -118,3 +118,23 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Linha de campo (estilo do modal) */
+.line-field {
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  transition: border-color 150ms ease, border-width 150ms ease;
+}
+
+.line-field:focus-within {
+  border-bottom: 2px solid #0B2E5D; /* DARK_BLUE */
+}
+
+/* Pequena redução do placeholder/label para campos unstyled */
+.mantine-TextInput-root[data-unstyled] .mantine-TextInput-input,
+.mantine-NumberInput-root[data-unstyled] .mantine-NumberInput-input,
+.mantine-Select-root[data-unstyled] .mantine-Select-input {
+  padding: 6px 0;
+}
+
+
