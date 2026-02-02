@@ -10,7 +10,6 @@ import {
   TextInput,
   NumberInput,
   MultiSelect,
-  Switch,
   SimpleGrid,
   Stack,
   Paper,
@@ -100,6 +99,11 @@ export function CadastroMedico() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+
+  // Ensure the page starts at the top (header) when this route/component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -206,8 +210,9 @@ export function CadastroMedico() {
 
       setLastCreatedName(payload.name);
       setShowSuccessModal(true);
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar médico';
+    } catch (e: unknown) {
+      const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
+      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Erro ao registrar médico';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSaving(false);

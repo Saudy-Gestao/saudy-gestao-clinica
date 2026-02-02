@@ -7,6 +7,8 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
 import { EsqueciSenha } from './components/Auth/EsqueciSenha';
+import { Adm } from './components/Auth/Adm';
+import { AdminHub } from './components/Admin/AdminHub';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
@@ -19,6 +21,7 @@ import { Financeiro } from './Financeiro/Financeiro';
 import { Faturamento } from './Faturamento/Faturamento';
 import { CadastroMedico } from './components/Medicos/CadastroMedico';
 import { CadastroPaciente } from './components/Patient/CadastroPaciente';
+import { CadastroCliente } from './components/Company/CadastroCliente';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -38,6 +41,14 @@ function App() {
           <Route 
             path="/login" 
             element={localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Login />} 
+          />
+          <Route 
+            path="/adm" 
+            element={localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Adm />} 
+          />
+          <Route 
+            path="/adm-hub"
+            element={<ProtectedRoute><AdminHub /></ProtectedRoute>}
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
@@ -92,6 +103,10 @@ function App() {
           <Route
             path="/cadastro-paciente"
             element={<ProtectedRoute><CadastroPaciente /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-cliente"
+            element={<ProtectedRoute><CadastroCliente /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Text, Stack } from '@mantine/core';
+import { Box, Title, Text, Stack, Group } from '@mantine/core';
 import { Header } from '../Header/Header';
 import { StatsCards } from '../StatsCards/StatsCards';
 import { PatientQueue } from '../PatientQueue/PatientQueue';
@@ -25,10 +25,13 @@ export function Dashboard() {
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         {/* Welcome Section */}
-        <Stack gap="xs" mb={30}>
-          <Title order={1} fw={600} style={{ fontSize: '2rem' }}>{getGreeting()}</Title>
-          <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
-        </Stack>
+        <Group mb={30} justify="space-between" align="center">
+          <Stack gap="xs">
+            <Title order={1} fw={600} style={{ fontSize: '2rem' }}>{getGreeting()}</Title>
+            <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
+          </Stack>
+
+        </Group>
 
         <StatsCards />
         <PatientQueue />

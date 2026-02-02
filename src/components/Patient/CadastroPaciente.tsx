@@ -8,7 +8,6 @@ import {
   Select,
   Textarea,
   TextInput,
-  MultiSelect,
   Switch,
   SimpleGrid,
   Stack,
@@ -84,6 +83,12 @@ export function CadastroPaciente() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+
+  // Ensure the page starts at the top (header) when this route/component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
   const formatDate = (d: Date | null) => {
     if (!d) return '';
     const day = String(d.getDate()).padStart(2, '0');
@@ -100,7 +105,7 @@ export function CadastroPaciente() {
   const [lastCreatedName, setLastCreatedName] = useState<string | null>(null);
 
   const [healthInsuranceInput, setHealthInsuranceInput] = useState('');
-  const [healthInsurancePopover, setHealthInsurancePopover] = useState(false);
+  const [, setHealthInsurancePopover] = useState(false);
 
   // Inputs temporários para campos que representam arrays — mantêm texto livre durante a digitação
   const [allergiesInput, setAllergiesInput] = useState('');
@@ -278,8 +283,9 @@ export function CadastroPaciente() {
 
       setLastCreatedName(payload.name);
       setShowSuccessModal(true);
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar paciente';
+    } catch (e: unknown) {
+      const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
+      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Erro ao registrar paciente';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSaving(false);
