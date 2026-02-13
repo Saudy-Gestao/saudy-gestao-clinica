@@ -3,6 +3,7 @@ import { MantineProvider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
 import { theme } from './themes/theme';
+import authService from './services/authService';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
@@ -18,7 +19,7 @@ import { SettingsPage } from './components/Settings/SettingsPage';
 import { Financeiro } from './Financeiro/Financeiro';
 import { Faturamento } from './Faturamento/Faturamento';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = true;
+  const isAuthenticated = authService.isAuthenticated();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
@@ -35,7 +36,7 @@ function App() {
         <Routes>
           <Route 
             path="/login" 
-            element={localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Login />} 
+            element={authService.isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Login />} 
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
