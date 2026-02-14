@@ -18,6 +18,8 @@ import { Estoque } from './components/Estoque/Estoque';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { Financeiro } from './Financeiro/Financeiro';
 import { Faturamento } from './Faturamento/Faturamento';
+import { CadastroMedico } from './components/Medicos/CadastroMedico';
+import { CadastroPaciente } from './components/Patient/CadastroPaciente';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = authService.isAuthenticated();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -83,6 +85,14 @@ function App() {
           <Route
             path="/faturamento"
             element={<ProtectedRoute><Faturamento /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-medico"
+            element={<ProtectedRoute><CadastroMedico /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-paciente"
+            element={<ProtectedRoute><CadastroPaciente /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
