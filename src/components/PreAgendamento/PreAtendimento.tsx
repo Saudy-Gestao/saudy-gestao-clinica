@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -16,17 +16,22 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Search, Plus, Edit2, ChevronLeft, Lock } from 'lucide-react';
+import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
+import preAttendanceService from '../../services/preAttendanceService';
+import patientService from '../../services/patientService';
+import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils/formatters';
 
 interface Patient extends NovoPatiente {
-  id: number;
-  totem: number;
-  status: string;
-  fila: string;
-  tipoFila: string;
-  agenda: string;
+  id: string;
+  patientId?: string;
+  totem?: number;
+  status?: string;
+  fila?: string;
+  tipoFila?: string;
+  agenda?: string;
 }
 
 interface NovoPatiente {
@@ -59,81 +64,6 @@ interface NovoPatiente {
   observacoesTriagem: string;
   observacoes: string;
 }
-
-const INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 1,
-    nomeCompleto: 'Maria Silva Santos',
-    cpf: '123.456.789-00',
-    dataNascimento: '1985-05-15',
-    sexo: 'F',
-    telefone: '(11) 99999-9999',
-    email: 'maria.silva@email.com',
-    endereco: 'Rua das Flores, 123',
-    convenio: 'Unimed',
-    tipoConvenio: 'Plano Básico',
-    validadeConvenio: '2025-12-31',
-    numCarteira: '123456789',
-    statusAutorizacao: 'autorizado',
-    observacoesConvenio: '',
-    pressaoArterial: '120/80',
-    frequenciaCardiaca: '70',
-    temperatura: '36.5',
-    saturacao: '98',
-    peso: '65',
-    altura: '165',
-    glicemia: '90',
-    imc: '23.9',
-    queixaPrincipal: 'Dor de cabeça',
-    historiaDoenca: 'História da doença',
-    alergias: 'Nenhuma',
-    medicamentos: 'Paracetamol',
-    antecedentes: 'Nenhum',
-    observacoesTriagem: '',
-    observacoes: '',
-    totem: 23,
-    status: 'Em atendimento',
-    fila: 'Recepção 01',
-    tipoFila: 'Exames',
-    agenda: 'Mamografia',
-  },
-  {
-    id: 2,
-    nomeCompleto: 'João Pedro Oliveira',
-    cpf: '987.654.321-00',
-    dataNascimento: '1990-08-20',
-    sexo: 'M',
-    telefone: '(11) 88888-8888',
-    email: 'joao.oliveira@email.com',
-    endereco: 'Av. Brasil, 456',
-    convenio: 'Sulamerica',
-    tipoConvenio: 'Plano Premium',
-    validadeConvenio: '2024-10-15',
-    numCarteira: '987654321',
-    statusAutorizacao: 'aguardando',
-    observacoesConvenio: '',
-    pressaoArterial: '130/85',
-    frequenciaCardiaca: '75',
-    temperatura: '37.0',
-    saturacao: '97',
-    peso: '80',
-    altura: '180',
-    glicemia: '95',
-    imc: '24.7',
-    queixaPrincipal: 'Dor nas costas',
-    historiaDoenca: 'História da doença',
-    alergias: 'Penicilina',
-    medicamentos: 'Ibuprofeno',
-    antecedentes: 'Cirurgia anterior',
-    observacoesTriagem: '',
-    observacoes: '',
-    totem: 24,
-    status: 'Aguardando',
-    fila: 'Recepção 02',
-    tipoFila: 'Exames',
-    agenda: 'Clínica',
-  },
-];
 
 const INITIAL_NOVO_PACIENTE: NovoPatiente = {
   nomeCompleto: '',
@@ -168,57 +98,262 @@ const INITIAL_NOVO_PACIENTE: NovoPatiente = {
 
 export function PreAtendimento() {
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [novoPaciente, setNovoPaciente] = useState<NovoPatiente>(INITIAL_NOVO_PACIENTE);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingPatientId, setEditingPatientId] = useState<number | null>(null);
+  const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [patientOptions, setPatientOptions] = useState<{ value: string; label: string }[]>([]);
+  const [patientById, setPatientById] = useState<Record<string, any>>({});
+  const [patientsLoading, setPatientsLoading] = useState(false);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
-  const filteredPatients = patients.filter(
-    (patient) =>
-      patient.nomeCompleto.toLowerCase().includes(searchValue.toLowerCase()) ||
-      patient.totem.toString().includes(searchValue)
-  );
+  const formatDateDisplay = (value?: string) => {
+    if (!value) return '';
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const [y, m, d] = value.split('T')[0].split('-');
+      return `${d}/${m}/${y}`;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
 
-  const handleAddPatient = () => {
+  const mapApiToPatient = (it: any): Patient => ({
+    id: String(it.id),
+    patientId: it.patientId || undefined,
+    nomeCompleto: it.fullName || '',
+    cpf: it.cpf || '',
+    dataNascimento: it.birthDate || '',
+    sexo: it.gender || '',
+    telefone: it.phone || '',
+    email: it.email || '',
+    endereco: it.address || '',
+    convenio: it.convenio || '',
+    tipoConvenio: it.convenioType || '',
+    validadeConvenio: it.convenioValidUntil || '',
+    numCarteira: it.convenioNumber || '',
+    statusAutorizacao: it.convenioStatus || '',
+    observacoesConvenio: it.convenioNotes || '',
+    pressaoArterial: it.bloodPressure || '',
+    frequenciaCardiaca: it.heartRate || '',
+    temperatura: it.temperature || '',
+    saturacao: it.oxygenSaturation || '',
+    peso: it.weight || '',
+    altura: it.height || '',
+    glicemia: it.glucose || '',
+    imc: it.bmi || '',
+    queixaPrincipal: it.mainComplaint || '',
+    historiaDoenca: it.diseaseHistory || '',
+    alergias: it.allergies || '',
+    medicamentos: it.medications || '',
+    antecedentes: it.antecedentes || '',
+    observacoesTriagem: it.triageNotes || '',
+    observacoes: it.notes || '',
+    totem: it.totem ?? undefined,
+    status: it.status || '',
+    fila: it.queue || '',
+    tipoFila: it.queueType || '',
+    agenda: it.agenda || '',
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data: any = await preAttendanceService.list();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : []));
+        setPatients(list.map(mapApiToPatient));
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+          color: 'red',
+        });
+      }
+    };
+
+    load();
+  }, []);
+
+  useEffect(() => {
+    const loadPatients = async () => {
+      setPatientsLoading(true);
+      try {
+        const data: any = await patientService.listPatients();
+        const listRaw = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.patients)
+            ? data.patients
+            : (Array.isArray(data?.data?.patients)
+              ? data.data.patients
+              : (Array.isArray(data?.data)
+                ? data.data
+                : (Array.isArray(data?.items) ? data.items : []))));
+
+        const list: any[] = Array.isArray(listRaw) ? listRaw : [];
+        const options = list.map((p: any) => {
+          const id = String(p.id ?? p.patientId ?? '');
+          const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+          const label = name || 'Paciente';
+          return { value: id || label, label };
+        });
+
+        const byId: Record<string, any> = {};
+        list.forEach((p: any) => {
+          const id = String(p.id ?? p.patientId ?? '');
+          if (id) byId[id] = p;
+        });
+
+        setPatientById(byId);
+        setPatientOptions(options);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+          color: 'red',
+        });
+      } finally {
+        setPatientsLoading(false);
+      }
+    };
+
+    loadPatients();
+  }, []);
+
+  const filteredPatients = patients.filter((patient) => {
+    const q = searchValue.toLowerCase();
+    const totemValue = patient.totem !== undefined ? String(patient.totem) : '';
+    return patient.nomeCompleto.toLowerCase().includes(q) || totemValue.includes(searchValue);
+  });
+
+  const handleAddPatient = async () => {
     if (!novoPaciente.nomeCompleto || !novoPaciente.cpf) {
       alert('Por favor, preencha os campos obrigatórios');
       return;
     }
 
+    const payload = {
+      patientId: selectedPatientId || undefined,
+      fullName: novoPaciente.nomeCompleto,
+      cpf: onlyDigits(novoPaciente.cpf),
+      birthDate: novoPaciente.dataNascimento || undefined,
+      gender: novoPaciente.sexo || undefined,
+      phone: onlyDigits(novoPaciente.telefone) || undefined,
+      email: novoPaciente.email || undefined,
+      address: novoPaciente.endereco || undefined,
+      convenio: novoPaciente.convenio || undefined,
+      convenioType: novoPaciente.tipoConvenio || undefined,
+      convenioValidUntil: novoPaciente.validadeConvenio || undefined,
+      convenioNumber: novoPaciente.numCarteira || undefined,
+      convenioStatus: novoPaciente.statusAutorizacao || undefined,
+      convenioNotes: novoPaciente.observacoesConvenio || undefined,
+      bloodPressure: novoPaciente.pressaoArterial || undefined,
+      heartRate: novoPaciente.frequenciaCardiaca || undefined,
+      temperature: novoPaciente.temperatura || undefined,
+      oxygenSaturation: novoPaciente.saturacao || undefined,
+      weight: novoPaciente.peso || undefined,
+      height: novoPaciente.altura || undefined,
+      glucose: novoPaciente.glicemia || undefined,
+      bmi: novoPaciente.imc || undefined,
+      mainComplaint: novoPaciente.queixaPrincipal || undefined,
+      diseaseHistory: novoPaciente.historiaDoenca || undefined,
+      allergies: novoPaciente.alergias || undefined,
+      medications: novoPaciente.medicamentos || undefined,
+      antecedentes: novoPaciente.antecedentes || undefined,
+      triageNotes: novoPaciente.observacoesTriagem || undefined,
+      notes: novoPaciente.observacoes || undefined,
+    };
+
     if (isEditing && editingPatientId !== null) {
-      // Edit existing patient
-      setPatients(patients.map(p => 
-        p.id === editingPatientId 
-          ? { ...p, ...novoPaciente }
-          : p
-      ));
+      try {
+        const updated = await preAttendanceService.update(editingPatientId, payload);
+        setPatients((prev) => prev.map((p) => (p.id === editingPatientId ? mapApiToPatient(updated) : p)));
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar paciente',
+          color: 'red',
+        });
+        return;
+      }
     } else {
-      // Add new patient
-      const newPatient: Patient = {
-        ...novoPaciente,
-        id: Math.max(...patients.map((p) => p.id), 0) + 1,
-        totem: Math.floor(Math.random() * 100) + 1,
-        status: 'Em atendimento',
-        fila: 'Recepção 01',
-        tipoFila: 'Exames',
-        agenda: 'Mamografia',
-      };
-      setPatients([...patients, newPatient]);
+      try {
+        let createdPatientId = selectedPatientId;
+
+        if (!createdPatientId) {
+          const toIsoDate = (value?: string) => {
+            if (!value) return undefined;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+            const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (!m) return undefined;
+            return `${m[3]}-${m[2]}-${m[1]}`;
+          };
+
+          const genderMap: Record<string, string> = { M: 'MALE', F: 'FEMALE', O: 'OTHER' };
+          const gender = genderMap[novoPaciente.sexo] || undefined;
+
+          const createdPatient = await patientService.createPatient({
+            name: novoPaciente.nomeCompleto,
+            cpf: onlyDigits(novoPaciente.cpf),
+            birthDate: toIsoDate(novoPaciente.dataNascimento),
+            gender,
+            phone: onlyDigits(novoPaciente.telefone) || undefined,
+            email: novoPaciente.email || undefined,
+            address: novoPaciente.endereco || undefined,
+            healthInsuranceName: novoPaciente.convenio || undefined,
+            healthInsuranceNumber: novoPaciente.numCarteira || undefined,
+            healthInsuranceExpiry: toIsoDate(novoPaciente.validadeConvenio),
+            observations: novoPaciente.observacoes || undefined,
+          } as any);
+
+          createdPatientId = String(createdPatient?.id ?? createdPatient?.patientId ?? '');
+        }
+
+        const created = await preAttendanceService.create({
+          ...payload,
+          patientId: createdPatientId || undefined,
+          totem: Math.floor(Math.random() * 100) + 1,
+          status: 'Em atendimento',
+          queue: 'Recepção 01',
+          queueType: 'Exames',
+          agenda: 'Mamografia',
+        });
+        setPatients((prev) => [mapApiToPatient(created), ...prev]);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao cadastrar paciente',
+          color: 'red',
+        });
+        return;
+      }
     }
 
     setNovoPaciente(INITIAL_NOVO_PACIENTE);
     setModalOpen(false);
     setIsEditing(false);
     setEditingPatientId(null);
+    setSelectedPatientId(null);
   };
 
   const handleEditPatient = (patient: Patient) => {
     setIsEditing(true);
     setEditingPatientId(patient.id);
+    setSelectedPatientId(patient.patientId || null);
     setNovoPaciente({
       nomeCompleto: patient.nomeCompleto,
       cpf: patient.cpf,
@@ -252,6 +387,32 @@ export function PreAtendimento() {
     setModalOpen(true);
   };
 
+  const handleSelectPatient = (value: string | null) => {
+    if (!value) {
+      setSelectedPatientId(null);
+      setNovoPaciente(INITIAL_NOVO_PACIENTE);
+      return;
+    }
+
+    setSelectedPatientId(value);
+    const p = patientById[value];
+    if (!p) return;
+
+    setNovoPaciente((prev) => ({
+      ...prev,
+      nomeCompleto: p.name || p.fullName || p.patientName || prev.nomeCompleto || '',
+      cpf: formatCPF(p.cpf || prev.cpf || ''),
+      dataNascimento: formatDateDisplay(p.birthDate || prev.dataNascimento || ''),
+      sexo: p.gender ? String(p.gender).charAt(0).toUpperCase() : prev.sexo || '',
+      telefone: formatPhone(p.phone || p.cellphone || prev.telefone || ''),
+      email: p.email || prev.email || '',
+      endereco: p.address || prev.endereco || '',
+      convenio: p.healthInsuranceName || prev.convenio || '',
+      validadeConvenio: formatDateDisplay(p.healthInsuranceExpiry || prev.validadeConvenio || ''),
+      numCarteira: p.healthInsuranceNumber || prev.numCarteira || '',
+    }));
+  };
+
   const rows = filteredPatients.map((patient) => (
     <Table.Tr key={patient.id} style={{ borderBottom: '1px solid #e9ecef' }}>
       <Table.Td>
@@ -274,7 +435,7 @@ export function PreAtendimento() {
             </Text>
             {isMobile && (
               <Text size="xs" c="dimmed">
-                Totem: {patient.totem}
+                Totem: {patient.totem ?? '-'}
               </Text>
             )}
           </Box>
@@ -282,27 +443,27 @@ export function PreAtendimento() {
       </Table.Td>
       {!isMobile && (
         <Table.Td>
-          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.totem}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.totem ?? '-'}</Text>
         </Table.Td>
       )}
       {!isMobile && (
         <Table.Td>
-          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }} c="#495057">{patient.status}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }} c="#495057">{patient.status || '-'}</Text>
         </Table.Td>
       )}
       {!isTablet && (
         <Table.Td>
-          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.fila}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.fila || '-'}</Text>
         </Table.Td>
       )}
       {!isTablet && (
         <Table.Td>
-          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.tipoFila}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.tipoFila || '-'}</Text>
         </Table.Td>
       )}
       {!isTablet && (
         <Table.Td>
-          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.agenda}</Text>
+          <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{patient.agenda || '-'}</Text>
         </Table.Td>
       )}
       <Table.Td>
@@ -356,7 +517,13 @@ export function PreAtendimento() {
               bg={DARK_BLUE}
               c="white"
               leftSection={isMobile ? undefined : <Plus size={18} />}
-              onClick={() => setModalOpen(true)}
+              onClick={() => {
+                setSelectedPatientId(null);
+                setNovoPaciente(INITIAL_NOVO_PACIENTE);
+                setIsEditing(false);
+                setEditingPatientId(null);
+                setModalOpen(true);
+              }}
               size={isMobile ? "sm" : "md"}
               fw={600}
               px={isMobile ? "sm" : "xl"}
@@ -421,6 +588,20 @@ export function PreAtendimento() {
 
           <Tabs.Panel value="dados-pessoais">
             <Stack gap={isMobile ? "sm" : "md"} mih={isMobile ? undefined : 750}>
+              <Box>
+                <Select
+                  label="Paciente"
+                  placeholder={patientsLoading ? 'Carregando pacientes...' : 'Selecione um paciente'}
+                  data={patientOptions}
+                  value={selectedPatientId}
+                  onChange={handleSelectPatient}
+                  searchable
+                  clearable
+                  nothingFoundMessage="Nenhum paciente encontrado"
+                  disabled={patientsLoading}
+                />
+              </Box>
+
               <FloatingInput
                 label="Nome completo"
                 value={novoPaciente.nomeCompleto}
@@ -436,7 +617,7 @@ export function PreAtendimento() {
                 <FloatingInput
                   label="CPF"
                   value={novoPaciente.cpf}
-                  onChange={(e) => setNovoPaciente({ ...novoPaciente, cpf: e.currentTarget.value })}
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, cpf: formatCPF(e.currentTarget.value) })}
                   disabled={isEditing}
                   style={isEditing ? { color: '#adb5bd' } : {}}
                   rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
@@ -444,9 +625,7 @@ export function PreAtendimento() {
                 <FloatingInput
                   label="Data de nascimento"
                   value={novoPaciente.dataNascimento}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, dataNascimento: e.currentTarget.value })
-                  }
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, dataNascimento: formatDateInput(e.currentTarget.value) })}
                   disabled={isEditing}
                   style={isEditing ? { color: '#adb5bd' } : {}}
                   rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
@@ -472,9 +651,7 @@ export function PreAtendimento() {
                 <FloatingInput
                   label="Telefone"
                   value={novoPaciente.telefone}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, telefone: e.currentTarget.value })
-                  }
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, telefone: formatPhone(e.currentTarget.value) })}
                 />
               </Group>
 
@@ -524,9 +701,7 @@ export function PreAtendimento() {
                 <FloatingInput
                   label="Validade"
                   value={novoPaciente.validadeConvenio}
-                  onChange={(e) =>
-                    setNovoPaciente({ ...novoPaciente, validadeConvenio: e.currentTarget.value })
-                  }
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, validadeConvenio: formatDateInput(e.currentTarget.value) })}
                 />
               </Group>
 

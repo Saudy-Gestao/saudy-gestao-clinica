@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -19,16 +19,21 @@ import {
   ActionIcon,
   Modal,
   Center,
-  ThemeIcon
+  ThemeIcon,
+  Tabs,
+  Table,
+  Loader,
+  Badge
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Check, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
 import doctorService from '../../services/doctorService';
+import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
 
@@ -58,6 +63,16 @@ interface DoctorForm {
   workingDays: string[];
   workingHoursStart: string;
   workingHoursEnd: string;
+}
+
+interface DoctorListItem {
+  id: string;
+  name: string;
+  crm: string;
+  crmState: string;
+  specialty: string;
+  isActive: boolean;
+  raw: any;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -122,6 +137,13 @@ export function CadastroMedico() {
   };
 
   const [form, setForm] = useState<DoctorForm>({ ...INITIAL_DOCTOR_FORM });
+  const [activeTab, setActiveTab] = useState('cadastro');
+  const [doctors, setDoctors] = useState<DoctorListItem[]>([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [doctorQuery, setDoctorQuery] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<DoctorListItem | null>(null);
+  const [editingDoctorId, setEditingDoctorId] = useState<string | null>(null);
 
   const [datePopoverOpened, setDatePopoverOpened] = useState(false);
   const [birthDateInput, setBirthDateInput] = useState('');
@@ -129,6 +151,130 @@ export function CadastroMedico() {
   const [saving, setSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastCreatedName, setLastCreatedName] = useState<string | null>(null);
+
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const filteredDoctors = useMemo(() => {
+    const q = doctorQuery.trim().toLowerCase();
+    if (!q) return doctors;
+    return doctors.filter((item) => item.name.toLowerCase().includes(q));
+  }, [doctors, doctorQuery]);
+
+  const isEditing = Boolean(editingDoctorId);
+
+  const formatDetailValue = (value: any) => {
+    if (value === null || value === undefined || value === '') return '-';
+    if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
+    return String(value);
+  };
+
+  const formatDateValue = (value: any) => {
+    if (!value) return '-';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  const formatCpfValue = (value: any) => {
+    if (!value) return '-';
+    return formatCPF(String(value));
+  };
+
+  const formatPhoneValue = (value: any) => {
+    if (!value) return '-';
+    return formatPhone(String(value));
+  };
+
+  const formatGenderValue = (value: any) => {
+    const normalized = String(value || '').toUpperCase();
+    if (!normalized) return '-';
+    if (normalized === 'MALE') return 'Masculino';
+    if (normalized === 'FEMALE') return 'Feminino';
+    if (normalized === 'OTHER') return 'Outro';
+    return normalized;
+  };
+
+  const formatCurrencyValue = (value: any) => {
+    const num = Number(value);
+    if (Number.isNaN(num)) return '-';
+    return `R$ ${num.toFixed(2).replace('.', ',')}`;
+  };
+
+  const populateFormFromDoctor = (raw: any) => {
+    const birthDate = raw?.birthDate ? new Date(raw.birthDate) : null;
+    setForm({
+      nome: raw?.name || raw?.nome || '',
+      crm: raw?.crm || '',
+      crmState: raw?.crmState || raw?.ufCrm || '',
+      email: raw?.email || '',
+      phone: raw?.phone || '',
+      cellphone: raw?.cellphone || '',
+      birthDate,
+      gender: (raw?.gender ? String(raw.gender).toLowerCase() : '') as Gender,
+      cpf: raw?.cpf || '',
+      rg: raw?.rg || '',
+      specialty: raw?.specialty || '',
+      specialties: Array.isArray(raw?.specialties) ? raw.specialties : [],
+      consultationFee: raw?.consultationFee ?? null,
+      biography: raw?.biography || '',
+      address: raw?.address || '',
+      addressNumber: raw?.addressNumber || '',
+      addressComplement: raw?.addressComplement || '',
+      neighborhood: raw?.neighborhood || '',
+      city: raw?.city || '',
+      state: raw?.state || '',
+      zipCode: raw?.zipCode || '',
+      isActive: raw?.isActive ?? true,
+      workingDays: Array.isArray(raw?.workingDays) ? raw.workingDays : [],
+      workingHoursStart: raw?.workingHoursStart || '',
+      workingHoursEnd: raw?.workingHoursEnd || '',
+    });
+  };
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      setDoctorsLoading(true);
+      try {
+        const data: any = await doctorService.listDoctors();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const mapped: DoctorListItem[] = list.map((item: any) => {
+          const name = item.name || item.nome || item.fullName || 'Médico';
+          const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+          return {
+            id: String(item.id ?? item.doctorId ?? ''),
+            name,
+            crm: String(item.crm ?? ''),
+            crmState: String(item.crmState ?? item.ufCrm ?? ''),
+            specialty: String(item.specialty ?? specialties[0] ?? ''),
+            isActive: Boolean(item.isActive ?? item.active ?? true),
+            raw: item,
+          };
+        }).filter((item: DoctorListItem) => item.id);
+
+        setDoctors(mapped);
+      } catch (e: any) {
+        showNotification({
+          title: 'Erro',
+          message: e?.response?.data?.message || e?.message || 'Erro ao carregar médicos',
+          color: 'red',
+        });
+      } finally {
+        setDoctorsLoading(false);
+      }
+    };
+
+    loadDoctors();
+  }, []);
 
   const statesOptions = [
     'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
@@ -202,15 +348,79 @@ export function CadastroMedico() {
         workingHoursEnd: form.workingHoursEnd || undefined,
       };
 
-      await doctorService.createDoctor(payload);
+      if (editingDoctorId) {
+        await doctorService.updateDoctor(editingDoctorId, payload);
+        setEditingDoctorId(null);
+        setForm({ ...INITIAL_DOCTOR_FORM });
+        setActiveTab('lista');
+        showNotification({ title: 'Médico atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
+      } else {
+        await doctorService.createDoctor(payload);
 
-      setLastCreatedName(payload.name);
-      setShowSuccessModal(true);
+        setLastCreatedName(payload.name);
+        setShowSuccessModal(true);
+      }
+      try {
+        const refreshed: any = await doctorService.listDoctors();
+        const list: any[] = Array.isArray(refreshed)
+          ? refreshed
+          : (Array.isArray(refreshed?.items)
+            ? refreshed.items
+            : (Array.isArray(refreshed?.data?.items)
+              ? refreshed.data.items
+              : (Array.isArray(refreshed?.data)
+                ? refreshed.data
+                : [])));
+        const mapped: DoctorListItem[] = list.map((item: any) => {
+          const name = item.name || item.nome || item.fullName || 'Médico';
+          const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+          return {
+            id: String(item.id ?? item.doctorId ?? ''),
+            name,
+            crm: String(item.crm ?? ''),
+            crmState: String(item.crmState ?? item.ufCrm ?? ''),
+            specialty: String(item.specialty ?? specialties[0] ?? ''),
+            isActive: Boolean(item.isActive ?? item.active ?? true),
+            raw: item,
+          };
+        }).filter((item: DoctorListItem) => item.id);
+        setDoctors(mapped);
+      } catch {
+        // Silent refresh failure after save.
+      }
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar médico';
+      setErrorMessage(msg);
+      setShowErrorModal(true);
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (editingDoctorId) {
+      setEditingDoctorId(null);
+      setForm({ ...INITIAL_DOCTOR_FORM });
+      setActiveTab('cadastro');
+      return;
+    }
+    navigate('/dashboard');
+  };
+
+  const handleDeleteDoctor = async (item: DoctorListItem) => {
+    const name = item.name || 'este médico';
+    if (!window.confirm(`Tem certeza que deseja excluir ${name}?`)) {
+      return;
+    }
+
+    try {
+      await doctorService.deleteDoctor(item.id);
+      setDoctors((prev) => prev.filter((d) => d.id !== item.id));
+      showNotification({ title: 'Médico excluído', message: 'Registro removido com sucesso.', color: 'green' });
+    } catch (e: any) {
+      const msg = e?.response?.data?.details || e?.response?.data?.error || e?.message || 'Erro ao excluir médico';
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
 
@@ -236,199 +446,360 @@ export function CadastroMedico() {
             </Box>
           </Group>
 
-          <Group>
-            <Button bg={DARK_BLUE} c="white" leftSection={<Check size={16} />} onClick={handleSave} loading={saving} disabled={saving} size={isMobile ? 'sm' : 'md'} fw={600}>
-              Salvar
-            </Button>
-          </Group>
         </Group>
+        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'cadastro')} keepMounted={false}>
+          <Tabs.List>
+            <Tabs.Tab value="cadastro">Cadastrar</Tabs.Tab>
+            <Tabs.Tab value="lista">Cadastrados</Tabs.Tab>
+          </Tabs.List>
 
-        <Stack gap="md">
-          {/* Dados Pessoais */}
-          <Paper p="md" withBorder radius="md">
-            <SectionTitle>Dados Pessoais</SectionTitle>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              <TextInput label="Nome completo" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.currentTarget.value })} required />
-              <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) })} maxLength={14} required />
-              <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
+          <Tabs.Panel value="cadastro" pt="md">
+            <Stack gap="md">
+              {isEditing && (
+                <Text size="sm" c="dimmed">
+                  Editando medico. Ajuste os dados e salve as alteracoes.
+                </Text>
+              )}
+              {/* Dados Pessoais */}
+              <Paper p="md" withBorder radius="md">
+                <SectionTitle>Dados Pessoais</SectionTitle>
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.currentTarget.value })} required />
+                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) })} maxLength={14} required />
+                  <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
-              <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
-                <Popover.Target>
-                  <TextInput
-                    label="Data de nascimento"
-                    placeholder="dd/mm/aaaa"
-                    value={birthDateInput}
-                    onChange={(e) => setBirthDateInput(formatDateInput(e.currentTarget.value))}
-                    onBlur={() => {
-                      if (!birthDateInput) {
-                        setForm({ ...form, birthDate: null });
-                        return;
-                      }
-                      const d = parseDate(birthDateInput);
-                      if (!d) {
-                        showNotification({ title: 'Erro', message: 'Data de nascimento inválida', color: 'red' });
-                        setForm({ ...form, birthDate: null });
-                      } else {
-                        setForm({ ...form, birthDate: d });
-                      }
-                    }}
+                  <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
+                    <Popover.Target>
+                      <TextInput
+                        label="Data de nascimento"
+                        placeholder="dd/mm/aaaa"
+                        value={birthDateInput}
+                        onChange={(e) => setBirthDateInput(formatDateInput(e.currentTarget.value))}
+                        onBlur={() => {
+                          if (!birthDateInput) {
+                            setForm({ ...form, birthDate: null });
+                            return;
+                          }
+                          const d = parseDate(birthDateInput);
+                          if (!d) {
+                            showNotification({ title: 'Erro', message: 'Data de nascimento inválida', color: 'red' });
+                            setForm({ ...form, birthDate: null });
+                          } else {
+                            setForm({ ...form, birthDate: d });
+                          }
+                        }}
+                        required
+                        rightSection={
+                          <ActionIcon size="sm" variant="subtle" onClick={() => setDatePopoverOpened((o) => !o)}>
+                            <CalendarIcon size={16} />
+                          </ActionIcon>
+                        }
+                        onClick={() => setDatePopoverOpened(true)}
+                        style={{ cursor: 'text' }}
+                      />
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                      <DatePicker
+                        value={form.birthDate}
+                        onChange={(d) => {
+                          setForm({ ...form, birthDate: d });
+                          setBirthDateInput(formatDate(d));
+                          setDatePopoverOpened(false);
+                        }}
+                        maxDate={new Date()}
+                      />
+                    </Popover.Dropdown>
+                  </Popover>
+
+                  <Select
+                    label="Gênero"
+                    placeholder="Selecione"
+                    data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
+                    value={form.gender}
+                    onChange={(v) => setForm({ ...form, gender: (v as Gender) || '' })}
+                  />
+
+                  <TextInput label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.currentTarget.value })} required />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => setForm({ ...form, phone: onlyDigits(e.currentTarget.value) })} />
+                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
+                </SimpleGrid>
+              </Paper>
+
+              {/* Dados Profissionais */}
+              <Paper p="md" withBorder radius="md">
+                <SectionTitle>Dados Profissionais</SectionTitle>
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                  <TextInput label="CRM" value={form.crm} onChange={(e) => setForm({ ...form, crm: e.currentTarget.value })} required />
+                  <Select
+                    label="UF do CRM"
+                    placeholder="Selecione"
+                    data={statesOptions}
+                    value={form.crmState}
+                    onChange={(v) => setForm({ ...form, crmState: v || '' })}
                     required
-                    rightSection={
-                      <ActionIcon size="sm" variant="subtle" onClick={() => setDatePopoverOpened((o) => !o)}>
-                        <CalendarIcon size={16} />
-                      </ActionIcon>
-                    }
-                    onClick={() => setDatePopoverOpened(true)}
-                    style={{ cursor: 'text' }}
                   />
-                </Popover.Target>
-                <Popover.Dropdown>
-                  <DatePicker
-                    value={form.birthDate}
-                    onChange={(d) => {
-                      setForm({ ...form, birthDate: d });
-                      setBirthDateInput(formatDate(d));
-                      setDatePopoverOpened(false);
-                    }}
-                    maxDate={new Date()}
+                  <Select
+                    label="Especialidade principal"
+                    placeholder="Escolha uma"
+                    data={specialtyOptions}
+                    value={form.specialty}
+                    onChange={(v) => setForm({ ...form, specialty: v || '' })}
                   />
-                </Popover.Dropdown>
-              </Popover>
+                  <MultiSelect
+                    label="Outras especialidades"
+                    placeholder="Adicionar"
+                    data={specialtyOptions}
+                    value={form.specialties}
+                    onChange={(v) => setForm({ ...form, specialties: v })}
+                  />
+                  <NumberInput
+                    label="Valor da consulta (R$)"
+                    placeholder="0,00"
+                    value={form.consultationFee ?? undefined}
+                    onChange={(v) => setForm({ ...form, consultationFee: typeof v === 'number' ? v : null })}
+                    decimalScale={2}
+                    min={0}
+                    prefix="R$ "
+                  />
+                </SimpleGrid>
+                <Textarea
+                  label="Biografia"
+                  placeholder="Breve descrição profissional"
+                  value={form.biography}
+                  onChange={(e) => setForm({ ...form, biography: e.currentTarget.value })}
+                  minRows={3}
+                  mt="md"
+                />
+              </Paper>
 
-              <Select
-                label="Gênero"
-                placeholder="Selecione"
-                data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
-                value={form.gender}
-                onChange={(v) => setForm({ ...form, gender: (v as Gender) || '' })}
-              />
+              {/* Endereço */}
+              <Paper p="md" withBorder radius="md">
+                <SectionTitle>Endereço</SectionTitle>
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) })} maxLength={9} style={{ gridColumn: 'span 1' }} />
+                  <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
+                  <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
+                </SimpleGrid>
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" mt="md">
+                  <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
+                  <TextInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
+                  <TextInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
+                  <Select
+                    label="Estado"
+                    placeholder="UF"
+                    data={statesOptions}
+                    value={form.state}
+                    onChange={(v) => setForm({ ...form, state: v || '' })}
+                  />
+                </SimpleGrid>
+              </Paper>
 
-              <TextInput label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.currentTarget.value })} required />
-              <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => setForm({ ...form, phone: onlyDigits(e.currentTarget.value) })} />
-              <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
+              {/* Horário de Trabalho */}
+              <Paper p="md" withBorder radius="md">
+                <SectionTitle>Horário de Trabalho</SectionTitle>
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                  <MultiSelect
+                    label="Dias de trabalho"
+                    placeholder="Selecione os dias"
+                    data={daysOptions}
+                    value={form.workingDays}
+                    onChange={(v) => setForm({ ...form, workingDays: v })}
+                  />
+                  <TextInput
+                    label="Horário início"
+                    placeholder="08:00"
+                    value={form.workingHoursStart}
+                    onChange={(e) => setForm({ ...form, workingHoursStart: e.currentTarget.value })}
+                  />
+                  <TextInput
+                    label="Horário fim"
+                    placeholder="18:00"
+                    value={form.workingHoursEnd}
+                    onChange={(e) => setForm({ ...form, workingHoursEnd: e.currentTarget.value })}
+                  />
+                </SimpleGrid>
+              </Paper>
+
+              {/* Botões finais */}
+              <Group justify="flex-end" mt="md">
+                <Button variant="default" onClick={handleCancel}>Cancelar</Button>
+                <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving} size="md" c="white">
+                  {isEditing ? 'Salvar alteracoes' : 'Salvar'}
+                </Button>
+              </Group>
+            </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="lista" pt="md">
+            <Paper p="md" withBorder radius="md">
+              <Group justify="space-between" mb="md" wrap="wrap">
+                <SectionTitle>Médicos cadastrados</SectionTitle>
+                <TextInput
+                  placeholder="Buscar por nome"
+                  value={doctorQuery}
+                  onChange={(e) => setDoctorQuery(e.currentTarget.value)}
+                  w={isMobile ? '100%' : 280}
+                />
+              </Group>
+
+              {doctorsLoading ? (
+                <Center style={{ padding: 16, gap: 8 }}>
+                  <Loader size={18} />
+                  <Text size="sm">Carregando médicos...</Text>
+                </Center>
+              ) : (
+                <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                  <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                    <Table.Thead>
+                      <Table.Tr style={{ borderBottom: 'none' }}>
+                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CRM</Table.Th>}
+                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Especialidade</Table.Th>}
+                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {filteredDoctors.length === 0 ? (
+                        <Table.Tr>
+                          <Table.Td colSpan={5}>
+                            <Text size="sm" c="dimmed" ta="center">Nenhum médico encontrado</Text>
+                          </Table.Td>
+                        </Table.Tr>
+                      ) : (
+                        filteredDoctors.map((item) => (
+                          <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                            <Table.Td>
+                              <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.name}</Text>
+                            </Table.Td>
+                            {!isTablet && (
+                              <Table.Td>
+                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
+                                  {item.crm ? `${item.crm}${item.crmState ? `/${item.crmState}` : ''}` : '-'}
+                                </Text>
+                              </Table.Td>
+                            )}
+                            {!isTablet && (
+                              <Table.Td>
+                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.specialty || '-'}</Text>
+                              </Table.Td>
+                            )}
+                            {!isTablet && (
+                              <Table.Td>
+                                <Badge
+                                  color={item.isActive ? 'green' : 'red'}
+                                  variant="light"
+                                  size="sm"
+                                >
+                                  {item.isActive ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              </Table.Td>
+                            )}
+                            <Table.Td>
+                              <Group gap={6} wrap="nowrap">
+                                <ActionIcon
+                                  variant="subtle"
+                                  color={DARK_BLUE}
+                                  onClick={() => {
+                                    setSelectedDoctor(item);
+                                    setDetailsOpen(true);
+                                  }}
+                                >
+                                  <Eye size={16} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color={DARK_BLUE}
+                                  onClick={() => {
+                                    setSelectedDoctor(item);
+                                    setEditingDoctorId(item.id);
+                                    populateFormFromDoctor(item.raw);
+                                    setActiveTab('cadastro');
+                                  }}
+                                >
+                                  <Pencil size={16} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={() => handleDeleteDoctor(item)}
+                                >
+                                  <Trash size={16} />
+                                </ActionIcon>
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </Box>
+              )}
+            </Paper>
+          </Tabs.Panel>
+        </Tabs>
+
+        <Modal
+          opened={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+          title="Detalhes do médico"
+          centered
+          size="lg"
+        >
+          <Stack gap="sm">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              <Text size="sm"><Text fw={600} span>Nome:</Text> {formatDetailValue(selectedDoctor?.raw?.name || selectedDoctor?.raw?.nome)}</Text>
+              <Text size="sm"><Text fw={600} span>CPF:</Text> {formatCpfValue(selectedDoctor?.raw?.cpf)}</Text>
+              <Text size="sm"><Text fw={600} span>Email:</Text> {formatDetailValue(selectedDoctor?.raw?.email)}</Text>
+              <Text size="sm"><Text fw={600} span>Telefone:</Text> {formatPhoneValue(selectedDoctor?.raw?.phone)}</Text>
+              <Text size="sm"><Text fw={600} span>Celular:</Text> {formatPhoneValue(selectedDoctor?.raw?.cellphone)}</Text>
+              <Text size="sm"><Text fw={600} span>Nascimento:</Text> {formatDateValue(selectedDoctor?.raw?.birthDate)}</Text>
+              <Text size="sm"><Text fw={600} span>Gênero:</Text> {formatGenderValue(selectedDoctor?.raw?.gender)}</Text>
+              <Text size="sm"><Text fw={600} span>RG:</Text> {formatDetailValue(selectedDoctor?.raw?.rg)}</Text>
+              <Text size="sm">
+                <Text fw={600} span>CRM/UF:</Text>{' '}
+                {(() => {
+                  const crm = selectedDoctor?.raw?.crm ? String(selectedDoctor.raw.crm) : '';
+                  const uf = selectedDoctor?.raw?.crmState || selectedDoctor?.raw?.ufCrm || '';
+                  if (!crm && !uf) return '-';
+                  return `${crm}${uf ? `/${uf}` : ''}`;
+                })()}
+              </Text>
+              <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
+              <Text size="sm"><Text fw={600} span>Outras especialidades:</Text> {formatDetailValue(selectedDoctor?.raw?.specialties)}</Text>
+              <Text size="sm"><Text fw={600} span>Valor consulta:</Text> {formatCurrencyValue(selectedDoctor?.raw?.consultationFee)}</Text>
             </SimpleGrid>
-          </Paper>
 
-          {/* Dados Profissionais */}
-          <Paper p="md" withBorder radius="md">
-            <SectionTitle>Dados Profissionais</SectionTitle>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              <TextInput label="CRM" value={form.crm} onChange={(e) => setForm({ ...form, crm: e.currentTarget.value })} required />
-              <Select
-                label="UF do CRM"
-                placeholder="Selecione"
-                data={statesOptions}
-                value={form.crmState}
-                onChange={(v) => setForm({ ...form, crmState: v || '' })}
-                required
-              />
-              <Select
-                label="Especialidade principal"
-                placeholder="Escolha uma"
-                data={specialtyOptions}
-                value={form.specialty}
-                onChange={(v) => setForm({ ...form, specialty: v || '' })}
-              />
-              <MultiSelect
-                label="Outras especialidades"
-                placeholder="Adicionar"
-                data={specialtyOptions}
-                value={form.specialties}
-                onChange={(v) => setForm({ ...form, specialties: v })}
-              />
-              <NumberInput
-                label="Valor da consulta (R$)"
-                placeholder="0,00"
-                value={form.consultationFee ?? undefined}
-                onChange={(v) => setForm({ ...form, consultationFee: typeof v === 'number' ? v : null })}
-                decimalScale={2}
-                min={0}
-                prefix="R$ "
-              />
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              <Text size="sm"><Text fw={600} span>Endereço:</Text> {formatDetailValue(selectedDoctor?.raw?.address)}</Text>
+              <Text size="sm"><Text fw={600} span>Número:</Text> {formatDetailValue(selectedDoctor?.raw?.addressNumber)}</Text>
+              <Text size="sm"><Text fw={600} span>Complemento:</Text> {formatDetailValue(selectedDoctor?.raw?.addressComplement)}</Text>
+              <Text size="sm"><Text fw={600} span>Bairro:</Text> {formatDetailValue(selectedDoctor?.raw?.neighborhood)}</Text>
+              <Text size="sm"><Text fw={600} span>Cidade:</Text> {formatDetailValue(selectedDoctor?.raw?.city)}</Text>
+              <Text size="sm"><Text fw={600} span>Estado:</Text> {formatDetailValue(selectedDoctor?.raw?.state)}</Text>
+              <Text size="sm"><Text fw={600} span>CEP:</Text> {selectedDoctor?.raw?.zipCode ? formatCEP(String(selectedDoctor?.raw?.zipCode)) : '-'}</Text>
             </SimpleGrid>
-            <Textarea
-              label="Biografia"
-              placeholder="Breve descrição profissional"
-              value={form.biography}
-              onChange={(e) => setForm({ ...form, biography: e.currentTarget.value })}
-              minRows={3}
-              mt="md"
-            />
-          </Paper>
 
-          {/* Endereço */}
-          <Paper p="md" withBorder radius="md">
-            <SectionTitle>Endereço</SectionTitle>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-              <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) })} maxLength={9} style={{ gridColumn: 'span 1' }} />
-              <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
-              <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              <Text size="sm"><Text fw={600} span>Dias de trabalho:</Text> {formatDetailValue(selectedDoctor?.raw?.workingDays)}</Text>
+              <Text size="sm"><Text fw={600} span>Início:</Text> {formatDetailValue(selectedDoctor?.raw?.workingHoursStart)}</Text>
+              <Text size="sm"><Text fw={600} span>Fim:</Text> {formatDetailValue(selectedDoctor?.raw?.workingHoursEnd)}</Text>
+              <Text size="sm"><Text fw={600} span>Biografia:</Text> {formatDetailValue(selectedDoctor?.raw?.biography)}</Text>
             </SimpleGrid>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" mt="md">
-              <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
-              <TextInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
-              <TextInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
-              <Select
-                label="Estado"
-                placeholder="UF"
-                data={statesOptions}
-                value={form.state}
-                onChange={(v) => setForm({ ...form, state: v || '' })}
-              />
-            </SimpleGrid>
-          </Paper>
-
-          {/* Horário de Trabalho */}
-          <Paper p="md" withBorder radius="md">
-            <SectionTitle>Horário de Trabalho</SectionTitle>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              <MultiSelect
-                label="Dias de trabalho"
-                placeholder="Selecione os dias"
-                data={daysOptions}
-                value={form.workingDays}
-                onChange={(v) => setForm({ ...form, workingDays: v })}
-              />
-              <TextInput
-                label="Horário início"
-                placeholder="08:00"
-                value={form.workingHoursStart}
-                onChange={(e) => setForm({ ...form, workingHoursStart: e.currentTarget.value })}
-              />
-              <TextInput
-                label="Horário fim"
-                placeholder="18:00"
-                value={form.workingHoursEnd}
-                onChange={(e) => setForm({ ...form, workingHoursEnd: e.currentTarget.value })}
-              />
-            </SimpleGrid>
-          </Paper>
-
-          {/* Botões finais */}
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={() => navigate('/dashboard')}>Cancelar</Button>
-            <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving} size="md" c="white">Salvar</Button>
-          </Group>
-        </Stack>
-
-        <Modal opened={showSuccessModal} onClose={() => setShowSuccessModal(false)} withCloseButton={false} centered size={420} closeOnEscape={true} closeOnClickOutside={false}>
-          <Center style={{ flexDirection: 'column', gap: 16, padding: 8 }}>
-            <ThemeIcon size={64} radius="xl" color="teal" variant="filled">
-              <Check size={34} />
-            </ThemeIcon>
-            <Text fw={700} size="lg">Médico cadastrado</Text>
-            <Text c="dimmed" align="center">{lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Médico cadastrado com sucesso.'}</Text>
-
-            <Group mt={8} justify="center" gap="lg">
-              <Button variant="default" onClick={() => { setShowSuccessModal(false); navigate('/dashboard'); }} style={{ minWidth: 180 }}>
-                Voltar para o dashboard
-              </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={() => { setForm({ ...INITIAL_DOCTOR_FORM }); setShowSuccessModal(false); }} style={{ minWidth: 180 }}>
-                Cadastrar novo
-              </Button>
-            </Group>
-          </Center>
+          </Stack>
         </Modal>
+
+        <ResultModal
+          opened={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          variant="success"
+          title="Médico cadastrado"
+          message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Médico cadastrado com sucesso.'}
+          secondary={{ label: 'Voltar para o dashboard', onClick: () => { setShowSuccessModal(false); navigate('/dashboard'); } }}
+          primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ ...INITIAL_DOCTOR_FORM }); setShowSuccessModal(false); } }}
+        />
+
+        <ResultModal opened={showErrorModal} onClose={() => setShowErrorModal(false)} variant="error" title="Erro ao cadastrar médico" message={errorMessage || 'Erro ao registrar médico'} secondary={{ label: 'Fechar', onClick: () => setShowErrorModal(false) }} />
       </Box>
     </Box>
   );

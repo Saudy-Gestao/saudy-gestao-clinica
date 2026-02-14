@@ -19,6 +19,8 @@ import { Financeiro } from './Financeiro/Financeiro';
 import { Faturamento } from './Faturamento/Faturamento';
 import { CadastroMedico } from './components/Medicos/CadastroMedico';
 import { CadastroPaciente } from './components/Patient/CadastroPaciente';
+import { CadastroProcedimento } from './components/Procedimentos/CadastroProcedimento';
+import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = true;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -90,8 +92,16 @@ function App() {
             element={<ProtectedRoute><CadastroMedico /></ProtectedRoute>}
           />
           <Route
+            path="/cadastro-procedimento"
+            element={<ProtectedRoute><CadastroProcedimento /></ProtectedRoute>}
+          />
+          <Route
             path="/cadastro-paciente"
             element={<ProtectedRoute><CadastroPaciente /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-convenio"
+            element={<ProtectedRoute><CadastroConvenio /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

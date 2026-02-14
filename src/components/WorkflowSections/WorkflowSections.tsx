@@ -46,6 +46,8 @@ export function WorkflowSections() {
         { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira', route: '/financeiro' },
         { icon: DollarSign, label: 'Faturamento', desc: 'Cobranças e NFs', route: '/faturamento' },
         { icon: UserPlus, label: 'Cadastro de Médico', desc: 'Registro de médicos', route: '/cadastro-medico' },
+        { icon: ClipboardList, label: 'Cadastro de Procedimentos', desc: 'Procedimentos e modalidades', route: '/cadastro-procedimento' },
+        { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio' },
         { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente' },
       ]
     }
@@ -62,7 +64,12 @@ export function WorkflowSections() {
                 key={i} 
                 p="md" 
                 withBorder 
-                style={{ cursor: item.route ? 'pointer' : 'default', borderColor: DARK_BLUE }}
+                style={{
+                  cursor: item.route ? 'pointer' : 'default',
+                  borderColor: DARK_BLUE,
+                  minHeight: 96,
+                  height: '100%'
+                }}
                 onClick={() => item.route && navigate(item.route)}
               >
                 <Group justify="space-between" align="flex-start">
@@ -71,8 +78,8 @@ export function WorkflowSections() {
                       <item.icon size={28} color={DARK_BLUE} />
                     </ThemeIcon>
                     <Box>
-                      <Text fw={500}>{item.label}</Text>
-                      <Text size="xs" c="dimmed">{item.desc}</Text>
+                      <Text fw={500} lineClamp={1}>{item.label}</Text>
+                      <Text size="xs" c="dimmed" lineClamp={1}>{item.desc}</Text>
                     </Box>
                   </Group>
                   {item.route && <ChevronRight size={16} color="#cbd5e0" />}

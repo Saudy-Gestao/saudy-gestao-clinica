@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Search, Plus, Edit2, ChevronLeft, Lock } from 'lucide-react';
+import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
+import consultationService from '../../services/consultationService';
 
 interface PatientRow {
-  id: number;
+  id: string;
   nomeCompleto: string;
+  convenio?: string;
   statusConvenio: string;
   agendadoPara: string;
   tipoFila: string;
@@ -18,38 +21,52 @@ interface PatientRow {
   fila: string;
 }
 
-const SAMPLE_ROWS: PatientRow[] = [
-  {
-    id: 1,
-    nomeCompleto: 'João Pedro Oliveira',
-    statusConvenio: 'Aguardando Aut.',
-    agendadoPara: '12/12/2025 | 12:00:00',
-    tipoFila: 'Exames',
-    agenda: 'Mamografia',
-    totem: 'Guichê 3',
-    fila: 'Guichê 3',
-  },
-  {
-    id: 2,
-    nomeCompleto: 'Maria Silva Santos',
-    statusConvenio: 'Autorizado',
-    agendadoPara: '-',
-    tipoFila: 'Exames',
-    agenda: 'Mamografia',
-    totem: 'Guichê 4',
-    fila: 'Guichê 4',
-  },
-];
-
 export function Consulta() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [rows] = useState(SAMPLE_ROWS);
+  const [rows, setRows] = useState<PatientRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
   const filtered = rows.filter((r) => r.nomeCompleto.toLowerCase().includes(query.toLowerCase()));
+
+  const mapApiToRow = (it: any): PatientRow => ({
+    id: String(it.id),
+    nomeCompleto: it.patientName || '',
+    convenio: it.convenio || '',
+    statusConvenio: it.convenioStatus || '',
+    agendadoPara: it.scheduledFor || '-',
+    tipoFila: it.queueType || '-',
+    agenda: it.agenda || '-',
+    totem: it.totem ? String(it.totem) : '-',
+    fila: it.queue || '-',
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data: any = await consultationService.list();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : []));
+        setRows(list.map(mapApiToRow));
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar consultas',
+          color: 'red',
+        });
+      }
+    };
+
+    load();
+  }, []);
 
   const [triagemData, setTriagemData] = useState({
     nome: '',
@@ -73,15 +90,17 @@ export function Consulta() {
   });
 
   const openTriagem = (r: PatientRow) => {
+    setEditingId(r.id);
     setTriagemData((t) => ({
       ...t,
       nome: r.nomeCompleto,
-      convenio: 'Unimed',
+      convenio: r.convenio || '',
     }));
     setModalOpen(true);
   };
 
   const openNovaConsulta = () => {
+    setEditingId(null);
     setTriagemData({
       nome: '',
       convenio: '',
@@ -103,6 +122,62 @@ export function Consulta() {
       observacoesTriagem: '',
     });
     setModalOpen(true);
+  };
+
+  const handleSaveTriagem = async () => {
+    if (!triagemData.nome.trim()) {
+      showNotification({ title: 'Erro', message: 'Nome do paciente e obrigatorio', color: 'red' });
+      return;
+    }
+
+    const payload = {
+      patientName: triagemData.nome,
+      convenio: triagemData.convenio || undefined,
+      bloodPressure: triagemData.pressaoArterial || undefined,
+      heartRate: triagemData.frequenciaCardiaca || undefined,
+      temperature: triagemData.temperatura || undefined,
+      oxygenSaturation: triagemData.saturacao || undefined,
+      weight: triagemData.peso || undefined,
+      height: triagemData.altura || undefined,
+      glucose: triagemData.glicemia || undefined,
+      bmi: triagemData.imc || undefined,
+      anamnese: triagemData.anamnese || undefined,
+      mainComplaint: triagemData.queixaPrincipal || undefined,
+      diseaseHistory: triagemData.historiaDoenca || undefined,
+      allergies: triagemData.alergias || undefined,
+      medications: triagemData.medicamentos || undefined,
+      antecedentes: triagemData.antecedentes || undefined,
+      pregnant: triagemData.gestante || undefined,
+      triageNotes: triagemData.observacoesTriagem || undefined,
+    };
+
+    try {
+      if (editingId) {
+        const current = rows.find((r) => r.id === editingId);
+        const updated = await consultationService.update(editingId, {
+          ...payload,
+          convenioStatus: current?.statusConvenio || undefined,
+          scheduledFor: current?.agendadoPara || undefined,
+          queueType: current?.tipoFila || undefined,
+          agenda: current?.agenda || undefined,
+          totem: current?.totem || undefined,
+          queue: current?.fila || undefined,
+        });
+        setRows((prev) => prev.map((r) => (r.id === editingId ? mapApiToRow(updated) : r)));
+      } else {
+        const created = await consultationService.create(payload);
+        setRows((prev) => [mapApiToRow(created), ...prev]);
+      }
+
+      setModalOpen(false);
+      setEditingId(null);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao salvar consulta',
+        color: 'red',
+      });
+    }
   };
 
   return (
@@ -309,7 +384,7 @@ export function Consulta() {
 
             <Group justify="flex-end" mt={8} gap={8}>
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={() => setModalOpen(false)} size="sm">Salvar</Button>
+              <Button bg={DARK_BLUE} onClick={handleSaveTriagem} size="sm">Salvar</Button>
             </Group>
           </Stack>
         </Stack>

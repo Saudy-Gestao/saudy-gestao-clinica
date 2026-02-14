@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput } from '@mantine/core';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput, Center, ThemeIcon, Loader } from '@mantine/core';
+import inventoryService from '../../services/inventoryService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft } from 'lucide-react';
+import { Search, Plus, ChevronLeft, Check } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePickerInput } from '@mantine/dates';
+import ResultModal from '../common/ResultModal';
 
 interface StockItem {
-  id: number;
+  id: string;
   codigo: string;
   nome: string;
   quantidade: number;
@@ -22,44 +24,40 @@ interface StockItem {
   status?: string;
 }
 
-const SAMPLE_ITEMS: StockItem[] = [
-  {
-    id: 1,
-    codigo: 'LUV001',
-    nome: 'Luvas de Procedimento',
-    quantidade: 150,
-    minimo: 50,
-    maximo: 100000,
-    precoUnitario: 45.9,
-    validade: '30/06/2026',
-    categoria: 'Material Hospitalar',
-    unidade: 'cx',
-    status: 'Disponível',
-  },
-  {
-    id: 2,
-    codigo: 'SE010',
-    nome: 'Seringa 100ml',
-    quantidade: 30,
-    minimo: 40,
-    maximo: 100000,
-    precoUnitario: 30.9,
-    validade: '30/06/2026',
-    categoria: 'Descartável',
-    unidade: 'un',
-    status: 'Baixo',
-  },
-];
+// SAMPLE_ITEMS removed — items are now fetched from backend (/inventory/).
 
 export function Estoque() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
-  const [items, setItems] = useState<StockItem[]>(SAMPLE_ITEMS);
+  const [items, setItems] = useState<StockItem[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Saving & success modal states
+  const [savingItem, setSavingItem] = useState(false);
+  const [showItemSuccessModal, setShowItemSuccessModal] = useState(false);
+  const [lastCreatedItemName, setLastCreatedItemName] = useState<string | null>(null);
+  const [lastItemAction, setLastItemAction] = useState<'created'|'updated'|null>(null);
+
+  // Error modal state
+  const [showItemErrorModal, setShowItemErrorModal] = useState(false);
+  const [itemErrorMessage, setItemErrorMessage] = useState<string | null>(null);
+  const [itemErrorTitle, setItemErrorTitle] = useState<string | null>(null);
+
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+
+  // Category options shared between filter and modal
+  const categoriesOptions = [
+    'Material Hospitalar',
+    'Medicamento',
+    'Equipamento',
+    'Limpeza',
+    'Descartável',
+    'Outros',
+  ].map((c) => ({ value: c, label: c }));
 
   const filtered = items.filter((i) => {
     const q = query.trim().toLowerCase();
@@ -104,11 +102,83 @@ export function Estoque() {
     if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return undefined;
     return date;
   };
+  // Fetch inventory items from backend
+  useEffect(() => {
+    const load = async () => {
+      setItemsLoading(true);
+      try {
+        const data: any = await inventoryService.getItems();
+        // backend may return array or wrapped object — handle both
+        const list: any[] = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (Array.isArray(data?.items) ? data.items : []));
+        const mapped: StockItem[] = list.map((it: any) => ({
+          id: String(it.id),
+          codigo: it.code || '',
+          nome: it.name || '',
+          quantidade: it.quantity ?? 0,
+          minimo: it.minQuantity ?? 0,
+          maximo: it.maxQuantity ?? 0,
+          precoUnitario: parseNumber(it.unitPrice ?? it.unitPrice),
+          validade: it.expiryDate ? (new Date(it.expiryDate)).toLocaleDateString('en-GB') : '-',
+          categoria: it.category || '',
+          unidade: it.unit || '',
+          status: it.status ? String(it.status).toUpperCase() : ((it.quantity ?? 0) <= (it.minQuantity ?? 0) ? 'LOW' : 'AVAILABLE'),
+        }));
+        setItems(mapped);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar itens';
+        setItemErrorTitle('Erro ao carregar itens');
+        setItemErrorMessage(msg);
+        setShowItemErrorModal(true);
+        showNotification({ title: 'Erro', message: msg, color: 'red' });
+      } finally {
+        setItemsLoading(false);
+      }
+    };
 
+    load();
+  }, []);
   const normalizeNumber = (val?: number | string | null) => {
     if (val === undefined || val === null || val === '') return null;
     const n = typeof val === 'number' ? val : Number(val);
     return Number.isFinite(n) ? n : null;
+  };
+
+  const parseNumber = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // Helpers to format labels consistently
+  const humanize = (s?: string) => {
+    if (!s) return '-';
+    return String(s).replace(/_/g, ' ').toLowerCase().split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
+
+  const formatStatus = (s?: string) => {
+    if (!s) return '-';
+    const map: Record<string, string> = {
+      AVAILABLE: 'Disponível',
+      LOW: 'Baixo',
+      OUT_OF_STOCK: 'Esgotado',
+      EXPIRED: 'Vencido',
+      UNAVAILABLE: 'Indisponível',
+      RESERVED: 'Reservado',
+      DAMAGED: 'Danificado',
+    };
+    return map[String(s).toUpperCase()] || humanize(s);
+  };
+
+  const formatCategory = (c?: string) => {
+    if (!c) return '-';
+    const map: Record<string, string> = {
+      'DESCARTÁVEL': 'Descartável',
+      'DESCARTAVEL': 'Descartável',
+      'MATERIAL HOSPITALAR': 'Material Hospitalar',
+      'LIMPEZA': 'Limpeza',
+      'MEDICAMENTO': 'Medicamento',
+      'EQUIPAMENTO': 'Equipamento',
+    };
+    return map[String(c).toUpperCase()] || humanize(c);
   };
 
   const openCadastrar = (it?: StockItem) => {
@@ -134,7 +204,15 @@ export function Estoque() {
     setModalOpen(true);
   };
 
-  const handleAddOrUpdate = () => {
+  const formatISODate = (d?: Date | undefined) => {
+    if (!d) return undefined;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const handleAddOrUpdate = async () => {
     if (!form.nome.trim()) {
       showNotification({ title: 'Erro', message: 'Nome do item é obrigatório', color: 'red' });
       return;
@@ -145,29 +223,90 @@ export function Estoque() {
       return;
     }
 
-    if (editingId) {
-      setItems((prev) => prev.map((p) => p.id === editingId ? ({ ...p, nome: form.nome, codigo: form.codigo, categoria: form.categoria, unidade: form.unidade, quantidade: form.quantidade ?? p.quantidade, minimo: form.minimo ?? p.minimo, maximo: form.maximo ?? p.maximo, precoUnitario: form.precoUnitario ?? p.precoUnitario, validade: formatDate(form.validade) }) : p));
-      showNotification({ title: 'Atualizado', message: 'Item atualizado', color: 'green' });
-    } else {
-      const id = items.length ? Math.max(...items.map((i) => i.id)) + 1 : 1;
-      const newItem: StockItem = {
-        id,
-        codigo: form.codigo || `CODE${id}`,
-        nome: form.nome,
-        quantidade: form.quantidade ?? 0,
-        minimo: form.minimo ?? 0,
-        maximo: form.maximo ?? 0,
-        precoUnitario: form.precoUnitario ?? 0,
-        validade: formatDate(form.validade) || '-',
-        categoria: form.categoria,
-        unidade: form.unidade,
-        status: (form.quantidade ?? 0) <= (form.minimo ?? 0) ? 'Baixo' : 'Disponível',
-      };
-      setItems((prev) => [newItem, ...prev]);
-      showNotification({ title: 'Adicionado', message: 'Item adicionado ao estoque', color: 'green' });
-    }
+    setSavingItem(true);
 
-    setModalOpen(false);
+    try {
+      if (editingId) {
+        const payload = {
+          name: form.nome,
+          code: form.codigo || undefined,
+          category: form.categoria || undefined,
+          unit: form.unidade || undefined,
+          quantity: normalizeNumber(form.quantidade) ?? 0,
+          minQuantity: normalizeNumber(form.minimo) ?? 0,
+          maxQuantity: normalizeNumber(form.maximo) ?? 0,
+          unitPrice: normalizeNumber(form.precoUnitario) ?? 0,
+          expiryDate: formatISODate(form.validade),
+          notes: undefined,
+        };
+
+        const updated = await inventoryService.updateItem(editingId, payload);
+
+        setItems((prev) => prev.map((p) => p.id === editingId ? ({
+          ...p,
+          nome: updated.name ?? p.nome,
+          codigo: updated.code ?? p.codigo,
+          categoria: updated.category ?? p.categoria,
+          unidade: updated.unit ?? p.unidade,
+          quantidade: updated.quantity ?? p.quantidade,
+          minimo: updated.minQuantity ?? p.minimo,
+          maximo: updated.maxQuantity ?? p.maximo,
+          precoUnitario: parseNumber(updated.unitPrice ?? updated.unitPrice ?? p.precoUnitario),
+          validade: updated.expiryDate ? (new Date(updated.expiryDate)).toLocaleDateString('en-GB') : p.validade,
+          status: updated.status ? String(updated.status).toUpperCase() : ((updated.quantity ?? p.quantidade) <= (updated.minQuantity ?? p.minimo) ? 'LOW' : 'AVAILABLE'),
+        }) : p));
+
+        setLastItemAction('updated');
+        setLastCreatedItemName(updated.name || form.nome);
+        setModalOpen(false);
+        setShowItemSuccessModal(true);
+      } else {
+        const payload = {
+          code: form.codigo || `CODE${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          name: form.nome,
+          category: form.categoria || '',
+          unit: form.unidade || '',
+          quantity: normalizeNumber(form.quantidade) ?? 0,
+          minQuantity: normalizeNumber(form.minimo) ?? 0,
+          maxQuantity: normalizeNumber(form.maximo) ?? 0,
+          unitPrice: normalizeNumber(form.precoUnitario) ?? 0,
+          expiryDate: formatISODate(form.validade) || '',
+          notes: '',
+        };
+
+        const created = await inventoryService.createItem(payload);
+
+        const newItem: StockItem = {
+          id: created.id ? String(created.id) : `tmp-${Date.now()}`,
+          codigo: created.code || form.codigo || `CODE${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          nome: created.name || form.nome,
+          quantidade: created.quantity ?? (form.quantidade ?? 0),
+          minimo: created.minQuantity ?? (form.minimo ?? 0),
+          maximo: created.maxQuantity ?? (form.maximo ?? 0),
+          precoUnitario: parseNumber(created.unitPrice ?? form.precoUnitario ?? 0),
+          validade: created.expiryDate ? (new Date(created.expiryDate)).toLocaleDateString('en-GB') : (formatDate(form.validade) || '-'),
+          categoria: created.category || form.categoria,
+          unidade: created.unit || form.unidade,
+          status: created.status ? String(created.status).toUpperCase() : ((created.quantity ?? form.quantidade ?? 0) <= (created.minQuantity ?? form.minimo ?? 0) ? 'LOW' : 'AVAILABLE'),
+        };
+
+        setItems((prev) => [newItem, ...prev]);
+
+        setLastItemAction('created');
+        setLastCreatedItemName(created.name || form.nome);
+        setModalOpen(false);
+        setShowItemSuccessModal(true);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar item';
+      // fallback to toast for some errors but also show error modal
+      setItemErrorTitle('Erro ao salvar item');
+      setItemErrorMessage(msg);
+      setShowItemErrorModal(true);
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
+    } finally {
+      setSavingItem(false);
+    }
   };
 
   return (
@@ -192,7 +331,7 @@ export function Estoque() {
 
           <Group>
             <Select
-              data={[{ value: 'all', label: 'Todas as categorias' }, { value: 'Medicamento', label: 'Medicamento' }, { value: 'Equipamento', label: 'Equipamento' }, { value: 'Limpeza', label: 'Limpeza' }, { value: 'Descartável', label: 'Descartável' }]}
+              data={[{ value: 'all', label: 'Todas as categorias' }, ...categoriesOptions]}
               value={category || 'all'}
               onChange={(val) => setCategory(val || '')}
               placeholder="Todas as categorias"
@@ -217,28 +356,34 @@ export function Estoque() {
           />
         </Box>
 
-        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-          <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: 'none' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Código</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Prod.</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Quant.</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Mín.</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Máx.</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Preço Unit.</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valid.</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Categoria</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map((it) => (
-                <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                  <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.codigo}</Text>
-                  </Table.Td>
+        {itemsLoading ? (
+          <Center style={{ padding: 24, gap: 8 }}>
+            <Loader />
+            <Text>Carregando itens...</Text>
+          </Center>
+        ) : (
+          <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+              <Table.Thead>
+                <Table.Tr style={{ borderBottom: 'none' }}>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Código</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Prod.</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Quant.</Table.Th>
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Mín.</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Máx.</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Preço Unit.</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valid.</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Categoria</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((it) => (
+                  <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                    <Table.Td>
+                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.codigo}</Text>
+                    </Table.Td>
                   <Table.Td>
                     <Box
                       bg={DARK_BLUE}
@@ -252,50 +397,51 @@ export function Estoque() {
                   <Table.Td>
                     <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.nome}</Text>
                   </Table.Td>
+                <Table.Td>
+                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.quantidade}</Text>
+                </Table.Td>
+
+                {!isTablet && (
                   <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.quantidade}</Text>
+                    <Text size="xs">{it.minimo}</Text>
                   </Table.Td>
+                )}
 
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{it.minimo}</Text>
-                    </Table.Td>
-                  )}
+                {!isTablet && (
+                  <Table.Td>
+                    <Text size="xs">{it.maximo}</Text>
+                  </Table.Td>
+                )}
 
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{it.maximo}</Text>
-                    </Table.Td>
-                  )}
+                {!isTablet && (
+                  <Table.Td>
+                    <Text size="xs">R${it.precoUnitario.toFixed(2)}</Text>
+                  </Table.Td>
+                )}
 
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">R${it.precoUnitario.toFixed(2)}</Text>
-                    </Table.Td>
-                  )}
+                {!isTablet && (
+                  <Table.Td>
+                    <Text size="xs">{it.validade || '-'}</Text>
+                  </Table.Td>
+                )}
 
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{it.validade || '-'}</Text>
-                    </Table.Td>
-                  )}
+                {!isTablet && (
+                  <Table.Td>
+                    <Text size="xs">{formatCategory(it.categoria)}</Text>
+                  </Table.Td>
+                )}
 
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{it.categoria === 'Descartável' ? 'Descartável' : 'Não descartável'}</Text>
-                    </Table.Td>
-                  )}
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{it.status}</Text>
-                    </Table.Td>
-                  )}
+                {!isTablet && (
+                  <Table.Td>
+                    <Text size="xs">{formatStatus(it.status)}</Text>
+                  </Table.Td>
+                )}
                 </Table.Tr>
               ))}
             </Table.Tbody>
-          </Table>
-        </Box>
+            </Table>
+            </Box>
+        )}
       </Box>
 
       <Modal
@@ -340,7 +486,7 @@ export function Estoque() {
 
               <Box>
                 <Box className="line-field">
-                  <Select variant="unstyled" data={[{ value: 'Material Hospitalar', label: 'Material Hospitalar' }, { value: 'Medicamento', label: 'Medicamento' }, { value: 'Limpeza', label: 'Limpeza' }, { value: 'Descartável', label: 'Descartável' }]} value={form.categoria} onChange={(v) => setForm({ ...form, categoria: v || '' })} placeholder="Categoria" />
+                  <Select variant="unstyled" data={categoriesOptions} value={form.categoria} onChange={(v) => setForm({ ...form, categoria: v || '' })} placeholder="Categoria" />
                 </Box>
 
                 <Box className="line-field">
@@ -372,11 +518,30 @@ export function Estoque() {
 
             <Group justify="flex-end" mt={8}>
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm">Cadastrar</Button>
+              <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingItem} disabled={savingItem}>{editingId ? 'Atualizar' : 'Cadastrar'}</Button>
             </Group>
           </Box>
         </Stack>
       </Modal>
+
+      <ResultModal
+        opened={showItemSuccessModal}
+        onClose={() => setShowItemSuccessModal(false)}
+        variant={lastItemAction === 'created' ? 'success' : 'success'}
+        title={lastItemAction === 'created' ? 'Item cadastrado' : 'Item atualizado'}
+        message={lastCreatedItemName ? `${lastCreatedItemName} ${lastItemAction === 'created' ? 'foi adicionado ao estoque.' : 'foi atualizado com sucesso.'}` : (lastItemAction === 'created' ? 'Item adicionado com sucesso.' : 'Item atualizado com sucesso.')}
+        secondary={{ label: 'Voltar', onClick: () => setShowItemSuccessModal(false) }}
+        primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ codigo: '', nome: '', categoria: '', unidade: '', quantidade: null, minimo: null, maximo: null, precoUnitario: null, validade: undefined }); setShowItemSuccessModal(false); setModalOpen(true); setEditingId(null); } }}
+      />
+
+      <ResultModal
+        opened={showItemErrorModal}
+        onClose={() => setShowItemErrorModal(false)}
+        variant="error"
+        title={itemErrorTitle || 'Erro'}
+        message={itemErrorMessage || 'Ocorreu um erro'}
+        secondary={{ label: 'Fechar', onClick: () => setShowItemErrorModal(false) }}
+      />
     </Box>
   );
 }

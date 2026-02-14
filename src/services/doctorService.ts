@@ -27,11 +27,31 @@ export interface CreateDoctorPayload {
   workingHoursEnd?: string;
 }
 
+export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;
+
 export default {
+  async listDoctors() {
+    const url = '/accounts/doctors/';
+    const res = await api.get(url);
+    return res.data;
+  },
+
   async createDoctor(payload: CreateDoctorPayload) {
     // Use absolute URL to point to local API (dev) as requested
-    const url = 'http://localhost:3001/doctors/';
+    const url = '/accounts/doctors/';
     const res = await api.post(url, payload);
+    return res.data;
+  },
+
+  async updateDoctor(id: string, payload: UpdateDoctorPayload) {
+    const url = `/accounts/doctors/${id}`;
+    const res = await api.put(url, payload);
+    return res.data;
+  },
+
+  async deleteDoctor(id: string) {
+    const url = `/accounts/doctors/${id}`;
+    const res = await api.delete(url);
     return res.data;
   },
 };
