@@ -14,7 +14,7 @@ import AuthService from '../../services/authService';
 export function Cadastro() {
   const navigate = useNavigate();
   const location = useLocation();
-  const loginType = location.state?.loginType || 'paciente'; // default to paciente if not specified
+  const loginType = location.state?.loginType || 'empresa'; // default to empresa now
   const isEmpresa = loginType === 'empresa';
   
   const isMobile = useMediaQuery('(max-width: 799px)');

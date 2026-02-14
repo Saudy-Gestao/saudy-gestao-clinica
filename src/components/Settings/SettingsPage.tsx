@@ -38,7 +38,17 @@ import branchService from '../../services/branchService';
 import sectorService from '../../services/sectorService';
 import userService from '../../services/userService';
 import accessService from '../../services/accessService';
+import { moduleService, type Module } from '../../services/moduleService';
 import { FloatingInput } from '../common/FloatingInput';
+
+// Validations
+import {
+  validateCompanyForm,
+  validateBranchForm,
+  validateSectorForm,
+  validateUserForm,
+  validateAccessForm,
+} from '../../utils/validations';
 
 const PageContainer = ({ children }: { children: React.ReactNode }) => (
     <Box bg="#f8f9fa" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -59,6 +69,9 @@ const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
 export function SettingsPage() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const [activeTab, setActiveTab] = useState<string | null>('company');
+  
+  // Get user's company from logged user
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   // --- States ---
   
@@ -68,6 +81,7 @@ export function SettingsPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [companyForm, setCompanyForm] = useState({ cnpj: '', legalName: '', tradeName: '', address: '', phone: '' });
   const [savingCompany, setSavingCompany] = useState(false);
+  const [companyErrors, setCompanyErrors] = useState<Record<string, string>>({});
 
   // Branches
   const [branches, setBranches] = useState<any[]>([]);
@@ -76,6 +90,7 @@ export function SettingsPage() {
   const [editingBranch, setEditingBranch] = useState<any | null>(null);
   const [branchForm, setBranchForm] = useState({ socialName: '', tradeName: '', address: '', phone: '' });
   const [savingBranch, setSavingBranch] = useState(false);
+  const [branchErrors, setBranchErrors] = useState<Record<string, string>>({});
 
   // Sectors
   const [sectors, setSectors] = useState<any[]>([]);
@@ -85,6 +100,7 @@ export function SettingsPage() {
   const [editingSector, setEditingSector] = useState<any | null>(null);
   const [sectorForm, setSectorForm] = useState({ name: '', description: '', branchId: '' });
   const [savingSector, setSavingSector] = useState(false);
+  const [sectorErrors, setSectorErrors] = useState<Record<string, string>>({});
 
   // Users
   const [users, setUsers] = useState<any[]>([]);
@@ -95,18 +111,37 @@ export function SettingsPage() {
   const [userForm, setUserForm] = useState({ sectorId: '', accessIds: [] as string[], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
   const [savingUser, setSavingUser] = useState(false);
   const [accessesList, setAccessesList] = useState<any[]>([]);
+  const [userErrors, setUserErrors] = useState<Record<string, string>>({});
 
   // Accesses
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [editingAccess, setEditingAccess] = useState<any | null>(null);
-  const [accessForm, setAccessForm] = useState({ description: '' });
+  const [accessForm, setAccessForm] = useState({ description: '', moduleIds: [] as string[] });
   const [savingAccess, setSavingAccess] = useState(false);
+  const [accessErrors, setAccessErrors] = useState<Record<string, string>>({});
+  
+  // Modules
+  const [modules, setModules] = useState<Module[]>([]);
+  const [loadingModules, setLoadingModules] = useState(false);
 
   // --- Effects ---
 
   useEffect(() => {
+    // Get logged user from localStorage
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        // Extract company ID from user's sector hierarchy
+        const companyId = user.sector?.branch?.company?.id || user.sector?.branch?.companyId;
+        setUserCompanyId(companyId);
+      } catch (error) {
+        console.error('Error parsing user from localStorage:', error);
+      }
+    }
     fetchCompanies();
     fetchAccesses();
+    fetchModules();
   }, []);
 
   useEffect(() => {
@@ -124,6 +159,13 @@ export function SettingsPage() {
       fetchBranches();
     }
   }, [selectedCompanyId]);
+
+  // Reload companies when userCompanyId is set
+  useEffect(() => {
+    if (userCompanyId && companies.length === 0) {
+      fetchCompanies();
+    }
+  }, [userCompanyId]);
 
   useEffect(() => {
     if (branches.length > 0 && !selectedBranchForSectors) {
@@ -162,9 +204,14 @@ export function SettingsPage() {
     setLoadingCompanies(true);
     try {
       const data = await companyService.listCompanies();
-      setCompanies(data || []);
-      if (data && data.length > 0) {
-        setSelectedCompanyId(data[0].id);
+      // Filter to show only user's company
+      let filteredCompanies = data || [];
+      if (userCompanyId) {
+        filteredCompanies = filteredCompanies.filter((c: any) => c.id === userCompanyId);
+      }
+      setCompanies(filteredCompanies);
+      if (filteredCompanies.length > 0) {
+        setSelectedCompanyId(filteredCompanies[0].id);
       }
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar empresas', color: 'red' });
@@ -175,6 +222,20 @@ export function SettingsPage() {
 
   const handleSaveCompany = async () => {
     if (!selectedCompanyId) return;
+    
+    // Validate form
+    const validation = validateCompanyForm(companyForm);
+    if (!validation.isValid) {
+      setCompanyErrors(validation.errors);
+      notifications.show({ 
+        title: 'Erro de validação', 
+        message: 'Corrija os campos destacados', 
+        color: 'red' 
+      });
+      return;
+    }
+    
+    setCompanyErrors({});
     setSavingCompany(true);
     try {
       await companyService.updateCompany(selectedCompanyId, companyForm);
@@ -209,17 +270,33 @@ export function SettingsPage() {
   const openBranchModalForCreate = () => {
     setEditingBranch(null);
     setBranchForm({ socialName: '', tradeName: '', address: '', phone: '' });
+    setBranchErrors({});
     setBranchModalOpen(true);
   };
 
   const openBranchModalForEdit = (branch: any) => {
     setEditingBranch(branch);
     setBranchForm({ socialName: branch.socialName || '', tradeName: branch.tradeName || '', address: branch.address || '', phone: branch.phone || '' });
+    setBranchErrors({});
     setBranchModalOpen(true);
   };
 
   const handleSaveBranch = async () => {
     if (!selectedCompanyId) return;
+    
+    // Validate form
+    const validation = validateBranchForm(branchForm);
+    if (!validation.isValid) {
+      setBranchErrors(validation.errors);
+      notifications.show({ 
+        title: 'Erro de validação', 
+        message: 'Corrija os campos destacados', 
+        color: 'red' 
+      });
+      return;
+    }
+    
+    setBranchErrors({});
     setSavingBranch(true);
     try {
       if (editingBranch) {
@@ -270,17 +347,33 @@ export function SettingsPage() {
   const openSectorModalForCreate = () => {
     setEditingSector(null);
     setSectorForm({ name: '', description: '', branchId: selectedBranchForSectors || '' });
+    setSectorErrors({});
     setSectorModalOpen(true);
   };
 
   const openSectorModalForEdit = (sector: any) => {
     setEditingSector(sector);
     setSectorForm({ name: sector.name || '', description: sector.description || '', branchId: sector.branchId || '' });
+    setSectorErrors({});
     setSectorModalOpen(true);
   };
 
   const handleSaveSector = async () => {
     if (!selectedBranchForSectors) return;
+    
+    // Validate form
+    const validation = validateSectorForm({ ...sectorForm, branchId: selectedBranchForSectors });
+    if (!validation.isValid) {
+      setSectorErrors(validation.errors);
+      notifications.show({ 
+        title: 'Erro de validação', 
+        message: 'Corrija os campos destacados', 
+        color: 'red' 
+      });
+      return;
+    }
+    
+    setSectorErrors({});
     setSavingSector(true);
     try {
       if (editingSector) {
@@ -320,18 +413,37 @@ export function SettingsPage() {
     }
   };
 
+  const fetchModules = async () => {
+    setLoadingModules(true);
+    try {
+      const data = await moduleService.getAll();
+      setModules(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar módulos:', error);
+      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar módulos', color: 'red' });
+    } finally {
+      setLoadingModules(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
       const data = await userService.listUsers();
       let filtered = data || [];
+      
+      // First filter by company
+      if (userCompanyId) {
+        filtered = filtered.filter((u: any) => u.sector?.branch?.company?.id === userCompanyId || u.sector?.branch?.companyId === userCompanyId);
+      }
+      
+      // Then apply additional filters
       if (selectedSectorForUsers) {
         filtered = filtered.filter((u: any) => u.sector?.id === selectedSectorForUsers);
       } else if (selectedBranchForSectors) {
         filtered = filtered.filter((u: any) => u.sector?.branchId === selectedBranchForSectors);
-      } else if (selectedCompanyId) {
-        filtered = filtered.filter((u: any) => u.sector?.branch?.companyId === selectedCompanyId);
       }
+      
       setUsers(filtered);
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar usuários', color: 'red' });
@@ -343,6 +455,7 @@ export function SettingsPage() {
   const openUserModalForCreate = () => {
     setEditingUser(null);
     setUserForm({ sectorId: selectedSectorForUsers || '', accessIds: [], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
+    setUserErrors({});
     setUserModalOpen(true);
   };
 
@@ -358,14 +471,24 @@ export function SettingsPage() {
         phone: user.phone || '', 
         address: user.address || '' 
     });
+    setUserErrors({});
     setUserModalOpen(true);
   };
 
   const handleSaveUser = async () => {
-    if (!userForm.sectorId) {
-      notifications.show({ title: 'Erro', message: 'Selecione um setor', color: 'red' });
+    // Validate form
+    const validation = validateUserForm(userForm, !!editingUser);
+    if (!validation.isValid) {
+      setUserErrors(validation.errors);
+      notifications.show({ 
+        title: 'Erro de validação', 
+        message: 'Corrija os campos destacados', 
+        color: 'red' 
+      });
       return;
     }
+    
+    setUserErrors({});
     setSavingUser(true);
     try {
       const payload: any = { ...userForm };
@@ -400,19 +523,52 @@ export function SettingsPage() {
 
   // Accesses
   const openAccessModalForCreate = () => {
+    if (modules.length === 0) {
+      notifications.show({ 
+        title: 'Aviso', 
+        message: 'Carregando módulos, aguarde...', 
+        color: 'yellow' 
+      });
+      return;
+    }
     setEditingAccess(null);
-    setAccessForm({ description: '' });
+    setAccessForm({ description: '', moduleIds: [] });
+    setAccessErrors({});
     setAccessModalOpen(true);
   };
 
   const openAccessModalForEdit = (access: any) => {
+    if (modules.length === 0) {
+      notifications.show({ 
+        title: 'Aviso', 
+        message: 'Carregando módulos, aguarde...', 
+        color: 'yellow' 
+      });
+      return;
+    }
     setEditingAccess(access);
-    setAccessForm({ description: access.description || '' });
+    setAccessForm({ 
+      description: access.description || '', 
+      moduleIds: access.modules?.map((m: any) => m.id) || [] 
+    });
+    setAccessErrors({});
     setAccessModalOpen(true);
   };
 
   const handleSaveAccess = async () => {
-    if (!accessForm.description) return;
+    // Validate form
+    const validation = validateAccessForm(accessForm);
+    if (!validation.isValid) {
+      setAccessErrors(validation.errors);
+      notifications.show({ 
+        title: 'Erro de validação', 
+        message: 'Corrija os campos destacados', 
+        color: 'red' 
+      });
+      return;
+    }
+    
+    setAccessErrors({});
     setSavingAccess(true);
     try {
       if (editingAccess) {
@@ -503,28 +659,46 @@ export function SettingsPage() {
                         
                         {loadingCompanies ? <Loader /> : (
                             <Stack gap="md" maw={600}>
-                                <Select
-                                    label="Selecionar empresa"
-                                    data={companies.map((c) => ({ value: c.id, label: `${c.legalName} (${c.cnpj})` }))}
-                                    value={selectedCompanyId || undefined}
-                                    onChange={(v) => v && setSelectedCompanyId(v)}
-                                    allowDeselect={false}
-                                />
                                 <Grid>
                                     <Grid.Col span={6}>
-                                        <FloatingInput label="CNPJ" value={companyForm.cnpj} onChange={(e: any) => setCompanyForm({ ...companyForm, cnpj: e.currentTarget.value })} />
+                                        <FloatingInput 
+                                          label="CNPJ" 
+                                          value={companyForm.cnpj} 
+                                          onChange={(e: any) => setCompanyForm({ ...companyForm, cnpj: e.currentTarget.value })} 
+                                          error={companyErrors.cnpj}
+                                        />
                                     </Grid.Col>
                                     <Grid.Col span={6}>
-                                        <FloatingInput label="Telefone" value={companyForm.phone} onChange={(e: any) => setCompanyForm({ ...companyForm, phone: e.currentTarget.value })} />
+                                        <FloatingInput 
+                                          label="Telefone" 
+                                          value={companyForm.phone} 
+                                          onChange={(e: any) => setCompanyForm({ ...companyForm, phone: e.currentTarget.value })} 
+                                          error={companyErrors.phone}
+                                        />
                                     </Grid.Col>
                                     <Grid.Col span={12}>
-                                        <FloatingInput label="Razão Social" value={companyForm.legalName} onChange={(e: any) => setCompanyForm({ ...companyForm, legalName: e.currentTarget.value })} />
+                                        <FloatingInput 
+                                          label="Razão Social" 
+                                          value={companyForm.legalName} 
+                                          onChange={(e: any) => setCompanyForm({ ...companyForm, legalName: e.currentTarget.value })} 
+                                          error={companyErrors.legalName}
+                                        />
                                     </Grid.Col>
                                     <Grid.Col span={12}>
-                                        <FloatingInput label="Nome Fantasia" value={companyForm.tradeName} onChange={(e: any) => setCompanyForm({ ...companyForm, tradeName: e.currentTarget.value })} />
+                                        <FloatingInput 
+                                          label="Nome Fantasia" 
+                                          value={companyForm.tradeName} 
+                                          onChange={(e: any) => setCompanyForm({ ...companyForm, tradeName: e.currentTarget.value })} 
+                                          error={companyErrors.tradeName}
+                                        />
                                     </Grid.Col>
                                     <Grid.Col span={12}>
-                                        <FloatingInput label="Endereço" value={companyForm.address} onChange={(e: any) => setCompanyForm({ ...companyForm, address: e.currentTarget.value })} />
+                                        <FloatingInput 
+                                          label="Endereço" 
+                                          value={companyForm.address} 
+                                          onChange={(e: any) => setCompanyForm({ ...companyForm, address: e.currentTarget.value })} 
+                                          error={companyErrors.address}
+                                        />
                                     </Grid.Col>
                                 </Grid>
                                 <Group justify="flex-end" mt="md">
@@ -554,7 +728,7 @@ export function SettingsPage() {
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
-                                        {branches.map(branch => (
+                                        {(branches || []).map(branch => (
                                             <Table.Tr key={branch.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                                 <Table.Td><Text size="sm" fw={500}>{branch.tradeName}</Text></Table.Td>
                                                 <Table.Td><Text size="sm">{branch.socialName}</Text></Table.Td>
@@ -574,10 +748,30 @@ export function SettingsPage() {
                         )}
                         <Modal opened={branchModalOpen} onClose={() => setBranchModalOpen(false)} title={editingBranch ? 'Editar Filial' : 'Nova Filial'} centered>
                              <Stack pt="lg">
-                                <FloatingInput label="Nome Fantasia" value={branchForm.tradeName} onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} />
-                                <FloatingInput label="Razão Social" value={branchForm.socialName} onChange={(e: any) => setBranchForm({ ...branchForm, socialName: e.currentTarget.value })} />
-                                <FloatingInput label="Telefone" value={branchForm.phone} onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })} />
-                                <FloatingInput label="Endereço" value={branchForm.address} onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })} />
+                                <FloatingInput 
+                                  label="Nome Fantasia" 
+                                  value={branchForm.tradeName} 
+                                  onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
+                                  error={branchErrors.tradeName}
+                                />
+                                <FloatingInput 
+                                  label="Razão Social" 
+                                  value={branchForm.socialName} 
+                                  onChange={(e: any) => setBranchForm({ ...branchForm, socialName: e.currentTarget.value })} 
+                                  error={branchErrors.socialName}
+                                />
+                                <FloatingInput 
+                                  label="Telefone" 
+                                  value={branchForm.phone} 
+                                  onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })} 
+                                  error={branchErrors.phone}
+                                />
+                                <FloatingInput 
+                                  label="Endereço" 
+                                  value={branchForm.address} 
+                                  onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })} 
+                                  error={branchErrors.address}
+                                />
                                 <Button fullWidth mt="md" onClick={handleSaveBranch} loading={savingBranch} bg={DARK_BLUE}>{editingBranch ? 'Salvar' : 'Criar'}</Button>
                             </Stack>
                         </Modal>
@@ -594,7 +788,7 @@ export function SettingsPage() {
                         <Select 
                             label="Filial"
                             placeholder="Selecione uma filial" 
-                            data={branches.map(b => ({ value: b.id, label: b.tradeName }))}
+                            data={(branches || []).map(b => ({ value: b.id, label: b.tradeName }))}
                             value={selectedBranchForSectors}
                             onChange={setSelectedBranchForSectors}
                             mb="lg"
@@ -612,7 +806,7 @@ export function SettingsPage() {
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
-                                        {sectors.map(sector => (
+                                        {(sectors || []).map(sector => (
                                             <Table.Tr key={sector.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                                 <Table.Td><Text size="sm" fw={500}>{sector.name}</Text></Table.Td>
                                                 <Table.Td><Text size="sm">{sector.description}</Text></Table.Td>
@@ -631,8 +825,18 @@ export function SettingsPage() {
                         )}
                          <Modal opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar Setor' : 'Novo Setor'} centered>
                              <Stack pt="lg">
-                                <FloatingInput label="Nome" value={sectorForm.name} onChange={(e: any) => setSectorForm({ ...sectorForm, name: e.currentTarget.value })} />
-                                <FloatingInput label="Descrição" value={sectorForm.description} onChange={(e: any) => setSectorForm({ ...sectorForm, description: e.currentTarget.value })} />
+                                <FloatingInput 
+                                  label="Nome" 
+                                  value={sectorForm.name} 
+                                  onChange={(e: any) => setSectorForm({ ...sectorForm, name: e.currentTarget.value })} 
+                                  error={sectorErrors.name}
+                                />
+                                <FloatingInput 
+                                  label="Descrição" 
+                                  value={sectorForm.description} 
+                                  onChange={(e: any) => setSectorForm({ ...sectorForm, description: e.currentTarget.value })} 
+                                  error={sectorErrors.description}
+                                />
                                 <Button fullWidth mt="md" onClick={handleSaveSector} loading={savingSector} bg={DARK_BLUE}>{editingSector ? 'Salvar' : 'Criar'}</Button>
                             </Stack>
                         </Modal>
@@ -650,7 +854,7 @@ export function SettingsPage() {
                             <Select 
                                 label="Filial"
                                 placeholder="Selecione..." 
-                                data={branches.map(b => ({ value: b.id, label: b.tradeName }))}
+                                data={(branches || []).map(b => ({ value: b.id, label: b.tradeName }))}
                                 value={selectedBranchForSectors}
                                 onChange={setSelectedBranchForSectors}
                                 style={{ flex: 1 }}
@@ -658,7 +862,7 @@ export function SettingsPage() {
                             <Select 
                                 label="Setor"
                                 placeholder="Selecione..." 
-                                data={sectors.map(s => ({ value: s.id, label: s.name }))}
+                                data={(sectors || []).map(s => ({ value: s.id, label: s.name }))}
                                 value={selectedSectorForUsers}
                                 onChange={setSelectedSectorForUsers}
                                 style={{ flex: 1 }}
@@ -678,7 +882,7 @@ export function SettingsPage() {
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
-                                        {users.map(user => (
+                                        {(users || []).map(user => (
                                             <Table.Tr key={user.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                                 <Table.Td>
                                                     <Group gap="sm">
@@ -694,7 +898,7 @@ export function SettingsPage() {
                                                         </Box>
                                                         <Box>
                                                             <Text size="sm" fw={500}>{user.name}</Text>
-                                                            <Text size="xs" c="dimmed">{user.accesses?.map((a:any) => a.description).join(', ')}</Text>
+                                                            <Text size="xs" c="dimmed">{(user.accesses || []).map((a:any) => a.description).join(', ') || 'Sem acessos'}</Text>
                                                         </Box>
                                                     </Group>
                                                 </Table.Td>
@@ -718,17 +922,18 @@ export function SettingsPage() {
                                 <Grid.Col span={12}>
                                     <Select 
                                         label="Setor" 
-                                        data={sectors.map(s => ({ value: s.id, label: s.name }))}
+                                        data={(sectors || []).map(s => ({ value: s.id, label: s.name }))}
                                         value={userForm.sectorId}
                                         onChange={(v) => setUserForm({...userForm, sectorId: v || ''})}
                                         mb="xs"
+                                        error={userErrors.sectorId}
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
                                     <MultiSelect 
                                         label="Acessos" 
-                                        data={accessesList.map(a => ({ value: a.id, label: a.description }))}
-                                        value={userForm.accessIds}
+                                        data={(accessesList || []).map(a => ({ value: a.id, label: a.description }))}
+                                        value={userForm.accessIds || []}
                                         onChange={(v) => setUserForm({...userForm, accessIds: v})}
                                         searchable
                                         mb="md"
@@ -736,10 +941,20 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput label="Nome" value={userForm.name} onChange={(e: any) => setUserForm({...userForm, name: e.currentTarget.value})} />
+                                    <FloatingInput 
+                                      label="Nome" 
+                                      value={userForm.name} 
+                                      onChange={(e: any) => setUserForm({...userForm, name: e.currentTarget.value})} 
+                                      error={userErrors.name}
+                                    />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput label="Email" value={userForm.email} onChange={(e: any) => setUserForm({...userForm, email: e.currentTarget.value})} />
+                                    <FloatingInput 
+                                      label="Email" 
+                                      value={userForm.email} 
+                                      onChange={(e: any) => setUserForm({...userForm, email: e.currentTarget.value})} 
+                                      error={userErrors.email}
+                                    />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
                                     <FloatingInput 
@@ -747,16 +962,33 @@ export function SettingsPage() {
                                         type="password" 
                                         value={userForm.password} 
                                         onChange={(e: any) => setUserForm({...userForm, password: e.currentTarget.value})} 
+                                        error={userErrors.password}
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput label="Telefone" value={userForm.phone} onChange={(e: any) => setUserForm({...userForm, phone: e.currentTarget.value})} />
+                                    <FloatingInput 
+                                      label="Telefone" 
+                                      value={userForm.phone} 
+                                      onChange={(e: any) => setUserForm({...userForm, phone: e.currentTarget.value})} 
+                                      error={userErrors.phone}
+                                    />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput type="date" label="Data de Nascimento" value={userForm.birthDate} onChange={(e: any) => setUserForm({...userForm, birthDate: e.currentTarget.value})} />
+                                    <FloatingInput 
+                                      type="date" 
+                                      label="Data de Nascimento" 
+                                      value={userForm.birthDate} 
+                                      onChange={(e: any) => setUserForm({...userForm, birthDate: e.currentTarget.value})} 
+                                      error={userErrors.birthDate}
+                                    />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
-                                    <FloatingInput label="Endereço" value={userForm.address} onChange={(e: any) => setUserForm({...userForm, address: e.currentTarget.value})} />
+                                    <FloatingInput 
+                                      label="Endereço" 
+                                      value={userForm.address} 
+                                      onChange={(e: any) => setUserForm({...userForm, address: e.currentTarget.value})} 
+                                      error={userErrors.address}
+                                    />
                                 </Grid.Col>
                             </Grid>
                             <Button fullWidth mt="md" onClick={handleSaveUser} loading={savingUser} bg={DARK_BLUE}>{editingUser ? 'Salvar' : 'Criar'}</Button>
@@ -776,13 +1008,33 @@ export function SettingsPage() {
                                 <Table.Thead>
                                     <Table.Tr style={{ borderBottom: 'none' }}>
                                         <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>
+                                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
                                         <Table.Th style={{ width: '100px' }}></Table.Th>
                                     </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {accessesList.map(access => (
+                                    {(accessesList || []).map(access => (
                                         <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                             <Table.Td><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
+                                            <Table.Td>
+                                              <Group gap={4}>
+                                                {(access.modules || []).map((module: any) => (
+                                                  <Text 
+                                                    key={module.id} 
+                                                    size="xs" 
+                                                    c="dimmed"
+                                                    style={{ 
+                                                      padding: '2px 8px', 
+                                                      background: '#e7f5ff', 
+                                                      borderRadius: 4,
+                                                      whiteSpace: 'nowrap'
+                                                    }}
+                                                  >
+                                                    {module.label}
+                                                  </Text>
+                                                )) || <Text size="xs" c="dimmed">Nenhum módulo</Text>}
+                                              </Group>
+                                            </Table.Td>
                                             <Table.Td>
                                                 <Group gap={4} justify="flex-end">
                                                     <ActionIcon variant="subtle" color="blue" onClick={() => openAccessModalForEdit(access)}><Edit size={16} /></ActionIcon>
@@ -791,14 +1043,57 @@ export function SettingsPage() {
                                             </Table.Td>
                                         </Table.Tr>
                                     ))}
-                                    {accessesList.length === 0 && <Table.Tr><Table.Td colSpan={2} align="center">Nenhum acesso cadastrado</Table.Td></Table.Tr>}
+                                    {accessesList.length === 0 && <Table.Tr><Table.Td colSpan={3} align="center">Nenhum acesso cadastrado</Table.Td></Table.Tr>}
                                 </Table.Tbody>
                             </Table>
                         </Box>
                         <Modal opened={accessModalOpen} onClose={() => setAccessModalOpen(false)} title={editingAccess ? 'Editar Acesso' : 'Novo Acesso'} centered>
                              <Stack pt="lg">
-                                <FloatingInput label="Descrição" value={accessForm.description} onChange={(e: any) => setAccessForm({ ...accessForm, description: e.currentTarget.value })} />
-                                <Button fullWidth mt="md" onClick={handleSaveAccess} loading={savingAccess} bg={DARK_BLUE}>{editingAccess ? 'Salvar' : 'Criar'}</Button>
+                                <FloatingInput 
+                                  label="Descrição" 
+                                  value={accessForm.description} 
+                                  onChange={(e: any) => setAccessForm({ ...accessForm, description: e.currentTarget.value })} 
+                                  error={accessErrors.description}
+                                />
+                                {loadingModules ? (
+                                  <Box style={{ textAlign: 'center', padding: '20px' }}>
+                                    <Loader size="sm" />
+                                    <Text size="sm" c="dimmed" mt="xs">Carregando módulos...</Text>
+                                  </Box>
+                                ) : (
+                                  <MultiSelect
+                                    label="Módulos"
+                                    placeholder="Selecione os módulos"
+                                    data={
+                                      Array.isArray(modules) && modules.length > 0
+                                        ? modules.map((m) => ({
+                                            value: m.id || '',
+                                            label: m.label || m.name || 'Sem nome',
+                                          }))
+                                        : []
+                                    }
+                                    value={accessForm.moduleIds || []}
+                                    onChange={(value) => setAccessForm({ ...accessForm, moduleIds: value })}
+                                    searchable
+                                    disabled={!modules || modules.length === 0}
+                                    error={accessErrors.moduleIds}
+                                    withAsterisk
+                                    styles={{
+                                      label: { marginBottom: 8, fontWeight: 500 },
+                                    }}
+                                    nothingFoundMessage="Nenhum módulo encontrado"
+                                  />
+                                )}
+                                <Button 
+                                  fullWidth 
+                                  mt="md" 
+                                  onClick={handleSaveAccess} 
+                                  loading={savingAccess}
+                                  disabled={loadingModules}
+                                  bg={DARK_BLUE}
+                                >
+                                  {editingAccess ? 'Salvar' : 'Criar'}
+                                </Button>
                             </Stack>
                         </Modal>
                     </Box>
