@@ -12,6 +12,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
+import authService from '../../services/authService';
 
 type Step = 'email' | 'code' | 'newPassword';
 
@@ -20,7 +21,7 @@ export function EsqueciSenha() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>('email');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,10 +32,10 @@ export function EsqueciSenha() {
   });
 
   const handleSendEmail = async () => {
-    if (!email) {
+    if (!identifier) {
       notifications.show({
         title: 'Erro',
-        message: 'Digite seu e-mail',
+        message: 'Digite seu e-mail ou CPF',
         color: 'red',
       });
       return;
@@ -42,10 +43,10 @@ export function EsqueciSenha() {
 
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await authService.sendResetCode(identifier);
       notifications.show({
         title: 'Código enviado',
-        message: 'Verifique seu e-mail',
+        message: 'Se o usuário existir, o código foi enviado por e-mail',
         color: 'green',
       });
       setStep('code');
@@ -72,12 +73,41 @@ export function EsqueciSenha() {
 
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await authService.verifyResetCode(identifier, code);
       setStep('newPassword');
     } catch (error) {
       notifications.show({
         title: 'Erro',
         message: 'Código inválido',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!identifier) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Informe seu e-mail ou CPF para reenviar o código',
+        color: 'red',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await authService.sendResetCode(identifier);
+      notifications.show({
+        title: 'Código reenviado',
+        message: 'Verifique seu e-mail',
+        color: 'green',
+      });
+    } catch {
+      notifications.show({
+        title: 'Erro',
+        message: 'Erro ao reenviar código',
         color: 'red',
       });
     } finally {
@@ -124,7 +154,11 @@ export function EsqueciSenha() {
 
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await authService.resetPassword({
+        identifier,
+        code,
+        newPassword,
+      });
       notifications.show({
         title: 'Sucesso',
         message: 'Senha alterada com sucesso!',
@@ -179,8 +213,8 @@ export function EsqueciSenha() {
       <Box className="floating-field">
         <input
           type="text"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           placeholder=" "
           aria-label="E-mail/CPF"
         />
@@ -201,7 +235,7 @@ export function EsqueciSenha() {
           }
         }}
       >
-        Gerar código
+        Enviar código
       </Button>
 
       <Button
@@ -256,6 +290,25 @@ export function EsqueciSenha() {
           root: {
             height: '56px',
             borderRadius: '8px',
+          }
+        }}
+      >
+        Verificar código
+      </Button>
+
+      <Button
+        fullWidth
+        size="lg"
+        variant="outline"
+        c={DARK_BLUE}
+        onClick={handleResendCode}
+        loading={loading}
+        styles={{
+          root: {
+            borderColor: DARK_BLUE,
+            height: '56px',
+            borderRadius: '8px',
+            borderWidth: '2px',
           }
         }}
       >

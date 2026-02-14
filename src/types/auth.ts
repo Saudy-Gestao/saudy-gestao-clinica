@@ -58,9 +58,9 @@ export interface AuthResponse {
 }
 
 export interface ResetPasswordData {
-  email: string;
-  code?: string;
-  newPassword?: string;
+  identifier: string;
+  code: string;
+  newPassword: string;
 }
 
 export interface PasswordStrength {

@@ -63,22 +63,22 @@ class AuthService {
   /**
    * Enviar código de recuperação de senha
    */
-  async sendResetCode(email: string): Promise<void> {
-    await api.post('/auth/forgot-password', { email });
+  async sendResetCode(identifier: string): Promise<void> {
+    await api.post('/forgot-password', { identifier });
   }
 
   /**
    * Verificar código de recuperação
    */
-  async verifyResetCode(email: string, code: string): Promise<void> {
-    await api.post('/auth/verify-code', { email, code });
+  async verifyResetCode(identifier: string, code: string): Promise<void> {
+    await api.post('/verify-code', { identifier, code });
   }
 
   /**
    * Redefinir senha
    */
   async resetPassword(data: ResetPasswordData): Promise<void> {
-    await api.post('/auth/reset-password', data);
+    await api.post('/reset-password', data);
   }
 
   /**

@@ -1,5 +1,7 @@
 import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import userService from '../../services/userService';
 import {
   UserPlus,
   Calendar,
@@ -19,23 +21,80 @@ import { DARK_BLUE } from '../../themes/theme';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
+  const [allowedModules, setAllowedModules] = useState<string[]>([]);
+
+  const extractModulesFromAccesses = (accesses: any[]) => {
+    const modules: string[] = [];
+
+    (accesses || []).forEach((access: any) => {
+      (access.modules || []).forEach((module: any) => {
+        if (module?.name && !modules.includes(module.name)) {
+          modules.push(module.name);
+        }
+      });
+    });
+
+    return modules;
+  };
+
+  const fetchUserModules = async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      setAllowedModules([]);
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      if (!user?.id) {
+        setAllowedModules([]);
+        return;
+      }
+
+      const freshUser = await userService.getUser(user.id);
+      localStorage.setItem('user', JSON.stringify(freshUser));
+      setAllowedModules(extractModulesFromAccesses(freshUser.accesses || []));
+    } catch (error) {
+      try {
+        const cachedUser = JSON.parse(userStr);
+        setAllowedModules(extractModulesFromAccesses(cachedUser.accesses || []));
+      } catch {
+        setAllowedModules([]);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchUserModules();
+
+    const onUserUpdated = () => {
+      fetchUserModules();
+    };
+
+    window.addEventListener('auth:user-updated', onUserUpdated);
+
+    return () => {
+      window.removeEventListener('auth:user-updated', onUserUpdated);
+    };
+  }, []);
+
   const sections = [
     {
       title: 'Fluxo do Paciente',
       items: [
-        { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento' },
-        { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento' },
-        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/consulta' },
-        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/consulta' },
+        { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
+        { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
+        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/consulta', moduleName: 'anamnese' },
+        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/consulta', moduleName: 'enfermagem' },
       ]
     },
     {
       title: 'Suporte Clínico',
       items: [
-        { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta' },
-        { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo' },
-        { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento' },
-        { icon: Folder, label: 'Documentos', desc: 'Gestão documental' },
+        { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta', moduleName: 'consulta' },
+        { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo', moduleName: 'laudo' },
+        { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento', moduleName: 'envelopamento' },
+        { icon: Folder, label: 'Documentos', desc: 'Gestão documental', moduleName: 'documentos' },
       ]
     },
     {
@@ -53,9 +112,37 @@ export function WorkflowSections() {
     }
   ];
 
+  // Filtra as seções para mostrar apenas módulos permitidos
+  const filteredSections = sections.map(section => ({
+    ...section,
+    items: section.items.filter(item => 
+      allowedModules.length === 0 || allowedModules.includes(item.moduleName)
+    )
+  })).filter(section => section.items.length > 0); // Remove seções vazias
+
   return (
     <>
-      {sections.map((section, idx) => (
+      {allowedModules.length === 0 ? (
+        <Box p="xl" style={{ textAlign: 'center' }}>
+          <Text size="lg" c="dimmed" mb="xs">
+            🔒 Você ainda não possui acessos configurados
+          </Text>
+          <Text size="sm" c="dimmed">
+            Entre em contato com o administrador do sistema para solicitar permissões
+          </Text>
+        </Box>
+      ) : filteredSections.length === 0 ? (
+        <Box p="xl" style={{ textAlign: 'center' }}>
+          <Text size="lg" c="dimmed" mb="xs">
+            🔒 Nenhum módulo disponível
+          </Text>
+          <Text size="sm" c="dimmed">
+            Seus acessos não correspondem a nenhum módulo do sistema
+          </Text>
+        </Box>
+      ) : (
+        <>
+          {filteredSections.map((section, idx) => (
         <Box key={idx} mb={30}>
           <Text fw={600} size="lg" c="dimmed" mb="md">{section.title}</Text>
           <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
@@ -89,6 +176,8 @@ export function WorkflowSections() {
           </SimpleGrid>
         </Box>
       ))}
+        </>
+      )}
     </>
   );
 }
