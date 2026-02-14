@@ -11,12 +11,12 @@ export interface Module {
 
 export const moduleService = {
   getAll: async (): Promise<Module[]> => {
-    const response = await api.get('/modules');
+    const response = await api.get('/auth/modules');
     return response.data;
   },
 
   getById: async (id: string): Promise<Module> => {
-    const response = await api.get(`/modules/${id}`);
+    const response = await api.get(`/auth/modules/${id}`);
     return response.data;
   },
 };
