@@ -30,10 +30,6 @@ export function UserMenu() {
           <Menu.Item icon={<Settings size={16} />} onClick={() => navigate('/settings')}>
             Configurações
           </Menu.Item>
-          <Menu.Divider />
-          <Menu.Item color="red" icon={<LogOut size={16} />} onClick={handleLogout}>
-            Sair
-          </Menu.Item>
         </Menu.Dropdown>
       </Menu>
   );

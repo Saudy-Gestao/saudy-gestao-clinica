@@ -1,7 +1,7 @@
 import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import api from '../../services/api';
+import userService from '../../services/userService';
 import {
   UserPlus,
   Calendar,
@@ -23,89 +23,59 @@ export function WorkflowSections() {
   const navigate = useNavigate();
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
 
-  useEffect(() => {
-    // Busca os módulos permitidos do usuário logado
-    const fetchUserModules = async () => {
-      const userStr = localStorage.getItem('user');
-      console.log('🔍 LocalStorage user string:', userStr);
-      
-      if (!userStr) {
-        console.warn('⚠️ Nenhum usuário no localStorage');
+  const extractModulesFromAccesses = (accesses: any[]) => {
+    const modules: string[] = [];
+
+    (accesses || []).forEach((access: any) => {
+      (access.modules || []).forEach((module: any) => {
+        if (module?.name && !modules.includes(module.name)) {
+          modules.push(module.name);
+        }
+      });
+    });
+
+    return modules;
+  };
+
+  const fetchUserModules = async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      setAllowedModules([]);
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      if (!user?.id) {
+        setAllowedModules([]);
         return;
       }
 
+      const freshUser = await userService.getUser(user.id);
+      localStorage.setItem('user', JSON.stringify(freshUser));
+      setAllowedModules(extractModulesFromAccesses(freshUser.accesses || []));
+    } catch (error) {
       try {
-        const user = JSON.parse(userStr);
-        console.log('👤 Usuário completo:', user);
-        console.log('🔐 Acessos do usuário:', user.accesses);
-        
-        // Verifica se os acessos têm módulos
-        const hasModules = user.accesses?.some((access: any) => 
-          access.modules && Array.isArray(access.modules) && access.modules.length > 0
-        );
-
-        let accesses = user.accesses;
-
-        // Se não tiver módulos, busca da API
-        if (!hasModules && user.id) {
-          console.log('⚠️ Módulos não encontrados no localStorage, buscando da API...');
-          console.log('🔗 Chamando GET /users/' + user.id);
-          try {
-            const response = await api.get(`/users/${user.id}`);
-            console.log('📡 Resposta da API:', response);
-            console.log('📡 Data:', response.data);
-            accesses = response.data.accesses || [];
-            console.log('✅ Acessos atualizados da API:', accesses);
-            
-            // Atualiza o localStorage com os dados completos
-            const updatedUser = { ...user, accesses };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            console.log('💾 localStorage atualizado com módulos');
-          } catch (error) {
-            console.error('❌ Erro ao buscar acessos da API:', error);
-            console.error('❌ Detalhes do erro:', error);
-          }
-        } else if (hasModules) {
-          console.log('✅ Módulos já encontrados no localStorage');
-        } else {
-          console.log('⚠️ user.id não encontrado:', user);
-        }
-        
-        // Extrai todos os módulos dos acessos
-        const modules: string[] = [];
-        if (accesses && Array.isArray(accesses)) {
-          console.log('📋 Número de acessos:', accesses.length);
-          
-          accesses.forEach((access: any, index: number) => {
-            console.log(`  Acesso ${index + 1}:`, access);
-            console.log(`  - Description: ${access.description}`);
-            console.log(`  - Modules:`, access.modules);
-            
-            if (access.modules && Array.isArray(access.modules)) {
-              console.log(`  - Número de módulos: ${access.modules.length}`);
-              access.modules.forEach((module: any) => {
-                console.log(`    - Módulo:`, module);
-                if (module.name && !modules.includes(module.name)) {
-                  modules.push(module.name);
-                  console.log(`    ✅ Adicionado: ${module.name}`);
-                }
-              });
-            } else {
-              console.warn(`  ⚠️ Acesso ${index + 1} não tem módulos ou não é array`);
-            }
-          });
-        } else {
-          console.warn('⚠️ accesses não existe ou não é array');
-        }
-        
-        console.log('🎯 Módulos permitidos FINAL:', modules);
-        setAllowedModules(modules);
-      } catch (error) {
-        console.error('❌ Erro ao processar usuário:', error);
+        const cachedUser = JSON.parse(userStr);
+        setAllowedModules(extractModulesFromAccesses(cachedUser.accesses || []));
+      } catch {
+        setAllowedModules([]);
       }
+    }
+  };
+
+  useEffect(() => {
+    fetchUserModules();
+
+    const onUserUpdated = () => {
+      fetchUserModules();
     };
 
-    fetchUserModules();
+    window.addEventListener('auth:user-updated', onUserUpdated);
+
+    return () => {
+      window.removeEventListener('auth:user-updated', onUserUpdated);
+    };
   }, []);
 
   const sections = [

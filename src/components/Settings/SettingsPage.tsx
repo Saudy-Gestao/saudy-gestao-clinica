@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
   Paper, 
@@ -27,7 +28,8 @@ import {
   Edit, 
   Trash, 
   Save,
-  UserPlus
+  UserPlus,
+  ChevronLeft
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -67,6 +69,7 @@ const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
 );
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const [activeTab, setActiveTab] = useState<string | null>('company');
   
@@ -521,6 +524,22 @@ export function SettingsPage() {
     }
   };
 
+  const refreshLoggedUserInStorage = async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+
+    try {
+      const currentUser = JSON.parse(userStr);
+      if (!currentUser?.id) return;
+
+      const freshUser = await userService.getUser(currentUser.id);
+      localStorage.setItem('user', JSON.stringify(freshUser));
+      window.dispatchEvent(new CustomEvent('auth:user-updated'));
+    } catch (error) {
+      console.error('Erro ao atualizar dados do usuário logado:', error);
+    }
+  };
+
   // Accesses
   const openAccessModalForCreate = () => {
     if (modules.length === 0) {
@@ -579,6 +598,7 @@ export function SettingsPage() {
         notifications.show({ title: 'Sucesso', message: 'Acesso criado', color: 'green' });
       }
       setAccessModalOpen(false);
+      await refreshLoggedUserInStorage();
       fetchAccesses();
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar acesso', color: 'red' });
@@ -642,7 +662,12 @@ export function SettingsPage() {
   return (
     <PageContainer>
       <Group justify="space-between" align="center" mb="lg">
-        <Title order={1} fw={600} style={{ fontSize: '1.8rem' }}>Configurações</Title>
+        <Group gap="sm" align="center">
+          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+            <ChevronLeft size={28} />
+          </ActionIcon>
+          <Title order={1} fw={600} style={{ fontSize: '1.8rem' }}>Configurações</Title>
+        </Group>
         <Text c="dimmed">{companies.find(c => c.id === selectedCompanyId)?.legalName}</Text>
       </Group>
 
