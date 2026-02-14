@@ -84,8 +84,8 @@ export function WorkflowSections() {
       items: [
         { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
-        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/consulta', moduleName: 'anamnese' },
-        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/consulta', moduleName: 'enfermagem' },
+        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/anamnese', moduleName: 'anamnese' },
+        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/enfermagem', moduleName: 'enfermagem' },
       ]
     },
     {
