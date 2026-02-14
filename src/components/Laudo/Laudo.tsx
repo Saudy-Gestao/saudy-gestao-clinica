@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Search, Plus, ChevronLeft, Lock, Eye, EyeOff } from 'lucide-react';
+import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import reportService from '../../services/reportService';
 
 interface PatientRow {
-  id: number;
+  id: string;
   nomeCompleto: string;
+  cpf?: string;
+  dataNascimento?: string;
   status: string;
   agendadoPara: string;
   medicoResponsavel: string;
@@ -16,41 +20,52 @@ interface PatientRow {
   observacao: string;
 }
 
-const SAMPLE_ROWS: PatientRow[] = [
-  {
-    id: 1,
-    nomeCompleto: 'Maria Silva Santos',
-    status: 'Em análise',
-    agendadoPara: '-',
-    medicoResponsavel: '-',
-    exame: 'Raio-X Tórax',
-    observacao: '-',
-  },
-  {
-    id: 2,
-    nomeCompleto: 'João Pedro Oliveira',
-    status: 'Laudado',
-    agendadoPara: '12/12/2025 | 12:00:00',
-    medicoResponsavel: 'Ana Clara',
-    exame: 'Ecocardiograma',
-    observacao: 'Dentro da normalidade',
-  },
-];
-
-const PATIENT_INFO: Record<number, { cpf?: string; dataNascimento?: string; medicoResponsavel?: string; exame?: string; observacao?: string }> = {
-  1: { cpf: '987.654.321-00', dataNascimento: '01/01/1990', medicoResponsavel: '', exame: 'Raio-X Tórax', observacao: '-' },
-  2: { cpf: '123.087.234-09', dataNascimento: '18/12/2000', medicoResponsavel: 'Ana Clara', exame: 'Ecocardiograma', observacao: 'Dentro da normalidade' },
-};
-
 export function Laudo() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [rows] = useState(SAMPLE_ROWS);
+  const [rows, setRows] = useState<PatientRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
   const filtered = rows.filter((r) => r.nomeCompleto.toLowerCase().includes(query.toLowerCase()));
+
+  const mapApiToRow = (it: any): PatientRow => ({
+    id: String(it.id),
+    nomeCompleto: it.patientName || '',
+    cpf: it.cpf || '',
+    dataNascimento: it.birthDate || '',
+    status: it.status || '',
+    agendadoPara: it.scheduledFor || '-',
+    medicoResponsavel: it.responsibleDoctor || '-',
+    exame: it.exam || '-',
+    observacao: it.observation || '-',
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data: any = await reportService.list();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : []));
+        setRows(list.map(mapApiToRow));
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar laudos',
+          color: 'red',
+        });
+      }
+    };
+
+    load();
+  }, []);
 
 
 
@@ -79,22 +94,23 @@ export function Laudo() {
 
   const openNovoLaudo = (r?: PatientRow) => {
     if (r) {
-      const info = PATIENT_INFO[r.id] || {};
+      setEditingId(r.id);
       setLaudoData({
         nome: r.nomeCompleto,
-        cpf: info.cpf || '',
-        dataNascimento: info.dataNascimento || '',
+        cpf: r.cpf || '',
+        dataNascimento: r.dataNascimento || '',
         medicoSolicitante: '',
         medicoLaudante: '',
         medicoRevisor: '',
         descricao: '',
         conclusao: '',
         observacoes: '',
-        status: '',
-        exame: info.exame || '',
+        status: r.status || '',
+        exame: r.exame || '',
       });
       setIsNewPatient(false);
     } else {
+      setEditingId(null);
       setLaudoData({
         nome: '',
         cpf: '',
@@ -350,7 +366,57 @@ export function Laudo() {
 
             <Group justify="flex-end" mt={70}>
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={() => { /* TODO: salvar laudo */ setModalOpen(false); }} size="sm">Salvar</Button>
+              <Button
+                bg={DARK_BLUE}
+                onClick={async () => {
+                  if (!laudoData.nome.trim()) {
+                    showNotification({ title: 'Erro', message: 'Nome e obrigatorio', color: 'red' });
+                    return;
+                  }
+
+                  const payload = {
+                    patientName: laudoData.nome,
+                    cpf: laudoData.cpf || undefined,
+                    birthDate: laudoData.dataNascimento || undefined,
+                    requestingDoctor: laudoData.medicoSolicitante || undefined,
+                    reportingDoctor: laudoData.medicoLaudante || undefined,
+                    reviewingDoctor: laudoData.medicoRevisor || undefined,
+                    description: laudoData.descricao || undefined,
+                    conclusion: laudoData.conclusao || undefined,
+                    notes: laudoData.observacoes || undefined,
+                    status: laudoData.status || undefined,
+                    exam: laudoData.exame || undefined,
+                  };
+
+                  try {
+                    if (editingId) {
+                      const current = rows.find((r) => r.id === editingId);
+                      const updated = await reportService.update(editingId, {
+                        ...payload,
+                        scheduledFor: current?.agendadoPara || undefined,
+                        responsibleDoctor: current?.medicoResponsavel || undefined,
+                        observation: current?.observacao || undefined,
+                      });
+                      setRows((prev) => prev.map((r) => (r.id === editingId ? mapApiToRow(updated) : r)));
+                    } else {
+                      const created = await reportService.create(payload);
+                      setRows((prev) => [mapApiToRow(created), ...prev]);
+                    }
+
+                    setModalOpen(false);
+                    setEditingId(null);
+                  } catch (err: any) {
+                    showNotification({
+                      title: 'Erro',
+                      message: err?.response?.data?.message || err?.message || 'Erro ao salvar laudo',
+                      color: 'red',
+                    });
+                  }
+                }}
+                size="sm"
+              >
+                Salvar
+              </Button>
             </Group>
           </Box>
         </Stack>

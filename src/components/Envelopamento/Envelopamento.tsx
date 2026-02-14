@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, FileButton, Badge } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -6,9 +6,10 @@ import { Search, Plus, ChevronLeft, Download, Edit2, UploadCloud } from 'lucide-
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import envelopmentService from '../../services/envelopmentService';
 
 interface PatientRow {
-  id: number;
+  id: string;
   nomeCompleto: string;
   dataHora: string;
   responsavel: string;
@@ -18,35 +19,11 @@ interface PatientRow {
   observacao?: string;
 }
 
-const SAMPLE_ROWS: PatientRow[] = [
-  {
-    id: 1,
-    nomeCompleto: 'Maria Silva Santos',
-    dataHora: '28/12/2025 | 15:30:09',
-    responsavel: 'Dr(a) Fernanda Maciel',
-    status: 'Entregue',
-    paginas: 5,
-    exame: 'Relatório',
-    observacao: '-',
-  },
-  {
-    id: 2,
-    nomeCompleto: 'João Pedro Oliveira',
-    dataHora: '30/12/2025 | 16:50:04',
-    responsavel: 'Dr. Luciano Farias',
-    status: 'Pronto',
-    paginas: 2,
-    exame: 'Exame',
-    observacao: 'Arquivos OK',
-  },
-];
-
-
 
 export function Envelopamento() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [rows, setRows] = useState(SAMPLE_ROWS);
+  const [rows, setRows] = useState<PatientRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
@@ -63,7 +40,42 @@ export function Envelopamento() {
     file: File | null;
   }>({ nome: '', responsavel: '', tipoDocumento: '', descricao: '', file: null });
 
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const mapApiToRow = (it: any): PatientRow => ({
+    id: String(it.id),
+    nomeCompleto: it.patientName || '',
+    dataHora: it.dateTime || '-',
+    responsavel: it.responsible || '-',
+    status: it.status || '-',
+    paginas: it.pages ?? 0,
+    exame: it.documentType || '-',
+    observacao: it.description || '-',
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data: any = await envelopmentService.list();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : []));
+        setRows(list.map(mapApiToRow));
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar envelopamentos',
+          color: 'red',
+        });
+      }
+    };
+
+    load();
+  }, []);
 
 
 
@@ -86,31 +98,50 @@ export function Envelopamento() {
     showNotification({ title: 'Download', message: `Solicitado download do registro de ${r.nomeCompleto}`, color: 'blue' });
   };
 
-  const handleAddOrUpdate = () => {
+  const handleAddOrUpdate = async () => {
     if (!envelopeData.nome.trim()) {
       showNotification({ title: 'Erro', message: 'Nome é obrigatório', color: 'red' });
       return;
     }
 
+    const now = new Date();
+    const payload = {
+      patientName: envelopeData.nome,
+      dateTime: `${now.toLocaleDateString()} | ${now.toLocaleTimeString()}`,
+      responsible: envelopeData.responsavel || undefined,
+      status: 'Pronto',
+      pages: envelopeData.file ? 1 : 0,
+      documentType: envelopeData.tipoDocumento || undefined,
+      description: envelopeData.descricao || undefined,
+      fileName: envelopeData.file?.name || undefined,
+    };
+
     if (editingId) {
-      setRows((prev) => prev.map((p) => p.id === editingId ? { ...p, nomeCompleto: envelopeData.nome, responsavel: envelopeData.responsavel || '-', exame: envelopeData.tipoDocumento, observacao: envelopeData.descricao } : p));
-      showNotification({ title: 'Atualizado', message: 'Envelopamento atualizado', color: 'green' });
+      try {
+        const updated = await envelopmentService.update(editingId, payload);
+        setRows((prev) => prev.map((p) => (p.id === editingId ? mapApiToRow(updated) : p)));
+        showNotification({ title: 'Atualizado', message: 'Envelopamento atualizado', color: 'green' });
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar envelopamento',
+          color: 'red',
+        });
+        return;
+      }
     } else {
-      const id = rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1;
-      const now = new Date();
-      const dataHora = `${now.toLocaleDateString()} | ${now.toLocaleTimeString()}`;
-      const newRow: PatientRow = {
-        id,
-        nomeCompleto: envelopeData.nome,
-        dataHora,
-        responsavel: envelopeData.responsavel || '-',
-        status: 'Pronto',
-        paginas: envelopeData.file ? 1 : 0,
-        exame: envelopeData.tipoDocumento,
-        observacao: envelopeData.descricao,
-      };
-      setRows((prev) => [newRow, ...prev]);
-      showNotification({ title: 'Adicionado', message: 'Envelopamento adicionado', color: 'green' });
+      try {
+        const created = await envelopmentService.create(payload);
+        setRows((prev) => [mapApiToRow(created), ...prev]);
+        showNotification({ title: 'Adicionado', message: 'Envelopamento adicionado', color: 'green' });
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao adicionar envelopamento',
+          color: 'red',
+        });
+        return;
+      }
     }
 
     setModalOpen(false);

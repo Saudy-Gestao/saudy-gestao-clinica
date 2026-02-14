@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -10,6 +10,7 @@ import {
   Stack,
   Textarea,
   Select,
+  MultiSelect,
   ActionIcon,
   Popover,
   SimpleGrid,
@@ -21,11 +22,19 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Search, Plus, ChevronLeft, ChevronRight, Calendar, Clock, LayoutGrid, List } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
+import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import appointmentService from '../../services/appointmentService';
+import patientService from '../../services/patientService';
+import doctorService from '../../services/doctorService';
+import insuranceService from '../../services/insuranceService';
+import procedureService from '../../services/procedureService';
+import { formatCPF } from '../../utils/formatters';
 
 interface Agendamento {
-  id: number;
+  id: string;
+  patientId?: string;
   pacienteNome: string;
   pacienteCPF: string;
   medicoNome: string;
@@ -40,65 +49,28 @@ interface Agendamento {
 }
 
 interface NovoAgendamento {
+  pacienteId: string;
+  pacienteNome: string;
+  pacienteCPF: string;
   especialidade: string;
   convenio: string;
   data: Date | null;
   hora: string;
   profissional: string;
+  tipoConsulta: string;
   informacoes: string;
 }
 
-const INITIAL_AGENDAMENTOS: Agendamento[] = [
-  {
-    id: 1,
-    pacienteNome: 'Maria Silva Santos',
-    pacienteCPF: '123.456.789-00',
-    medicoNome: 'Dr. João Pereira',
-    especialidade: 'Cardiologia',
-    convenio: 'Unimed',
-    data: '2026-01-15',
-    hora: '09:00',
-    tipoConsulta: 'Consulta de rotina',
-    status: 'Agendado',
-    observacoes: 'Paciente com histórico de hipertensão',
-    totem: 23,
-  },
-  {
-    id: 2,
-    pacienteNome: 'João Pedro Oliveira',
-    pacienteCPF: '987.654.321-00',
-    medicoNome: 'Dra. Ana Costa',
-    especialidade: 'Ortopedia',
-    convenio: 'Particular',
-    data: '2026-01-16',
-    hora: '14:30',
-    tipoConsulta: 'Retorno',
-    status: 'Pendente',
-    observacoes: 'Avaliação pós-cirurgia',
-    totem: 24,
-  },
-  {
-    id: 3,
-    pacienteNome: 'Carla Santos',
-    pacienteCPF: '456.789.123-00',
-    medicoNome: 'Dr. Roberto Lima',
-    especialidade: 'Dermatologia',
-    convenio: 'Sulamerica',
-    data: '2026-01-17',
-    hora: '11:00',
-    tipoConsulta: 'Primeira consulta',
-    status: 'Agendado',
-    observacoes: '',
-    totem: 25,
-  },
-];
-
 const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
+  pacienteId: '',
+  pacienteNome: '',
+  pacienteCPF: '',
   especialidade: '',
   convenio: '',
   data: null,
   hora: '',
   profissional: '',
+  tipoConsulta: '',
   informacoes: '',
 };
 
@@ -110,17 +82,17 @@ const TIME_SLOTS = {
 
 export function Agendamento() {
   const navigate = useNavigate();
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(INITIAL_AGENDAMENTOS);
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingAgendamentoId, setEditingAgendamentoId] = useState<number | null>(null);
+  const [editingAgendamentoId, setEditingAgendamentoId] = useState<string | null>(null);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('list');
   // State to track expanded cards (ids)
-  const [expandedIds, setExpandedIds] = useState<number[]>([]);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   // Calendar state
   const [currentMonth, setCurrentMonth] = useState(() => dayjs().startOf('month').toDate());
@@ -128,6 +100,20 @@ export function Agendamento() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   // Modal for showing appointments on a selected day
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [patientOptions, setPatientOptions] = useState<{ value: string; label: string }[]>([]);
+  const [patientById, setPatientById] = useState<Record<string, any>>({});
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+  const [summaryItems, setSummaryItems] = useState<string[]>([]);
+  const [doctorOptions, setDoctorOptions] = useState<{ value: string; label: string }[]>([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
+  const [insurancesLoading, setInsurancesLoading] = useState(false);
+  const [procedureOptions, setProcedureOptions] = useState<{ value: string; label: string }[]>([]);
+  const [proceduresLoading, setProceduresLoading] = useState(false);
+  const [savingAgendamento, setSavingAgendamento] = useState(false);
 
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState('');
@@ -143,6 +129,205 @@ export function Agendamento() {
   const [viewedDate, setViewedDate] = useState<Date>(new Date());
 
   dayjs.locale('pt-br');
+
+
+
+  const mapApiToAgendamento = (it: any): Agendamento => ({
+    id: String(it.id),
+    patientId: it.patientId || it.patient_id || it.patient?.id || undefined,
+    pacienteNome: it.patientName || it.patient_name || it.patient?.name || it.pacienteNome || '',
+    pacienteCPF: it.patientCpf || it.patient_cpf || it.patient?.cpf || it.pacienteCPF || '',
+    medicoNome: it.doctorName || it.doctor_name || it.doctor?.name || it.medicoNome || '',
+    especialidade: it.specialty || it.procedure || it.procedureName || it.procedimento || it.especialidade || '',
+    convenio: it.convenio || it.insurance || it.healthInsuranceName || '',
+    data: it.date || it.data || '',
+    hora: it.time || it.hora || '',
+    tipoConsulta: it.type || it.tipoConsulta || '',
+    status: it.status || '',
+    observacoes: it.observations || it.observacoes || '',
+    totem: it.totem ?? undefined,
+  });
+
+  const getResumoLinha = (agendamento: Agendamento) => {
+    const parts = [agendamento.tipoConsulta, agendamento.especialidade].filter(Boolean);
+    const base = parts.length ? parts.join(' | ') : '—';
+    return agendamento.medicoNome ? `${base} | Dr(a): ${agendamento.medicoNome}` : base;
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data: any = await appointmentService.list();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : []));
+        setAgendamentos(list.map(mapApiToAgendamento));
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos',
+          color: 'red',
+        });
+      }
+    };
+
+    load();
+  }, []);
+
+  useEffect(() => {
+    const loadPatients = async () => {
+      setPatientsLoading(true);
+      try {
+        const data: any = await patientService.listPatients();
+        const listRaw = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.patients)
+            ? data.patients
+            : (Array.isArray(data?.data?.patients)
+              ? data.data.patients
+              : (Array.isArray(data?.data)
+                ? data.data
+                : (Array.isArray(data?.items) ? data.items : []))));
+
+        const list: any[] = Array.isArray(listRaw) ? listRaw : [];
+        const options = list.map((p: any) => {
+          const id = String(p.id ?? p.patientId ?? '');
+          const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+          const label = name ? `${name}${p.cpf ? ` • ${formatCPF(p.cpf)}` : ''}` : 'Paciente';
+          return { value: id || label, label };
+        });
+
+        const byId: Record<string, any> = {};
+        list.forEach((p: any) => {
+          const id = String(p.id ?? p.patientId ?? '');
+          if (id) byId[id] = p;
+        });
+
+        setPatientById(byId);
+        setPatientOptions(options);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+          color: 'red',
+        });
+      } finally {
+        setPatientsLoading(false);
+      }
+    };
+
+    loadPatients();
+  }, []);
+
+  useEffect(() => {
+    const loadInsurances = async () => {
+      setInsurancesLoading(true);
+      try {
+        const data: any = await insuranceService.listInsurances({ isActive: true });
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const options = list
+          .map((it: any) => {
+            const name = (it.name || it.nome || '').toString().trim();
+            return name ? { value: name, label: name } : null;
+          })
+          .filter(Boolean) as { value: string; label: string }[];
+
+        setInsuranceOptions(options);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+          color: 'red',
+        });
+      } finally {
+        setInsurancesLoading(false);
+      }
+    };
+
+    const loadDoctors = async () => {
+      setDoctorsLoading(true);
+      try {
+        const data: any = await doctorService.listDoctors();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const options = list
+          .map((doctor: any) => {
+            const name = doctor.name || doctor.nome || doctor.fullName || '';
+            return name ? { value: name, label: name } : null;
+          })
+          .filter(Boolean) as { value: string; label: string }[];
+
+        setDoctorOptions(options);
+
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+          color: 'red',
+        });
+      } finally {
+        setDoctorsLoading(false);
+      }
+    };
+
+    const loadProcedures = async () => {
+      setProceduresLoading(true);
+      try {
+        const data: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const options = list
+          .map((item: any) => {
+            const name = (item.name || item.nome || '').toString().trim();
+            return name ? { value: name, label: name } : null;
+          })
+          .filter(Boolean) as { value: string; label: string }[];
+
+        setProcedureOptions(options);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+          color: 'red',
+        });
+      } finally {
+        setProceduresLoading(false);
+      }
+    };
+
+    loadInsurances();
+    loadDoctors();
+    loadProcedures();
+  }, []);
 
   const getFilteredTimeSlots = (period: string) => {
     if (period === 'Todos') {
@@ -160,64 +345,173 @@ export function Agendamento() {
 
   const handleEditAgendamento = (agendamento: Agendamento) => {
     setNovoAgendamento({
+      pacienteId: agendamento.patientId || '',
+      pacienteNome: agendamento.pacienteNome || '',
+      pacienteCPF: agendamento.pacienteCPF || '',
       especialidade: agendamento.especialidade,
       convenio: agendamento.convenio,
-      data: new Date(agendamento.data),
+      data: agendamento.data ? new Date(agendamento.data) : null,
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
+      tipoConsulta: agendamento.tipoConsulta,
       informacoes: agendamento.observacoes,
     });
+    const specialties = agendamento.especialidade
+      ? agendamento.especialidade.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    setSelectedSpecialties(specialties);
+    setSummaryItems(specialties);
+    setSelectedPatientId(agendamento.patientId || null);
     setIsEditing(true);
     setEditingAgendamentoId(agendamento.id);
     setModalOpen(true);
   };
 
-  const handleAddAgendamento = () => {
-    if (!novoAgendamento.especialidade || !novoAgendamento.data || !novoAgendamento.hora) {
-      alert('Por favor, preencha os campos obrigatórios');
+  const handleSelectPatient = (value: string | null) => {
+    if (!value) {
+      setSelectedPatientId(null);
+      setNovoAgendamento((prev) => ({
+        ...prev,
+        pacienteId: '',
+        pacienteNome: '',
+        pacienteCPF: '',
+      }));
       return;
     }
 
-    const agendamentoData = {
-      pacienteNome: '', // Placeholder, since not in modal
-      pacienteCPF: '', // Placeholder
-      medicoNome: novoAgendamento.profissional,
-      especialidade: novoAgendamento.especialidade,
-      data: novoAgendamento.data ? novoAgendamento.data.toISOString().split('T')[0] : '',
-      hora: novoAgendamento.hora,
-      tipoConsulta: '', // Placeholder
-      status: '', // Placeholder
-      observacoes: novoAgendamento.informacoes,
-      convenio: novoAgendamento.convenio,
+    setSelectedPatientId(value);
+    const p = patientById[value];
+    if (!p) return;
+
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      pacienteId: String(p.id ?? p.patientId ?? value),
+      pacienteNome: p.name || p.fullName || p.patientName || prev.pacienteNome || '',
+      pacienteCPF: p.cpf || prev.pacienteCPF || '',
+      convenio: p.healthInsuranceName || prev.convenio || '',
+    }));
+  };
+
+  const handleAddSummary = () => {
+    if (selectedSpecialties.length === 0) return;
+    setSummaryItems((prev) => Array.from(new Set([...prev, ...selectedSpecialties])));
+    setSelectedSpecialties([]);
+  };
+
+  const handleAddAgendamento = async () => {
+    const specialties = summaryItems.length ? summaryItems : selectedSpecialties;
+    const specialtyValue = specialties.join(', ');
+
+    if (!selectedPatientId) {
+      showNotification({ title: 'Erro', message: 'Paciente é obrigatório', color: 'red' });
+      return;
+    }
+    if (!novoAgendamento.convenio) {
+      showNotification({ title: 'Erro', message: 'Convênio é obrigatório', color: 'red' });
+      return;
+    }
+    if (!novoAgendamento.data || !novoAgendamento.hora) {
+      showNotification({ title: 'Erro', message: 'Data e horário são obrigatórios', color: 'red' });
+      return;
+    }
+    if (!novoAgendamento.profissional) {
+      showNotification({ title: 'Erro', message: 'Profissional é obrigatório', color: 'red' });
+      return;
+    }
+    if (!novoAgendamento.tipoConsulta) {
+      showNotification({ title: 'Erro', message: 'Tipo é obrigatório', color: 'red' });
+      return;
+    }
+    if (!specialtyValue) {
+      showNotification({ title: 'Erro', message: 'Procedimento é obrigatório', color: 'red' });
+      return;
+    }
+
+    const basePayload = {
+      patientId: selectedPatientId || undefined,
+      patientName: novoAgendamento.pacienteNome || undefined,
+      patientCpf: novoAgendamento.pacienteCPF || undefined,
+      doctorName: novoAgendamento.profissional || undefined,
+      specialty: specialtyValue,
+      convenio: novoAgendamento.convenio || undefined,
+      date: novoAgendamento.data ? novoAgendamento.data.toISOString().split('T')[0] : '',
+      time: novoAgendamento.hora,
+      type: novoAgendamento.tipoConsulta || undefined,
+      observations: novoAgendamento.informacoes || undefined,
     };
 
+    setSavingAgendamento(true);
     if (isEditing && editingAgendamentoId !== null) {
-      // Edit existing agendamento
-      setAgendamentos(agendamentos.map(a =>
-        a.id === editingAgendamentoId
-          ? { ...a, ...agendamentoData }
-          : a
-      ));
+      const current = agendamentos.find((a) => a.id === editingAgendamentoId);
+      try {
+        const updated = await appointmentService.update(editingAgendamentoId, {
+          ...basePayload,
+          patientName: basePayload.patientName || current?.pacienteNome || undefined,
+          patientCpf: basePayload.patientCpf || current?.pacienteCPF || undefined,
+          type: basePayload.type || current?.tipoConsulta || undefined,
+          status: current?.status || undefined,
+          totem: current?.totem,
+        });
+        setAgendamentos((prev) => prev.map((a) => (a.id === editingAgendamentoId ? mapApiToAgendamento(updated) : a)));
+        showNotification({
+          title: 'Agendamento atualizado',
+          message: 'Dados do agendamento atualizados com sucesso.',
+          color: 'green',
+        });
+      } catch (err: any) {
+        setSavingAgendamento(false);
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar agendamento',
+          color: 'red',
+        });
+        return;
+      }
     } else {
-      // Add new agendamento
-      const newAgendamento: Agendamento = {
-        ...agendamentoData,
-        id: Math.max(...agendamentos.map((a) => a.id), 0) + 1,
-        totem: Math.floor(Math.random() * 100) + 1,
-      };
-      setAgendamentos([...agendamentos, newAgendamento]);
+      try {
+        const created = await appointmentService.create({
+          ...basePayload,
+          status: 'Pendente',
+          totem: Math.floor(Math.random() * 100) + 1,
+        });
+        setAgendamentos((prev) => [mapApiToAgendamento(created), ...prev]);
+        showNotification({
+          title: 'Agendamento criado',
+          message: 'Agendamento realizado com sucesso.',
+          color: 'green',
+        });
+      } catch (err: any) {
+        setSavingAgendamento(false);
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao criar agendamento',
+          color: 'red',
+        });
+        return;
+      }
     }
 
     setNovoAgendamento(INITIAL_NOVO_AGENDAMENTO);
     setModalOpen(false);
     setIsEditing(false);
     setEditingAgendamentoId(null);
+    setSavingAgendamento(false);
   };
 
-  const handleStatusChange = (agendamentoId: number, newStatus: string) => {
-    setAgendamentos(agendamentos.map(a =>
-      a.id === agendamentoId ? { ...a, status: newStatus } : a
-    ));
+  const handleStatusChange = async (agendamentoId: string, newStatus: string) => {
+    const current = agendamentos.find((a) => a.id === agendamentoId);
+    if (!current) return;
+
+    try {
+      const updated = await appointmentService.update(agendamentoId, { status: newStatus });
+      setAgendamentos((prev) => prev.map((a) => (a.id === agendamentoId ? mapApiToAgendamento(updated) : a)));
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status',
+        color: 'red',
+      });
+    }
   };
 
   const rows = filteredAgendamentos.map((agendamento) => (
@@ -231,7 +525,7 @@ export function Agendamento() {
       <Box onClick={() => handleEditAgendamento(agendamento)} style={{ borderLeft: !isMobile ? '1px solid #e9ecef' : 'none', paddingLeft: !isMobile ? 16 : 0, flex: 1, cursor: 'pointer' }}>
         <Text fw={600} size="sm">{agendamento.pacienteNome}</Text>
         <Text size="xs" c="dimmed" mt={6}>
-          {agendamento.tipoConsulta} {" | "} {agendamento.especialidade} {" | "} Dr(a): {agendamento.medicoNome}
+          {getResumoLinha(agendamento)}
         </Text>
       </Box>
 
@@ -482,7 +776,15 @@ export function Agendamento() {
               bg={DARK_BLUE}
               c="white"
               leftSection={isMobile ? undefined : <Plus size={16} />}
-              onClick={() => setModalOpen(true)}
+              onClick={() => {
+                setIsEditing(false);
+                setEditingAgendamentoId(null);
+                setNovoAgendamento(INITIAL_NOVO_AGENDAMENTO);
+                setSelectedPatientId(null);
+                setSelectedSpecialties([]);
+                setSummaryItems([]);
+                setModalOpen(true);
+              }}
               size={isMobile ? "sm" : "md"}
               fw={600}
               px={isMobile ? "sm" : "xl"}
@@ -563,7 +865,7 @@ export function Agendamento() {
                         </Group>
                       ) : (
                         <Box mt={8}>
-                          <Text size="sm"><strong>Especialidade:</strong> {a.especialidade || '—'}</Text>
+                          <Text size="sm"><strong>Procedimento:</strong> {a.especialidade || '—'}</Text>
                           <Text size="sm" mt={6}><strong>Profissional:</strong> {a.medicoNome || '—'}</Text>
                           <Button size="xs" variant="outline" mt={8} onClick={() => setExpandedIds(prev => prev.filter(id => id !== a.id))}>
                             Ver menos
@@ -695,7 +997,7 @@ export function Agendamento() {
                         <Group align="center" style={{ width: '100%' }}>
                           <Box style={{ flex: 1 }}>
                             <Text fw={600}>{a.hora} — {a.pacienteNome || '—'}</Text>
-                            <Text size="xs" c="dimmed">{a.especialidade} | Dr(a). {a.medicoNome}</Text>
+                            <Text size="xs" c="dimmed">{getResumoLinha(a)}</Text>
                           </Box>
                           <Box style={{ marginLeft: 12 }}>
                             <Button size="xs" onClick={() => { handleEditAgendamento(a); setCalendarModalOpen(false); }}>
@@ -727,6 +1029,9 @@ export function Agendamento() {
           setIsEditing(false);
           setEditingAgendamentoId(null);
           setNovoAgendamento(INITIAL_NOVO_AGENDAMENTO);
+          setSelectedPatientId(null);
+          setSelectedSpecialties([]);
+          setSummaryItems([]);
         }}
         title={isEditing ? "Editar Agendamento" : "Novo Agendamento"}
         size={isMobile ? "100%" : isTablet ? "90%" : "lg"}
@@ -747,34 +1052,38 @@ export function Agendamento() {
       >
         <Stack gap={isMobile ? "sm" : "md"} mih={isMobile ? undefined : 600}>
           <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-            <Box className="floating-field">
-              <input
-                type="text"
-                value={novoAgendamento.especialidade}
-                onChange={(e) =>
-                  setNovoAgendamento({ ...novoAgendamento, especialidade: e.currentTarget.value })
-                }
-                placeholder=" "
+            <Box>
+              <Select
+                label="Paciente"
+                placeholder={patientsLoading ? 'Carregando pacientes...' : 'Selecione o paciente'}
+                data={patientOptions}
+                value={selectedPatientId}
+                onChange={handleSelectPatient}
+                searchable
+                clearable
+                nothingFoundMessage="Nenhum paciente encontrado"
+                disabled={patientsLoading}
               />
-              <label>Especialidade</label>
             </Box>
-            <Box className="floating-field">
-              <input
-                type="text"
+            <Box>
+              <Select
+                label="Convênio"
+                placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio'}
+                data={insuranceOptions}
                 value={novoAgendamento.convenio}
-                onChange={(e) =>
-                  setNovoAgendamento({ ...novoAgendamento, convenio: e.currentTarget.value })
-                }
-                placeholder=" "
+                onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenio: value || '' })}
+                searchable
+                clearable
+                disabled={insurancesLoading}
+                nothingFoundMessage="Nenhum convênio encontrado"
               />
-              <label>Convênio</label>
             </Box>
           </Group>
 
           <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
             <Box>
               <DateInput
-                label="Data da Consulta"
+                label="Data"
                 placeholder="Selecione a data"
                 value={novoAgendamento.data}
                 onChange={(value) =>
@@ -789,7 +1098,7 @@ export function Agendamento() {
             <Box>
               <TimeInput
                 label="Horário"
-                placeholder="Selecione o horário"
+                placeholder="--:--"
                 value={novoAgendamento.hora}
                 onChange={(e) =>
                   setNovoAgendamento({ ...novoAgendamento, hora: e.currentTarget.value })
@@ -800,21 +1109,59 @@ export function Agendamento() {
             </Box>
           </Group>
 
-          <Box className="floating-field">
-            <input
-              type="text"
-              value={novoAgendamento.profissional}
-              onChange={(e) =>
-                setNovoAgendamento({ ...novoAgendamento, profissional: e.currentTarget.value })
-              }
-              placeholder=" "
+          <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
+            <Box>
+              <Select
+                label="Profissional"
+                placeholder={doctorsLoading ? 'Carregando médicos...' : 'Selecione o profissional'}
+                data={doctorOptions}
+                value={novoAgendamento.profissional}
+                onChange={(value) => setNovoAgendamento({ ...novoAgendamento, profissional: value || '' })}
+                searchable
+                clearable
+                disabled={doctorsLoading}
+                nothingFoundMessage="Nenhum médico encontrado"
+              />
+            </Box>
+            <Box>
+              <Select
+                label="Tipo"
+                placeholder="Selecione"
+                data={[
+                  { value: 'Consulta', label: 'Consulta' },
+                  { value: 'Exame', label: 'Exame' },
+                  { value: 'Retorno', label: 'Retorno' },
+                  { value: 'Outro', label: 'Outro' },
+                ]}
+                value={novoAgendamento.tipoConsulta}
+                onChange={(value) => setNovoAgendamento({ ...novoAgendamento, tipoConsulta: value || '' })}
+              />
+            </Box>
+          </Group>
+
+          <Box>
+            <MultiSelect
+              label="Procedimento (selecione um ou mais)"
+              placeholder={proceduresLoading ? 'Carregando procedimentos...' : 'Selecione'}
+              data={procedureOptions}
+              value={selectedSpecialties}
+              onChange={setSelectedSpecialties}
+              searchable
+              clearable
+              disabled={proceduresLoading}
+              nothingFoundMessage="Nenhum procedimento cadastrado"
             />
-            <label>Profissional</label>
           </Box>
 
+          <Group justify="flex-start">
+            <Button variant="outline" size="xs" onClick={handleAddSummary}>
+              Adicionar ao resumo
+            </Button>
+          </Group>
+
           <Textarea
-            label="Informações"
-            placeholder="Informações adicionais sobre o agendamento"
+            label="Observações"
+            placeholder="Observações adicionais"
             rows={4}
             value={novoAgendamento.informacoes}
             onChange={(e) =>
@@ -822,11 +1169,22 @@ export function Agendamento() {
             }
           />
 
+          <Box style={{ border: '1px solid #e9ecef', borderRadius: 8, padding: 12 }}>
+            <Text fw={600} size="sm" mb={6}>Resumo</Text>
+            {summaryItems.length > 0 ? (
+              summaryItems.map((item) => (
+                <Text key={item} size="xs">{item}</Text>
+              ))
+            ) : (
+              <Text size="xs" c="dimmed">Nenhum item</Text>
+            )}
+          </Box>
+
           <Group justify="flex-end" gap="md" mt={isMobile ? "sm" : "lg"}>
             <Button variant="default" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
-            <Button bg={DARK_BLUE} onClick={handleAddAgendamento}>
+            <Button bg={DARK_BLUE} onClick={handleAddAgendamento} loading={savingAgendamento} disabled={savingAgendamento}>
               Salvar
             </Button>
           </Group>

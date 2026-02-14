@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput } from '@mantine/core';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput, Paper, Loader, Popover, Grid } from '@mantine/core';
+import invoiceService from '../services/invoiceService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, User, ExternalLink } from 'lucide-react';
+import { Search, Plus, ChevronLeft, User, ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../themes/theme';
-import { DatePickerInput } from '@mantine/dates';
+import { DatePicker } from '@mantine/dates';
+import { formatDateInput } from '../utils/formatters';
+import ResultModal from '../components/common/ResultModal';
 
 export function Header() {
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -54,19 +57,15 @@ interface InvoiceRow {
   valorTotal: number;
 }
 
-const SAMPLE_ROWS: InvoiceRow[] = [
-  { id: 1, codigo: 'FAT-2025-001', emissao: '28/12/2025 | 15:30:09', vencimento: '28/12/2025 | 15:30:09', status: 'Enviada', convenio: 'Unimed', valor: 350, descontoPercent: 0, valorTotal: 350 },
-  { id: 2, codigo: 'FAT-2025-002', emissao: '30/12/2025 | 16:50:04', vencimento: '30/12/2025 | 16:50:04', status: 'Emitida', convenio: 'Bradesco', valor: 40, descontoPercent: 10, valorTotal: 36 },
-  { id: 3, codigo: 'FAT-2025-003', emissao: '30/12/2025 | 17:20:04', vencimento: '30/12/2025 | 17:20:04', status: 'Glosada', convenio: '-', valor: 60, descontoPercent: 10, valorTotal: 54 },
-];
 
 
 
 export function Faturamento() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [rows, setRows] = useState(SAMPLE_ROWS);
+  const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -82,9 +81,38 @@ export function Faturamento() {
     vencimento: Date | null;
     formaPagamento: string;
     nome: string;
-  }>({ tipo: '', categoria: '', descricao: '', valor: undefined, vencimento: null, formaPagamento: '', nome: '' });
+    desconto?: number;
+  }>({ tipo: '', categoria: '', descricao: '', valor: undefined, vencimento: null, formaPagamento: '', nome: '', desconto: 0 });
 
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [showInvoiceSuccess, setShowInvoiceSuccess] = useState(false);
+  const [lastInvoiceCode, setLastInvoiceCode] = useState<string | null>(null);
+  const [showInvoiceError, setShowInvoiceError] = useState(false);
+  const [invoiceErrorMessage, setInvoiceErrorMessage] = useState<string | null>(null);
+  const [invoiceErrorTitle, setInvoiceErrorTitle] = useState<string | null>(null);
+  const [dateInput, setDateInput] = useState('');
+  const [popoverOpened, setPopoverOpened] = useState(false);
+
+  const formatDate = (d: Date | null) => {
+    if (!d) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const parseDate = (s: string) => {
+    if (!s) return null;
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    const day = Number(m[1]);
+    const month = Number(m[2]) - 1;
+    const year = Number(m[3]);
+    const date = new Date(year, month, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+    return date;
+  }; 
 
 
 
@@ -94,24 +122,34 @@ export function Faturamento() {
 
   const openInvoice = (r?: InvoiceRow) => {
     if (r) {
+      // If the row has a vencimento like '28/12/2025 | 15:30:09', try to parse the date part
+      const parsed = r.vencimento ? ((): Date | null => {
+        const m = r.vencimento.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+        if (!m) return null;
+        return parseDate(m[1]);
+      })() : null;
+
       setInvoiceData({
         tipo: '',
         categoria: '',
         descricao: '',
         valor: r.valor,
-        vencimento: null,
+        vencimento: parsed,
         formaPagamento: '',
         nome: '',
+        desconto: r.descontoPercent ?? 0,
       });
+      setDateInput(parsed ? formatDate(parsed) : '');
       setEditingId(r.id);
     } else {
       setInvoiceData({ tipo: '', categoria: '', descricao: '', valor: undefined, vencimento: null, formaPagamento: '', nome: '' });
+      setDateInput('');
       setEditingId(null);
     }
     setModalOpen(true);
-  };
+  }; 
 
-  const handleAddOrUpdate = () => {
+  const handleAddOrUpdate = async () => {
     if (!invoiceData.valor || invoiceData.valor <= 0) {
       showNotification({ title: 'Erro', message: 'Valor é obrigatório e deve ser maior que 0', color: 'red' });
       return;
@@ -124,25 +162,51 @@ export function Faturamento() {
 
     if (editingId) {
       const updatedValor = invoiceData.valor ?? 0;
-      setRows((prev) => prev.map((r) => r.id === editingId ? { ...r, valor: updatedValor, valorTotal: updatedValor } : r));
-      showNotification({ title: 'Atualizado', message: 'Fatura atualizada', color: 'green' });
+      const updatedDiscount = invoiceData.desconto ?? 0;
+      setRows((prev) => prev.map((r) => r.id === editingId ? { ...r, valor: updatedValor, descontoPercent: updatedDiscount, valorTotal: updatedValor - (updatedValor * (updatedDiscount || 0) / 100) } : r));
+      setShowInvoiceSuccess(true);
+      setLastInvoiceCode(`FAT-${new Date().getFullYear()}-${String(editingId).padStart(3, '0')}`);
     } else {
-      const id = rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1;
-      const now = new Date();
-      const dataHora = `${now.toLocaleDateString()} | ${now.toLocaleTimeString()}`;
-      const codigo = `FAT-${now.getFullYear()}-${String(id).padStart(3, '0')}`;
-      const newRow: InvoiceRow = {
-        id,
-        codigo,
-        emissao: dataHora,
-        vencimento: invoiceData.vencimento ? `${invoiceData.vencimento.toLocaleDateString()} | 00:00:00` : dataHora,
-        status: 'Emitida',
-        convenio: '-',
-        valor: invoiceData.valor || 0,
-        valorTotal: invoiceData.valor || 0,
-      };
-      setRows((prev) => [newRow, ...prev]);
-      showNotification({ title: 'Adicionado', message: 'Fatura adicionada', color: 'green' });
+      setSavingInvoice(true);
+      try {
+        const payload = {
+          patientName: invoiceData.nome || undefined,
+          dueDate: invoiceData.vencimento ? invoiceData.vencimento.toISOString().slice(0,10) : undefined,
+          convention: invoiceData.categoria || invoiceData.tipo || undefined,
+          value: invoiceData.valor || 0,
+          discount: invoiceData.desconto ?? 0,
+          paymentMethod: invoiceData.formaPagamento || undefined,
+        };
+        const created: any = await invoiceService.createInvoice(payload);
+
+        const now = new Date();
+        const createdId = created.id ?? created.number ?? (rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1);
+        const emissao = created.issuedAt ? new Date(created.issuedAt).toLocaleString('pt-BR') : `${now.toLocaleDateString()} | ${now.toLocaleTimeString()}`;
+        const venc = created.dueDate ? new Date(created.dueDate).toLocaleDateString('pt-BR') : (invoiceData.vencimento ? invoiceData.vencimento.toLocaleDateString() : emissao);
+
+        const newRow: InvoiceRow = {
+          id: Number(createdId),
+          codigo: (created.number as string) || `FAT-${new Date().getFullYear()}-${String(createdId).padStart(3, '0')}`,
+          emissao: emissao,
+          vencimento: venc,
+          status: created.status || 'Emitida',
+          convenio: created.convention || created.convention_name || invoiceData.categoria || '-',
+          valor: created.value ?? created.amount ?? invoiceData.valor ?? 0,
+          descontoPercent: created.discount ?? invoiceData.desconto ?? 0,
+          valorTotal: (created.value ?? invoiceData.valor ?? 0) - ((created.value ?? invoiceData.valor ?? 0) * (created.discount ?? invoiceData.desconto ?? 0) / 100),
+        };
+
+        setRows((prev) => [newRow, ...prev]);
+        setLastInvoiceCode(newRow.codigo);
+        setShowInvoiceSuccess(true);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || 'Erro ao criar fatura';
+        setInvoiceErrorTitle('Erro ao criar fatura');
+        setInvoiceErrorMessage(msg);
+        setShowInvoiceError(true);
+      } finally {
+        setSavingInvoice(false);
+      }
     }
 
     setModalOpen(false);
@@ -203,76 +267,83 @@ export function Faturamento() {
         </Box>
 
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-          <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: 'none' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Data/Hora Emissão</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Data/Hora Vencimento</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convenio</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Desconto</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor Total</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map((r) => (
-                <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                  <Table.Td>
-                    <Group gap={isMobile ? 'xs' : 'sm'}>
-                      {!isMobile && (
-                        <Box
-                          bg={DARK_BLUE}
-                          w={32}
-                          h={32}
-                          style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                        >
-                          <Text c="white" fw={600} size="sm">{r.codigo.charAt(0).toUpperCase()}</Text>
-                        </Box>
-                      )}
-                      <Box>
-                        <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.codigo}</Text>
-                        {isMobile && <Text size="xs" c="dimmed">Status: {r.status}</Text>}
-                      </Box>
-                    </Group>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="xs">{r.emissao}</Text>
-                  </Table.Td>
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{r.vencimento}</Text>
-                    </Table.Td>
-                  )}
-
-                  <Table.Td>
-                    <Text size="xs">{r.status}</Text>
-                  </Table.Td>
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs">{r.convenio}</Text>
-                    </Table.Td>
-                  )}
-
-                  <Table.Td>
-                    <Text size="xs">R${r.valor.toFixed(2)}</Text>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="xs">{r.descontoPercent ? `${r.descontoPercent}%` : '-'}</Text>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="xs">R${r.valorTotal.toFixed(2)}</Text>
-                  </Table.Td>
+          {invoicesLoading ? (
+            <Paper style={{ padding: 24, textAlign: 'center' }}>
+              <Loader />
+              <Text mt={8}>Carregando faturas...</Text>
+            </Paper>
+          ) : (
+            <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+              <Table.Thead>
+                <Table.Tr style={{ borderBottom: 'none' }}>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Data/Hora Emissão</Table.Th>
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Data/Hora Vencimento</Table.Th>}
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convenio</Table.Th>}
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Desconto</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor Total</Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((r) => (
+                  <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                    <Table.Td>
+                      <Group gap={isMobile ? 'xs' : 'sm'}>
+                        {!isMobile && (
+                          <Box
+                            bg={DARK_BLUE}
+                            w={32}
+                            h={32}
+                            style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          >
+                            <Text c="white" fw={600} size="sm">{r.codigo.charAt(0).toUpperCase()}</Text>
+                          </Box>
+                        )}
+                        <Box>
+                          <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.codigo}</Text>
+                          {isMobile && <Text size="xs" c="dimmed">Status: {r.status}</Text>}
+                        </Box>
+                      </Group>
+                    </Table.Td>
+
+                    <Table.Td>
+                      <Text size="xs">{r.emissao}</Text>
+                    </Table.Td>
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs">{r.vencimento}</Text>
+                      </Table.Td>
+                    )}
+
+                    <Table.Td>
+                      <Text size="xs">{r.status}</Text>
+                    </Table.Td>
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs">{r.convenio}</Text>
+                      </Table.Td>
+                    )}
+
+                    <Table.Td>
+                      <Text size="xs">R${r.valor.toFixed(2)}</Text>
+                    </Table.Td>
+
+                    <Table.Td>
+                      <Text size="xs">{r.descontoPercent ? `${r.descontoPercent}%` : '-'}</Text>
+                    </Table.Td>
+
+                    <Table.Td>
+                      <Text size="xs">R${r.valorTotal.toFixed(2)}</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
         </Box>
       </Box>
 
@@ -340,21 +411,72 @@ export function Faturamento() {
                 onChange={(val) => setInvoiceData({ ...invoiceData, valor: typeof val === 'number' ? val : Number(val) || 0 })} 
                 styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
               />
-              <DatePickerInput
-                placeholder="Vencimento"
-                value={invoiceData.vencimento} 
-                onChange={(val) => setInvoiceData({ ...invoiceData, vencimento: val })} 
-              />
+              <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
+                <Popover.Target>
+                  <TextInput
+                    placeholder="dd/mm/yyyy"
+                    value={dateInput}
+                    onChange={(e) => setDateInput(formatDateInput(e.currentTarget.value))}
+                    onBlur={() => {
+                      if (!dateInput) {
+                        setInvoiceData({ ...invoiceData, vencimento: null });
+                        return;
+                      }
+                      const parsed = parseDate(dateInput);
+                      if (!parsed) setInvoiceData({ ...invoiceData, vencimento: null });
+                      else setInvoiceData({ ...invoiceData, vencimento: parsed });
+                    }}
+                    rightSection={
+                      <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
+                        <CalendarIcon size={16} />
+                      </ActionIcon>
+                    }
+                    styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
+                  />
+                </Popover.Target>
+                <Popover.Dropdown style={{ padding: 8 }}>
+                  <DatePicker 
+                    value={invoiceData.vencimento}
+                    onChange={(d) => {
+                      setInvoiceData({ ...invoiceData, vencimento: d });
+                      setDateInput(formatDate(d));
+                      setPopoverOpened(false);
+                    }}
+                  />
+                </Popover.Dropdown>
+              </Popover>
             </Group>
 
-            {/* Forma de pagamento */}
-            <Select 
-              data={[{ value: 'dinheiro', label: 'Dinheiro' }, { value: 'cartao', label: 'Cartão' }, { value: 'boleto', label: 'Boleto' }]} 
-              placeholder="Forma de pagamento" 
-              value={invoiceData.formaPagamento} 
-              onChange={(val) => setInvoiceData({ ...invoiceData, formaPagamento: val || '' })} 
-              styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
-            />
+            <Grid grow>
+              <Grid.Col span={isMobile ? 12 : 6}>
+                <Box>
+                  <Text size="sm" fw={500} mb={4}>Desconto (%)</Text>
+                  <NumberInput
+                    placeholder="Desconto (%)"
+                    value={invoiceData.desconto ?? 0}
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    hideControls
+                    onChange={(val) => setInvoiceData({ ...invoiceData, desconto: typeof val === 'number' ? val : Number(val) || 0 })}
+                    styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
+                  />
+                </Box>
+              </Grid.Col>
+
+              <Grid.Col span={isMobile ? 12 : 6}>
+                <Box>
+                  <Text size="sm" fw={500} mb={4}>Forma de pagamento</Text>
+                  <Select 
+                    data={[{ value: 'dinheiro', label: 'Dinheiro' }, { value: 'cartao', label: 'Cartão' }, { value: 'boleto', label: 'Boleto' }]} 
+                    placeholder="Forma de pagamento" 
+                    value={invoiceData.formaPagamento} 
+                    onChange={(val) => setInvoiceData({ ...invoiceData, formaPagamento: val || '' })} 
+                    styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }} 
+                  />
+                </Box>
+              </Grid.Col>
+            </Grid>
 
             {/* Nome */}
             <TextInput 
@@ -380,13 +502,30 @@ export function Faturamento() {
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">
                 Cancelar
               </Button>
-              <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm">
+              <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingInvoice} disabled={savingInvoice}>
                 Salvar
               </Button>
             </Group>
           </Stack>
         </Box>
       </Modal>
+
+      <ResultModal
+        opened={showInvoiceSuccess}
+        onClose={() => setShowInvoiceSuccess(false)}
+        variant="success"
+        title={'Fatura criada'}
+        message={lastInvoiceCode ? `Fatura ${lastInvoiceCode} criada com sucesso.` : 'Fatura criada com sucesso.'}
+        primary={{ label: 'Fechar', onClick: () => setShowInvoiceSuccess(false) }}
+      />
+
+      <ResultModal
+        opened={showInvoiceError}
+        onClose={() => setShowInvoiceError(false)}
+        variant="error"
+        title={invoiceErrorTitle || 'Erro'}
+        message={invoiceErrorMessage || 'Ocorreu um erro ao criar a fatura.'}
+      />
     </Box>
   );
 }

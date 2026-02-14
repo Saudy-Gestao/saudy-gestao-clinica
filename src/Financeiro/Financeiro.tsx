@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -19,17 +19,21 @@ import {
   Popover,
   ActionIcon,
   Menu,
+  Loader,
 } from '@mantine/core';
 import { Calendar as CalendarIcon, MoreVertical, ChevronLeft } from 'lucide-react';
+import { formatDateInput } from '../utils/formatters';
 import { DatePicker } from '@mantine/dates';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { FloatingInput } from '../components/common/FloatingInput';
 import { Header } from '../components/Header/Header';
 import { DARK_BLUE } from '../themes/theme';
+import ResultModal from '../components/common/ResultModal';
+import financeService from '../services/financeService';
 
 interface Lancamento {
-  id: number;
+  id: string;
   nome: string;
   cpf?: string;
   dataHora: string;
@@ -39,6 +43,7 @@ interface Lancamento {
   desconto: number;
   valorTotal: number;
   metodoPagamento?: string;
+  dueDate?: string | null;
 }
 
 export function Financeiro() {
@@ -50,44 +55,8 @@ export function Financeiro() {
   const [modalOpened, setModalOpened] = useState(false);
   const [popoverOpened, setPopoverOpened] = useState(false);
   const [dateInput, setDateInput] = useState('');
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([
-    {
-      id: 1,
-      nome: 'Maria Silva Santos',
-      cpf: '123.456.789-00',
-      dataHora: '28/12/2025 | 15:30:09',
-      tipo: 'Laudo',
-      status: 'Pago',
-      valor: 350.0,
-      desconto: 0,
-      valorTotal: 350.0,
-      metodoPagamento: 'Cartão de Crédito',
-    },
-    {
-      id: 2,
-      nome: 'João Pedro Oliveira',
-      cpf: '987.654.321-00',
-      dataHora: '30/12/2025 | 16:50:04',
-      tipo: 'Consulta',
-      status: 'Pendente',
-      valor: 40.0,
-      desconto: 10,
-      valorTotal: 36.0,
-      metodoPagamento: 'PIX',
-    },
-    {
-      id: 3,
-      nome: 'Luvas e Seringa',
-      cpf: '000.000.000-00',
-      dataHora: '30/12/2025 | 17:20:04',
-      tipo: 'Material',
-      status: 'Pendente',
-      valor: 60.0,
-      desconto: 10,
-      valorTotal: 54.0,
-      metodoPagamento: 'Dinheiro',
-    },
-  ]);
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+  const [entriesLoading, setEntriesLoading] = useState(false);
 
   // Estado do formulário
   const [formData, setFormData] = useState({
@@ -100,6 +69,14 @@ export function Financeiro() {
     formaPagamento: '',
     nome: '',
   });
+
+  // Saving & result modal state
+  const [savingLancamento, setSavingLancamento] = useState(false);
+  const [showLancamentoSuccess, setShowLancamentoSuccess] = useState(false);
+  const [lastLancamentoName, setLastLancamentoName] = useState<string | null>(null);
+  const [showLancamentoError, setShowLancamentoError] = useState(false);
+  const [lancamentoErrorMessage, setLancamentoErrorMessage] = useState<string | null>(null);
+  const [lancamentoErrorTitle, setLancamentoErrorTitle] = useState<string | null>(null);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -121,6 +98,16 @@ export function Financeiro() {
     return date;
   };
 
+  const parseNumber = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const humanize = (s?: string) => {
+    if (!s) return '';
+    return String(s).replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   const handleModalClose = () => {
     setModalOpened(false);
     setDateInput('');
@@ -136,45 +123,143 @@ export function Financeiro() {
     });
   };
 
-  const handleSaveLancamento = () => {
+  // Load entries from backend
+  useEffect(() => {
+    const load = async () => {
+      setEntriesLoading(true);
+      try {
+        const data: any = await financeService.getEntries();
+        const list: any[] = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (Array.isArray(data?.items) ? data.items : []));
+        const mapped: Lancamento[] = list.map((it: any) => {
+          const valor = parseNumber(it.value ?? it.amount);
+          const desconto = parseNumber(it.discount ?? 0);
+          return {
+            id: String(it.id),
+            nome: it.relatedName || it.name || it.related_name || '-',
+            dataHora: it.createdAt ? (new Date(it.createdAt)).toLocaleString('pt-BR') : (it.dueDate ? (new Date(it.dueDate)).toLocaleDateString('pt-BR') : ''),
+            tipo: it.type || it.category || '-',
+            status: it.status || 'Pendente',
+            valor: valor,
+            desconto: desconto,
+            valorTotal: valor - (valor * desconto / 100),
+            metodoPagamento: it.paymentMethod || it.payment_method || '-',
+            dueDate: it.dueDate || undefined,
+          };
+        });
+        setLancamentos(mapped);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar lançamentos';
+        setLancamentoErrorTitle('Erro ao carregar lançamentos');
+        setLancamentoErrorMessage(msg);
+        setShowLancamentoError(true);
+      } finally {
+        setEntriesLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const handleSaveLancamento = async () => {
     const valor = parseFloat(formData.valor) || 0;
     const desconto = parseFloat(formData.desconto) || 0;
-    const valorDesconto = (valor * desconto) / 100;
-    const valorTotal = valor - valorDesconto;
 
-    const newLancamento: Lancamento = {
-      id: lancamentos.length + 1,
-      nome: formData.nome,
-      dataHora: new Date().toLocaleString('pt-BR'),
-      tipo: formData.categoria || formData.tipo,
-      status: 'Pendente',
-      valor: valor,
-      desconto: desconto,
-      valorTotal: valorTotal,
+    const payload = {
+      type: formData.tipo || 'outro',
+      category: formData.categoria || undefined,
+      description: formData.descricao || undefined,
+      value: valor,
+      discount: desconto,
+      dueDate: formData.vencimento ? formData.vencimento.toISOString().slice(0,10) : undefined,
+      paymentMethod: formData.formaPagamento || undefined,
+      relatedName: formData.nome || undefined,
     };
-    setLancamentos(prev => [...prev, newLancamento]);
-    console.log('Salvando lançamento:', formData);
-    handleModalClose();
+
+    setSavingLancamento(true);
+
+    try {
+      const created = await financeService.createEntry(payload);
+
+      // Map response to Lancamento if possible
+      const mapped: Lancamento = {
+        id: (created.id ?? (lancamentos.length + 1)) as any,
+        nome: created.relatedName || created.name || formData.nome,
+        dataHora: created.createdAt ? (new Date(created.createdAt)).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'),
+        tipo: created.type || formData.categoria || formData.tipo,
+        status: created.status || 'Pendente',
+        valor: created.value ?? valor,
+        desconto: created.discount ?? desconto,
+        valorTotal: (created.value ?? valor) - ((created.value ?? valor) * (created.discount ?? desconto) / 100),
+        metodoPagamento: created.paymentMethod || formData.formaPagamento || undefined,
+        dueDate: created.dueDate || payload.dueDate || undefined,
+      }; 
+
+      setLancamentos(prev => [...prev, mapped]);
+      setLastLancamentoName(mapped.nome);
+      setShowLancamentoSuccess(true);
+      handleModalClose();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Erro ao criar lançamento';
+      setLancamentoErrorTitle('Erro ao criar lançamento');
+      setLancamentoErrorMessage(msg);
+      setShowLancamentoError(true);
+    } finally {
+      setSavingLancamento(false);
+    }
   };
 
-  const getStatusColor = (status: string) => {
-    if (status === 'Pago') return 'green';
-    if (status === 'Pendente') return 'yellow';
+  const isOverdue = (status: string | undefined, dueDate?: string) => {
+    if (!dueDate) return false;
+    const s = String(status || '').toUpperCase();
+    if (s === 'PAID' || s === 'PAGO') return false;
+    const due = new Date(dueDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return due.getTime() < today.getTime();
+  };
+
+  const getStatusColor = (status: string, dueDate?: string) => {
+    if (isOverdue(status, dueDate)) return 'red';
+    const s = String(status || '').toUpperCase();
+    if (s === 'PAID' || s === 'PAGO') return 'green';
+    if (s === 'PENDING' || s === 'PENDENTE') return 'yellow';
     return 'gray';
   };
 
-  const getStatusLabel = (status: string) => {
-    if (status === 'Pago') return 'Pago';
-    if (status === 'Pendente') return 'Pendente';
-    return status;
-  };
+  const getStatusLabel = (status: string, dueDate?: string) => {
+    if (isOverdue(status, dueDate)) return 'Atrasado';
+    const s = String(status || '').toUpperCase();
+    if (s === 'PAID' || s === 'PAGO') return 'Pago';
+    if (s === 'PENDING' || s === 'PENDENTE') return 'Pendente';
+    return humanize(status);
+  }; 
+
+  const [payingIds, setPayingIds] = useState<string[]>([]);
 
   const filteredLancamentos = lancamentos.filter((lancamento) => {
     const term = searchValue.trim().toLowerCase();
+
+    // Normalize type text for robust matching
+    const tipo = (lancamento.tipo || '').toLowerCase();
+
+    // Tab-based filtering: accept a few synonyms coming from backend
+    const receitaKeys = ['receita', 'income', 'revenue', 'in'];
+    const despesaKeys = ['despesa', 'despesas', 'expense', 'expenses', 'out'];
+
+    let matchesTab = true;
+    if (activeTab === 'receita') {
+      matchesTab = receitaKeys.some((k) => tipo.includes(k));
+    } else if (activeTab === 'despesas') {
+      matchesTab = despesaKeys.some((k) => tipo.includes(k));
+    }
+
+    if (!matchesTab) return false;
+
+    // Search box filtering
     if (!term) return true;
     const nome = lancamento.nome.toLowerCase();
     const cpf = (lancamento.cpf || '').toLowerCase();
-    const tipo = lancamento.tipo.toLowerCase();
+
     return nome.includes(term) || cpf.includes(term) || tipo.includes(term);
   });
 
@@ -189,8 +274,8 @@ export function Financeiro() {
       <Table.Td>{lancamento.dataHora}</Table.Td>
       <Table.Td>{lancamento.tipo}</Table.Td>
       <Table.Td>
-        <Badge color={getStatusColor(lancamento.status)} variant="light">
-          {getStatusLabel(lancamento.status)}
+        <Badge color={getStatusColor(lancamento.status, lancamento.dueDate)} variant="light">
+          {getStatusLabel(lancamento.status, lancamento.dueDate)}
         </Badge>
       </Table.Td>
       <Table.Td>R${lancamento.valor.toFixed(2)}</Table.Td>
@@ -204,16 +289,13 @@ export function Financeiro() {
               <MoreVertical size={18} />
             </ActionIcon>
           </Menu.Target>
-          <Menu.Dropdown>
+              <Menu.Dropdown>
             <Menu.Item
               color="green"
-              disabled={lancamento.status === 'Pago'}
-              onClick={() => {
-                // Lógica para processar pagamento
-                console.log('Processar pagamento:', lancamento.id);
-              }}
+              disabled={(String(lancamento.status || '').toUpperCase() === 'PAID') || payingIds.includes(lancamento.id)}
+              onClick={() => handlePay(lancamento.id)}
             >
-              Pagar
+              {payingIds.includes(lancamento.id) ? 'Pagar...' : 'Pagar'}
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
@@ -221,8 +303,24 @@ export function Financeiro() {
     </Table.Tr>
   ));
 
+  const handlePay = async (id: string) => {
+    if (payingIds.includes(id)) return;
+    setPayingIds((p) => [...p, id]);
+    try {
+      const updated = await financeService.updateEntry(id, { status: 'PAID' });
+      setLancamentos((prev) => prev.map((l) => l.id === id ? ({ ...l, status: updated.status || 'Pago' }) : l));
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Erro ao processar pagamento';
+      setLancamentoErrorTitle('Erro ao realizar o pagamento');
+      setLancamentoErrorMessage(msg);
+      setShowLancamentoError(true);
+    } finally {
+      setPayingIds((p) => p.filter((x) => x !== id));
+    }
+  };
+
   return (
-    <Box style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
+    <Box style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}> 
       <Header />
 
       {/* Page Header */}
@@ -279,25 +377,32 @@ export function Financeiro() {
       <Container size="xl" py={isMobile ? 'md' : 'xl'}>
 
         {/* Tabela */}
-        <Paper style={{ borderRadius: '8px', overflowX: 'auto' }}>
-          <Table striped highlightOnHover>
-            <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
-              <Table.Tr>
-                <Table.Th></Table.Th>
-                <Table.Th>Nome</Table.Th>
-                <Table.Th>Data/Hora</Table.Th>
-                <Table.Th>Tipo</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Valor</Table.Th>
-                <Table.Th>Desconto</Table.Th>
-                <Table.Th>Valor Total</Table.Th>
-                <Table.Th>Método Pagamento</Table.Th>
-                <Table.Th>Ações</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>{rows}</Table.Tbody>
-          </Table>
-        </Paper>
+        {entriesLoading ? (
+          <Paper style={{ borderRadius: '8px', padding: 24, textAlign: 'center' }}>
+            <Loader />
+            <Text mt={8}>Carregando lançamentos...</Text>
+          </Paper>
+        ) : (
+          <Paper style={{ borderRadius: '8px', overflowX: 'auto' }}>
+            <Table striped highlightOnHover>
+              <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
+                <Table.Tr>
+                  <Table.Th></Table.Th>
+                  <Table.Th>Nome</Table.Th>
+                  <Table.Th>Data/Hora</Table.Th>
+                  <Table.Th>Tipo</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Valor</Table.Th>
+                  <Table.Th>Desconto</Table.Th>
+                  <Table.Th>Valor Total</Table.Th>
+                  <Table.Th>Método Pagamento</Table.Th>
+                  <Table.Th>Ações</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>{rows}</Table.Tbody>
+            </Table>
+          </Paper>
+        )}
       </Container>
 
       {/* Modal Novo Lançamento */}
@@ -387,9 +492,19 @@ export function Financeiro() {
                       value={dateInput}
                       onChange={(e) => {
                         const v = e.currentTarget.value;
-                        setDateInput(v);
-                        const parsed = parseDate(v);
-                        setFormData({ ...formData, vencimento: parsed });
+                        setDateInput(formatDateInput(v));
+                      }}
+                      onBlur={() => {
+                        if (!dateInput) {
+                          setFormData({ ...formData, vencimento: null });
+                          return;
+                        }
+                        const parsed = parseDate(dateInput);
+                        if (!parsed) {
+                          setFormData({ ...formData, vencimento: null });
+                        } else {
+                          setFormData({ ...formData, vencimento: parsed });
+                        }
                       }}
                       rightSection={
                         <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
@@ -445,12 +560,30 @@ export function Financeiro() {
             <Button variant="default" onClick={handleModalClose}>
               Cancelar
             </Button>
-            <Button color="dark" onClick={handleSaveLancamento}>
-              Salvar
+            <Button color="dark" onClick={handleSaveLancamento} loading={savingLancamento} disabled={savingLancamento}>
+              {savingLancamento ? 'Salvando...' : 'Salvar'}
             </Button>
           </Group>
         </Stack>
       </Modal>
+
+      <ResultModal
+        opened={showLancamentoSuccess}
+        onClose={() => setShowLancamentoSuccess(false)}
+        variant="success"
+        title="Lançamento criado"
+        message={lastLancamentoName ? `${lastLancamentoName} foi cadastrado com sucesso.` : 'Lançamento cadastrado com sucesso.'}
+        secondary={{ label: 'Fechar', onClick: () => setShowLancamentoSuccess(false) }}
+      />
+
+      <ResultModal
+        opened={showLancamentoError}
+        onClose={() => setShowLancamentoError(false)}
+        variant="error"
+        title="Erro ao criar lançamento"
+        message={lancamentoErrorMessage || 'Ocorreu um erro ao criar o lançamento'}
+        secondary={{ label: 'Fechar', onClick: () => setShowLancamentoError(false) }}
+      />
     </Box>
   );
 }

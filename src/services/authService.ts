@@ -13,7 +13,7 @@ class AuthService {
    * Login do usuário
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/login', credentials);
+    const response = await api.post<AuthResponse>('/auth/login', credentials);
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
@@ -41,7 +41,7 @@ class AuthService {
    * Registro de empresa completa
    */
   async registerCompany(data: CompanyRegisterData): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/register', data);
+    const response = await api.post<AuthResponse>('/auth/register', data);
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);

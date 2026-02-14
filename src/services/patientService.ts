@@ -37,10 +37,30 @@ export interface CreatePatientPayload {
   observations?: string;
 }
 
+export type UpdatePatientPayload = Partial<CreatePatientPayload>;
+
 export default {
+  async listPatients() {
+    const url = '/accounts/patients/';
+    const res = await api.get(url);
+    return res.data;
+  },
+
   async createPatient(payload: CreatePatientPayload) {
-    const url = 'http://localhost:3001/patients/';
+    const url = '/accounts/patients/';
     const res = await api.post(url, payload);
+    return res.data;
+  },
+
+  async updatePatient(id: string, payload: UpdatePatientPayload) {
+    const url = `/accounts/patients/${id}`;
+    const res = await api.put(url, payload);
+    return res.data;
+  },
+
+  async deletePatient(id: string) {
+    const url = `/accounts/patients/${id}`;
+    const res = await api.delete(url);
     return res.data;
   },
 };

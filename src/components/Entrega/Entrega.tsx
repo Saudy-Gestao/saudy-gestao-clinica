@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, Popover, ActionIcon, Select, Textarea } from '@mantine/core';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, Popover, ActionIcon, Select, Textarea, Paper, Loader, Menu } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, Plus, ChevronLeft, Calendar as CalendarIcon, MoreVertical } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
+import deliveryService from '../../services/deliveryService';
+import patientService from '../../services/patientService';
+import { formatDateInput } from '../../utils/formatters';
 
 interface DeliveryRow {
-  id: number;
+  id: string;
   nomeCompleto: string;
   dataHora: string;
   responsavel: string;
@@ -19,35 +22,22 @@ interface DeliveryRow {
   dataHoraEntrega?: string;
 }
 
-const SAMPLE_ROWS: DeliveryRow[] = [
-  {
-    id: 1,
-    nomeCompleto: 'Maria Silva Santos',
-    dataHora: '28/12/2025 | 15:30:09',
-    responsavel: 'Dr(a) Fernanda Maciel',
-    status: 'Disponível',
-    tipo: 'Laudo',
-    entreguePara: '-',
-    dataHoraEntrega: '-',
-  },
-  {
-    id: 2,
-    nomeCompleto: 'João Pedro Oliveira',
-    dataHora: '30/12/2025 | 16:50:04',
-    responsavel: 'Dr. Luciano Farias',
-    status: 'Entregue',
-    tipo: 'Exame',
-    entreguePara: 'João Pedro Oliveira',
-    dataHoraEntrega: '12/12/2025 14:30',
-  },
-];
-
 export function Entrega() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [rows, setRows] = useState(SAMPLE_ROWS);
+  const [rows, setRows] = useState<DeliveryRow[]>([]);
+  const [rowsLoading, setRowsLoading] = useState(false);
+  const [savingDelivery, setSavingDelivery] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deliverModalOpen, setDeliverModalOpen] = useState(false);
+  const [deliverTarget, setDeliverTarget] = useState<DeliveryRow | null>(null);
+  const [deliverToName, setDeliverToName] = useState('');
+  const [deliverToCpf, setDeliverToCpf] = useState('');
+  const [delivering, setDelivering] = useState(false);
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [patientOptions, setPatientOptions] = useState<{ value: string; label: string }[]>([]);
+  const [patientById, setPatientById] = useState<Record<string, any>>({});
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -62,6 +52,98 @@ export function Entrega() {
 
   const [popoverOpened, setPopoverOpened] = useState(false);
   const [dateInput, setDateInput] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      setRowsLoading(true);
+      try {
+        const data: any = await deliveryService.getDeliveries();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const mapped: DeliveryRow[] = list.map((it: any, idx: number) => {
+          const id = String(it.id ?? it.deliveryId ?? idx + 1);
+          const availableAt = it.availableAt || it.available_at;
+          const deliveredAt = it.deliveredAt || it.delivered_at;
+          return {
+            id,
+            nomeCompleto: it.patientName || it.patient_name || '- ',
+            dataHora: availableAt ? new Date(availableAt).toLocaleString('pt-BR') : '-',
+            responsavel: it.responsible || '-',
+            status: it.status ? String(it.status).toUpperCase() : 'AVAILABLE',
+            tipo: it.documentType || it.document_type || '-',
+            entreguePara: it.deliveredTo || it.delivered_to || '-',
+            dataHoraEntrega: deliveredAt ? new Date(deliveredAt).toLocaleString('pt-BR') : '-',
+          };
+        });
+
+        setRows(mapped);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar entregas',
+          color: 'red',
+        });
+      } finally {
+        setRowsLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  useEffect(() => {
+    const loadPatients = async () => {
+      setPatientsLoading(true);
+      try {
+        const data: any = await patientService.listPatients();
+        const listRaw = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.patients)
+            ? data.patients
+            : (Array.isArray(data?.data?.patients)
+              ? data.data.patients
+              : (Array.isArray(data?.data)
+                ? data.data
+                : (Array.isArray(data?.items) ? data.items : []))));
+
+        const list: any[] = Array.isArray(listRaw) ? listRaw : [];
+
+        const options = list.map((p: any) => {
+          const id = String(p.id ?? p.patientId ?? '');
+          const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+          const label = name || 'Paciente';
+          return { value: id || label, label };
+        });
+
+        const byId: Record<string, any> = {};
+        list.forEach((p: any) => {
+          const id = String(p.id ?? p.patientId ?? '');
+          if (id) byId[id] = p;
+        });
+
+        setPatientById(byId);
+        setPatientOptions(options);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+          color: 'red',
+        });
+      } finally {
+        setPatientsLoading(false);
+      }
+    };
+
+    loadPatients();
+  }, []);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -83,9 +165,38 @@ export function Entrega() {
     return date;
   };
 
+  const humanize = (s?: string) => {
+    if (!s) return '-';
+    return String(s)
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
+  const formatStatus = (s?: string) => {
+    if (!s) return '-';
+    const key = String(s).toUpperCase();
+    const map: Record<string, string> = {
+      AVAILABLE: 'Disponivel',
+      AVALIABLE: 'Disponivel',
+      DISPONIVEL: 'Disponivel',
+      LOW: 'Baixo',
+      OUT_OF_STOCK: 'Esgotado',
+      EXPIRED: 'Vencido',
+      UNAVAILABLE: 'Indisponivel',
+      RESERVED: 'Reservado',
+      DAMAGED: 'Danificado',
+      ENTREGUE: 'Entregue',
+    };
+    return map[key] || humanize(s);
+  };
+
   const openRegistrar = (r?: DeliveryRow) => {
     if (r) {
       setEditingId(r.id);
+      // Keep patient name in form when editing, we use id only for new records
       setForm({ paciente: r.nomeCompleto, tipoDocumento: r.tipo, dataDisponivel: null, descricao: '' });
     } else {
       setEditingId(null);
@@ -94,7 +205,62 @@ export function Entrega() {
     setModalOpen(true);
   };
 
-  const handleRegister = () => {
+  const openDeliver = (row: DeliveryRow) => {
+    setDeliverTarget(row);
+    if (row.entreguePara && row.entreguePara !== '-') {
+      const parts = row.entreguePara.split(' - ');
+      setDeliverToName(parts[0] || '');
+      setDeliverToCpf(parts[1] || '');
+    } else {
+      setDeliverToName('');
+      setDeliverToCpf('');
+    }
+    setDeliverModalOpen(true);
+  };
+
+  const handleDeliver = async () => {
+    if (!deliverTarget) return;
+    if (!deliverToName.trim() || !deliverToCpf.trim()) {
+      showNotification({ title: 'Erro', message: 'Informe nome e CPF de quem recebeu', color: 'red' });
+      return;
+    }
+
+    setDelivering(true);
+    try {
+      const payload = {
+        status: 'ENTREGUE',
+        deliveredTo: `${deliverToName.trim()} - ${deliverToCpf.trim()}`,
+        deliveredAt: new Date().toISOString(),
+      };
+
+      const updated: any = await deliveryService.updateDelivery(deliverTarget.id, payload);
+      const deliveredAt = updated.deliveredAt || updated.delivered_at || payload.deliveredAt;
+
+      setRows((prev) => prev.map((r) => {
+        if (r.id !== deliverTarget.id) return r;
+        return {
+          ...r,
+          status: updated.status ? String(updated.status).toUpperCase() : 'ENTREGUE',
+          entreguePara: updated.deliveredTo || payload.deliveredTo,
+          dataHoraEntrega: deliveredAt ? new Date(deliveredAt).toLocaleString('pt-BR') : r.dataHoraEntrega,
+        };
+      }));
+
+      showNotification({ title: 'Entrega realizada', message: 'Registro atualizado', color: 'green' });
+      setDeliverModalOpen(false);
+      setDeliverTarget(null);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao registrar entrega',
+        color: 'red',
+      });
+    } finally {
+      setDelivering(false);
+    }
+  };
+
+  const handleRegister = async () => {
     if (!form.paciente.trim()) {
       showNotification({ title: 'Erro', message: 'Paciente é obrigatório', color: 'red' });
       return;
@@ -108,25 +274,53 @@ export function Entrega() {
     if (editingId) {
       setRows((prev) => prev.map((p) => p.id === editingId ? { ...p, nomeCompleto: form.paciente, tipo: form.tipoDocumento || p.tipo } : p));
       showNotification({ title: 'Atualizado', message: 'Registro atualizado', color: 'green' });
-    } else {
-      const id = rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1;
-      const now = new Date();
-      const dataHora = `${now.toLocaleDateString()} | ${now.toLocaleTimeString()}`;
-      const newRow: DeliveryRow = {
-        id,
-        nomeCompleto: form.paciente,
-        dataHora,
-        responsavel: '-',
-        status: 'Disponível',
-        tipo: form.tipoDocumento || '-',
-        entreguePara: '-',
-        dataHoraEntrega: '-',
-      };
-      setRows((prev) => [newRow, ...prev]);
-      showNotification({ title: 'Adicionado', message: 'Entrega registrada', color: 'green' });
+      setModalOpen(false);
+      return;
     }
 
-    setModalOpen(false);
+    setSavingDelivery(true);
+    try {
+      const selectedPatient = patientById[form.paciente];
+      const payload = {
+        patientId: selectedPatient?.id,
+        patientName: selectedPatient?.name || form.paciente,
+        documentType: form.tipoDocumento || undefined,
+        availableAt: form.dataDisponivel ? form.dataDisponivel.toISOString() : undefined,
+        description: form.descricao || undefined,
+        responsible: undefined,
+        status: 'AVAILABLE',
+        deliveredTo: undefined,
+        deliveredAt: undefined,
+      };
+
+      const created: any = await deliveryService.createDelivery(payload);
+      const availableAt = created.availableAt || created.available_at || payload.availableAt;
+      const deliveredAt = created.deliveredAt || created.delivered_at;
+      const newRow: DeliveryRow = {
+        id: String(created.id ?? rows.length + 1),
+        nomeCompleto: created.patientName || created.patient_name || selectedPatient?.name || form.paciente,
+        dataHora: availableAt ? new Date(availableAt).toLocaleString('pt-BR') : '-',
+        responsavel: created.responsible || '-',
+        status: created.status ? String(created.status).toUpperCase() : 'AVAILABLE',
+        tipo: created.documentType || created.document_type || form.tipoDocumento || '-',
+        entreguePara: created.deliveredTo || created.delivered_to || '-',
+        dataHoraEntrega: deliveredAt ? new Date(deliveredAt).toLocaleString('pt-BR') : '-',
+      };
+
+      setRows((prev) => [newRow, ...prev]);
+      showNotification({ title: 'Adicionado', message: 'Entrega registrada', color: 'green' });
+      setModalOpen(false);
+      setForm({ paciente: '', tipoDocumento: '', dataDisponivel: null, descricao: '' });
+      setDateInput('');
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao registrar entrega',
+        color: 'red',
+      });
+    } finally {
+      setSavingDelivery(false);
+    }
   };
 
 
@@ -178,76 +372,102 @@ export function Entrega() {
         </Box>
 
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-          <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: 'none' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Data/Hora</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Responsável</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Entregue para</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Data/Hora da entrega</Table.Th>}
+          {rowsLoading ? (
+            <Paper style={{ padding: 24, textAlign: 'center' }}>
+              <Loader />
+              <Text mt={8}>Carregando entregas...</Text>
+            </Paper>
+          ) : (
+            <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+              <Table.Thead>
+                <Table.Tr style={{ borderBottom: 'none' }}>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Data/Hora</Table.Th>
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Responsável</Table.Th>}
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Entregue para</Table.Th>}
+                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Data/Hora da entrega</Table.Th>}
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
 
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map((r) => (
-                <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                  <Table.Td>
-                    <Group gap={isMobile ? 'xs' : 'sm'}>
-                      {!isMobile && (
-                        <Box
-                          bg={DARK_BLUE}
-                          w={32}
-                          h={32}
-                          style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                        >
-                          <Text c="white" fw={600} size="sm">{r.nomeCompleto.charAt(0).toUpperCase()}</Text>
-                        </Box>
-                      )}
-                      <Box>
-                        <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.nomeCompleto}</Text>
-                        {isMobile && <Text size="xs" c="dimmed">Responsável: {r.responsavel}</Text>}
-                      </Box>
-                    </Group>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.dataHora}</Text>
-                  </Table.Td>
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.responsavel}</Text>
-                    </Table.Td>
-                  )}
-
-                  <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.status}</Text>
-                  </Table.Td>
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.tipo}</Text>
-                    </Table.Td>
-                  )}
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.entreguePara || '-'}</Text>
-                    </Table.Td>
-                  )}
-
-                  {!isTablet && (
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.dataHoraEntrega || '-'}</Text>
-                    </Table.Td>
-                  )}
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((r) => (
+                  <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                    <Table.Td>
+                      <Group gap={isMobile ? 'xs' : 'sm'}>
+                        {!isMobile && (
+                          <Box
+                            bg={DARK_BLUE}
+                            w={32}
+                            h={32}
+                            style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          >
+                            <Text c="white" fw={600} size="sm">{r.nomeCompleto.charAt(0).toUpperCase()}</Text>
+                          </Box>
+                        )}
+                        <Box>
+                          <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.nomeCompleto}</Text>
+                          {isMobile && <Text size="xs" c="dimmed">Responsável: {r.responsavel}</Text>}
+                        </Box>
+                      </Group>
+                    </Table.Td>
+
+                    <Table.Td>
+                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.dataHora}</Text>
+                    </Table.Td>
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.responsavel}</Text>
+                      </Table.Td>
+                    )}
+
+                    <Table.Td>
+                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{formatStatus(r.status)}</Text>
+                    </Table.Td>
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.tipo}</Text>
+                      </Table.Td>
+                    )}
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.entreguePara || '-'}</Text>
+                      </Table.Td>
+                    )}
+
+                    {!isTablet && (
+                      <Table.Td>
+                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.dataHoraEntrega || '-'}</Text>
+                      </Table.Td>
+                    )}
+
+                    <Table.Td>
+                      <Menu withinPortal position="bottom-end" shadow="sm">
+                        <Menu.Target>
+                          <ActionIcon variant="subtle" color="gray">
+                            <MoreVertical size={18} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Item
+                            onClick={() => openDeliver(r)}
+                            disabled={String(r.status || '').toUpperCase().includes('ENTREGUE')}
+                          >
+                            Entregar
+                          </Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
         </Box>
       </Box>
 
@@ -266,9 +486,17 @@ export function Entrega() {
         <Stack gap={10}>
           <Box style={{ padding: 8 }}>
 
-            <Box className="floating-field" style={{ marginBottom: 8 }}>
-              <input type="text" value={form.paciente} onChange={(e) => setForm({ ...form, paciente: e.currentTarget.value })} placeholder=" " />
-              <label>Paciente</label>
+            <Box style={{ marginBottom: 8 }}>
+              <Select
+                data={patientOptions}
+                placeholder={patientsLoading ? 'Carregando pacientes...' : 'Paciente'}
+                value={form.paciente}
+                onChange={(val) => setForm({ ...form, paciente: val || '' })}
+                searchable
+                clearable
+                nothingFoundMessage="Nenhum paciente encontrado"
+                disabled={patientsLoading}
+              />
             </Box>
 
             <Box style={{ marginBottom: 8 }}>
@@ -288,7 +516,7 @@ export function Entrega() {
                     placeholder="dd/mm/yyyy"
                     value={dateInput}
                     onChange={(e) => {
-                      const v = e.currentTarget.value;
+                      const v = formatDateInput(e.currentTarget.value);
                       setDateInput(v);
                       const parsed = parseDate(v);
                       setForm({ ...form, dataDisponivel: parsed });
@@ -312,7 +540,48 @@ export function Entrega() {
 
             <Group justify="flex-end" mt={8}>
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={handleRegister} size="sm">Registrar</Button>
+              <Button bg={DARK_BLUE} onClick={handleRegister} size="sm" loading={savingDelivery} disabled={savingDelivery}>Registrar</Button>
+            </Group>
+          </Box>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={deliverModalOpen}
+        onClose={() => setDeliverModalOpen(false)}
+        title={'Registrar entrega'}
+        size={isMobile ? '100%' : 520}
+        centered={false}
+        fullScreen={isMobile}
+        styles={{
+          content: { left: 48, bottom: 96, top: 'auto', transform: 'none', width: isMobile ? '100%' : 520 },
+          body: { overflowY: 'auto' },
+        }}
+      >
+        <Stack gap={10}>
+          <Box style={{ padding: 8 }}>
+            <Text size="sm" mb={4}>Paciente</Text>
+            <Text fw={600} mb={8}>{deliverTarget?.nomeCompleto || '-'}</Text>
+
+            <Box style={{ marginBottom: 8 }}>
+              <TextInput
+                placeholder="Nome de quem recebeu"
+                value={deliverToName}
+                onChange={(e) => setDeliverToName(e.currentTarget.value)}
+              />
+            </Box>
+
+            <Box style={{ marginBottom: 8 }}>
+              <TextInput
+                placeholder="CPF de quem recebeu"
+                value={deliverToCpf}
+                onChange={(e) => setDeliverToCpf(e.currentTarget.value)}
+              />
+            </Box>
+
+            <Group justify="flex-end" mt={8}>
+              <Button variant="default" onClick={() => setDeliverModalOpen(false)} size="sm">Cancelar</Button>
+              <Button bg={DARK_BLUE} onClick={handleDeliver} size="sm" loading={delivering} disabled={delivering}>Entregar</Button>
             </Group>
           </Box>
         </Stack>
