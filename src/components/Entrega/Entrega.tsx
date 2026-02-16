@@ -50,6 +50,8 @@ export function Entrega() {
     descricao: '',
   });
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+
   const [popoverOpened, setPopoverOpened] = useState(false);
   const [dateInput, setDateInput] = useState('');
 
@@ -260,13 +262,27 @@ export function Entrega() {
     }
   };
 
+  const validateFields = (data: typeof form) => {
+    const errors: Record<string,string> = {};
+    if (!data.paciente || !String(data.paciente).trim()) errors.paciente = 'Paciente é obrigatório';
+    if (!data.tipoDocumento || !String(data.tipoDocumento).trim()) errors.tipoDocumento = 'Tipo de documento é obrigatório';
+    return errors;
+  };
+
   const handleRegister = async () => {
-    if (!form.paciente.trim()) {
-      showNotification({ title: 'Erro', message: 'Paciente é obrigatório', color: 'red' });
+    // clear previous errors
+    setFieldErrors({});
+
+    // client-side validation
+    const fErrors = validateFields(form);
+    if (Object.keys(fErrors).length) {
+      setFieldErrors(fErrors);
+      showNotification({ title: 'Erro', message: Object.values(fErrors)[0], color: 'red' });
       return;
     }
 
     if (dateInput && !form.dataDisponivel) {
+      setFieldErrors((p) => ({ ...p, dataDisponivel: 'Data disponível inválida' }));
       showNotification({ title: 'Erro', message: 'Data disponível inválida', color: 'red' });
       return;
     }
@@ -313,11 +329,24 @@ export function Entrega() {
       setForm({ paciente: '', tipoDocumento: '', dataDisponivel: null, descricao: '' });
       setDateInput('');
     } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao registrar entrega',
-        color: 'red',
-      });
+      // map server field errors to front fields (patientName -> paciente, documentType -> tipoDocumento)
+      const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;
+      if (serverFields && typeof serverFields === 'object') {
+        const mapped: Record<string,string> = {};
+        for (const [k, v] of Object.entries(serverFields)) {
+          if (k === 'patientName') mapped['paciente'] = v as string;
+          else if (k === 'documentType') mapped['tipoDocumento'] = v as string;
+          else mapped[k] = v as string;
+        }
+        setFieldErrors(mapped);
+        showNotification({ title: 'Erro', message: Object.values(mapped)[0], color: 'red' });
+      } else {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao registrar entrega',
+          color: 'red',
+        });
+      }
     } finally {
       setSavingDelivery(false);
     }
@@ -488,23 +517,31 @@ export function Entrega() {
 
             <Box style={{ marginBottom: 8 }}>
               <Select
+                label="Paciente"
+                wrapperProps={{ 'data-required': true }}
                 data={patientOptions}
                 placeholder={patientsLoading ? 'Carregando pacientes...' : 'Paciente'}
                 value={form.paciente}
-                onChange={(val) => setForm({ ...form, paciente: val || '' })}
+                onChange={(val) => { setForm({ ...form, paciente: val || '' }); setFieldErrors((p) => { const { paciente, ...rest } = p; return rest; }); }}
                 searchable
                 clearable
                 nothingFoundMessage="Nenhum paciente encontrado"
                 disabled={patientsLoading}
+                error={fieldErrors.paciente}
+                required
               />
             </Box>
 
             <Box style={{ marginBottom: 8 }}>
               <Select
+                label="Tipo de documento"
+                wrapperProps={{ 'data-required': true }}
                 data={[{ value: 'laudo', label: 'Laudo' }, { value: 'exame', label: 'Exame' }, { value: 'relatorio', label: 'Relatório' }, { value: 'outro', label: 'Outro' }]}
                 placeholder="Tipo de documento"
                 value={form.tipoDocumento}
-                onChange={(val) => setForm({ ...form, tipoDocumento: val || '' })}
+                onChange={(val) => { setForm({ ...form, tipoDocumento: val || '' }); setFieldErrors((p) => { const { tipoDocumento, ...rest } = p; return rest; }); }}
+                error={fieldErrors.tipoDocumento}
+                required
               />
             </Box>
 
@@ -520,12 +557,14 @@ export function Entrega() {
                       setDateInput(v);
                       const parsed = parseDate(v);
                       setForm({ ...form, dataDisponivel: parsed });
+                      setFieldErrors((p) => { const { dataDisponivel, ...rest } = p; return rest; });
                     }}
                     rightSection={
                       <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
                         <CalendarIcon size={16} />
                       </ActionIcon>
                     }
+                    error={fieldErrors.dataDisponivel}
                   />
                 </Popover.Target>
                 <Popover.Dropdown style={{ padding: 8 }}>

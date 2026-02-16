@@ -310,7 +310,8 @@ export function CadastroConvenio() {
         <Stack gap={10}>
           <Box style={{ padding: 8 }}>
             <TextInput
-              label="Nome do convenio"
+              label="Nome do convênio"
+              required
               placeholder="Ex: Unimed"
               value={form.name}
               onChange={(e) => handleNameChange(e?.currentTarget?.value ?? '')}

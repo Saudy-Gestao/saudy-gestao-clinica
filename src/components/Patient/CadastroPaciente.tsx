@@ -427,22 +427,33 @@ export function CadastroPaciente() {
     { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' }, { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
   ];
 
-  const validate = (data: PatientForm) => {
-    if (!data.name.trim()) return 'Nome é obrigatório';
-    if (!/^\d{11}$/.test(data.cpf)) return 'CPF deve conter 11 dígitos numéricos';
-    if (!data.birthDate) return 'Data de nascimento é obrigatória';
-    if (data.birthDate && data.birthDate > new Date()) return 'Data de nascimento inválida';
-    if (data.hasHealthInsurance && !data.healthInsuranceName.trim()) return 'Nome do convênio é obrigatório';
-    
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateFields = (data: PatientForm) => {
+    const errors: Record<string, string> = {};
+    if (!data.name.trim()) errors.name = 'Nome é obrigatório';
+    if (!/^\d{11}$/.test(String(data.cpf))) errors.cpf = 'CPF deve conter 11 dígitos numéricos';
+    if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
+    if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
+    // Gênero agora é obrigatório
+    if (!data.gender) errors.gender = 'Gênero é obrigatório';
+    if (data.hasHealthInsurance && !data.healthInsuranceName.trim()) errors.healthInsuranceName = 'Nome do convênio é obrigatório';
+
+    if (data.email && !/^[\w-.]+@[\w-]+\.[\w-.]+$/.test(String(data.email))) errors.email = 'Email inválido';
+
+    // Celular é obrigatório e deve ter 10 ou 11 dígitos (apenas números)
+    if (!data.cellphone) errors.cellphone = 'Celular é obrigatório';
+    else if (!/^\d{10,11}$/.test(String(data.cellphone))) errors.cellphone = 'Celular inválido';
+
     // Valida apenas limites máximos razoáveis
-    if (data.phone && data.phone.length > 15) return 'Telefone muito longo';
-    if (data.cellphone && data.cellphone.length > 15) return 'Celular muito longo';
-    if (data.emergencyContactPhone && data.emergencyContactPhone.length > 15) return 'Telefone de emergência muito longo';
-    if (data.guardianCpf && data.guardianCpf.length > 11) return 'CPF do responsável muito longo';
-    if (data.guardianPhone && data.guardianPhone.length > 15) return 'Telefone do responsável muito longo';
-    if (data.zipCode && data.zipCode.length > 8) return 'CEP muito longo';
-    
-    return null;
+    if (data.phone && data.phone.length > 15) errors.phone = 'Telefone muito longo';
+    if (data.cellphone && data.cellphone.length > 15) errors.cellphone = 'Celular muito longo';
+    if (data.emergencyContactPhone && data.emergencyContactPhone.length > 15) errors.emergencyContactPhone = 'Telefone de emergência muito longo';
+    if (data.guardianCpf && data.guardianCpf.length > 11) errors.guardianCpf = 'CPF do responsável muito longo';
+    if (data.guardianPhone && data.guardianPhone.length > 15) errors.guardianPhone = 'Telefone do responsável muito longo';
+    if (data.zipCode && data.zipCode.length > 8) errors.zipCode = 'CEP muito longo';
+
+    return errors;
   };
 
   const parseDate = (s: string) => {
@@ -458,9 +469,14 @@ export function CadastroPaciente() {
   }; 
 
   const handleSave = async () => {
-    const err = validate(form);
-    if (err) {
-      showNotification({ title: 'Erro', message: err, color: 'red' });
+    // clear previous field errors
+    setFieldErrors({});
+
+    // run field-level validation
+    const fErrors = validateFields(form);
+    if (Object.keys(fErrors).length) {
+      setFieldErrors(fErrors);
+      showNotification({ title: 'Erro', message: Object.values(fErrors)[0], color: 'red' });
       return;
     }
 
@@ -519,11 +535,14 @@ export function CadastroPaciente() {
         await patientService.updatePatient(editingPatientId, payload);
         setEditingPatientId(null);
         setForm({ ...INITIAL_PATIENT_FORM });
+        setFieldErrors({});
         setActiveTab('lista');
         showNotification({ title: 'Paciente atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
         await patientService.createPatient(payload);
+
         setLastCreatedName(payload.name);
+        setFieldErrors({});
         setShowSuccessModal(true);
       }
       try {
@@ -565,10 +584,17 @@ export function CadastroPaciente() {
         // Silent refresh failure after save.
       }
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar paciente';
-      setErrorMessage(msg);
-      setShowErrorModal(true);
-      showNotification({ title: 'Erro', message: msg, color: 'red' });
+      // handle field-level errors returned by server
+      const serverFields: Record<string,string> | undefined = e?.response?.data?.fields;
+      if (serverFields && typeof serverFields === 'object') {
+        setFieldErrors(serverFields);
+        showNotification({ title: 'Erro', message: Object.values(serverFields)[0], color: 'red' });
+      } else {
+        const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar paciente';
+        setErrorMessage(msg);
+        setShowErrorModal(true);
+        showNotification({ title: 'Erro', message: msg, color: 'red' });
+      }
     } finally {
       setSaving(false);
     }
@@ -639,8 +665,8 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.name} onChange={(e) => setForm({ ...form, name: e.currentTarget.value })} required />
-                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) })} maxLength={14} required />
+                  <TextInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); setFieldErrors((p) => { const { name, ...rest } = p; return rest; }); }} error={fieldErrors.name} required />
+                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cpf, ...rest } = p; return rest; }); }} maxLength={14} required error={fieldErrors.cpf} />
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
@@ -653,13 +679,16 @@ export function CadastroPaciente() {
                         onBlur={() => {
                           if (!birthDateInput) {
                             setForm({ ...form, birthDate: null });
+                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
                             return;
                           }
                           const d = parseDate(birthDateInput);
                           if (!d) {
+                            setFieldErrors((p) => ({ ...p, birthDate: 'Data de nascimento inválida' }));
                             showNotification({ title: 'Erro', message: 'Data de nascimento inválida', color: 'red' });
                             setForm({ ...form, birthDate: null });
                           } else {
+                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
                             setForm({ ...form, birthDate: d });
                           }
                         }}
@@ -691,7 +720,9 @@ export function CadastroPaciente() {
                     placeholder="Selecione"
                     data={genderOptions}
                     value={form.gender}
-                    onChange={(v) => setForm({ ...form, gender: (v as Gender) || '' })}
+                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); setFieldErrors((p) => { const { gender, ...rest } = p; return rest; }); }}
+                    error={fieldErrors.gender}
+                    required
                   />
 
                   <Select
@@ -704,9 +735,9 @@ export function CadastroPaciente() {
 
                   <TextInput label="Ocupação/Profissão" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.currentTarget.value })} />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.currentTarget.value })} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => setForm({ ...form, phone: onlyDigits(e.currentTarget.value) })} />
-                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
+                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); setFieldErrors((p) => { const { email, ...rest } = p; return rest; }); }} error={fieldErrors.email} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { phone, ...rest } = p; return rest; }); }} error={fieldErrors.phone} />
+                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cellphone, ...rest } = p; return rest; }); }} error={fieldErrors.cellphone} required />
                 </SimpleGrid>
               </Paper>
 
@@ -714,7 +745,7 @@ export function CadastroPaciente() {
                 <SectionTitle>Contato de Emergência / Responsáveis</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
                   <TextInput label="Nome contato" value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.currentTarget.value })} />
-                  <TextInput label="Telefone contato" value={formatPhone(form.emergencyContactPhone)} onChange={(e) => setForm({ ...form, emergencyContactPhone: onlyDigits(e.currentTarget.value) })} />
+                  <TextInput label="Telefone contato" value={formatPhone(form.emergencyContactPhone)} onChange={(e) => { setForm({ ...form, emergencyContactPhone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { emergencyContactPhone, ...rest } = p; return rest; }); }} error={fieldErrors.emergencyContactPhone} />
                   <TextInput label="Parentesco" value={form.emergencyContactRelationship} onChange={(e) => setForm({ ...form, emergencyContactRelationship: e.currentTarget.value })} />
                 </SimpleGrid>
 
@@ -727,8 +758,8 @@ export function CadastroPaciente() {
                   <Box style={{ border: '1px solid #e9ecef', borderRadius: 8, padding: 12 }}>
                     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
                       <TextInput label="Nome do responsável" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.currentTarget.value })} />
-                      <TextInput label="CPF do responsável" value={formatCPF(form.guardianCpf)} onChange={(e) => setForm({ ...form, guardianCpf: onlyDigits(e.currentTarget.value) })} maxLength={14} />
-                      <TextInput label="Telefone do responsável" value={formatPhone(form.guardianPhone)} onChange={(e) => setForm({ ...form, guardianPhone: onlyDigits(e.currentTarget.value) })} maxLength={15} />
+                      <TextInput label="CPF do responsável" value={formatCPF(form.guardianCpf)} onChange={(e) => { setForm({ ...form, guardianCpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { guardianCpf, ...rest } = p; return rest; }); }} maxLength={14} error={fieldErrors.guardianCpf} />
+                      <TextInput label="Telefone do responsável" value={formatPhone(form.guardianPhone)} onChange={(e) => { setForm({ ...form, guardianPhone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { guardianPhone, ...rest } = p; return rest; }); }} maxLength={15} error={fieldErrors.guardianPhone} />
                       <TextInput label="Parentesco" value={form.guardianRelationship} onChange={(e) => setForm({ ...form, guardianRelationship: e.currentTarget.value })} />
                     </SimpleGrid>
                   </Box>
@@ -763,11 +794,12 @@ export function CadastroPaciente() {
                         placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione um convênio'}
                         data={insuranceOptions}
                         value={form.healthInsuranceName}
-                        onChange={(value) => setForm({ ...form, healthInsuranceName: value || '' })}
+                        onChange={(value) => { setForm({ ...form, healthInsuranceName: value || '' }); setFieldErrors((p) => { const { healthInsuranceName, ...rest } = p; return rest; }); }}
                         searchable
                         clearable
                         disabled={insurancesLoading}
                         nothingFoundMessage="Nenhum convênio encontrado"
+                        error={fieldErrors.healthInsuranceName}
                       />
                       <TextInput label="Número do convênio" value={form.healthInsuranceNumber} onChange={(e) => setForm({ ...form, healthInsuranceNumber: e.currentTarget.value })} />
 
@@ -849,7 +881,7 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) })} maxLength={9} />
+                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => { setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { zipCode, ...rest } = p; return rest; }); }} maxLength={9} error={fieldErrors.zipCode} />
                   <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} />
                   <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
                   <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />

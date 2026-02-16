@@ -34,18 +34,18 @@ export default function ResultModal({ opened, onClose, variant = 'success', titl
         {message && <Text c="dimmed" align="center">{message}</Text>}
 
         <Group mt={8} justify="center" gap="lg">
+          {primary && (
+            <Button bg={DARK_BLUE} c="white" onClick={() => { primary.onClick(); }} style={{ minWidth: 140 }}>
+              {primary.label}
+            </Button>
+          )}
+
           {secondary ? (
             <Button variant={secondary.variant || 'default'} onClick={() => { secondary.onClick(); }} style={{ minWidth: 140 }}>
               {secondary.label}
             </Button>
           ) : (
             <Button variant="default" onClick={onClose} style={{ minWidth: 140 }}>Fechar</Button>
-          )}
-
-          {primary && (
-            <Button bg={DARK_BLUE} c="white" onClick={() => { primary.onClick(); }} style={{ minWidth: 140 }}>
-              {primary.label}
-            </Button>
           )}
         </Group>
       </Center>

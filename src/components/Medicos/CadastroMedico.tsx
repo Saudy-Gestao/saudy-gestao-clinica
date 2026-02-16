@@ -10,7 +10,6 @@ import {
   TextInput,
   NumberInput,
   MultiSelect,
-  Switch,
   SimpleGrid,
   Stack,
   Paper,
@@ -19,7 +18,6 @@ import {
   ActionIcon,
   Modal,
   Center,
-  ThemeIcon,
   Tabs,
   Table,
   Loader,
@@ -297,24 +295,37 @@ export function CadastroMedico() {
     { value: 'Domingo', label: 'Domingo' },
   ];
 
-  const validate = (data: DoctorForm) => {
-    if (!data.nome.trim()) return 'Nome é obrigatório';
-    if (!data.crm.trim()) return 'CRM é obrigatório';
-    if (!data.crmState) return 'UF do CRM é obrigatório';
-    if (!/^[\w-.]+@[\w-]+\.[\w-.]+$/.test(data.email)) return 'Email inválido';
-    if (!/^\d{11}$/.test(data.cpf)) return 'CPF deve conter 11 dígitos numéricos';
-    if (!data.birthDate) return 'Data de nascimento é obrigatória';
-    if (data.birthDate && data.birthDate > new Date()) return 'Data de nascimento inválida';
-    if (data.consultationFee !== null && data.consultationFee < 0) return 'Valor da consulta inválido';
-    if (data.workingHoursStart && !/^\d{2}:\d{2}$/.test(data.workingHoursStart)) return 'Formato de início do horário inválido (HH:MM)';
-    if (data.workingHoursEnd && !/^\d{2}:\d{2}$/.test(data.workingHoursEnd)) return 'Formato de fim do horário inválido (HH:MM)';
-    return null;
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+
+  const validateFields = (data: DoctorForm) => {
+    const errors: Record<string,string> = {};
+    if (!data.nome.trim()) errors.nome = 'Nome é obrigatório';
+    if (!data.crm.trim()) errors.crm = 'CRM é obrigatório';
+    if (!data.crmState) errors.crmState = 'UF do CRM é obrigatório';
+    if (!data.email || !/^[\w-.]+@[\w-]+\.[\w-.]+$/.test(data.email)) errors.email = 'Email inválido';
+    if (!data.phone || !/^\d{10,11}$/.test(String(data.phone))) errors.phone = 'Telefone inválido';
+    if (!/^\d{11}$/.test(data.cpf)) errors.cpf = 'CPF deve conter 11 dígitos numéricos';
+    if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
+    if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
+    if (!data.gender) errors.gender = 'Gênero é obrigatório';
+    if (!data.specialty) errors.specialty = 'Especialidade é obrigatória';
+    if (data.consultationFee !== null && data.consultationFee < 0) errors.consultationFee = 'Valor da consulta inválido';
+    if (data.workingHoursStart && !/^\d{2}:\d{2}$/.test(data.workingHoursStart)) errors.workingHoursStart = 'Formato de início do horário inválido (HH:MM)';
+    if (data.workingHoursEnd && !/^\d{2}:\d{2}$/.test(data.workingHoursEnd)) errors.workingHoursEnd = 'Formato de fim do horário inválido (HH:MM)';
+    return errors;
   };
 
+
+
   const handleSave = async () => {
-    const err = validate(form);
-    if (err) {
-      showNotification({ title: 'Erro', message: err, color: 'red' });
+    // clear previous field errors
+    setFieldErrors({});
+
+    // run field-level validation
+    const fErrors = validateFields(form);
+    if (Object.keys(fErrors).length) {
+      setFieldErrors(fErrors);
+      showNotification({ title: 'Erro', message: Object.values(fErrors)[0], color: 'red' });
       return;
     }
 
@@ -352,12 +363,14 @@ export function CadastroMedico() {
         await doctorService.updateDoctor(editingDoctorId, payload);
         setEditingDoctorId(null);
         setForm({ ...INITIAL_DOCTOR_FORM });
+        setFieldErrors({});
         setActiveTab('lista');
         showNotification({ title: 'Médico atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
         await doctorService.createDoctor(payload);
 
         setLastCreatedName(payload.name);
+        setFieldErrors({});
         setShowSuccessModal(true);
       }
       try {
@@ -389,10 +402,23 @@ export function CadastroMedico() {
         // Silent refresh failure after save.
       }
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar médico';
-      setErrorMessage(msg);
-      setShowErrorModal(true);
-      showNotification({ title: 'Erro', message: msg, color: 'red' });
+      // handle field-level errors returned by server
+      const serverFields: Record<string,string> | undefined = e?.response?.data?.fields;
+      if (serverFields && typeof serverFields === 'object') {
+        // map API field names to front-end form keys where necessary
+        const mapped: Record<string,string> = {};
+        for (const [k, v] of Object.entries(serverFields)) {
+          if (k === 'name') mapped['nome'] = v as string;
+          else mapped[k] = v as string;
+        }
+        setFieldErrors(mapped);
+        showNotification({ title: 'Erro', message: Object.values(mapped)[0], color: 'red' });
+      } else {
+        const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar médico';
+        setErrorMessage(msg);
+        setShowErrorModal(true);
+        showNotification({ title: 'Erro', message: msg, color: 'red' });
+      }
     } finally {
       setSaving(false);
     }
@@ -402,6 +428,7 @@ export function CadastroMedico() {
     if (editingDoctorId) {
       setEditingDoctorId(null);
       setForm({ ...INITIAL_DOCTOR_FORM });
+      setFieldErrors({});
       setActiveTab('cadastro');
       return;
     }
@@ -464,8 +491,8 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.currentTarget.value })} required />
-                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) })} maxLength={14} required />
+                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); setFieldErrors((p) => { const { nome, ...rest } = p; return rest; }); }} error={fieldErrors.nome} required />
+                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cpf, ...rest } = p; return rest; }); }} maxLength={14} error={fieldErrors.cpf} required />
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
@@ -482,9 +509,10 @@ export function CadastroMedico() {
                           }
                           const d = parseDate(birthDateInput);
                           if (!d) {
-                            showNotification({ title: 'Erro', message: 'Data de nascimento inválida', color: 'red' });
+                            setFieldErrors((p) => ({ ...p, birthDate: 'Data de nascimento inválida' }));
                             setForm({ ...form, birthDate: null });
                           } else {
+                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
                             setForm({ ...form, birthDate: d });
                           }
                         }}
@@ -496,6 +524,7 @@ export function CadastroMedico() {
                         }
                         onClick={() => setDatePopoverOpened(true)}
                         style={{ cursor: 'text' }}
+                        error={fieldErrors.birthDate}
                       />
                     </Popover.Target>
                     <Popover.Dropdown>
@@ -516,11 +545,13 @@ export function CadastroMedico() {
                     placeholder="Selecione"
                     data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
                     value={form.gender}
-                    onChange={(v) => setForm({ ...form, gender: (v as Gender) || '' })}
+                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); setFieldErrors((p) => { const { gender, ...rest } = p; return rest; }); }}
+                    error={fieldErrors.gender}
+                    required
                   />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.currentTarget.value })} required />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => setForm({ ...form, phone: onlyDigits(e.currentTarget.value) })} />
+                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); setFieldErrors((p) => { const { email, ...rest } = p; return rest; }); }} required error={fieldErrors.email} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { phone, ...rest } = p; return rest; }); }} error={fieldErrors.phone} required />
                   <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
                 </SimpleGrid>
               </Paper>
@@ -529,21 +560,24 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Profissionais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="CRM" value={form.crm} onChange={(e) => setForm({ ...form, crm: e.currentTarget.value })} required />
+                  <TextInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); setFieldErrors((p) => { const { crm, ...rest } = p; return rest; }); }} required error={fieldErrors.crm} />
                   <Select
                     label="UF do CRM"
                     placeholder="Selecione"
                     data={statesOptions}
                     value={form.crmState}
-                    onChange={(v) => setForm({ ...form, crmState: v || '' })}
+                    onChange={(v) => { setForm({ ...form, crmState: v || '' }); setFieldErrors((p) => { const { crmState, ...rest } = p; return rest; }); }}
                     required
+                    error={fieldErrors.crmState}
                   />
                   <Select
                     label="Especialidade principal"
                     placeholder="Escolha uma"
                     data={specialtyOptions}
                     value={form.specialty}
-                    onChange={(v) => setForm({ ...form, specialty: v || '' })}
+                    onChange={(v) => { setForm({ ...form, specialty: v || '' }); setFieldErrors((p) => { const { specialty, ...rest } = p; return rest; }); }}
+                    error={fieldErrors.specialty}
+                    required
                   />
                   <MultiSelect
                     label="Outras especialidades"
@@ -556,8 +590,9 @@ export function CadastroMedico() {
                     label="Valor da consulta (R$)"
                     placeholder="0,00"
                     value={form.consultationFee ?? undefined}
-                    onChange={(v) => setForm({ ...form, consultationFee: typeof v === 'number' ? v : null })}
+                    onChange={(v) => { setForm({ ...form, consultationFee: typeof v === 'number' ? v : null }); setFieldErrors((p) => { const { consultationFee, ...rest } = p; return rest; }); }}
                     decimalScale={2}
+                    error={fieldErrors.consultationFee}
                     min={0}
                     prefix="R$ "
                   />
@@ -795,8 +830,8 @@ export function CadastroMedico() {
           variant="success"
           title="Médico cadastrado"
           message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Médico cadastrado com sucesso.'}
-          secondary={{ label: 'Voltar para o dashboard', onClick: () => { setShowSuccessModal(false); navigate('/dashboard'); } }}
           primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ ...INITIAL_DOCTOR_FORM }); setShowSuccessModal(false); } }}
+          secondary={{ label: 'Voltar para o dashboard', onClick: () => { setShowSuccessModal(false); navigate('/dashboard'); } }}
         />
 
         <ResultModal opened={showErrorModal} onClose={() => setShowErrorModal(false)} variant="error" title="Erro ao cadastrar médico" message={errorMessage || 'Erro ao registrar médico'} secondary={{ label: 'Fechar', onClick: () => setShowErrorModal(false) }} />
