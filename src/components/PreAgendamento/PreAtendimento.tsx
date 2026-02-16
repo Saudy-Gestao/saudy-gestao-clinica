@@ -22,6 +22,7 @@ import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
 import preAttendanceService from '../../services/preAttendanceService';
 import patientService from '../../services/patientService';
+import insuranceService from '../../services/insuranceService';
 import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils/formatters';
 
 interface Patient extends NovoPatiente {
@@ -107,6 +108,8 @@ export function PreAtendimento() {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patientOptions, setPatientOptions] = useState<{ value: string; label: string }[]>([]);
   const [patientById, setPatientById] = useState<Record<string, any>>({});
+  const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
+  const [insurancesLoading, setInsurancesLoading] = useState(false);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
@@ -126,43 +129,49 @@ export function PreAtendimento() {
     return `${day}/${month}/${year}`;
   };
 
-  const mapApiToPatient = (it: any): Patient => ({
-    id: String(it.id),
-    patientId: it.patientId || undefined,
-    nomeCompleto: it.fullName || '',
-    cpf: it.cpf || '',
-    dataNascimento: it.birthDate || '',
-    sexo: it.gender || '',
-    telefone: it.phone || '',
-    email: it.email || '',
-    endereco: it.address || '',
-    convenio: it.convenio || '',
-    tipoConvenio: it.convenioType || '',
-    validadeConvenio: it.convenioValidUntil || '',
-    numCarteira: it.convenioNumber || '',
-    statusAutorizacao: it.convenioStatus || '',
-    observacoesConvenio: it.convenioNotes || '',
-    pressaoArterial: it.bloodPressure || '',
-    frequenciaCardiaca: it.heartRate || '',
-    temperatura: it.temperature || '',
-    saturacao: it.oxygenSaturation || '',
-    peso: it.weight || '',
-    altura: it.height || '',
-    glicemia: it.glucose || '',
-    imc: it.bmi || '',
-    queixaPrincipal: it.mainComplaint || '',
-    historiaDoenca: it.diseaseHistory || '',
-    alergias: it.allergies || '',
-    medicamentos: it.medications || '',
-    antecedentes: it.antecedentes || '',
-    observacoesTriagem: it.triageNotes || '',
-    observacoes: it.notes || '',
-    totem: it.totem ?? undefined,
-    status: it.status || '',
-    fila: it.queue || '',
-    tipoFila: it.queueType || '',
-    agenda: it.agenda || '',
-  });
+  const mapApiToPatient = (it: any): Patient => {
+    const raw = it?.item || it?.data || it;
+    const id = raw?.id || raw?.preAttendanceId || raw?.pre_attendance_id || raw?.patientId || raw?.patient_id || `tmp-${Math.random().toString(36).slice(2)}`;
+    const nomeCompleto = (raw?.fullName || raw?.full_name || raw?.name || raw?.patientName || raw?.patient_name || raw?.patient?.name || '').toString().trim();
+
+    return {
+      id: String(id),
+      patientId: raw?.patientId || raw?.patient_id || raw?.patient?.id || undefined,
+      nomeCompleto,
+      cpf: raw?.cpf || raw?.patientCpf || raw?.patient_cpf || raw?.patient?.cpf || '',
+      dataNascimento: raw?.birthDate || raw?.birth_date || '',
+      sexo: raw?.gender || raw?.sexo || '',
+      telefone: raw?.phone || raw?.cellphone || '',
+      email: raw?.email || '',
+      endereco: raw?.address || raw?.endereco || '',
+      convenio: raw?.convenio || raw?.insurance || raw?.healthInsuranceName || '',
+      tipoConvenio: raw?.convenioType || raw?.convenio_type || '',
+      validadeConvenio: raw?.convenioValidUntil || raw?.convenio_valid_until || raw?.healthInsuranceExpiry || raw?.healthInsuranceValidity || '',
+      numCarteira: raw?.convenioNumber || raw?.convenio_number || raw?.healthInsuranceNumber || '',
+      statusAutorizacao: raw?.convenioStatus || raw?.convenio_status || '',
+      observacoesConvenio: raw?.convenioNotes || raw?.convenio_notes || '',
+      pressaoArterial: raw?.bloodPressure || raw?.blood_pressure || '',
+      frequenciaCardiaca: raw?.heartRate || raw?.heart_rate || '',
+      temperatura: raw?.temperature || '',
+      saturacao: raw?.oxygenSaturation || raw?.oxygen_saturation || '',
+      peso: raw?.weight || '',
+      altura: raw?.height || '',
+      glicemia: raw?.glucose || '',
+      imc: raw?.bmi || '',
+      queixaPrincipal: raw?.mainComplaint || raw?.main_complaint || '',
+      historiaDoenca: raw?.diseaseHistory || raw?.disease_history || '',
+      alergias: raw?.allergies || '',
+      medicamentos: raw?.medications || '',
+      antecedentes: raw?.antecedentes || '',
+      observacoesTriagem: raw?.triageNotes || raw?.triage_notes || '',
+      observacoes: raw?.notes || raw?.observacoes || '',
+      totem: raw?.totem ?? undefined,
+      status: raw?.status || '',
+      fila: raw?.queue || raw?.fila || '',
+      tipoFila: raw?.queueType || raw?.queue_type || raw?.tipoFila || '',
+      agenda: raw?.agenda || '',
+    };
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -231,6 +240,43 @@ export function PreAtendimento() {
     };
 
     loadPatients();
+  }, []);
+
+  useEffect(() => {
+    const loadInsurances = async () => {
+      setInsurancesLoading(true);
+      try {
+        const data: any = await insuranceService.listInsurances({ isActive: true });
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const options = list
+          .map((it: any) => {
+            const name = (it.name || it.nome || '').toString().trim();
+            return name ? { value: name, label: name } : null;
+          })
+          .filter(Boolean) as { value: string; label: string }[];
+
+        setInsuranceOptions(options);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+          color: 'red',
+        });
+      } finally {
+        setInsurancesLoading(false);
+      }
+    };
+
+    loadInsurances();
   }, []);
 
   const filteredPatients = patients.filter((patient) => {
@@ -682,13 +728,19 @@ export function PreAtendimento() {
 
           <Tabs.Panel value="convenio">
             <Stack gap={isMobile ? "sm" : "md"} mih={isMobile ? undefined : 750}>
-              <FloatingInput
-                label="Nome convênio"
-                value={novoPaciente.convenio}
-                onChange={(e) =>
-                  setNovoPaciente({ ...novoPaciente, convenio: e.currentTarget.value })
-                }
-              />
+              <Box>
+                <Select
+                  label="Convênio"
+                  placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione um convênio'}
+                  data={insuranceOptions}
+                  value={novoPaciente.convenio}
+                  onChange={(value) => setNovoPaciente({ ...novoPaciente, convenio: value || '' })}
+                  searchable
+                  clearable
+                  disabled={insurancesLoading}
+                  nothingFoundMessage="Nenhum convênio encontrado"
+                />
+              </Box>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
                 <FloatingInput
