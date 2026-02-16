@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput, Center, ThemeIcon, Loader } from '@mantine/core';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput, Center, Loader } from '@mantine/core';
 import inventoryService from '../../services/inventoryService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Check } from 'lucide-react';
+import { Search, Plus, ChevronLeft, X } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePickerInput } from '@mantine/dates';
 import ResultModal from '../common/ResultModal';
+import { FloatingInput } from '../common/FloatingInput';
 
 interface StockItem {
   id: string;
@@ -75,15 +76,15 @@ export function Estoque() {
     minimo: null as number | null,
     maximo: null as number | null,
     precoUnitario: null as number | null,
-    validade: undefined as Date | undefined,
+    validade: null as Date | null,
   });
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+
   // date input helpers
-  // eslint-disable-next-line no-empty-pattern
-  const [] = useState(false);
   const [dateInput, setDateInput] = useState('');
 
-  const formatDate = (d: Date | undefined) => {
+  const formatDate = (d: Date | null | undefined) => {
     if (!d) return '';
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -193,18 +194,18 @@ export function Estoque() {
         minimo: it.minimo,
         maximo: it.maximo,
         precoUnitario: it.precoUnitario,
-        validade: it.validade ? parseDate(it.validade) : undefined,
+        validade: it.validade ? (parseDate(it.validade) ?? null) : null,
       });
       setDateInput(it.validade || '');
     } else {
       setEditingId(null);
-      setForm({ codigo: '', nome: '', categoria: '', unidade: '', quantidade: null, minimo: null, maximo: null, precoUnitario: null, validade: undefined });
+      setForm({ codigo: '', nome: '', categoria: '', unidade: '', quantidade: null, minimo: null, maximo: null, precoUnitario: null, validade: null });
       setDateInput('');
     }
     setModalOpen(true);
   };
 
-  const formatISODate = (d?: Date | undefined) => {
+  const formatISODate = (d?: Date | null) => {
     if (!d) return undefined;
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -213,13 +214,19 @@ export function Estoque() {
   };
 
   const handleAddOrUpdate = async () => {
-    if (!form.nome.trim()) {
-      showNotification({ title: 'Erro', message: 'Nome do item é obrigatório', color: 'red' });
-      return;
-    }
+    // clear previous field errors
+    setFieldErrors({});
 
-    if (dateInput && !form.validade) {
-      showNotification({ title: 'Erro', message: 'Validade inválida', color: 'red' });
+    const errors: Record<string, string> = {};
+    if (!form.nome || !form.nome.trim()) errors.name = 'Nome do item é obrigatório';
+    if (!form.codigo || !form.codigo.trim()) errors.code = 'Código é obrigatório';
+    // validade is required when creating a new item; also validate manually-typed/partial dates
+    if (!editingId && !form.validade) errors.expiryDate = 'Validade é obrigatória';
+    else if (dateInput && !form.validade) errors.expiryDate = 'Validade inválida';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      showNotification({ title: 'Erro', message: 'Preencha os campos obrigatórios', color: 'red' });
       return;
     }
 
@@ -262,7 +269,7 @@ export function Estoque() {
         setShowItemSuccessModal(true);
       } else {
         const payload = {
-          code: form.codigo || `CODE${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          code: form.codigo,
           name: form.nome,
           category: form.categoria || '',
           unit: form.unidade || '',
@@ -270,7 +277,7 @@ export function Estoque() {
           minQuantity: normalizeNumber(form.minimo) ?? 0,
           maxQuantity: normalizeNumber(form.maximo) ?? 0,
           unitPrice: normalizeNumber(form.precoUnitario) ?? 0,
-          expiryDate: formatISODate(form.validade) || '',
+          expiryDate: formatISODate(form.validade)!,
           notes: '',
         };
 
@@ -278,7 +285,7 @@ export function Estoque() {
 
         const newItem: StockItem = {
           id: created.id ? String(created.id) : `tmp-${Date.now()}`,
-          codigo: created.code || form.codigo || `CODE${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          codigo: created.code || form.codigo,
           nome: created.name || form.nome,
           quantidade: created.quantity ?? (form.quantidade ?? 0),
           minimo: created.minQuantity ?? (form.minimo ?? 0),
@@ -298,7 +305,13 @@ export function Estoque() {
         setShowItemSuccessModal(true);
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar item';
+      // if backend returned per-field errors, map them to the form
+      const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;
+      if (serverFields && typeof serverFields === 'object') {
+        setFieldErrors(serverFields);
+      }
+
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Erro ao salvar item';
       // fallback to toast for some errors but also show error modal
       setItemErrorTitle('Erro ao salvar item');
       setItemErrorMessage(msg);
@@ -460,15 +473,23 @@ export function Estoque() {
           <Box style={{ padding: 8 }}>
             <Text size="sm" fw={600} mb={8}>Cadastrar item</Text>
 
-            <Box className="floating-field" style={{ marginBottom: 8 }}>
-              <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.currentTarget.value })} placeholder=" " />
-              <label>Nome do item</label>
-            </Box>
+              <FloatingInput
+              containerProps={{ style: { marginBottom: 8 } }}
+              label={<><span>Nome do item</span><span style={{ color: '#fa5252' }}> *</span></>}
+              value={form.nome}
+              onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); setFieldErrors((prev) => { const { name, ...rest } = prev; return rest; }); }}
+              error={fieldErrors.name}
+            />
 
             <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 8 }}>
               <Box>
                 <Box className="line-field">
-                  <TextInput variant="unstyled" placeholder="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.currentTarget.value })} />
+                  <FloatingInput
+                    label={<><span>Código</span><span style={{ color: '#fa5252' }}> *</span></>}
+                    value={form.codigo}
+                    onChange={(e) => { setForm({ ...form, codigo: e.currentTarget.value }); setFieldErrors((prev) => { const { code, ...rest } = prev; return rest; }); }}
+                    error={fieldErrors.code}
+                  />
                 </Box>
 
                 <Box className="line-field">
@@ -497,21 +518,31 @@ export function Estoque() {
                   <NumberInput variant="unstyled" value={form.maximo ?? undefined} onChange={(val) => setForm({ ...form, maximo: normalizeNumber(val) })} placeholder="Quant. Máx." min={0} />
                 </Box>
 
-                <Box style={{ marginBottom: 8, borderBottom: '1px solid #dee2e6', paddingBottom: 6 }}>
+                <Box style={{ marginBottom: 8, borderBottom: '1px solid #dee2e6', paddingBottom: 6, position: 'relative' }}>
                   <DatePickerInput
+                    aria-label="Validade"
                     placeholder="Validade"
                     value={form.validade}
                     onChange={(val) => {
-                      const date = val || undefined;
+                      const date = val ?? null; // keep null when cleared
                       setForm({ ...form, validade: date });
                       setDateInput(date ? formatDate(date) : '');
+                      setFieldErrors((prev) => { const { expiryDate, ...rest } = prev; return rest; });
                     }}
                     valueFormat="DD/MM/YYYY"
-                    clearable
-                    styles={{
-                      input: { border: 'none', padding: 0, fontSize: '0.875rem' }
-                    }}
-                  />
+                    clearable={false}
+                    rightSection={form.validade ? (
+                      <ActionIcon size="sm" variant="subtle" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); e.preventDefault(); setForm({ ...form, validade: null }); setDateInput(''); setFieldErrors((prev) => { const { expiryDate, ...rest } = prev; return rest; }); }} title="Limpar data"><X size={12} /></ActionIcon>
+                    ) : undefined}
+                    styles={{ input: { border: 'none', padding: '10px 44px 6px 0', fontSize: '0.875rem' } }} />
+                  {/* placeholder asterisk (red) — visible only when field is empty to mimic placeholder) */}
+                  {!form.validade && (
+                    <span className="placeholder-asterisk" aria-hidden>*</span>
+                  )}
+
+                  {fieldErrors.expiryDate && (
+                    <Text size="xs" c="red" mt={6}>{fieldErrors.expiryDate}</Text>
+                  )}
                 </Box>
               </Box>
             </Box>
@@ -531,7 +562,7 @@ export function Estoque() {
         title={lastItemAction === 'created' ? 'Item cadastrado' : 'Item atualizado'}
         message={lastCreatedItemName ? `${lastCreatedItemName} ${lastItemAction === 'created' ? 'foi adicionado ao estoque.' : 'foi atualizado com sucesso.'}` : (lastItemAction === 'created' ? 'Item adicionado com sucesso.' : 'Item atualizado com sucesso.')}
         secondary={{ label: 'Voltar', onClick: () => setShowItemSuccessModal(false) }}
-        primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ codigo: '', nome: '', categoria: '', unidade: '', quantidade: null, minimo: null, maximo: null, precoUnitario: null, validade: undefined }); setShowItemSuccessModal(false); setModalOpen(true); setEditingId(null); } }}
+        primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ codigo: '', nome: '', categoria: '', unidade: '', quantidade: null, minimo: null, maximo: null, precoUnitario: null, validade: null }); setShowItemSuccessModal(false); setModalOpen(true); setEditingId(null); } }}
       />
 
       <ResultModal

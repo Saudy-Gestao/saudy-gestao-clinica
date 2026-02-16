@@ -45,12 +45,40 @@ body {
   pointer-events: none;
 }
 
+/* ensure DatePicker wrapper can mimic floating behavior */
+.floating-field.has-value label,
+.floating-field.is-focused label,
 .floating-field input:focus + label,
 .floating-field input:not(:placeholder-shown) + label {
   top: -6px;
   font-size: 0.7rem;
   color: #0B2E5D; /* DARK_BLUE */
 }
+
+/* make hovering the wrapper give subtle input feedback */
+.floating-field:hover input {
+  border-bottom-color: #c7d2df;
+}
+
+/* red asterisk overlay used to simulate a colored '*' inside the placeholder */
+.placeholder-asterisk {
+  position: absolute;
+  right: 8px;
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #fa5252;
+  font-size: 0.85rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ensure placeholder text does not collide with the asterisk */
+.mantine-DatePickerInput-root .mantine-Input-input::placeholder,
+.mantine-TextInput-root[data-unstyled] .mantine-TextInput-input::placeholder {
+  opacity: 0.6;
+}
+
 
 .floating-field input[disabled] + label,
 .floating-field input[readonly] + label {
@@ -131,10 +159,11 @@ button:disabled {
 }
 
 /* Pequena redução do placeholder/label para campos unstyled */
+/* Ajustado para alinhar com .floating-field (top padding + bottom padding) */
 .mantine-TextInput-root[data-unstyled] .mantine-TextInput-input,
 .mantine-NumberInput-root[data-unstyled] .mantine-NumberInput-input,
 .mantine-Select-root[data-unstyled] .mantine-Select-input {
-  padding: 6px 0;
+  padding: 10px 0 6px;
 }
 
 

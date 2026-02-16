@@ -9,7 +9,7 @@ export interface CreateInventoryPayload {
   minQuantity?: number;
   maxQuantity?: number;
   unitPrice?: number;
-  expiryDate?: string; // YYYY-MM-DD
+  expiryDate: string; // YYYY-MM-DD — now required for create
   notes?: string;
 }
 

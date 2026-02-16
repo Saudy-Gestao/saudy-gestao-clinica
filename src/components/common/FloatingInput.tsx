@@ -2,7 +2,7 @@ import { Box, Text } from '@mantine/core';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
 interface FloatingInputProps extends ComponentPropsWithoutRef<'input'> {
-  label: string;
+  label: ReactNode;
   rightSection?: ReactNode;
   containerProps?: ComponentPropsWithoutRef<typeof Box>;
   error?: string;
