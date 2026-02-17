@@ -64,21 +64,21 @@ class AuthService {
    * Enviar código de recuperação de senha
    */
   async sendResetCode(identifier: string): Promise<void> {
-    await api.post('/forgot-password', { identifier });
+    await api.post('/auth/forgot-password', { identifier });
   }
 
   /**
    * Verificar código de recuperação
    */
   async verifyResetCode(identifier: string, code: string): Promise<void> {
-    await api.post('/verify-code', { identifier, code });
+    await api.post('/auth/verify-code', { identifier, code });
   }
 
   /**
    * Redefinir senha
    */
   async resetPassword(data: ResetPasswordData): Promise<void> {
-    await api.post('/reset-password', data);
+    await api.post('/auth/reset-password', data);
   }
 
   /**

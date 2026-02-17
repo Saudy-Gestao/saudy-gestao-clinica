@@ -1,5 +1,10 @@
 # React + TypeScript + Vite
 
+## Integração com API monolítica
+
+- Em desenvolvimento local, o `vite.config.ts` já faz proxy de `/auth`, `/accounts`, `/admin`, `/care` e `/procedures` para `http://localhost:3000`.
+- Se preferir URL direta (produção/staging), copie `.env.example` para `.env` e defina `VITE_API_URL`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
