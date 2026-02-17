@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, FileButton, Badge } from '@mantine/core';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, FileButton, Badge, Tabs, Paper, Title } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Download, Edit2, UploadCloud } from 'lucide-react';
+import { Search, Plus, ChevronLeft, Download, Edit2, UploadCloud, Eye, Trash } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import envelopmentService from '../../services/envelopmentService';
+import ResultModal from '../common/ResultModal';
 
 interface PatientRow {
   id: string;
@@ -41,6 +42,11 @@ export function Envelopamento() {
   }>({ nome: '', responsavel: '', tipoDocumento: '', descricao: '', file: null });
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'cadastro' | 'cadastrados'>('cadastrados');
+  const [isViewing, setIsViewing] = useState(false);
+
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name?: string } | null>(null);
 
   const mapApiToRow = (it: any): PatientRow => ({
     id: String(it.id),
@@ -83,7 +89,10 @@ export function Envelopamento() {
 
 
 
-  const openEnvelope = (r?: PatientRow) => {
+  // open modal: view-only when `view` is true; otherwise used for creating new (but edits happen in Cadastro tab)
+  const openEnvelope = (r?: PatientRow, view = false) => {
+    setIsViewing(Boolean(view));
+
     if (r) {
       setEnvelopeData({ nome: r.nomeCompleto, responsavel: r.responsavel, tipoDocumento: r.exame || '', descricao: r.observacao || '', file: null });
       setEditingId(r.id);
@@ -91,11 +100,33 @@ export function Envelopamento() {
       setEnvelopeData({ nome: '', responsavel: '', tipoDocumento: '', descricao: '', file: null });
       setEditingId(null);
     }
+
     setModalOpen(true);
   };
 
   const handleDownload = (r: PatientRow) => {
     showNotification({ title: 'Download', message: `Solicitado download do registro de ${r.nomeCompleto}`, color: 'blue' });
+  };
+
+  const handleEditEnvelopment = (r: PatientRow) => {
+    setIsViewing(false);
+    setEditingId(r.id);
+    setEnvelopeData({ nome: r.nomeCompleto, responsavel: r.responsavel, tipoDocumento: r.exame || '', descricao: r.observacao || '', file: null });
+    setActiveTab('cadastro');
+  };
+
+  const handleDeleteEnvelopment = async (id: string) => {
+    try {
+      await envelopmentService.remove(id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      showNotification({ title: 'Envelopamento excluído', message: 'Registro removido com sucesso.', color: 'green' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir envelopamento';
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeleteTarget(null);
+    }
   };
 
   const handleAddOrUpdate = async () => {
@@ -144,7 +175,10 @@ export function Envelopamento() {
       }
     }
 
-    setModalOpen(false);
+    // after save switch to list and clear
+    setActiveTab('cadastrados');
+    setEnvelopeData({ nome: '', responsavel: '', tipoDocumento: '', descricao: '', file: null });
+    setEditingId(null);
   };  
 
   return (
@@ -168,31 +202,90 @@ export function Envelopamento() {
           </Group>
         </Group>
 
-        {/* Search and Button Section */}
-        <Box mb={isMobile ? 20 : 30}>
-          <Group gap="md" align="flex-end">
-            <TextInput
-              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou CPF..'}
-              leftSection={<Search size={16} color="#999" />}
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
-              radius="md"
-              size={isMobile ? 'sm' : 'md'}
-              style={{ flex: 1 }}
-            />
-            <Button
-              bg={DARK_BLUE}
-              c="white"
-              leftSection={isMobile ? undefined : <Plus size={18} />}
-              onClick={() => openEnvelope()}
-              size={isMobile ? 'sm' : 'md'}
-              fw={600}
-              px={isMobile ? 'sm' : 'xl'}
-            >
-              {isMobile ? <Plus size={16} /> : 'Novo envelope'}
-            </Button>
-          </Group>
-        </Box>
+        <Tabs value={activeTab} onChange={(v) => setActiveTab(v as any)}>
+          <Tabs.List>
+            <Tabs.Tab value="cadastro">Cadastrar</Tabs.Tab>
+            <Tabs.Tab value="cadastrados">Cadastrados</Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="cadastro" pt="xs">
+            <Paper p="md" radius="md" withBorder>
+              <Title order={5} fw={600} c={DARK_BLUE} mb="sm">Cadastrar Envelopamento</Title>
+              <Box style={{ padding: 8 }}>
+                <Box className="floating-field" style={{ marginBottom: 8 }}>
+                  <input type="text" value={envelopeData.nome} onChange={(e) => setEnvelopeData({ ...envelopeData, nome: e.currentTarget.value })} placeholder=" " />
+                  <label>Nome</label>
+                </Box>
+
+                <Box className="floating-field" style={{ marginBottom: 8 }}>
+                  <input type="text" value={envelopeData.responsavel} onChange={(e) => setEnvelopeData({ ...envelopeData, responsavel: e.currentTarget.value })} placeholder=" " />
+                  <label>Responsável</label>
+                </Box>
+
+                <Box style={{ marginBottom: 8 }}>
+                  <Select
+                    data={[{ value: 'relatorio', label: 'Relatório' }, { value: 'exame', label: 'Exame' }, { value: 'laudo', label: 'Laudo' }, { value: 'outro', label: 'Outro' }]}
+                    placeholder="Tipo de documento"
+                    value={envelopeData.tipoDocumento}
+                    onChange={(val) => setEnvelopeData({ ...envelopeData, tipoDocumento: val || '' })}
+                  />
+                </Box>
+
+                <Box style={{ marginBottom: 8 }}>
+                  <Textarea placeholder="Descrição/Conteúdo" value={envelopeData.descricao} onChange={(e) => setEnvelopeData({ ...envelopeData, descricao: e.currentTarget.value })} minRows={3} />
+                </Box>
+
+                <Box style={{ marginBottom: 8 }}>
+                  <FileButton accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword" onChange={(file) => setEnvelopeData({ ...envelopeData, file })}>
+                    {(props) => (
+                      <Box {...props} style={{ border: '1px dashed #dee2e6', padding: 18, borderRadius: 6, textAlign: 'center', cursor: 'pointer' }}>
+                        <UploadCloud size={20} style={{ color: '#6c757d' }} />
+                        <Text size="sm" c="dimmed">Upload do documento</Text>
+                        <Text size="xs" c="dimmed">Tamanho limite: 200mb</Text>
+                        {envelopeData.file && (
+                          <Box mt={8}>
+                            <Badge variant="outline">{envelopeData.file.name}</Badge>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </FileButton>
+                  <Text size="xs" c="dimmed" mt={6}>Arquivos suportados: pdf, doc, xls</Text>
+                </Box>
+
+                <Group justify="flex-end" mt={8}>
+                  <Button variant="default" onClick={() => { setActiveTab('cadastrados'); setEnvelopeData({ nome: '', responsavel: '', tipoDocumento: '', descricao: '', file: null }); setEditingId(null); }} size="sm">Cancelar</Button>
+                  <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm">{editingId ? 'Salvar' : 'Adicionar'}</Button>
+                </Group>
+              </Box>
+            </Paper>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="cadastrados" pt="xs">
+            <Box mb={isMobile ? 20 : 30}>
+              <Group gap="md" align="flex-end">
+                <TextInput
+                  placeholder={isMobile ? 'Buscar...' : 'Buscar por nome...'}
+                  leftSection={<Search size={16} color="#999" />}
+                  value={query}
+                  onChange={(e) => setQuery(e.currentTarget.value)}
+                  radius="md"
+                  size={isMobile ? 'sm' : 'md'}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  bg={DARK_BLUE}
+                  c="white"
+                  leftSection={isMobile ? undefined : <Plus size={18} />}
+                  onClick={() => { setActiveTab('cadastro'); setEnvelopeData({ nome: '', responsavel: '', tipoDocumento: '', descricao: '', file: null }); setEditingId(null); }}
+                  size={isMobile ? 'sm' : 'md'}
+                  fw={600}
+                  px={isMobile ? 'sm' : 'xl'}
+                >
+                  {isMobile ? <Plus size={16} /> : 'Novo'}
+                </Button>
+              </Group>
+            </Box>
 
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
           <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
@@ -269,17 +362,39 @@ export function Envelopamento() {
                           <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
 
                           <ActionIcon
-                            size="sm"
                             variant="subtle"
-                            disabled={actionsDisabled}
-                            onClick={actionsDisabled ? undefined : () => openEnvelope(r)}
-                            title={actionsDisabled ? 'Ações indisponíveis: Entregue' : 'Editar'}
-                            style={{ color: actionsDisabled ? '#adb5bd' : undefined, cursor: actionsDisabled ? 'not-allowed' : 'pointer' }}
+                            color={DARK_BLUE}
+                            onClick={() => { handleEditEnvelopment(r); }}
+                            title="Editar"
+                            aria-label="Editar"
                           >
-                            <Edit2 size={18} />
+                            <Edit2 size={16} />
                           </ActionIcon>
 
                           <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
+
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            onClick={() => openEnvelope(r, true)}
+                            title="Visualizar"
+                            aria-label="Visualizar"
+                            style={{ color: '#001F54', cursor: 'pointer' }}
+                          >
+                            <Eye size={18} />
+                          </ActionIcon>
+
+                          <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
+
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            onClick={() => { setDeleteTarget({ id: r.id, name: r.nomeCompleto }); setDeleteConfirmOpen(true); }}
+                            title="Excluir"
+                            aria-label="Excluir"
+                          >
+                            <Trash size={16} />
+                          </ActionIcon>
                         </Group>
                       );
                     })()}
@@ -289,12 +404,14 @@ export function Envelopamento() {
             </Table.Tbody>
           </Table>
         </Box>
+      </Tabs.Panel>
+    </Tabs>
       </Box>
 
       <Modal
         opened={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={'Envelopamento de documentação'}
+        onClose={() => { setModalOpen(false); setIsViewing(false); }}
+        title={isViewing ? 'Visualizar Envelopamento' : 'Envelopamento de documentação'}
         size={isMobile ? '100%' : 520}
         centered={false}
         fullScreen={isMobile}
@@ -304,57 +421,84 @@ export function Envelopamento() {
         }}
       >
         <Stack gap={10}>
-          <Box style={{ padding: 8 }}>
-            <Text size="sm" fw={600} mb={8}>Envelopamento de documentação</Text>
-
+          <Box style={{ padding: 6 }}>
             <Box className="floating-field" style={{ marginBottom: 8 }}>
-              <input type="text" value={envelopeData.nome} onChange={(e) => setEnvelopeData({ ...envelopeData, nome: e.currentTarget.value })} placeholder=" " />
+              <input 
+                type="text" 
+                value={envelopeData.nome} 
+                readOnly={isViewing}
+                disabled={isViewing}
+                placeholder=" " 
+                style={{ color: isViewing ? '#adb5bd' : undefined }} 
+              />
               <label>Nome</label>
             </Box>
 
             <Box className="floating-field" style={{ marginBottom: 8 }}>
-              <input type="text" value={envelopeData.responsavel} onChange={(e) => setEnvelopeData({ ...envelopeData, responsavel: e.currentTarget.value })} placeholder=" " />
+              <input 
+                type="text" 
+                value={envelopeData.responsavel} 
+                readOnly={isViewing}
+                disabled={isViewing}
+                placeholder=" " 
+                style={{ color: isViewing ? '#adb5bd' : undefined }} 
+              />
               <label>Responsável</label>
             </Box>
 
-            <Box style={{ marginBottom: 8 }}>
-              <Select
-                data={[{ value: 'relatorio', label: 'Relatório' }, { value: 'exame', label: 'Exame' }, { value: 'laudo', label: 'Laudo' }, { value: 'outro', label: 'Outro' }]}
-                placeholder="Tipo de documento"
-                value={envelopeData.tipoDocumento}
-                onChange={(val) => setEnvelopeData({ ...envelopeData, tipoDocumento: val || '' })}
+            <Box className="floating-field" style={{ marginBottom: 8 }}>
+              <input 
+                type="text" 
+                value={envelopeData.tipoDocumento} 
+                readOnly={isViewing}
+                disabled={isViewing}
+                placeholder=" " 
+                style={{ color: isViewing ? '#adb5bd' : undefined }} 
               />
+              <label>Tipo de documento</label>
             </Box>
 
-            <Box style={{ marginBottom: 8 }}>
-              <Textarea placeholder="Descrição/Conteúdo" value={envelopeData.descricao} onChange={(e) => setEnvelopeData({ ...envelopeData, descricao: e.currentTarget.value })} minRows={3} />
+            <Box className="floating-field" style={{ marginBottom: 8 }}>
+              <input 
+                type="text" 
+                value={envelopeData.descricao} 
+                readOnly={isViewing}
+                disabled={isViewing}
+                placeholder=" " 
+                style={{ color: isViewing ? '#adb5bd' : undefined }} 
+              />
+              <label>Descrição</label>
             </Box>
 
-            <Box style={{ marginBottom: 8 }}>
-              <FileButton accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword" onChange={(file) => setEnvelopeData({ ...envelopeData, file })}>
-                {(props) => (
-                  <Box {...props} style={{ border: '1px dashed #dee2e6', padding: 18, borderRadius: 6, textAlign: 'center', cursor: 'pointer' }}>
-                    <UploadCloud size={20} style={{ color: '#6c757d' }} />
-                    <Text size="sm" c="dimmed">Upload do documento</Text>
-                    <Text size="xs" c="dimmed">Tamanho limite: 200mb</Text>
-                    {envelopeData.file && (
-                      <Box mt={8}>
-                        <Badge variant="outline">{envelopeData.file.name}</Badge>
-                      </Box>
-                    )}
-                  </Box>
-                )}
-              </FileButton>
-              <Text size="xs" c="dimmed" mt={6}>Arquivos suportados: pdf, doc, xls</Text>
-            </Box>
+            {envelopeData.file && (
+              <Box style={{ marginBottom: 8 }}>
+                <Badge variant="outline">{envelopeData.file.name}</Badge>
+              </Box>
+            )}
 
-            <Group justify="flex-end" mt={8}>
-              <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm">Adicionar</Button>
+            <Group justify="flex-end" mt={70}>
+              {isViewing ? (
+                <Button variant="default" onClick={() => { setModalOpen(false); setIsViewing(false); }} size="sm">Fechar</Button>
+              ) : (
+                <>
+                  <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
+                  <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm">Salvar</Button>
+                </>
+              )}
             </Group>
           </Box>
         </Stack>
       </Modal>
+
+      <ResultModal
+        opened={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null); }}
+        variant="error"
+        title="Confirmar exclusão"
+        message={`Confirma a exclusão de ${deleteTarget?.name || 'este envelopamento'}?`}
+        primary={{ label: 'Excluir', onClick: () => deleteTarget && handleDeleteEnvelopment(deleteTarget.id) }}
+        secondary={{ label: 'Cancelar', onClick: () => { setDeleteConfirmOpen(false); setDeleteTarget(null); } }}
+      />
     </Box>
   );
 }
