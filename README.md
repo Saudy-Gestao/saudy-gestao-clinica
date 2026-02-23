@@ -5,6 +5,13 @@
 - Em desenvolvimento local, o `vite.config.ts` já faz proxy de `/auth`, `/accounts`, `/admin`, `/care` e `/procedures` para `http://localhost:3000`.
 - Se preferir URL direta (produção/staging), copie `.env.example` para `.env` e defina `VITE_API_URL`.
 
+## Variáveis de ambiente
+
+- Desenvolvimento: `.env.development` usa `VITE_API_URL=http://localhost:3000`
+- Produção (Render): `.env.production` usa `VITE_API_URL=https://saudy-backend.onrender.com`
+
+No Render, você também pode (e é recomendado) configurar a variável de ambiente `VITE_API_URL` diretamente no serviço de frontend.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

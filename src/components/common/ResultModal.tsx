@@ -1,4 +1,3 @@
-import React from 'react';
 import { Modal, Center, ThemeIcon, Text, Group, Button } from '@mantine/core';
 import { Check, X } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';

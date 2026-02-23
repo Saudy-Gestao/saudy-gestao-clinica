@@ -12,7 +12,6 @@ import {
   ActionIcon,
   Switch,
   Textarea,
-  Paper,
   Center,
   Loader
 } from '@mantine/core';

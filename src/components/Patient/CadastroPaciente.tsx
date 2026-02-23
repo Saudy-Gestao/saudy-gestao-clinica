@@ -8,7 +8,6 @@ import {
   Select,
   Textarea,
   TextInput,
-  MultiSelect,
   Switch,
   SimpleGrid,
   Stack,
@@ -18,7 +17,6 @@ import {
   ActionIcon,
   Modal,
   Center,
-  ThemeIcon,
   Tabs,
   Table,
   Loader,
@@ -119,7 +117,7 @@ export function CadastroPaciente() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [healthInsuranceInput, setHealthInsuranceInput] = useState('');
-  const [healthInsurancePopover, setHealthInsurancePopover] = useState(false);
+  const [, setHealthInsurancePopover] = useState(false);
   const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
   const [insurancesLoading, setInsurancesLoading] = useState(false);
 

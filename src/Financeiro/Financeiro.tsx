@@ -76,7 +76,6 @@ export function Financeiro() {
   const [lastLancamentoName, setLastLancamentoName] = useState<string | null>(null);
   const [showLancamentoError, setShowLancamentoError] = useState(false);
   const [lancamentoErrorMessage, setLancamentoErrorMessage] = useState<string | null>(null);
-  const [lancamentoErrorTitle, setLancamentoErrorTitle] = useState<string | null>(null);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -149,7 +148,6 @@ export function Financeiro() {
         setLancamentos(mapped);
       } catch (err: any) {
         const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar lançamentos';
-        setLancamentoErrorTitle('Erro ao carregar lançamentos');
         setLancamentoErrorMessage(msg);
         setShowLancamentoError(true);
       } finally {
@@ -200,7 +198,6 @@ export function Financeiro() {
       handleModalClose();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Erro ao criar lançamento';
-      setLancamentoErrorTitle('Erro ao criar lançamento');
       setLancamentoErrorMessage(msg);
       setShowLancamentoError(true);
     } finally {
@@ -208,7 +205,7 @@ export function Financeiro() {
     }
   };
 
-  const isOverdue = (status: string | undefined, dueDate?: string) => {
+  const isOverdue = (status: string | undefined, dueDate?: string | null) => {
     if (!dueDate) return false;
     const s = String(status || '').toUpperCase();
     if (s === 'PAID' || s === 'PAGO') return false;
@@ -218,7 +215,7 @@ export function Financeiro() {
     return due.getTime() < today.getTime();
   };
 
-  const getStatusColor = (status: string, dueDate?: string) => {
+  const getStatusColor = (status: string, dueDate?: string | null) => {
     if (isOverdue(status, dueDate)) return 'red';
     const s = String(status || '').toUpperCase();
     if (s === 'PAID' || s === 'PAGO') return 'green';
@@ -226,7 +223,7 @@ export function Financeiro() {
     return 'gray';
   };
 
-  const getStatusLabel = (status: string, dueDate?: string) => {
+  const getStatusLabel = (status: string, dueDate?: string | null) => {
     if (isOverdue(status, dueDate)) return 'Atrasado';
     const s = String(status || '').toUpperCase();
     if (s === 'PAID' || s === 'PAGO') return 'Pago';
@@ -311,7 +308,6 @@ export function Financeiro() {
       setLancamentos((prev) => prev.map((l) => l.id === id ? ({ ...l, status: updated.status || 'Pago' }) : l));
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Erro ao processar pagamento';
-      setLancamentoErrorTitle('Erro ao realizar o pagamento');
       setLancamentoErrorMessage(msg);
       setShowLancamentoError(true);
     } finally {

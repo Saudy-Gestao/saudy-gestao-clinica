@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput, Paper, Loader, Popover, Grid } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
@@ -65,7 +65,7 @@ export function Faturamento() {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [invoicesLoading] = useState(false);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 

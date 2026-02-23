@@ -1,15 +1,10 @@
 import { Menu, Avatar, Group, UnstyledButton } from '@mantine/core';
-import { User, Settings, LogOut } from 'lucide-react';
+import { User, Settings } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
-import authService from '../../services/authService';
 
 export function UserMenu() {
   const navigate = useNavigate();
-
-  const handleLogout = () => {
-    authService.logout();
-  };
 
   return (
     <Menu shadow="md" position="bottom-end">

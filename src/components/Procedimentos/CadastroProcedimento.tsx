@@ -312,7 +312,7 @@ export function CadastroProcedimento() {
                   <NumberInput
                     label="Preco"
                     placeholder="0,00"
-                    value={form.price}
+                    value={form.price ?? undefined}
                     onChange={(value) => setForm((prev) => ({ ...prev, price: typeof value === 'number' ? value : null }))}
                     min={0}
                     decimalScale={2}
