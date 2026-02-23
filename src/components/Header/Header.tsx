@@ -1,12 +1,14 @@
 import { Box, Group, Text, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import UserMenu from './UserMenu';
 import authService from '../../services/authService';
 import { DARK_BLUE } from '../../themes/theme';
 
 export function Header() {
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const navigate = useNavigate();
 
   const currentTime = new Date();
   const timeStr = currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -28,7 +30,15 @@ export function Header() {
           <Group gap="xs" align="center">
             <UserMenu />
             <Text c="white" size="xs">|</Text>
-            <ActionIcon variant="subtle" color="white" size="sm" onClick={() => authService.logout()}>
+            <ActionIcon
+              variant="subtle"
+              color="white"
+              size="sm"
+              onClick={() => {
+                authService.logout();
+                navigate('/login', { replace: true });
+              }}
+            >
               <LogOut size={16} color="white" />
             </ActionIcon>
           </Group>
