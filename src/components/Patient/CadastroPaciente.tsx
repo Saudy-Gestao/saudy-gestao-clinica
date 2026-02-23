@@ -8,7 +8,6 @@ import {
   Select,
   Textarea,
   TextInput,
-  MultiSelect,
   Switch,
   SimpleGrid,
   Stack,
@@ -99,6 +98,12 @@ export function CadastroPaciente() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+
+  // Ensure the page starts at the top (header) when this route/component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
   const formatDate = (d: Date | null) => {
     if (!d) return '';
     const day = String(d.getDate()).padStart(2, '0');
