@@ -17,7 +17,6 @@ import {
   ActionIcon,
   Modal,
   Center,
-  ThemeIcon,
   Tabs,
   Table,
   Loader,
@@ -38,6 +37,58 @@ type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
 
 type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | '';
+
+type ApiRecord = Record<string, unknown>;
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+      fields?: Record<string, string>;
+      details?: string;
+      error?: string;
+    };
+  };
+  message?: string;
+};
+
+const isRecord = (value: unknown): value is ApiRecord => typeof value === 'object' && value !== null;
+
+const getString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+const getDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+};
+
+const getBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (value == null) return fallback;
+  return Boolean(value);
+};
+
+const getApiList = (response: unknown): ApiRecord[] => {
+  if (Array.isArray(response)) return response as ApiRecord[];
+  const record = isRecord(response) ? response : {};
+  const keys = ['patients', 'items', 'results'];
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) return value as ApiRecord[];
+  }
+  const nested = record.data;
+  if (Array.isArray(nested)) return nested as ApiRecord[];
+  const nestedRecord = isRecord(nested) ? nested : {};
+  for (const key of keys) {
+    const value = nestedRecord[key];
+    if (Array.isArray(value)) return value as ApiRecord[];
+  }
+  return [];
+};
 
 interface PatientForm {
   name: string;
@@ -83,7 +134,7 @@ interface PatientListItem {
   cpf: string;
   phone: string;
   insuranceName: string;
-  raw: any;
+  raw: ApiRecord;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -124,7 +175,7 @@ export function CadastroPaciente() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [healthInsuranceInput, setHealthInsuranceInput] = useState('');
-  const [healthInsurancePopover, setHealthInsurancePopover] = useState(false);
+  const [, setHealthInsurancePopover] = useState(false);
   const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
   const [insurancesLoading, setInsurancesLoading] = useState(false);
 
@@ -179,6 +230,16 @@ export function CadastroPaciente() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PatientListItem | null>(null);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // Sincroniza os inputs temporários com os arrays do form
   useEffect(() => {
@@ -219,72 +280,81 @@ export function CadastroPaciente() {
     return map[value] || '';
   };
 
-  const populateFormFromPatient = (raw: any) => {
-    const birthDate = raw?.birthDate ? new Date(raw.birthDate) : null;
-    const insuranceExpiry = raw?.healthInsuranceExpiry ? new Date(raw.healthInsuranceExpiry) : null;
+  const populateFormFromPatient = (raw: ApiRecord) => {
+    const birthDate = getDate(raw.birthDate);
+    const insuranceExpiry = getDate(raw.healthInsuranceExpiry);
+    const allergies = Array.isArray(raw.allergies)
+      ? (raw.allergies as unknown[]).map((item) => getString(item)).filter(Boolean)
+      : [];
+    const chronicConditions = Array.isArray(raw.chronicConditions)
+      ? (raw.chronicConditions as unknown[]).map((item) => getString(item)).filter(Boolean)
+      : [];
+    const currentMedications = Array.isArray(raw.currentMedications)
+      ? (raw.currentMedications as unknown[]).map((item) => getString(item)).filter(Boolean)
+      : [];
+    const rawBloodType = typeof raw.bloodType === 'string' ? raw.bloodType : null;
     setForm({
-      name: raw?.name || raw?.nome || '',
-      email: raw?.email || '',
-      phone: raw?.phone || '',
-      cellphone: raw?.cellphone || '',
+      name: getString(raw.name ?? raw.nome),
+      email: getString(raw.email),
+      phone: getString(raw.phone),
+      cellphone: getString(raw.cellphone),
       birthDate,
       gender: (raw?.gender ? String(raw.gender).toLowerCase() : '') as Gender,
-      cpf: raw?.cpf || '',
-      rg: raw?.rg || '',
+      cpf: getString(raw.cpf),
+      rg: getString(raw.rg),
       maritalStatus: (raw?.maritalStatus ? String(raw.maritalStatus).toLowerCase() : '') as MaritalStatus,
-      occupation: raw?.occupation || '',
-      address: raw?.address || '',
-      addressNumber: raw?.addressNumber || '',
-      addressComplement: raw?.addressComplement || '',
-      neighborhood: raw?.neighborhood || '',
-      city: raw?.city || '',
-      state: raw?.state || '',
-      zipCode: raw?.zipCode || '',
-      emergencyContactName: raw?.emergencyContactName || '',
-      emergencyContactPhone: raw?.emergencyContactPhone || '',
-      emergencyContactRelationship: raw?.emergencyContactRelationship || '',
-      hasGuardian: Boolean(raw?.hasGuardian),
-      guardianName: raw?.guardianName || '',
-      guardianCpf: raw?.guardianCpf || '',
-      guardianPhone: raw?.guardianPhone || '',
-      guardianRelationship: raw?.guardianRelationship || '',
-      hasHealthInsurance: Boolean(raw?.hasHealthInsurance),
-      healthInsuranceName: raw?.healthInsuranceName || '',
-      healthInsuranceNumber: raw?.healthInsuranceNumber || '',
+      occupation: getString(raw.occupation),
+      address: getString(raw.address),
+      addressNumber: getString(raw.addressNumber),
+      addressComplement: getString(raw.addressComplement),
+      neighborhood: getString(raw.neighborhood),
+      city: getString(raw.city),
+      state: getString(raw.state),
+      zipCode: getString(raw.zipCode),
+      emergencyContactName: getString(raw.emergencyContactName),
+      emergencyContactPhone: getString(raw.emergencyContactPhone),
+      emergencyContactRelationship: getString(raw.emergencyContactRelationship),
+      hasGuardian: getBoolean(raw.hasGuardian),
+      guardianName: getString(raw.guardianName),
+      guardianCpf: getString(raw.guardianCpf),
+      guardianPhone: getString(raw.guardianPhone),
+      guardianRelationship: getString(raw.guardianRelationship),
+      hasHealthInsurance: getBoolean(raw.hasHealthInsurance),
+      healthInsuranceName: getString(raw.healthInsuranceName),
+      healthInsuranceNumber: getString(raw.healthInsuranceNumber),
       healthInsuranceExpiry: insuranceExpiry,
-      bloodType: mapEnumToBloodType(raw?.bloodType),
-      allergies: Array.isArray(raw?.allergies) ? raw.allergies : [],
-      chronicConditions: Array.isArray(raw?.chronicConditions) ? raw.chronicConditions : [],
-      currentMedications: Array.isArray(raw?.currentMedications) ? raw.currentMedications : [],
-      observations: raw?.observations || '',
-      isActive: raw?.isActive ?? true,
+      bloodType: mapEnumToBloodType(rawBloodType),
+      allergies,
+      chronicConditions,
+      currentMedications,
+      observations: getString(raw.observations),
+      isActive: getBoolean(raw.isActive, true),
     });
   };
 
-  const formatDetailValue = (value: any) => {
+  const formatDetailValue = (value: unknown) => {
     if (value === null || value === undefined || value === '') return '-';
     if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
     return String(value);
   };
 
-  const formatDateValue = (value: any) => {
-    if (!value) return '-';
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
+  const formatDateValue = (value: unknown) => {
+    const date = getDate(value);
+    if (!date) return '-';
     return date.toLocaleDateString('pt-BR');
   };
 
-  const formatCpfValue = (value: any) => {
+  const formatCpfValue = (value: unknown) => {
     if (!value) return '-';
     return formatCPF(String(value));
   };
 
-  const formatPhoneValue = (value: any) => {
+  const formatPhoneValue = (value: unknown) => {
     if (!value) return '-';
     return formatPhone(String(value));
   };
 
-  const formatGenderValue = (value: any) => {
+  const formatGenderValue = (value: unknown) => {
     const normalized = String(value || '').toUpperCase();
     if (!normalized) return '-';
     if (normalized === 'MALE') return 'Masculino';
@@ -293,7 +363,7 @@ export function CadastroPaciente() {
     return normalized;
   };
 
-  const formatMaritalStatusValue = (value: any) => {
+  const formatMaritalStatusValue = (value: unknown) => {
     const normalized = String(value || '').toUpperCase();
     if (!normalized) return '-';
     if (normalized === 'SINGLE') return 'Solteiro(a)';
@@ -304,7 +374,7 @@ export function CadastroPaciente() {
     return normalized;
   };
 
-  const formatBloodTypeValue = (value: any) => {
+  const formatBloodTypeValue = (value: unknown) => {
     const normalized = String(value || '').toUpperCase();
     if (!normalized) return '-';
     const map: Record<string, string> = {
@@ -324,44 +394,29 @@ export function CadastroPaciente() {
     const loadPatients = async () => {
       setPatientsLoading(true);
       try {
-        const data: any = await patientService.listPatients();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.patients)
-            ? data.patients
-            : (Array.isArray(data?.items)
-              ? data.items
-              : (Array.isArray(data?.results)
-                ? data.results
-                : (Array.isArray(data?.data?.patients)
-                  ? data.data.patients
-                  : (Array.isArray(data?.data?.items)
-                    ? data.data.items
-                    : (Array.isArray(data?.data?.results)
-                      ? data.data.results
-                      : (Array.isArray(data?.data)
-                        ? data.data
-                        : [])))))));
+        const data: unknown = await patientService.listPatients();
+        const list = getApiList(data);
 
-        const mapped: PatientListItem[] = list.map((item: any, index: number) => {
-          const name = item.name || item.nome || item.fullName || 'Paciente';
-          const phone = item.cellphone || item.phone || '';
-          const insuranceName = item.healthInsuranceName || item.insuranceName || item.convenio || '';
+        const mapped: PatientListItem[] = list.map((item: ApiRecord, index: number) => {
+          const name = String(item.name ?? item.nome ?? item.fullName ?? 'Paciente');
+          const phone = String(item.cellphone ?? item.phone ?? '');
+          const insuranceName = String(item.healthInsuranceName ?? item.insuranceName ?? item.convenio ?? '');
           return {
             id: String(item.id ?? item.patientId ?? item._id ?? item.uuid ?? index),
             name,
             cpf: String(item.cpf ?? ''),
-            phone: String(phone ?? ''),
-            insuranceName: String(insuranceName ?? ''),
+            phone,
+            insuranceName,
             raw: item,
           };
         });
 
         setPatients(mapped);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const err = e as ApiError;
         showNotification({
           title: 'Erro',
-          message: e?.response?.data?.message || e?.message || 'Erro ao carregar pacientes',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
           color: 'red',
         });
       } finally {
@@ -376,29 +431,22 @@ export function CadastroPaciente() {
     const loadInsurances = async () => {
       setInsurancesLoading(true);
       try {
-        const data: any = await insuranceService.listInsurances({ isActive: true });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+        const data: unknown = await insuranceService.listInsurances({ isActive: true });
+        const list = getApiList(data);
 
         const options = list
-          .map((it: any) => {
-            const name = (it.name || it.nome || '').toString().trim();
+          .map((it: ApiRecord) => {
+            const name = String(it.name ?? it.nome ?? '').trim();
             return name ? { value: name, label: name } : null;
           })
           .filter(Boolean) as { value: string; label: string }[];
 
         setInsuranceOptions(options);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const err = e as ApiError;
         showNotification({
           title: 'Erro',
-          message: e?.response?.data?.message || e?.message || 'Erro ao carregar convênios',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
           color: 'red',
         });
       } finally {
@@ -431,8 +479,6 @@ export function CadastroPaciente() {
     { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' }, { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
     { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' }, { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
   ];
-
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const validateFields = (data: PatientForm) => {
     const errors: Record<string, string> = {};
@@ -551,35 +597,19 @@ export function CadastroPaciente() {
         setShowSuccessModal(true);
       }
       try {
-        const refreshed: any = await patientService.listPatients();
-        const list: any[] = Array.isArray(refreshed)
-          ? refreshed
-          : (Array.isArray(refreshed?.patients)
-            ? refreshed.patients
-            : (Array.isArray(refreshed?.items)
-              ? refreshed.items
-              : (Array.isArray(refreshed?.results)
-                ? refreshed.results
-                : (Array.isArray(refreshed?.data?.patients)
-                  ? refreshed.data.patients
-                  : (Array.isArray(refreshed?.data?.items)
-                    ? refreshed.data.items
-                    : (Array.isArray(refreshed?.data?.results)
-                      ? refreshed.data.results
-                      : (Array.isArray(refreshed?.data)
-                        ? refreshed.data
-                        : [])))))));
+        const refreshed: unknown = await patientService.listPatients();
+        const list = getApiList(refreshed);
 
-        const mapped: PatientListItem[] = list.map((item: any, index: number) => {
-          const name = item.name || item.nome || item.fullName || 'Paciente';
-          const phone = item.cellphone || item.phone || '';
-          const insuranceName = item.healthInsuranceName || item.insuranceName || item.convenio || '';
+        const mapped: PatientListItem[] = list.map((item: ApiRecord, index: number) => {
+          const name = String(item.name ?? item.nome ?? item.fullName ?? 'Paciente');
+          const phone = String(item.cellphone ?? item.phone ?? '');
+          const insuranceName = String(item.healthInsuranceName ?? item.insuranceName ?? item.convenio ?? '');
           return {
             id: String(item.id ?? item.patientId ?? item._id ?? item.uuid ?? index),
             name,
             cpf: String(item.cpf ?? ''),
-            phone: String(phone ?? ''),
-            insuranceName: String(insuranceName ?? ''),
+            phone,
+            insuranceName,
             raw: item,
           };
         });
@@ -588,14 +618,15 @@ export function CadastroPaciente() {
       } catch {
         // Silent refresh failure after save.
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as ApiError;
       // handle field-level errors returned by server
-      const serverFields: Record<string,string> | undefined = e?.response?.data?.fields;
+      const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;
       if (serverFields && typeof serverFields === 'object') {
         setFieldErrors(serverFields);
         showNotification({ title: 'Erro', message: Object.values(serverFields)[0], color: 'red' });
       } else {
-        const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar paciente';
+        const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar paciente';
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -625,8 +656,9 @@ export function CadastroPaciente() {
       await patientService.deletePatient(item.id);
       setPatients((prev) => prev.filter((p) => p.id !== item.id));
       showNotification({ title: 'Paciente excluído', message: 'Registro removido com sucesso.', color: 'green' });
-    } catch (e: any) {
-      const msg = e?.response?.data?.details || e?.response?.data?.error || e?.message || 'Erro ao excluir paciente';
+    } catch (e: unknown) {
+      const err = e as ApiError;
+      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir paciente';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -670,8 +702,8 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); setFieldErrors((p) => { const { name, ...rest } = p; return rest; }); }} error={fieldErrors.name} required />
-                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cpf, ...rest } = p; return rest; }); }} maxLength={14} required error={fieldErrors.cpf} />
+                  <TextInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); clearFieldError('name'); }} error={fieldErrors.name} required />
+                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); clearFieldError('cpf'); }} maxLength={14} required error={fieldErrors.cpf} />
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
@@ -684,7 +716,7 @@ export function CadastroPaciente() {
                         onBlur={() => {
                           if (!birthDateInput) {
                             setForm({ ...form, birthDate: null });
-                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
+                            clearFieldError('birthDate');
                             return;
                           }
                           const d = parseDate(birthDateInput);
@@ -693,7 +725,7 @@ export function CadastroPaciente() {
                             showNotification({ title: 'Erro', message: 'Data de nascimento inválida', color: 'red' });
                             setForm({ ...form, birthDate: null });
                           } else {
-                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
+                            clearFieldError('birthDate');
                             setForm({ ...form, birthDate: d });
                           }
                         }}
@@ -725,7 +757,7 @@ export function CadastroPaciente() {
                     placeholder="Selecione"
                     data={genderOptions}
                     value={form.gender}
-                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); setFieldErrors((p) => { const { gender, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); clearFieldError('gender'); }}
                     error={fieldErrors.gender}
                     required
                   />
@@ -740,9 +772,9 @@ export function CadastroPaciente() {
 
                   <TextInput label="Ocupação/Profissão" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.currentTarget.value })} />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); setFieldErrors((p) => { const { email, ...rest } = p; return rest; }); }} error={fieldErrors.email} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { phone, ...rest } = p; return rest; }); }} error={fieldErrors.phone} />
-                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cellphone, ...rest } = p; return rest; }); }} error={fieldErrors.cellphone} required />
+                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} error={fieldErrors.email} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
+                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} error={fieldErrors.cellphone} required />
                 </SimpleGrid>
               </Paper>
 
@@ -750,7 +782,7 @@ export function CadastroPaciente() {
                 <SectionTitle>Contato de Emergência / Responsáveis</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
                   <TextInput label="Nome contato" value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.currentTarget.value })} />
-                  <TextInput label="Telefone contato" value={formatPhone(form.emergencyContactPhone)} onChange={(e) => { setForm({ ...form, emergencyContactPhone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { emergencyContactPhone, ...rest } = p; return rest; }); }} error={fieldErrors.emergencyContactPhone} />
+                  <TextInput label="Telefone contato" value={formatPhone(form.emergencyContactPhone)} onChange={(e) => { setForm({ ...form, emergencyContactPhone: onlyDigits(e.currentTarget.value) }); clearFieldError('emergencyContactPhone'); }} error={fieldErrors.emergencyContactPhone} />
                   <TextInput label="Parentesco" value={form.emergencyContactRelationship} onChange={(e) => setForm({ ...form, emergencyContactRelationship: e.currentTarget.value })} />
                 </SimpleGrid>
 
@@ -763,8 +795,8 @@ export function CadastroPaciente() {
                   <Box style={{ border: '1px solid #e9ecef', borderRadius: 8, padding: 12 }}>
                     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
                       <TextInput label="Nome do responsável" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.currentTarget.value })} />
-                      <TextInput label="CPF do responsável" value={formatCPF(form.guardianCpf)} onChange={(e) => { setForm({ ...form, guardianCpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { guardianCpf, ...rest } = p; return rest; }); }} maxLength={14} error={fieldErrors.guardianCpf} />
-                      <TextInput label="Telefone do responsável" value={formatPhone(form.guardianPhone)} onChange={(e) => { setForm({ ...form, guardianPhone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { guardianPhone, ...rest } = p; return rest; }); }} maxLength={15} error={fieldErrors.guardianPhone} />
+                      <TextInput label="CPF do responsável" value={formatCPF(form.guardianCpf)} onChange={(e) => { setForm({ ...form, guardianCpf: onlyDigits(e.currentTarget.value) }); clearFieldError('guardianCpf'); }} maxLength={14} error={fieldErrors.guardianCpf} />
+                      <TextInput label="Telefone do responsável" value={formatPhone(form.guardianPhone)} onChange={(e) => { setForm({ ...form, guardianPhone: onlyDigits(e.currentTarget.value) }); clearFieldError('guardianPhone'); }} maxLength={15} error={fieldErrors.guardianPhone} />
                       <TextInput label="Parentesco" value={form.guardianRelationship} onChange={(e) => setForm({ ...form, guardianRelationship: e.currentTarget.value })} />
                     </SimpleGrid>
                   </Box>
@@ -799,7 +831,7 @@ export function CadastroPaciente() {
                         placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione um convênio'}
                         data={insuranceOptions}
                         value={form.healthInsuranceName}
-                        onChange={(value) => { setForm({ ...form, healthInsuranceName: value || '' }); setFieldErrors((p) => { const { healthInsuranceName, ...rest } = p; return rest; }); }}
+                        onChange={(value) => { setForm({ ...form, healthInsuranceName: value || '' }); clearFieldError('healthInsuranceName'); }}
                         searchable
                         clearable
                         disabled={insurancesLoading}
@@ -886,7 +918,7 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => { setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { zipCode, ...rest } = p; return rest; }); }} maxLength={9} error={fieldErrors.zipCode} />
+                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => { setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) }); clearFieldError('zipCode'); }} maxLength={9} error={fieldErrors.zipCode} />
                   <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} />
                   <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
                   <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />

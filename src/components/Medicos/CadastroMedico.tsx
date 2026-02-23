@@ -35,6 +35,57 @@ import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
 
+type ApiRecord = Record<string, unknown>;
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+      fields?: Record<string, string>;
+      details?: string;
+      error?: string;
+    };
+  };
+  message?: string;
+};
+
+const isRecord = (value: unknown): value is ApiRecord => typeof value === 'object' && value !== null;
+
+const getString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+const getDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+};
+
+const getNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const getBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (value == null) return fallback;
+  return Boolean(value);
+};
+
+const getApiList = (response: unknown): ApiRecord[] => {
+  if (Array.isArray(response)) return response as ApiRecord[];
+  const record = isRecord(response) ? response : {};
+  if (Array.isArray(record.items)) return record.items as ApiRecord[];
+  const nested = record.data;
+  if (Array.isArray(nested)) return nested as ApiRecord[];
+  const nestedRecord = isRecord(nested) ? nested : {};
+  if (Array.isArray(nestedRecord.items)) return nestedRecord.items as ApiRecord[];
+  return [];
+};
+
 interface DoctorForm {
   nome: string;
   crm: string;
@@ -70,7 +121,7 @@ interface DoctorListItem {
   crmState: string;
   specialty: string;
   isActive: boolean;
-  raw: any;
+  raw: ApiRecord;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -157,6 +208,16 @@ export function CadastroMedico() {
 
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   const filteredDoctors = useMemo(() => {
     const q = doctorQuery.trim().toLowerCase();
@@ -166,30 +227,29 @@ export function CadastroMedico() {
 
   const isEditing = Boolean(editingDoctorId);
 
-  const formatDetailValue = (value: any) => {
+  const formatDetailValue = (value: unknown) => {
     if (value === null || value === undefined || value === '') return '-';
     if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
     return String(value);
   };
 
-  const formatDateValue = (value: any) => {
-    if (!value) return '-';
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
+  const formatDateValue = (value: unknown) => {
+    const date = getDate(value);
+    if (!date) return '-';
     return date.toLocaleDateString('pt-BR');
   };
 
-  const formatCpfValue = (value: any) => {
+  const formatCpfValue = (value: unknown) => {
     if (!value) return '-';
     return formatCPF(String(value));
   };
 
-  const formatPhoneValue = (value: any) => {
+  const formatPhoneValue = (value: unknown) => {
     if (!value) return '-';
     return formatPhone(String(value));
   };
 
-  const formatGenderValue = (value: any) => {
+  const formatGenderValue = (value: unknown) => {
     const normalized = String(value || '').toUpperCase();
     if (!normalized) return '-';
     if (normalized === 'MALE') return 'Masculino';
@@ -198,40 +258,46 @@ export function CadastroMedico() {
     return normalized;
   };
 
-  const formatCurrencyValue = (value: any) => {
+  const formatCurrencyValue = (value: unknown) => {
     const num = Number(value);
     if (Number.isNaN(num)) return '-';
     return `R$ ${num.toFixed(2).replace('.', ',')}`;
   };
 
-  const populateFormFromDoctor = (raw: any) => {
-    const birthDate = raw?.birthDate ? new Date(raw.birthDate) : null;
+  const populateFormFromDoctor = (raw: ApiRecord) => {
+    const birthDate = getDate(raw.birthDate);
+    const specialties = Array.isArray(raw.specialties)
+      ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
+      : [];
+    const workingDays = Array.isArray(raw.workingDays)
+      ? (raw.workingDays as unknown[]).map((item) => getString(item)).filter(Boolean)
+      : [];
     setForm({
-      nome: raw?.name || raw?.nome || '',
-      crm: raw?.crm || '',
-      crmState: raw?.crmState || raw?.ufCrm || '',
-      email: raw?.email || '',
-      phone: raw?.phone || '',
-      cellphone: raw?.cellphone || '',
+      nome: getString(raw.name ?? raw.nome),
+      crm: getString(raw.crm),
+      crmState: getString(raw.crmState ?? raw.ufCrm),
+      email: getString(raw.email),
+      phone: getString(raw.phone),
+      cellphone: getString(raw.cellphone),
       birthDate,
       gender: (raw?.gender ? String(raw.gender).toLowerCase() : '') as Gender,
-      cpf: raw?.cpf || '',
-      rg: raw?.rg || '',
-      specialty: raw?.specialty || '',
-      specialties: Array.isArray(raw?.specialties) ? raw.specialties : [],
-      consultationFee: raw?.consultationFee ?? null,
-      biography: raw?.biography || '',
-      address: raw?.address || '',
-      addressNumber: raw?.addressNumber || '',
-      addressComplement: raw?.addressComplement || '',
-      neighborhood: raw?.neighborhood || '',
-      city: raw?.city || '',
-      state: raw?.state || '',
-      zipCode: raw?.zipCode || '',
-      isActive: raw?.isActive ?? true,
-      workingDays: Array.isArray(raw?.workingDays) ? raw.workingDays : [],
-      workingHoursStart: raw?.workingHoursStart || '',
-      workingHoursEnd: raw?.workingHoursEnd || '',
+      cpf: getString(raw.cpf),
+      rg: getString(raw.rg),
+      specialty: getString(raw.specialty),
+      specialties,
+      consultationFee: getNumber(raw.consultationFee),
+      biography: getString(raw.biography),
+      address: getString(raw.address),
+      addressNumber: getString(raw.addressNumber),
+      addressComplement: getString(raw.addressComplement),
+      neighborhood: getString(raw.neighborhood),
+      city: getString(raw.city),
+      state: getString(raw.state),
+      zipCode: getString(raw.zipCode),
+      isActive: getBoolean(raw.isActive, true),
+      workingDays,
+      workingHoursStart: getString(raw.workingHoursStart),
+      workingHoursEnd: getString(raw.workingHoursEnd),
     });
   };
 
@@ -239,20 +305,12 @@ export function CadastroMedico() {
     const loadDoctors = async () => {
       setDoctorsLoading(true);
       try {
-        const data: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+        const data: unknown = await doctorService.listDoctors();
+        const list = getApiList(data);
 
-        const mapped: DoctorListItem[] = list.map((item: any) => {
-          const name = item.name || item.nome || item.fullName || 'Médico';
-          const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+        const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
+          const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
+          const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
           return {
             id: String(item.id ?? item.doctorId ?? ''),
             name,
@@ -265,10 +323,11 @@ export function CadastroMedico() {
         }).filter((item: DoctorListItem) => item.id);
 
         setDoctors(mapped);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const err = e as ApiError;
         showNotification({
           title: 'Erro',
-          message: e?.response?.data?.message || e?.message || 'Erro ao carregar médicos',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
           color: 'red',
         });
       } finally {
@@ -299,8 +358,6 @@ export function CadastroMedico() {
     { value: 'Sabado', label: 'Sábado' },
     { value: 'Domingo', label: 'Domingo' },
   ];
-
-  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
 
   const validateFields = (data: DoctorForm) => {
     const errors: Record<string,string> = {};
@@ -379,19 +436,11 @@ export function CadastroMedico() {
         setShowSuccessModal(true);
       }
       try {
-        const refreshed: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(refreshed)
-          ? refreshed
-          : (Array.isArray(refreshed?.items)
-            ? refreshed.items
-            : (Array.isArray(refreshed?.data?.items)
-              ? refreshed.data.items
-              : (Array.isArray(refreshed?.data)
-                ? refreshed.data
-                : [])));
-        const mapped: DoctorListItem[] = list.map((item: any) => {
-          const name = item.name || item.nome || item.fullName || 'Médico';
-          const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+        const refreshed: unknown = await doctorService.listDoctors();
+        const list = getApiList(refreshed);
+        const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
+          const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
+          const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
           return {
             id: String(item.id ?? item.doctorId ?? ''),
             name,
@@ -406,9 +455,10 @@ export function CadastroMedico() {
       } catch {
         // Silent refresh failure after save.
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as ApiError;
       // handle field-level errors returned by server
-      const serverFields: Record<string,string> | undefined = e?.response?.data?.fields;
+      const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;
       if (serverFields && typeof serverFields === 'object') {
         // map API field names to front-end form keys where necessary
         const mapped: Record<string,string> = {};
@@ -419,7 +469,7 @@ export function CadastroMedico() {
         setFieldErrors(mapped);
         showNotification({ title: 'Erro', message: Object.values(mapped)[0], color: 'red' });
       } else {
-        const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar médico';
+        const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar médico';
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -450,8 +500,9 @@ export function CadastroMedico() {
       await doctorService.deleteDoctor(item.id);
       setDoctors((prev) => prev.filter((d) => d.id !== item.id));
       showNotification({ title: 'Médico excluído', message: 'Registro removido com sucesso.', color: 'green' });
-    } catch (e: any) {
-      const msg = e?.response?.data?.details || e?.response?.data?.error || e?.message || 'Erro ao excluir médico';
+    } catch (e: unknown) {
+      const err = e as ApiError;
+      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir médico';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -496,8 +547,8 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); setFieldErrors((p) => { const { nome, ...rest } = p; return rest; }); }} error={fieldErrors.nome} required />
-                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cpf, ...rest } = p; return rest; }); }} maxLength={14} error={fieldErrors.cpf} required />
+                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); clearFieldError('nome'); }} error={fieldErrors.nome} required />
+                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); clearFieldError('cpf'); }} maxLength={14} error={fieldErrors.cpf} required />
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
@@ -517,7 +568,7 @@ export function CadastroMedico() {
                             setFieldErrors((p) => ({ ...p, birthDate: 'Data de nascimento inválida' }));
                             setForm({ ...form, birthDate: null });
                           } else {
-                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
+                            clearFieldError('birthDate');
                             setForm({ ...form, birthDate: d });
                           }
                         }}
@@ -550,13 +601,13 @@ export function CadastroMedico() {
                     placeholder="Selecione"
                     data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
                     value={form.gender}
-                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); setFieldErrors((p) => { const { gender, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); clearFieldError('gender'); }}
                     error={fieldErrors.gender}
                     required
                   />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); setFieldErrors((p) => { const { email, ...rest } = p; return rest; }); }} required error={fieldErrors.email} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { phone, ...rest } = p; return rest; }); }} error={fieldErrors.phone} required />
+                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} required />
                   <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
                 </SimpleGrid>
               </Paper>
@@ -565,13 +616,13 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Profissionais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); setFieldErrors((p) => { const { crm, ...rest } = p; return rest; }); }} required error={fieldErrors.crm} />
+                  <TextInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
                   <Select
                     label="UF do CRM"
                     placeholder="Selecione"
                     data={statesOptions}
                     value={form.crmState}
-                    onChange={(v) => { setForm({ ...form, crmState: v || '' }); setFieldErrors((p) => { const { crmState, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, crmState: v || '' }); clearFieldError('crmState'); }}
                     required
                     error={fieldErrors.crmState}
                   />
@@ -580,7 +631,7 @@ export function CadastroMedico() {
                     placeholder="Escolha uma"
                     data={specialtyOptions}
                     value={form.specialty}
-                    onChange={(v) => { setForm({ ...form, specialty: v || '' }); setFieldErrors((p) => { const { specialty, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, specialty: v || '' }); clearFieldError('specialty'); }}
                     error={fieldErrors.specialty}
                     required
                   />
@@ -595,7 +646,7 @@ export function CadastroMedico() {
                     label="Valor da consulta (R$)"
                     placeholder="0,00"
                     value={form.consultationFee ?? undefined}
-                    onChange={(v) => { setForm({ ...form, consultationFee: typeof v === 'number' ? v : null }); setFieldErrors((p) => { const { consultationFee, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, consultationFee: typeof v === 'number' ? v : null }); clearFieldError('consultationFee'); }}
                     decimalScale={2}
                     error={fieldErrors.consultationFee}
                     min={0}
