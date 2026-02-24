@@ -147,9 +147,9 @@ export function CadastroCliente() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Box p="xl" mx="auto" maw={900}>
-        <Title order={3} fw={600} style={{ color: DARK_BLUE, marginBottom: 18 }}>Cadastrar cliente</Title>
+        <Title order={3} fw={600} style={{ color: 'var(--mantine-color-text)', marginBottom: 18 }}>Cadastrar cliente</Title>
 
         <Paper p="md" withBorder radius="md">
           <Stepper active={active} onStepClick={setActive}>

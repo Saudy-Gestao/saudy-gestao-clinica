@@ -21,7 +21,7 @@ export function Dashboard() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         {/* Welcome Section */}

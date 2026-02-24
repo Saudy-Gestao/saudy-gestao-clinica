@@ -126,7 +126,7 @@ interface DoctorListItem {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Title order={5} fw={600} c={DARK_BLUE} mb="sm" mt="md">
+    <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
       {children}
     </Title>
   );
@@ -508,7 +508,7 @@ export function CadastroMedico() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1000} mx="auto">
@@ -520,10 +520,10 @@ export function CadastroMedico() {
             </ActionIcon>
 
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Cadastro de Médico
               </Text>
-              <Text size="sm" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Registro de médicos
               </Text>
             </Box>
@@ -790,7 +790,7 @@ export function CadastroMedico() {
                               <Group gap={6} wrap="nowrap">
                                 <ActionIcon
                                   variant="subtle"
-                                  color={DARK_BLUE}
+                                  style={{ color: 'var(--mantine-color-text)' }}
                                   onClick={() => {
                                     setSelectedDoctor(item);
                                     setDetailsOpen(true);
@@ -800,7 +800,7 @@ export function CadastroMedico() {
                                 </ActionIcon>
                                 <ActionIcon
                                   variant="subtle"
-                                  color={DARK_BLUE}
+                                  style={{ color: 'var(--mantine-color-text)' }}
                                   onClick={() => {
                                     setSelectedDoctor(item);
                                     setEditingDoctorId(item.id);

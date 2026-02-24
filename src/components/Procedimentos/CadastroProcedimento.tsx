@@ -62,7 +62,7 @@ const INITIAL_FORM: ProcedureForm = {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Title order={5} fw={600} c={DARK_BLUE} mb="sm" mt="md">
+    <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
       {children}
     </Title>
   );
@@ -271,7 +271,7 @@ export function CadastroProcedimento() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         <Stack gap="md">

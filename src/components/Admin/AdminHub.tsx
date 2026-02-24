@@ -8,7 +8,7 @@ export function AdminHub() {
   const navigate = useNavigate();
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         <Group mb={30} justify="space-between" align="center">

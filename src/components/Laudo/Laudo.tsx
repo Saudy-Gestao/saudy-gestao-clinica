@@ -254,7 +254,7 @@ export function Laudo() {
   };  
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -264,10 +264,10 @@ export function Laudo() {
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Laudo
               </Text>
-              <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Emissão de laudos
               </Text>
             </Box>
@@ -282,7 +282,7 @@ export function Laudo() {
 
           <Tabs.Panel value="cadastro" pt="xs">
             <Paper p="md" radius="md" withBorder>
-              <Title order={5} fw={600} c={DARK_BLUE} mb="sm">Cadastrar Laudo</Title>
+              <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm">Cadastrar Laudo</Title>
               <Box style={{ padding: 6 }}>
                 <Box className="floating-field" style={{ marginBottom: 8 }}>
                   <input
@@ -378,7 +378,7 @@ export function Laudo() {
               <Group gap="md" align="flex-end">
                 <TextInput
                   placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou CPF..'}
-                  leftSection={<Search size={16} color="#999" />}
+                  leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
                   value={query}
                   onChange={(e) => setQuery(e.currentTarget.value)}
                   radius="md"
@@ -469,7 +469,7 @@ export function Laudo() {
                           <Group gap={6} wrap="nowrap" justify="center" align="center">
                             <ActionIcon
                               variant="subtle"
-                              color={DARK_BLUE}
+                              style={{ color: 'var(--mantine-color-text)' }}
                               onClick={() => handleEditLaudo(r)}
                               title="Editar laudo"
                               aria-label="Editar laudo"
@@ -481,7 +481,7 @@ export function Laudo() {
                               size="sm"
                               variant="subtle"
                               onClick={() => openNovoLaudo(r as PatientRow, true)}
-                              style={{ color: '#001F54', cursor: 'pointer' }}
+                              style={{ color: 'var(--mantine-color-text)', cursor: 'pointer' }}
                               title="Ver laudo"
                               aria-label="Ver laudo"
                             >
