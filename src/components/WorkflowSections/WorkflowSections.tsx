@@ -93,6 +93,7 @@ export function WorkflowSections() {
       items: [
         { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta', moduleName: 'consulta' },
         { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo', moduleName: 'laudo' },
+        { icon: FileText, label: 'Laudo por Exame', desc: 'Fila com editor de laudo', route: '/laudo-exames', moduleName: 'laudo' },
         { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento', moduleName: 'envelopamento' },
         { icon: Folder, label: 'Documentos', desc: 'Gestão documental', moduleName: 'documentos' },
       ]

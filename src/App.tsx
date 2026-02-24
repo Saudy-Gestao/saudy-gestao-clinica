@@ -12,6 +12,7 @@ import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
+import { LaudoExames } from './components/LaudoExames/LaudoExames';
 import { Envelopamento } from './components/Envelopamento/Envelopamento';
 import { Entrega } from './components/Entrega/Entrega';
 import { Estoque } from './components/Estoque/Estoque';
@@ -67,6 +68,10 @@ function App() {
           <Route
             path="/laudo"
             element={<ProtectedRoute><Laudo /></ProtectedRoute>}
+          />
+          <Route
+            path="/laudo-exames"
+            element={<ProtectedRoute><LaudoExames /></ProtectedRoute>}
           />
           <Route
             path="/envelopamento"
