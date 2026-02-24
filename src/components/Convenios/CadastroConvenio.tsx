@@ -208,7 +208,7 @@ export function CadastroConvenio() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -218,10 +218,10 @@ export function CadastroConvenio() {
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Convenios
               </Text>
-              <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Cadastro de convenios
               </Text>
             </Box>

@@ -53,7 +53,7 @@ import {
 } from '../../utils/validations';
 
 const PageContainer = ({ children }: { children: React.ReactNode }) => (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto" w="100%" style={{ flex: 1 }}>
         <Stack gap="lg">{children}</Stack>
@@ -63,7 +63,7 @@ const PageContainer = ({ children }: { children: React.ReactNode }) => (
 
 const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
     <Box mb="md">
-        <Title order={2} size="h3" fw={600} c={DARK_BLUE}>{title}</Title>
+        <Title order={2} size="h3" fw={600} c="var(--mantine-color-text)">{title}</Title>
         {desc && <Text c="dimmed" size="sm">{desc}</Text>}
     </Box>
 );

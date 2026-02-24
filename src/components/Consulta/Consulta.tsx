@@ -181,7 +181,7 @@ export function Consulta() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -191,10 +191,10 @@ export function Consulta() {
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Consulta
               </Text>
-              <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Atendimento médico
               </Text>
             </Box>
@@ -206,7 +206,7 @@ export function Consulta() {
           <Group gap="md" align="flex-end">
             <TextInput
               placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou CPF..'}
-              leftSection={<Search size={16} color="#999" />}
+              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
               value={query}
               onChange={(e) => setQuery(e.currentTarget.value)}
               radius="md"
@@ -296,7 +296,7 @@ export function Consulta() {
                   <Table.Td>
                     <Group gap={4} justify="flex-end" align="center">
                       <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>
-                      <ActionIcon size="sm" variant="subtle" style={{ color: '#001F54' }} onClick={() => openTriagem(r as PatientRow)}>
+                      <ActionIcon size="sm" variant="subtle" style={{ color: 'var(--mantine-color-text)' }} onClick={() => openTriagem(r as PatientRow)}>
                         <Edit2 size={18} />
                       </ActionIcon>
                       <Text c="dimmed" style={{ padding: '0 6px' }}>|</Text>

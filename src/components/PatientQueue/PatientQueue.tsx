@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Group, Text, Paper, Button, Stack, Loader, Center } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
+import { useMantineColorScheme } from '@mantine/core';
 import { Play, ChevronRight, ArrowRight, Clock } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
@@ -17,6 +18,7 @@ interface QueuePatient {
 
 export function PatientQueue() {
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const { colorScheme } = useMantineColorScheme();
   const [queue, setQueue] = useState<QueuePatient[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,7 +64,7 @@ export function PatientQueue() {
     return (
       <Box mb={40}>
         <Group justify="space-between" mb="md">
-          <Text fw={600} size="lg" style={{ color: '#A5A1A1' }}>Fila de Atendimento</Text>
+          <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         </Group>
         <Center h={200}>
           <Loader size="lg" />
@@ -75,7 +77,7 @@ export function PatientQueue() {
     return (
       <Box mb={40}>
         <Group justify="space-between" mb="md">
-          <Text fw={600} size="lg" style={{ color: '#A5A1A1' }}>Fila de Atendimento</Text>
+          <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         </Group>
         <Paper p="xl" withBorder>
           <Center>
@@ -91,21 +93,21 @@ export function PatientQueue() {
   return (
     <Box mb={40}>
       <Group justify="space-between" mb="md">
-        <Text fw={600} size="lg" style={{ color: '#A5A1A1' }}>Fila de Atendimento</Text>
+        <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         <Group gap={4} style={{ cursor: 'pointer' }}>
-          {!isMobile && <Text size="sm" style={{ color: '#4B4545' }}>Ver agenda completa</Text>}
-          {isMobile ? <ChevronRight size={20} color="#4B4545" /> : <ArrowRight size={16} color="gray" />}
+          {!isMobile && <Text size="sm" c="dimmed">Ver agenda completa</Text>}
+          {isMobile ? <ChevronRight size={20} color="currentColor" /> : <ArrowRight size={16} color="currentColor" />}
         </Group>
       </Group>
 
       <Stack gap="sm">
         {/* Active Item */}
         {firstPatient && (
-          <Paper p="md" bg={isMobile ? 'white' : DARK_BLUE} c={isMobile ? 'black' : 'white'} radius="md" withBorder={isMobile}>
+          <Paper p="md" bg={isMobile ? 'var(--mantine-color-default)' : DARK_BLUE} c={isMobile ? 'var(--mantine-color-text)' : 'white'} radius="md" withBorder={isMobile}>
             <Group justify="space-between">
               <Group>
                 <Box
-                  bg={isMobile ? '#e2e8f0' : DARK_BLUE}
+                  bg={isMobile ? 'var(--mantine-color-default-hover)' : DARK_BLUE}
                   c={isMobile ? 'gray' : 'white'}
                   w={32}
                   h={32}
@@ -117,12 +119,12 @@ export function PatientQueue() {
                   <Text fw={600} size="lg">{firstPatient.name}</Text>
                   {isMobile ? (
                     <Box>
-                      <Group gap="xs" c="black">
+                      <Group gap="xs">
                         <Clock size={16} />
                         <Text size="sm">{firstPatient.time}</Text>
                         <Text size="sm">{firstPatient.type}</Text>
                       </Group>
-                      <Text size="sm" c="black">{firstPatient.doctor}</Text>
+                      <Text size="sm">{firstPatient.doctor}</Text>
                     </Box>
                   ) : (
                     <Group gap="xs" c={isMobile ? 'black' : undefined}>
@@ -135,7 +137,7 @@ export function PatientQueue() {
                 </Box>
               </Group>
               {!isMobile && (
-                <Button bg="white" c="#001f54" leftSection={<Play size={16} fill="#001f54" />}>
+                <Button bg="white" c={colorScheme === 'dark' ? 'dark' : 'darkBlue.9'} leftSection={<Play size={16} fill={colorScheme === 'dark' ? '#1a1b1e' : '#001f54'} />}>
                   Chamar
                 </Button>
               )}
@@ -149,7 +151,7 @@ export function PatientQueue() {
             <Group justify="space-between">
               <Group>
                 <Box
-                  bg="#e2e8f0"
+                  bg="var(--mantine-color-default-hover)"
                   c="gray"
                   w={32}
                   h={32}
@@ -161,15 +163,15 @@ export function PatientQueue() {
                   <Text fw={600} size="lg">{patient.name}</Text>
                   {isMobile ? (
                     <Box>
-                      <Group gap="xs" c="black">
+                      <Group gap="xs">
                         <Clock size={16} />
                         <Text size="sm">{patient.time}</Text>
                         <Text size="sm">{patient.type}</Text>
                       </Group>
-                      <Text size="sm" c="black">{patient.doctor}</Text>
+                      <Text size="sm">{patient.doctor}</Text>
                     </Box>
                   ) : (
-                    <Group gap="xs" c="black">
+                    <Group gap="xs">
                       <Clock size={16} />
                       <Text size="sm">{patient.time}</Text>
                       <Text size="sm">{patient.type}</Text>

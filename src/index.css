@@ -10,7 +10,8 @@ body {
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8f9fa;
+  background-color: var(--mantine-color-body);
+  color: var(--mantine-color-text);
 }
 
 /* Floating label inputs */
@@ -21,17 +22,17 @@ body {
 .floating-field input {
   width: 100%;
   border: none;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid var(--mantine-color-default-border);
   border-radius: 0;
   padding: 10px 0 6px 0;
   background: transparent;
   font-size: 0.875rem;
-  color: #212529;
+  color: var(--mantine-color-text);
 }
 
 .floating-field input:focus {
   outline: none;
-  border-bottom: 2px solid #0B2E5D; /* DARK_BLUE */
+  border-bottom: 2px solid var(--mantine-color-darkBlue-6);
   padding-bottom: 5px;
 }
 
@@ -39,7 +40,7 @@ body {
   position: absolute;
   left: 0;
   top: 8px;
-  color: #6c757d;
+  color: var(--mantine-color-dimmed);
   font-size: 0.8rem;
   transition: transform 160ms ease, font-size 160ms ease, top 160ms ease, color 160ms ease;
   pointer-events: none;
@@ -52,12 +53,12 @@ body {
 .floating-field input:not(:placeholder-shown) + label {
   top: -6px;
   font-size: 0.7rem;
-  color: #0B2E5D; /* DARK_BLUE */
+  color: var(--mantine-color-darkBlue-6);
 }
 
 /* make hovering the wrapper give subtle input feedback */
 .floating-field:hover input {
-  border-bottom-color: #c7d2df;
+  border-bottom-color: var(--mantine-color-darkBlue-4);
 }
 
 /* red asterisk overlay used to simulate a colored '*' inside the placeholder */
@@ -82,7 +83,7 @@ body {
 
 .floating-field input[disabled] + label,
 .floating-field input[readonly] + label {
-  color: #adb5bd;
+  color: var(--mantine-color-placeholder);
   opacity: 0.9;
 }
 
@@ -119,7 +120,7 @@ body {
   top: -40px;
   left: 0;
   background: var(--mantine-color-teal-6);
-  color: white;
+  color: var(--mantine-color-white);
   padding: 8px 16px;
   text-decoration: none;
   border-radius: 0 0 4px 0;
@@ -132,12 +133,17 @@ body {
 
 /* Melhor contraste para textos */
 .mantine-Text-root[data-dimmed] {
-  color: #6c757d !important;
+  color: var(--mantine-color-dimmed) !important;
 }
 
 /* Espaçamento consistente */
 .mantine-Stack-root {
   gap: var(--mantine-spacing-md);
+}
+
+/* Compatibilidade: normaliza cabeçalhos de tabela com cor hardcoded */
+.mantine-Table-th[style*="#868e96"] {
+  color: var(--mantine-color-dimmed) !important;
 }
 
 /* Botões mais acessíveis */
@@ -148,14 +154,14 @@ button:disabled {
 
 /* Linha de campo (estilo do modal) */
 .line-field {
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--mantine-color-default-border);
   padding-bottom: 6px;
   margin-bottom: 8px;
   transition: border-color 150ms ease, border-width 150ms ease;
 }
 
 .line-field:focus-within {
-  border-bottom: 2px solid #0B2E5D; /* DARK_BLUE */
+  border-bottom: 2px solid var(--mantine-color-darkBlue-6);
 }
 
 /* Pequena redução do placeholder/label para campos unstyled */

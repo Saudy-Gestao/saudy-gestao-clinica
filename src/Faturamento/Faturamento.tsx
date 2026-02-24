@@ -213,7 +213,7 @@ export function Faturamento() {
   };  
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -245,7 +245,7 @@ export function Faturamento() {
           <Group gap="md" align="flex-end">
             <TextInput
               placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou número..'}
-              leftSection={<Search size={16} color="#999" />}
+              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
               value={query}
               onChange={(e) => setQuery(e.currentTarget.value)}
               radius="md"

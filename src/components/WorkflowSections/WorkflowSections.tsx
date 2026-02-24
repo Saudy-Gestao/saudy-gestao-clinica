@@ -1,4 +1,4 @@
-import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon } from '@mantine/core';
+import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import userService from '../../services/userService';
@@ -21,7 +21,9 @@ import { DARK_BLUE } from '../../themes/theme';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
+  const { colorScheme } = useMantineColorScheme();
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
+  const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
 
   const extractModulesFromAccesses = (accesses: any[]) => {
     const modules: string[] = [];
@@ -153,7 +155,7 @@ export function WorkflowSections() {
                 withBorder 
                 style={{
                   cursor: item.route ? 'pointer' : 'default',
-                  borderColor: DARK_BLUE,
+                  borderColor: 'var(--mantine-color-default-border)',
                   minHeight: 96,
                   height: '100%'
                 }}
@@ -161,15 +163,15 @@ export function WorkflowSections() {
               >
                 <Group justify="space-between" align="flex-start">
                   <Group>
-                    <ThemeIcon size="xl" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${DARK_BLUE}`, borderRadius: '8px' }}>
-                      <item.icon size={28} color={DARK_BLUE} />
+                    <ThemeIcon size="xl" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${accentColor}`, borderRadius: '8px' }}>
+                      <item.icon size={28} color={accentColor} />
                     </ThemeIcon>
                     <Box>
                       <Text fw={500} lineClamp={1}>{item.label}</Text>
                       <Text size="xs" c="dimmed" lineClamp={1}>{item.desc}</Text>
                     </Box>
                   </Group>
-                  {item.route && <ChevronRight size={16} color="#cbd5e0" />}
+                  {item.route && <ChevronRight size={16} color="var(--mantine-color-dimmed)" />}
                 </Group>
               </Paper>
             ))}

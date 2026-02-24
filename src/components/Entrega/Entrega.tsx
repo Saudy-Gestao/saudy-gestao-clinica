@@ -354,7 +354,7 @@ export function Entrega() {
 
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -364,10 +364,10 @@ export function Entrega() {
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Entrega
               </Text>
-              <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Controle de entregas
               </Text>
             </Box>
@@ -379,7 +379,7 @@ export function Entrega() {
           <Group gap="md" align="flex-end">
             <TextInput
               placeholder={isMobile ? 'Buscar...' : 'Buscar paciente..'}
-              leftSection={<Search size={16} color="#999" />}
+              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
               value={query}
               onChange={(e) => setQuery(e.currentTarget.value)}
               radius="md"
