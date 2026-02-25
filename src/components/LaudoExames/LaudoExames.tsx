@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
-  // Avatar,
   Badge,
   Box,
   Button,
+  Collapse,
   Divider,
   Group,
   Modal,
@@ -17,12 +17,14 @@ import {
   Title,
   ThemeIcon,
   Tooltip,
+  Timeline,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, User, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, X, ScanLine } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
+import { DicomViewer } from '../DicomViewer/DicomViewer';
 import { DARK_BLUE } from '../../themes/theme';
 
 type ExamStatus = 'pendente' | 'rascunho' | 'finalizado';
@@ -48,6 +50,16 @@ interface ReportTemplate {
   id: string;
   name: string;
   examType: string;
+  group: string;
+  content: string;
+}
+
+interface PreviousReport {
+  id: string;
+  examType: string;
+  date: string;
+  status: ExamStatus;
+  summary: string;
   content: string;
 }
 
@@ -56,6 +68,12 @@ interface ReportPhrase {
   examType: string;
   label: string;
   text: string;
+}
+
+interface LaudoTab {
+  id: string;
+  label: string;
+  content: string;
 }
 
 const MOCK_EXAMS: ExamItem[] = [
@@ -117,26 +135,101 @@ const TEMPLATE_TEXT = `
 const MOCK_REPORT_TEMPLATES: ReportTemplate[] = [
   {
     id: 'TMP-001',
-    name: 'Padrão Raio-X de Tórax',
+    name: 'Tórax PA normal',
     examType: 'Raio-X de tórax',
+    group: 'Raio-X',
     content:
       '<h3>Descrição</h3><p>Campos pulmonares sem opacidades focais. Silhueta cardíaca preservada.</p><h3>Conclusão</h3><p>Sem sinais radiográficos de alteração aguda.</p>',
   },
   {
+    id: 'TMP-004',
+    name: 'Tórax PA com derrame',
+    examType: 'Raio-X de tórax',
+    group: 'Raio-X',
+    content:
+      '<h3>Descrição</h3><p>Opacidade homogênea ocupando terço inferior do hemitórax direito, com sinal do menisco presente.</p><h3>Conclusão</h3><p>Derrame pleural à direita.</p>',
+  },
+  {
+    id: 'TMP-005',
+    name: 'Coluna lombar normal',
+    examType: 'Raio-X de coluna',
+    group: 'Raio-X',
+    content:
+      '<h3>Descrição</h3><p>Corpos vertebrais lombares com morfologia e alturas preservadas. Espaços discais mantidos.</p><h3>Conclusão</h3><p>Estudo radiográfico da coluna lombar sem alterações significativas.</p>',
+  },
+  {
     id: 'TMP-002',
-    name: 'Padrão Ultrassom Abdominal',
+    name: 'Abdômen total normal',
     examType: 'Ultrassom abdominal',
+    group: 'Ultrassonografia',
     content:
       '<h3>Descrição</h3><p>Fígado de dimensões normais e ecotextura homogênea. Vias biliares sem dilatação.</p><h3>Conclusão</h3><p>Exame ultrassonográfico sem alterações relevantes.</p>',
   },
   {
+    id: 'TMP-006',
+    name: 'Abdômen com esteatose',
+    examType: 'Ultrassom abdominal',
+    group: 'Ultrassonografia',
+    content:
+      '<h3>Descrição</h3><p>Fígado com dimensões aumentadas e ecogenicidade difusamente aumentada, com atenuação posterior do feixe sonoro.</p><h3>Conclusão</h3><p>Esteatose hepática grau II/III.</p>',
+  },
+  {
     id: 'TMP-003',
-    name: 'Padrão Mamografia',
+    name: 'Mamografia BI-RADS 2',
     examType: 'Mamografia bilateral',
+    group: 'Mamografia',
     content:
       '<h3>Descrição</h3><p>Mamas com padrão fibroglandular, sem nódulos suspeitos ou microcalcificações agrupadas.</p><h3>Conclusão</h3><p>BI-RADS 2.</p>',
   },
+  {
+    id: 'TMP-007',
+    name: 'Crânio sem contraste normal',
+    examType: 'Tomografia de crânio',
+    group: 'Tomografia',
+    content:
+      '<h3>Descrição</h3><p>Parênquima encefálico com coeficientes de atenuação normais. Sistema ventricular de dimensões e morfologia preservadas.</p><h3>Conclusão</h3><p>Tomografia computadorizada de crânio sem alterações agudas.</p>',
+  },
+  {
+    id: 'TMP-008',
+    name: 'Tórax sem contraste normal',
+    examType: 'Tomografia de tórax',
+    group: 'Tomografia',
+    content:
+      '<h3>Descrição</h3><p>Campos pulmonares com transparência preservada. Estruturas mediastinais de aspecto habitual. Não há derrame pleural.</p><h3>Conclusão</h3><p>Tomografia de tórax sem sinais de alteração parenquimatosa ou mediastinal.</p>',
+  },
 ];
+
+const MOCK_PREVIOUS_REPORTS: Record<string, PreviousReport[]> = {
+  '123.456.789-01': [
+    {
+      id: 'EX-OLD-001',
+      examType: 'Raio-X de tórax',
+      date: '15/01/2026 10:30',
+      status: 'finalizado',
+      summary: 'Sem sinais radiográficos de alteração aguda.',
+      content: '<h3>Descrição</h3><p>Campos pulmonares sem opacidades focais. Silhueta cardíaca preservada.</p><h3>Conclusão</h3><p>Sem sinais radiográficos de alteração aguda.</p>',
+    },
+    {
+      id: 'EX-OLD-002',
+      examType: 'Ultrassom abdominal',
+      date: '02/12/2025 14:00',
+      status: 'finalizado',
+      summary: 'Esteatose hepática leve. Demais órgãos sem alterações.',
+      content: '<h3>Descrição</h3><p>Fígado com dimensões normais e ecogenicidade levemente aumentada. Vias biliares sem dilatação.</p><h3>Conclusão</h3><p>Esteatose hepática leve.</p>',
+    },
+  ],
+  '987.654.321-55': [
+    {
+      id: 'EX-OLD-003',
+      examType: 'Ultrassom abdominal',
+      date: '10/11/2025 09:15',
+      status: 'finalizado',
+      summary: 'Sem alterações ultrassonográficas significativas.',
+      content: '<h3>Descrição</h3><p>Fígado com dimensões preservadas e ecotextura homogênea.</p><h3>Conclusão</h3><p>Sem alterações ultrassonográficas significativas.</p>',
+    },
+  ],
+  '111.222.333-44': [],
+};
 
 const MOCK_REPORT_PHRASES: ReportPhrase[] = [
   {
@@ -214,7 +307,6 @@ export function LaudoExames() {
   const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
   const [editorContent, setEditorContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [hasEditorChanges, setHasEditorChanges] = useState(false);
   const [templates, setTemplates] = useState<ReportTemplate[]>(MOCK_REPORT_TEMPLATES);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateQuery, setTemplateQuery] = useState('');
@@ -223,6 +315,12 @@ export function LaudoExames() {
   const [phrases, setPhrases] = useState<ReportPhrase[]>(MOCK_REPORT_PHRASES);
   const [toolsExpanded, setToolsExpanded] = useState(true);
   const [headerExpanded, setHeaderExpanded] = useState(true);
+  const [previousReportsModalOpen, setPreviousReportsModalOpen] = useState(false);
+  const [selectedPreviousReport, setSelectedPreviousReport] = useState<PreviousReport | null>(null);
+  const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Record<string, boolean>>({});
+  const [laudoTabs, setLaudoTabs] = useState<LaudoTab[]>([]);
+  const [activeLaudoTabId, setActiveLaudoTabId] = useState<string | null>(null);
+  const [dicomViewerVisible, setDicomViewerVisible] = useState(false);
 
   const selectedExam = useMemo(
     () => examRows.find((exam) => exam.id === selectedExamId) || null,
@@ -258,6 +356,25 @@ export function LaudoExames() {
     );
   }, [filteredTemplates, templateQuery]);
 
+  const groupedTemplates = useMemo(() => {
+    const groups: Record<string, ReportTemplate[]> = {};
+    filteredTemplatesByQuery.forEach((template) => {
+      const group = template.group || 'Outros';
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(template);
+    });
+    return groups;
+  }, [filteredTemplatesByQuery]);
+
+  const previousReports = useMemo(() => {
+    if (!selectedExam) return [];
+    return MOCK_PREVIOUS_REPORTS[selectedExam.cpf] || [];
+  }, [selectedExam]);
+
+  const toggleTemplateGroup = (group: string) => {
+    setExpandedTemplateGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+
   const availablePhrases = useMemo(() => {
     if (!selectedExam) return phrases;
     return phrases.filter((phrase) => phrase.examType === selectedExam.examType);
@@ -284,12 +401,19 @@ export function LaudoExames() {
   useEffect(() => {
     if (!selectedExam) {
       setEditorContent('');
-      setHasEditorChanges(false);
+      setLaudoTabs([]);
+      setActiveLaudoTabId(null);
       return;
     }
 
-    setEditorContent(selectedExam.reportText || TEMPLATE_TEXT);
-    setHasEditorChanges(false);
+    const initialTab: LaudoTab = {
+      id: `laudo-${Date.now()}`,
+      label: 'Laudo 1',
+      content: selectedExam.reportText || TEMPLATE_TEXT,
+    };
+    setLaudoTabs([initialTab]);
+    setActiveLaudoTabId(initialTab.id);
+    setEditorContent(initialTab.content);
   }, [selectedExam]);
 
   useEffect(() => {
@@ -315,7 +439,7 @@ export function LaudoExames() {
 
   const saveDraft = (notify = true, source: 'manual' | 'auto' = 'manual', contentOverride?: string) => {
     if (!selectedExam) return;
-    const contentToSave = contentOverride ?? editorContent;
+    const contentToSave = contentOverride ?? getAllLaudoContent();
 
     const now = new Date().toLocaleString('pt-BR');
     upsertExam((exam) => ({
@@ -329,7 +453,6 @@ export function LaudoExames() {
     }
 
     setLastSavedAt(now);
-    setHasEditorChanges(false);
 
     if (notify && source === 'manual') {
       showNotification({
@@ -340,15 +463,7 @@ export function LaudoExames() {
     }
   };
 
-  useEffect(() => {
-    if (!modalOpen || !selectedExam || !hasEditorChanges) return;
 
-    const timeoutId = setTimeout(() => {
-      saveDraft(false, 'auto');
-    }, 2000);
-
-    return () => clearTimeout(timeoutId);
-  }, [modalOpen, selectedExam, editorContent, hasEditorChanges]);
 
   const resolvePlaceholders = (content: string, exam: ExamItem) => {
     const replacements: Record<string, string> = {
@@ -377,7 +492,6 @@ export function LaudoExames() {
       setEditorContent((previous) => `${previous}${htmlFragment}`);
     }
 
-    setHasEditorChanges(true);
   };
 
   const openExam = (examId: string) => {
@@ -389,11 +503,68 @@ export function LaudoExames() {
     setModalOpen(false);
     setTemplatePickerModalOpen(false);
     setPdfPreviewModalOpen(false);
+    setPreviousReportsModalOpen(false);
+    setSelectedPreviousReport(null);
     setSelectedTemplateId(null);
     setSelectedPhraseId(null);
     setTemplateQuery('');
     setPhraseQuery('');
-    setHasEditorChanges(false);
+    setLaudoTabs([]);
+    setActiveLaudoTabId(null);
+  };
+
+  const switchLaudoTab = (tabId: string) => {
+    if (tabId === activeLaudoTabId) return;
+    const targetTab = laudoTabs.find(t => t.id === tabId);
+    if (!targetTab) return;
+    setLaudoTabs(prev => prev.map(tab =>
+      tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab
+    ));
+    setEditorContent(targetTab.content);
+    setActiveLaudoTabId(tabId);
+  };
+
+  const addLaudoTab = () => {
+    const newId = `laudo-${Date.now()}`;
+    const newLabel = `Laudo ${laudoTabs.length + 1}`;
+    const newTab: LaudoTab = {
+      id: newId,
+      label: newLabel,
+      content: TEMPLATE_TEXT,
+    };
+    setLaudoTabs(prev => [
+      ...prev.map(tab => tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab),
+      newTab,
+    ]);
+    setActiveLaudoTabId(newId);
+    setEditorContent(TEMPLATE_TEXT);
+  };
+
+  const removeLaudoTab = (tabId: string) => {
+    if (laudoTabs.length <= 1) return;
+    const synced = laudoTabs.map(tab =>
+      tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab
+    );
+    const filtered = synced.filter(tab => tab.id !== tabId);
+    setLaudoTabs(filtered);
+    if (tabId === activeLaudoTabId) {
+      const newActive = filtered[0];
+      setActiveLaudoTabId(newActive.id);
+      setEditorContent(newActive.content);
+    }
+  };
+
+  const getAllLaudoContent = (): string => {
+    const allTabs = laudoTabs.map(tab =>
+      tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab
+    );
+    if (allTabs.length === 1) return allTabs[0].content;
+    return allTabs.map((tab, index) => {
+      const pageBreak = index > 0
+        ? '<hr style="page-break-after: always; border: none; margin: 24px 0;" />'
+        : '';
+      return pageBreak + '<h2>' + tab.label + '</h2>' + tab.content;
+    }).join('');
   };
 
   const applyTemplate = () => {
@@ -407,7 +578,6 @@ export function LaudoExames() {
     }
 
     setEditorContent(selectedTemplate.content);
-    setHasEditorChanges(true);
     showNotification({
       title: 'Padrão aplicado',
       message: `${selectedTemplate.name} aplicado ao laudo atual.`,
@@ -435,8 +605,6 @@ export function LaudoExames() {
     } else {
       setEditorContent((previous) => `${previous}${htmlFragment}`);
     }
-
-    setHasEditorChanges(true);
     showNotification({
       title: 'Frase inserida',
       message: `A frase "${phrase.label}" foi inserida no laudo.`,
@@ -447,7 +615,7 @@ export function LaudoExames() {
   const buildPreviewHtml = () => {
     if (!selectedExam) return '';
 
-    const resolvedContent = resolvePlaceholders(editorContent, selectedExam);
+    const resolvedContent = resolvePlaceholders(getAllLaudoContent(), selectedExam);
 
     return `
       <!DOCTYPE html>
@@ -490,7 +658,7 @@ export function LaudoExames() {
 
         const updatedExam = {
           ...exam,
-          reportText: editorContent,
+          reportText: getAllLaudoContent(),
           status: 'rascunho' as ExamStatus,
           issuerSignedAt: role === 'issuer' ? signatureDate : exam.issuerSignedAt,
           reviewerSignedAt: role === 'reviewer' ? signatureDate : exam.reviewerSignedAt,
@@ -505,7 +673,6 @@ export function LaudoExames() {
     );
 
     setLastSavedAt(signatureDate);
-    setHasEditorChanges(false);
     // showNotification({
     //   title: role === 'issuer' ? 'Assinado como emissor' : 'Assinado como revisor',
     //   message:
@@ -537,7 +704,7 @@ export function LaudoExames() {
           ? {
               ...exam,
               status: nextStatus,
-              reportText: editorContent,
+              reportText: getAllLaudoContent(),
             }
           : exam,
       ),
@@ -545,7 +712,6 @@ export function LaudoExames() {
 
     const now = new Date();
     setLastSavedAt(now.toLocaleString('pt-BR'));
-    setHasEditorChanges(false);
     showNotification({
       title: nextStatus === 'finalizado' ? 'Laudo finalizado' : 'Rascunho salvo',
       message:
@@ -765,11 +931,7 @@ export function LaudoExames() {
                       <Badge variant="dot" color={selectedExam.reviewerSignedAt ? 'green' : 'gray'} size="sm">
                         Revisor: {selectedExam.reviewerSignedAt ? 'Assinado' : 'Pendente'}
                       </Badge>
-                      {hasEditorChanges && (
-                        <Badge variant="dot" color="orange" size="sm">
-                          Alterações pendentes
-                        </Badge>
-                      )}
+
                     </Group>
                   </Stack>
                 </Group>
@@ -799,11 +961,38 @@ export function LaudoExames() {
                       variant="filled" 
                       color="darkBlue" 
                       onClick={() => setTemplatePickerModalOpen(true)} 
-                      mb="md" 
+                      mb="sm" 
                       fullWidth
                       leftSection={<LayoutTemplate size={18} />}
                     >
-                      Escolher padrão de laudo
+                      Padrão de Laudo
+                    </Button>
+
+                    <Button 
+                      variant="light" 
+                      color="darkBlue" 
+                      onClick={() => { setPreviousReportsModalOpen(true); setSelectedPreviousReport(null); }} 
+                      mb="sm" 
+                      fullWidth
+                      leftSection={<History size={18} />}
+                    >
+                      Laudos Anteriores
+                      {previousReports.length > 0 && (
+                        <Badge size="sm" variant="filled" color="darkBlue" ml="xs" circle>
+                          {previousReports.length}
+                        </Badge>
+                      )}
+                    </Button>
+
+                    <Button 
+                      variant={dicomViewerVisible ? 'filled' : 'light'}
+                      color="darkBlue" 
+                      onClick={() => setDicomViewerVisible((v) => !v)} 
+                      mb="md" 
+                      fullWidth
+                      leftSection={<ScanLine size={18} />}
+                    >
+                      {dicomViewerVisible ? 'Ocultar imagem' : 'Imagem DICOM'}
                     </Button>
 
                     <TextInput
@@ -857,9 +1046,14 @@ export function LaudoExames() {
                             variant="light"
                             color="blue"
                             size="md"
-                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                            onDoubleClick={() => insertPlaceholder(item.key)}
-                            title={`${item.label} (${item.key}) — duplo clique para inserir`}
+                            style={{
+                              cursor: 'pointer',
+                              userSelect: 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                            className="dynamic-field-badge"
+                            onClick={() => insertPlaceholder(item.key)}
+                            title={`${item.label} — clique para inserir`}
                             leftSection={<Plus size={12} />}
                           >
                             {item.label}
@@ -870,7 +1064,13 @@ export function LaudoExames() {
                   </Paper>
                 )}
 
-                <Box style={{ flex: 1, minWidth: 0, minHeight: isMobile ? 360 : 0, position: 'relative' }}>
+                {!isMobile && dicomViewerVisible && (
+                  <Box style={{ flex: '1 1 50%', minWidth: 0, minHeight: 0 }}>
+                    <DicomViewer style={{ height: '100%' }} />
+                  </Box>
+                )}
+
+                <Box style={{ flex: '1 1 50%', minWidth: 0, minHeight: isMobile ? 360 : 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
                   {!isMobile && (
                     <Group 
                       gap="xs" 
@@ -889,7 +1089,7 @@ export function LaudoExames() {
                           style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                           onClick={() => setToolsExpanded(!toolsExpanded)}
                         >
-                          <LayoutTemplate size={16} />
+                          {toolsExpanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
                         </ActionIcon>
                       </Tooltip>
                       <Tooltip label={headerExpanded ? "Expandir editor (ocultar cabeçalho)" : "Restaurar cabeçalho"} position="bottom" withArrow>
@@ -905,7 +1105,54 @@ export function LaudoExames() {
                       </Tooltip>
                     </Group>
                   )}
-                  <Editor
+
+                  <Paper
+                    withBorder
+                    px="xs"
+                    py={4}
+                    bg="gray.1"
+                    style={{
+                      borderBottom: 'none',
+                      borderBottomLeftRadius: 0,
+                      borderBottomRightRadius: 0,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Group gap={4} align="center">
+                      {laudoTabs.map((tab) => (
+                        <Button
+                          key={tab.id}
+                          variant={tab.id === activeLaudoTabId ? 'filled' : 'subtle'}
+                          color={tab.id === activeLaudoTabId ? 'darkBlue' : 'gray'}
+                          size="compact-sm"
+                          onClick={() => switchLaudoTab(tab.id)}
+                          styles={{ root: { fontWeight: tab.id === activeLaudoTabId ? 700 : 500 } }}
+                          rightSection={
+                            laudoTabs.length > 1 ? (
+                              <ActionIcon
+                                size={16}
+                                variant="transparent"
+                                color={tab.id === activeLaudoTabId ? 'white' : 'gray'}
+                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); removeLaudoTab(tab.id); }}
+                              >
+                                <X size={12} />
+                              </ActionIcon>
+                            ) : undefined
+                          }
+                        >
+                          {tab.label}
+                        </Button>
+                      ))}
+                      <Tooltip label="Adicionar laudo" position="bottom" withArrow>
+                        <ActionIcon variant="subtle" color="gray" size="sm" onClick={addLaudoTab}>
+                          <Plus size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Paper>
+
+                  <Box style={{ flex: 1, minHeight: 0 }}>
+                    <Editor
                     apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
                     onInit={(_event, editor) => {
                       editorRef.current = editor;
@@ -913,7 +1160,6 @@ export function LaudoExames() {
                     value={editorContent}
                     onEditorChange={(value) => {
                       setEditorContent(value);
-                      setHasEditorChanges(true);
                     }}
                     init={{
                       height: isMobile ? 320 : '100%',
@@ -925,6 +1171,7 @@ export function LaudoExames() {
                       content_style: 'body { font-family:Poppins,sans-serif; font-size:14px; }',
                     }}
                   />
+                  </Box>
                 </Box>
               </Group>
 
@@ -966,14 +1213,14 @@ export function LaudoExames() {
         <Modal
           opened={templatePickerModalOpen}
           onClose={() => { setTemplatePickerModalOpen(false); setTemplateQuery(''); }}
-          title="Padrões de laudo"
+          title="Padrão de Laudo"
           centered
-          size={isMobile ? '100%' : '70%'}
+          size={isMobile ? '100%' : '75%'}
           fullScreen={isMobile}
         >
-          <Group justify="space-between" mb="sm">
+          <Group justify="space-between" mb="sm" align="center">
             <Text size="sm" c="dimmed">
-              {filteredTemplatesByQuery.length} padrões encontrados
+              {filteredTemplatesByQuery.length} padrões em {Object.keys(groupedTemplates).length} grupo(s)
             </Text>
           </Group>
 
@@ -982,7 +1229,7 @@ export function LaudoExames() {
               withBorder
               p="sm"
               style={{
-                flex: isMobile ? '1 1 100%' : '0 0 320px',
+                flex: isMobile ? '1 1 100%' : '0 0 340px',
                 maxHeight: isMobile ? '36vh' : '60vh',
                 overflowY: 'auto',
               }}
@@ -992,28 +1239,54 @@ export function LaudoExames() {
                 value={templateQuery}
                 onChange={(event) => setTemplateQuery(event.currentTarget.value)}
                 mb="sm"
+                leftSection={<Search size={16} />}
               />
 
-              <Stack gap="xs">
-                {filteredTemplatesByQuery.length === 0 ? (
-                  <Text size="sm" c="dimmed">
-                    Nenhum padrão encontrado.
-                  </Text>
-                ) : (
-                  filteredTemplatesByQuery.map((template) => (
-                    <Paper
-                      key={template.id}
-                      withBorder
-                      p="xs"
-                      style={{ cursor: 'pointer', borderColor: selectedTemplateId === template.id ? DARK_BLUE : undefined }}
-                      onClick={() => setSelectedTemplateId(template.id)}
-                    >
-                      <Text fw={500} size="sm">{template.name}</Text>
-                      <Text size="xs" c="dimmed">{template.examType}</Text>
-                    </Paper>
-                  ))
-                )}
-              </Stack>
+              {Object.keys(groupedTemplates).length === 0 ? (
+                <Text size="sm" c="dimmed">Nenhum padrão encontrado.</Text>
+              ) : (
+                <Stack gap="xs">
+                  {Object.entries(groupedTemplates).map(([group, groupTemplates]) => (
+                    <Box key={group}>
+                      <Paper
+                        p="xs"
+                        bg="gray.1"
+                        radius="sm"
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => toggleTemplateGroup(group)}
+                      >
+                        <Group gap="xs" align="center">
+                          {expandedTemplateGroups[group] === false ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                          <Text size="sm" fw={700} c="dark.8">{group}</Text>
+                          <Badge size="xs" variant="light" color="gray" ml="auto">{groupTemplates.length}</Badge>
+                        </Group>
+                      </Paper>
+                      <Collapse in={expandedTemplateGroups[group] !== false}>
+                        <Stack gap={4} mt={4} pl="sm">
+                          {groupTemplates.map((template) => (
+                            <Paper
+                              key={template.id}
+                              withBorder
+                              p="xs"
+                              shadow={selectedTemplateId === template.id ? 'sm' : 'none'}
+                              style={{
+                                cursor: 'pointer',
+                                borderColor: selectedTemplateId === template.id ? DARK_BLUE : '#e9ecef',
+                                backgroundColor: selectedTemplateId === template.id ? '#f0f4ff' : 'white',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onClick={() => setSelectedTemplateId(template.id)}
+                            >
+                              <Text fw={600} size="sm" c="dark.9">{template.name}</Text>
+                              <Text size="xs" c="dimmed">{template.examType}</Text>
+                            </Paper>
+                          ))}
+                        </Stack>
+                      </Collapse>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
             </Paper>
 
             <Paper
@@ -1028,13 +1301,18 @@ export function LaudoExames() {
             >
               {selectedTemplate ? (
                 <>
-                  <Badge variant="outline" color="gray" mb="sm">
-                    Tipo de exame: {selectedTemplate.examType}
-                  </Badge>
+                  <Group gap="sm" mb="md">
+                    <Badge variant="light" color="darkBlue">{selectedTemplate.group}</Badge>
+                    <Badge variant="outline" color="gray">{selectedTemplate.examType}</Badge>
+                  </Group>
+                  <Title order={5} mb="sm" c="dark.9">{selectedTemplate.name}</Title>
                   <Box dangerouslySetInnerHTML={{ __html: selectedTemplate.content }} />
                 </>
               ) : (
-                <Text size="sm" c="dimmed">Selecione um padrão para visualizar.</Text>
+                <Stack align="center" justify="center" style={{ height: '100%', opacity: 0.5 }}>
+                  <LayoutTemplate size={48} />
+                  <Text size="sm" c="dimmed">Selecione um padrão para visualizar.</Text>
+                </Stack>
               )}
             </Paper>
           </Group>
@@ -1043,10 +1321,122 @@ export function LaudoExames() {
             <Button variant="default" onClick={() => setTemplatePickerModalOpen(false)}>
               Fechar
             </Button>
-            <Button bg={DARK_BLUE} c="white" onClick={() => { applyTemplate(); setTemplatePickerModalOpen(false); }}>
+            <Button bg={DARK_BLUE} c="white" onClick={() => { applyTemplate(); setTemplatePickerModalOpen(false); }} leftSection={<CheckCircle size={16} />}>
               Aplicar padrão
             </Button>
           </Group>
+        </Modal>
+
+        <Modal
+          opened={previousReportsModalOpen}
+          onClose={() => { setPreviousReportsModalOpen(false); setSelectedPreviousReport(null); }}
+          title="Laudos Anteriores do Paciente"
+          centered
+          size={isMobile ? '100%' : '75%'}
+          fullScreen={isMobile}
+        >
+          {selectedExam && (
+            <>
+              <Paper withBorder p="sm" mb="md" bg="gray.0" radius="md">
+                <Group gap="sm">
+                  <ThemeIcon variant="light" color="darkBlue" size="lg">
+                    <History size={20} />
+                  </ThemeIcon>
+                  <Box>
+                    <Text fw={600} size="sm" c="dark.9">{selectedExam.patientName}</Text>
+                    <Text size="xs" c="dimmed">CPF: {selectedExam.cpf} • {previousReports.length} laudo(s) anterior(es)</Text>
+                  </Box>
+                </Group>
+              </Paper>
+
+              <Group align="stretch" gap="md" wrap={isMobile ? 'wrap' : 'nowrap'}>
+                <Paper
+                  withBorder
+                  p="sm"
+                  style={{
+                    flex: isMobile ? '1 1 100%' : '0 0 340px',
+                    maxHeight: isMobile ? '36vh' : '55vh',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {previousReports.length === 0 ? (
+                    <Stack align="center" justify="center" py="xl">
+                      <History size={40} color="#adb5bd" />
+                      <Text size="sm" c="dimmed" ta="center">Nenhum laudo anterior encontrado para este paciente.</Text>
+                    </Stack>
+                  ) : (
+                    <Timeline active={-1} bulletSize={28} lineWidth={2}>
+                      {previousReports.map((report) => (
+                        <Timeline.Item
+                          key={report.id}
+                          bullet={<FileText size={14} />}
+                          title={
+                            <Text fw={600} size="sm" c="dark.9" style={{ cursor: 'pointer' }} onClick={() => setSelectedPreviousReport(report)}>
+                              {report.examType}
+                            </Text>
+                          }
+                        >
+                          <Paper
+                            withBorder
+                            p="xs"
+                            mt={4}
+                            shadow={selectedPreviousReport?.id === report.id ? 'sm' : 'none'}
+                            style={{
+                              cursor: 'pointer',
+                              borderColor: selectedPreviousReport?.id === report.id ? DARK_BLUE : '#e9ecef',
+                              backgroundColor: selectedPreviousReport?.id === report.id ? '#f0f4ff' : 'white',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onClick={() => setSelectedPreviousReport(report)}
+                          >
+                            <Group gap="xs" mb={4}>
+                              <Badge size="xs" variant="light" color="gray">{report.date}</Badge>
+                              <Badge size="xs" variant="light" color="green">{statusLabel[report.status]}</Badge>
+                            </Group>
+                            <Text size="xs" c="dimmed" lineClamp={2}>{report.summary}</Text>
+                          </Paper>
+                        </Timeline.Item>
+                      ))}
+                    </Timeline>
+                  )}
+                </Paper>
+
+                <Paper
+                  withBorder
+                  p="md"
+                  style={{
+                    flex: 1,
+                    minHeight: isMobile ? '42vh' : 400,
+                    maxHeight: isMobile ? '42vh' : '55vh',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {selectedPreviousReport ? (
+                    <>
+                      <Group gap="sm" mb="sm">
+                        <Badge variant="light" color="darkBlue">{selectedPreviousReport.examType}</Badge>
+                        <Badge variant="light" color="gray">{selectedPreviousReport.date}</Badge>
+                        <Badge variant="light" color="green">{statusLabel[selectedPreviousReport.status]}</Badge>
+                      </Group>
+                      <Divider mb="sm" />
+                      <Box dangerouslySetInnerHTML={{ __html: selectedPreviousReport.content }} />
+                    </>
+                  ) : (
+                    <Stack align="center" justify="center" style={{ height: '100%', opacity: 0.5 }}>
+                      <FileText size={48} />
+                      <Text size="sm" c="dimmed">Selecione um laudo anterior para visualizar.</Text>
+                    </Stack>
+                  )}
+                </Paper>
+              </Group>
+
+              <Group justify="flex-end" mt="md">
+                <Button variant="default" onClick={() => setPreviousReportsModalOpen(false)}>
+                  Fechar
+                </Button>
+              </Group>
+            </>
+          )}
         </Modal>
 
         <Modal
