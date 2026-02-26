@@ -160,9 +160,10 @@ export function SettingsPage() {
           phone: comp.phone || '' 
         });
       }
+      // Forçar refetch dos branches
       fetchBranches();
     }
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, companies]);
 
   // Reload companies when userCompanyId is set
   useEffect(() => {
@@ -263,6 +264,7 @@ export function SettingsPage() {
       const data = await branchService.listBranches();
       // Filter by selected company
       const filtered = (data || []).filter((b: any) => b.companyId === selectedCompanyId);
+      console.log('🔍 Branches recebidas:', filtered);
       setBranches(filtered);
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar filiais', color: 'red' });
