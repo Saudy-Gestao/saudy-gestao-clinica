@@ -15,6 +15,7 @@ import {
   Loader, 
   MultiSelect,
   Grid,
+  Badge,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -749,6 +750,7 @@ export function SettingsPage() {
                                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome Fantasia</Table.Th>
                                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Razão Social</Table.Th>
                                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Telefone</Table.Th>
+                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>
                                             <Table.Th style={{ width: '100px' }}></Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
@@ -759,14 +761,21 @@ export function SettingsPage() {
                                                 <Table.Td><Text size="sm">{branch.socialName}</Text></Table.Td>
                                                 <Table.Td><Text size="sm">{branch.phone}</Text></Table.Td>
                                                 <Table.Td>
+                                                    <Badge color={branch.isMatriz ? 'blue' : 'gray'} variant="light" size="sm">
+                                                        {branch.isMatriz ? 'Matriz' : 'Filial'}
+                                                    </Badge>
+                                                </Table.Td>
+                                                <Table.Td>
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openBranchModalForEdit(branch)}><Edit size={16} /></ActionIcon>
-                                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteBranch(branch.id)}><Trash size={16} /></ActionIcon>
+                                                        {!branch.isMatriz && (
+                                                            <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteBranch(branch.id)}><Trash size={16} /></ActionIcon>
+                                                        )}
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
                                         ))}
-                                        {branches.length === 0 && <Table.Tr><Table.Td colSpan={4} align="center">Nenhuma filial cadastrada</Table.Td></Table.Tr>}
+                                        {branches.length === 0 && <Table.Tr><Table.Td colSpan={5} align="center">Nenhuma filial cadastrada</Table.Td></Table.Tr>}
                                     </Table.Tbody>
                                 </Table>
                             </Box>
