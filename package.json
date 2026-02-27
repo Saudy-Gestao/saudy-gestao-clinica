@@ -13,9 +13,6 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
-    "@cornerstonejs/core": "^4.17.5",
-    "@cornerstonejs/dicom-image-loader": "^4.17.5",
-    "@cornerstonejs/tools": "^4.17.5",
     "@mantine/core": "7.13.2",
     "@mantine/dates": "7.13.2",
     "@mantine/hooks": "7.13.2",

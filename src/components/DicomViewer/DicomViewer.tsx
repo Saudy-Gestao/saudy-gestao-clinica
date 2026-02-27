@@ -1,15 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RenderingEngine, Enums as csEnums } from '@cornerstonejs/core';
-import type { Types as csTypes } from '@cornerstonejs/core';
-import {
-  ToolGroupManager,
-  Enums as toolsEnums,
-  WindowLevelTool,
-  ZoomTool,
-  PanTool,
-  LengthTool,
-  annotation,
-} from '@cornerstonejs/tools';
 import {
   ActionIcon,
   Badge,
@@ -41,12 +30,17 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-import { initCornerstone } from './cornerstoneInit';
-import { addFile, getImageData, clearCache } from './saudyImageLoader';
+import {
+  parseDicomFile,
+  buildDisplayPixels,
+  screenToImage,
+  imageToScreen,
+  calculateDistance,
+  type DicomImage,
+  type Measurement,
+} from './dicomUtils';
 
 /* ─────────── Constants ─────────── */
-
-const VIEWPORT_ID = 'saudy-stack-vp';
 
 const WL_PRESETS = [
   { name: 'Pulmão', wc: -600, ww: 1500 },
@@ -59,13 +53,6 @@ const WL_PRESETS = [
 ];
 
 type ActiveTool = 'wl' | 'zoom' | 'pan' | 'ruler';
-
-const TOOL_NAME: Record<ActiveTool, string> = {
-  wl: WindowLevelTool.toolName,
-  zoom: ZoomTool.toolName,
-  pan: PanTool.toolName,
-  ruler: LengthTool.toolName,
-};
 
 const TOOL_LABEL: Record<ActiveTool, { label: string; cursor: string }> = {
   wl: { label: 'Janela / Nível', cursor: 'crosshair' },
@@ -90,45 +77,42 @@ interface DicomMeta {
   pixelSpacing: [number, number] | null;
 }
 
-interface DicomViewerProps {
-  style?: React.CSSProperties;
+interface DragState {
+  active: boolean;
+  startX: number;
+  startY: number;
+  startWc: number;
+  startWw: number;
+  startPanX: number;
+  startPanY: number;
+  startZoom: number;
 }
 
-/* ─────────── Helpers ─────────── */
+interface RulerDraw {
+  start: { x: number; y: number } | null;
+  end: { x: number; y: number } | null;
+}
 
-function metaForImageId(imageId: string): DicomMeta | null {
-  const data = getImageData(imageId);
-  if (!data) return null;
-  const m = data.metadata;
-  return {
-    patientName: m.patientName,
-    patientId: m.patientId,
-    studyDate: m.studyDate,
-    modality: m.modality,
-    studyDescription: m.studyDescription,
-    seriesDescription: m.seriesDescription,
-    rows: m.rows,
-    columns: m.columns,
-    bitsAllocated: m.bitsAllocated,
-    bitsStored: m.bitsStored,
-    pixelSpacing: m.pixelSpacing,
-  };
+interface DicomViewerProps {
+  style?: React.CSSProperties;
 }
 
 /* ─────────── Component ─────────── */
 
 export function DicomViewer({ style }: DicomViewerProps) {
-  /* — DOM / engine refs — */
-  const elementRef = useRef<HTMLDivElement>(null);
-  // Unique IDs per component instance – stable across re-renders
-  const engineIdRef = useRef('saudy-re-' + Math.random().toString(36).slice(2));
-  const toolGroupIdRef = useRef('saudy-tg-' + Math.random().toString(36).slice(2));
-  const engineRef = useRef<RenderingEngine | null>(null);
+  /* — Refs — */
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const loadingRef = useRef(false); // guard without stale closure issues
+  const rafRef = useRef(0);
+  const loadingRef = useRef(false);
+  const dragRef = useRef<DragState>({
+    active: false, startX: 0, startY: 0,
+    startWc: 0, startWw: 0, startPanX: 0, startPanY: 0, startZoom: 1,
+  });
 
-  /* — series state — */
-  const [imageIds, setImageIds] = useState<string[]>([]);
+  /* — Data state — */
+  const [images, setImages] = useState<DicomImage[]>([]);
   const [fileNames, setFileNames] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -136,239 +120,409 @@ export function DicomViewer({ style }: DicomViewerProps) {
   const [loadProgress, setLoadProgress] = useState({ loaded: 0, total: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
 
-  /* — viewer UI state — */
-  const [activeTool, setActiveTool] = useState<ActiveTool>('wl');
-  const [invert, setInvert] = useState(false);
+  /* — View state — */
+  const [wc, setWc] = useState(0);
+  const [ww, setWw] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
+  const [invert, setInvert] = useState(false);
+  const [activeTool, setActiveTool] = useState<ActiveTool>('wl');
   const [showMetadata, setShowMetadata] = useState(false);
-  const [wlInfo, setWlInfo] = useState({ wc: 0, ww: 1 });
   const [dicomMeta, setDicomMeta] = useState<DicomMeta | null>(null);
-  const [hasAnnotations, setHasAnnotations] = useState(false);
 
-  /* — init flag — */
-  const [csReady, setCsReady] = useState(false);
+  /* — Measurements — */
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const rulerRef = useRef<RulerDraw>({ start: null, end: null });
+  const [rulerLive, setRulerLive] = useState<RulerDraw>({ start: null, end: null });
 
-  /* ───────── Init Cornerstone once ───────── */
-  useEffect(() => {
-    initCornerstone()
-      .then(() => setCsReady(true))
-      .catch((e) => setError(String(e)));
-  }, []);
+  /* Stable refs – avoid stale closures in mouse handlers */
+  const stateRef = useRef({
+    wc, ww, zoom, pan, rotation, invert, activeTool,
+    images, currentIndex, measurements,
+  });
+  stateRef.current = {
+    wc, ww, zoom, pan, rotation, invert, activeTool,
+    images, currentIndex, measurements,
+  };
 
-  /* ───────── Create rendering engine + viewport + tools ───────── */
-  useEffect(() => {
-    if (!csReady) return;
-    const el = elementRef.current;
-    if (!el) return;
+  /* ═══════════ Canvas rendering ═══════════ */
 
-    const engineId = engineIdRef.current;
-    const tgId = toolGroupIdRef.current;
-    const { MouseBindings } = toolsEnums;
+  const renderFrame = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
-    const engine = new RenderingEngine(engineId);
-    engineRef.current = engine;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    engine.enableElement({
-      viewportId: VIEWPORT_ID,
-      type: csEnums.ViewportType.STACK,
-      element: el,
-    });
+    const {
+      images: imgs, currentIndex: idx,
+      wc: cWc, ww: cWw, zoom: cZoom,
+      pan: cPan, rotation: cRot, invert: cInv,
+      measurements: meas,
+    } = stateRef.current;
 
-    /* Tool group */
-    const tg = ToolGroupManager.createToolGroup(tgId);
-    if (tg) {
-      for (const name of Object.values(TOOL_NAME)) {
-        tg.addTool(name);
-      }
-      tg.setToolActive(TOOL_NAME.wl, {
-        bindings: [{ mouseButton: MouseBindings.Primary }],
+    /* Size canvas to its container (retina-aware) */
+    const rect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const cw = rect.width;
+    const ch = rect.height;
+    canvas.width = cw * dpr;
+    canvas.height = ch * dpr;
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    /* Clear to black */
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cw, ch);
+
+    if (imgs.length === 0 || idx >= imgs.length) return;
+
+    const image = imgs[idx];
+    const { metadata: m } = image;
+    const iw = m.columns;
+    const ih = m.rows;
+
+    /* Build RGBA display pixels with current W/L */
+    const rgba = buildDisplayPixels(image, cWc, cWw, cInv);
+    // Copy into a fresh Uint8ClampedArray backed by a plain ArrayBuffer
+    // (avoids TS SharedArrayBuffer incompatibility with ImageData)
+    const clamped = new Uint8ClampedArray(rgba.length);
+    clamped.set(rgba);
+    const imgData = new ImageData(clamped, iw, ih);
+
+    /* Offscreen canvas at native DICOM resolution */
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = iw;
+    offCanvas.height = ih;
+    const offCtx = offCanvas.getContext('2d')!;
+    offCtx.putImageData(imgData, 0, 0);
+
+    /* Fit scale so image fills the viewport */
+    const fitScale = Math.min(cw / iw, ch / ih);
+
+    /* Draw image with zoom / pan / rotation */
+    ctx.save();
+    ctx.translate(cw / 2 + cPan.x, ch / 2 + cPan.y);
+    ctx.rotate((cRot * Math.PI) / 180);
+    ctx.scale(cZoom * fitScale, cZoom * fitScale);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(offCanvas, -iw / 2, -ih / 2);
+    ctx.restore();
+
+    /* ─── Draw ruler measurements ─── */
+    const allMeas = [...meas];
+    const ruler = rulerRef.current;
+    if (ruler.start && ruler.end) {
+      const dist = calculateDistance(ruler.start, ruler.end, m.pixelSpacing);
+      allMeas.push({
+        id: '__live__',
+        startImg: ruler.start,
+        endImg: ruler.end,
+        distanceMm: dist.distanceMm,
+        distancePx: dist.distancePx,
       });
-      for (const name of [TOOL_NAME.zoom, TOOL_NAME.pan, TOOL_NAME.ruler]) {
-        tg.setToolPassive(name);
-      }
-      tg.addViewport(VIEWPORT_ID, engineId);
     }
 
-    /* Sync W/L HUD and slice index on every rendered frame */
-    const onRendered = () => {
-      const vp = engine.getStackViewport(VIEWPORT_ID);
-      if (!vp) return;
+    for (const ms of allMeas) {
+      const s = imageToScreen(ms.startImg.x, ms.startImg.y, cw, ch, iw, ih, cZoom, cPan.x, cPan.y, cRot);
+      const e = imageToScreen(ms.endImg.x, ms.endImg.y, cw, ch, iw, ih, cZoom, cPan.x, cPan.y, cRot);
+      const isLive = ms.id === '__live__';
+      const color = isLive ? '#4dabf7' : '#51cf66';
 
-      setCurrentIndex(vp.getCurrentImageIdIndex());
+      /* Line */
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(e.x, e.y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(isLive ? [6, 4] : []);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
-      const props = vp.getProperties();
-      if (props.voiRange) {
-        const ww = props.voiRange.upper - props.voiRange.lower;
-        const wc = (props.voiRange.upper + props.voiRange.lower) / 2;
-        if (Number.isFinite(wc) && Number.isFinite(ww)) {
-          setWlInfo({ wc: Math.round(wc), ww: Math.round(ww) });
-        }
+      /* Endpoints */
+      for (const p of [s, e]) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
       }
 
-      const all = annotation.state.getAllAnnotations();
-      setHasAnnotations(all.length > 0);
-    };
+      /* Distance label */
+      const label = ms.distanceMm != null
+        ? `${ms.distanceMm.toFixed(1)} mm`
+        : `${ms.distancePx.toFixed(1)} px`;
+      const mx = (s.x + e.x) / 2;
+      const my = (s.y + e.y) / 2;
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      const tm = ctx.measureText(label);
+      const pad = 4;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(mx - tm.width / 2 - pad, my - 18 - pad, tm.width + pad * 2, 16 + pad);
+      ctx.fillStyle = color;
+      ctx.fillText(label, mx, my - 8);
+    }
+  }, []);
 
-    el.addEventListener(csEnums.Events.IMAGE_RENDERED as string, onRendered);
+  /** Schedule a render on the next animation frame */
+  const requestRender = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(renderFrame);
+  }, [renderFrame]);
 
-    /* Scroll = next/prev slice; Ctrl+scroll = zoom */
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const vp = engine.getStackViewport(VIEWPORT_ID);
-      if (!vp) return;
-
-      if (e.ctrlKey || e.metaKey) {
-        const cam = vp.getCamera() as csTypes.ICamera;
-        const cur = cam.parallelScale ?? 1;
-        const next = cur * (e.deltaY > 0 ? 1.1 : 0.9);
-        vp.setCamera({ parallelScale: Math.max(0.01, Math.min(50, next)) });
-        vp.render();
-      } else {
-        const ids = vp.getImageIds();
-        if (ids.length <= 1) return;
-        const cur = vp.getCurrentImageIdIndex();
-        const next = e.deltaY > 0 ? Math.min(cur + 1, ids.length - 1) : Math.max(cur - 1, 0);
-        if (next !== cur) {
-          void vp.setImageIdIndex(next);
-          vp.render();
-        }
-      }
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-
-    return () => {
-      el.removeEventListener(csEnums.Events.IMAGE_RENDERED as string, onRendered);
-      el.removeEventListener('wheel', onWheel);
-      try { ToolGroupManager.destroyToolGroup(tgId); } catch { /* ignore */ }
-      try { engine.destroy(); } catch { /* ignore */ }
-      engineRef.current = null;
-    };
-  }, [csReady]);
-
-  /* ───────── Keyboard navigation ───────── */
+  /* Re-render when any view state changes */
   useEffect(() => {
-    if (imageIds.length <= 1) return;
+    requestRender();
+  }, [images, currentIndex, wc, ww, zoom, pan, rotation, invert, measurements, rulerLive, requestRender]);
+
+  /* Resize observer */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => requestRender());
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [requestRender]);
+
+  /* ═══════════ Mouse interaction ═══════════ */
+
+  const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent) => {
+    const c = canvasRef.current;
+    if (!c) return { x: 0, y: 0 };
+    const r = c.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }, []);
+
+  const toImgCoord = useCallback((sx: number, sy: number) => {
+    const { images: imgs, currentIndex: idx, zoom: z, pan: p, rotation: r } = stateRef.current;
+    if (imgs.length === 0) return { x: 0, y: 0 };
+    const m = imgs[idx].metadata;
+    const el = containerRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    return screenToImage(sx, sy, rect.width, rect.height, m.columns, m.rows, z, p.x, p.y, r);
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (stateRef.current.images.length === 0) return;
+    const pos = getCanvasPos(e);
+    const st = stateRef.current;
+
+    if (st.activeTool === 'ruler') {
+      const imgPos = toImgCoord(pos.x, pos.y);
+      rulerRef.current = { start: imgPos, end: imgPos };
+      setRulerLive({ start: imgPos, end: imgPos });
+      return;
+    }
+
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startWc: st.wc,
+      startWw: st.ww,
+      startPanX: st.pan.x,
+      startPanY: st.pan.y,
+      startZoom: st.zoom,
+    };
+  }, [getCanvasPos, toImgCoord]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const st = stateRef.current;
+    if (st.images.length === 0) return;
+
+    /* Ruler live preview */
+    if (st.activeTool === 'ruler' && rulerRef.current.start) {
+      const pos = getCanvasPos(e);
+      const imgPos = toImgCoord(pos.x, pos.y);
+      rulerRef.current.end = imgPos;
+      setRulerLive({ start: rulerRef.current.start, end: imgPos });
+      return;
+    }
+
+    const d = dragRef.current;
+    if (!d.active) return;
+
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+
+    switch (st.activeTool) {
+      case 'wl': {
+        setWw(Math.max(1, d.startWw + dx * 2));
+        setWc(d.startWc - dy * 2);
+        break;
+      }
+      case 'zoom': {
+        const factor = 1 - dy * 0.005;
+        setZoom(Math.max(0.1, Math.min(20, d.startZoom * factor)));
+        break;
+      }
+      case 'pan': {
+        setPan({ x: d.startPanX + dx, y: d.startPanY + dy });
+        break;
+      }
+    }
+  }, [getCanvasPos, toImgCoord]);
+
+  const handleMouseUp = useCallback(() => {
+    const st = stateRef.current;
+
+    /* Finalise ruler measurement */
+    if (st.activeTool === 'ruler' && rulerRef.current.start && rulerRef.current.end) {
+      const m = st.images[st.currentIndex]?.metadata;
+      if (m) {
+        const dist = calculateDistance(rulerRef.current.start, rulerRef.current.end, m.pixelSpacing);
+        if (dist.distancePx > 3) {
+          setMeasurements((prev) => [
+            ...prev,
+            {
+              id: 'meas-' + Date.now(),
+              startImg: rulerRef.current.start!,
+              endImg: rulerRef.current.end!,
+              distanceMm: dist.distanceMm,
+              distancePx: dist.distancePx,
+            },
+          ]);
+        }
+      }
+      rulerRef.current = { start: null, end: null };
+      setRulerLive({ start: null, end: null });
+    }
+
+    dragRef.current.active = false;
+  }, []);
+
+  /* ═══════════ Scroll ═══════════ */
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const st = stateRef.current;
+    if (st.images.length === 0) return;
+
+    if (e.ctrlKey || e.metaKey) {
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      setZoom((z) => Math.max(0.1, Math.min(20, z * factor)));
+    } else if (st.images.length > 1) {
+      const next = e.deltaY > 0
+        ? Math.min(st.currentIndex + 1, st.images.length - 1)
+        : Math.max(st.currentIndex - 1, 0);
+      if (next !== st.currentIndex) {
+        setCurrentIndex(next);
+        syncMeta(next);
+      }
+    }
+  }, []);
+
+  /* ═══════════ Keyboard ═══════════ */
+
+  useEffect(() => {
+    if (images.length <= 1) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        goTo(-1);
+        setCurrentIndex((i) => { const n = Math.max(0, i - 1); syncMeta(n); return n; });
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
-        goTo(1);
+        setCurrentIndex((i) => { const n = Math.min(images.length - 1, i + 1); syncMeta(n); return n; });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageIds.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [images.length]);
 
-  /* ───────── Helpers ───────── */
+  /* ═══════════ Helpers ═══════════ */
 
-  const getVp = useCallback(
-    () => engineRef.current?.getStackViewport(VIEWPORT_ID) ?? null,
-    [],
-  );
-
-  const goTo = useCallback((offset: number) => {
-    const vp = engineRef.current?.getStackViewport(VIEWPORT_ID);
-    if (!vp) return;
-    const ids = vp.getImageIds();
-    const next = Math.max(0, Math.min(vp.getCurrentImageIdIndex() + offset, ids.length - 1));
-    void vp.setImageIdIndex(next);
-    vp.render();
+  const syncMeta = useCallback((idx: number) => {
+    const imgs = stateRef.current.images;
+    if (idx >= imgs.length) return;
+    const m = imgs[idx].metadata;
+    setDicomMeta({
+      patientName: m.patientName,
+      patientId: m.patientId,
+      studyDate: m.studyDate,
+      modality: m.modality,
+      studyDescription: m.studyDescription,
+      seriesDescription: m.seriesDescription,
+      rows: m.rows,
+      columns: m.columns,
+      bitsAllocated: m.bitsAllocated,
+      bitsStored: m.bitsStored,
+      pixelSpacing: m.pixelSpacing,
+    });
   }, []);
 
-  const applyInitialVoi = useCallback((imageId: string) => {
-    const vp = getVp();
-    if (!vp) return;
+  /* ═══════════ Load files ═══════════ */
 
-    const data = getImageData(imageId);
-    if (!data) return;
+  const loadFiles = useCallback(async (files: File[]) => {
+    if (!files.length || loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setError(null);
+    setLoadProgress({ loaded: 0, total: files.length });
 
-    const { metadata: m } = data;
-    const wc = m.windowCenter;
-    const ww = m.windowWidth;
-    const isMono1 = m.photometricInterpretation === 'MONOCHROME1';
+    const sorted = [...files].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true }),
+    );
 
-    vp.setProperties({
-      voiRange: { lower: wc - ww / 2, upper: wc + ww / 2 },
-      invert: isMono1,
-    });
-    setInvert(isMono1);
-    setWlInfo({ wc: Math.round(wc), ww: Math.round(ww) });
-    vp.resetCamera();
-    vp.render();
-  }, [getVp]);
+    const parsed: DicomImage[] = [];
+    const names: string[] = [];
 
-  /* ───────── Load files ───────── */
-  const loadFiles = useCallback(
-    async (files: File[]) => {
-      if (!files.length || loadingRef.current) return;
-      loadingRef.current = true;
-      setLoading(true);
-      setError(null);
-      setLoadProgress({ loaded: 0, total: files.length });
-
-      const sorted = [...files].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true }),
-      );
-
-      // Clear previous cache
-      clearCache();
-
-      const ids: string[] = [];
-      const names: string[] = [];
-
-      try {
-        for (let i = 0; i < sorted.length; i++) {
-          const id = await addFile(sorted[i]);
-          ids.push(id);
-          names.push(sorted[i].name);
-          setLoadProgress({ loaded: i + 1, total: sorted.length });
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Erro ao processar arquivo DICOM';
-        setError(msg);
-        loadingRef.current = false;
-        setLoading(false);
-        return;
+    try {
+      for (let i = 0; i < sorted.length; i++) {
+        const ab = await sorted[i].arrayBuffer();
+        const img = parseDicomFile(ab);
+        parsed.push(img);
+        names.push(sorted[i].name);
+        setLoadProgress({ loaded: i + 1, total: sorted.length });
       }
-
-      setImageIds(ids);
-      setFileNames(names);
-      setCurrentIndex(0);
-      setInvert(false);
-      setRotation(0);
-      annotation.state.removeAllAnnotations();
-      setHasAnnotations(false);
-
-      // Metadata is immediately available from the parsed data
-      setDicomMeta(metaForImageId(ids[0]));
-
-      // Give React one frame to flush the state update so elementRef renders
-      // and the engine effect can run before we call getVp()
-      await new Promise<void>((res) => setTimeout(res, 50));
-
-      const vp = getVp();
-      if (vp) {
-        try {
-          await vp.setStack(ids, 0);
-          applyInitialVoi(ids[0]);
-        } catch (err: unknown) {
-          const msg =
-            err instanceof Error ? err.message : typeof err === 'string' ? err : 'Erro ao carregar DICOM';
-          setError(msg);
-        }
-      } else {
-        setError('Viewer não inicializado — tente novamente em instantes.');
-      }
-
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao processar arquivo DICOM';
+      setError(msg);
       loadingRef.current = false;
       setLoading(false);
-    },
-    [applyInitialVoi, getVp],
-  );
+      return;
+    }
+
+    const first = parsed[0];
+    const m = first.metadata;
+    const isMono1 = m.photometricInterpretation === 'MONOCHROME1';
+
+    setImages(parsed);
+    setFileNames(names);
+    setCurrentIndex(0);
+    setWc(m.windowCenter);
+    setWw(m.windowWidth);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setRotation(0);
+    setInvert(isMono1);
+    setMeasurements([]);
+    rulerRef.current = { start: null, end: null };
+    setRulerLive({ start: null, end: null });
+
+    setDicomMeta({
+      patientName: m.patientName,
+      patientId: m.patientId,
+      studyDate: m.studyDate,
+      modality: m.modality,
+      studyDescription: m.studyDescription,
+      seriesDescription: m.seriesDescription,
+      rows: m.rows,
+      columns: m.columns,
+      bitsAllocated: m.bitsAllocated,
+      bitsStored: m.bitsStored,
+      pixelSpacing: m.pixelSpacing,
+    });
+
+    loadingRef.current = false;
+    setLoading(false);
+  }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) loadFiles(Array.from(e.target.files));
@@ -381,97 +535,55 @@ export function DicomViewer({ style }: DicomViewerProps) {
     if (e.dataTransfer.files.length) loadFiles(Array.from(e.dataTransfer.files));
   };
 
-  /* ───────── Tool switching ───────── */
-  const switchTool = useCallback((tool: ActiveTool) => {
-    const tg = ToolGroupManager.getToolGroup(toolGroupIdRef.current);
-    if (!tg) return;
-    for (const name of Object.values(TOOL_NAME)) {
-      try { tg.setToolPassive(name); } catch { /* ignore */ }
-    }
-    tg.setToolActive(TOOL_NAME[tool], {
-      bindings: [{ mouseButton: toolsEnums.MouseBindings.Primary }],
-    });
-    setActiveTool(tool);
-  }, []);
+  /* ═══════════ Viewport actions ═══════════ */
 
-  /* ───────── Viewport actions ───────── */
-  const applyPreset = (wc: number, ww: number) => {
-    const vp = getVp();
-    if (!vp) return;
-    vp.setProperties({ voiRange: { lower: wc - ww / 2, upper: wc + ww / 2 } });
-    setWlInfo({ wc, ww });
-    vp.render();
-  };
-
-  const toggleInvert = () => {
-    const vp = getVp();
-    if (!vp) return;
-    const next = !invert;
-    setInvert(next);
-    vp.setProperties({ invert: next });
-    vp.render();
-  };
-
-  const rotateView = () => {
-    const vp = getVp();
-    if (!vp) return;
-    const next = (rotation + 90) % 360;
-    setRotation(next);
-    vp.setCamera({ rotation: next });
-    vp.render();
-  };
+  const applyPreset = (pWc: number, pWw: number) => { setWc(pWc); setWw(pWw); };
+  const toggleInvert = () => setInvert((v) => !v);
+  const rotateView = () => setRotation((r) => (r + 90) % 360);
 
   const resetView = () => {
-    const vp = getVp();
-    if (!vp) return;
-    vp.resetProperties();
-    vp.resetCamera();
-    setInvert(false);
+    if (images.length === 0) return;
+    const m = images[currentIndex].metadata;
+    setWc(m.windowCenter);
+    setWw(m.windowWidth);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
     setRotation(0);
-    vp.render();
+    setInvert(m.photometricInterpretation === 'MONOCHROME1');
   };
 
   const clearAnnotations = () => {
-    annotation.state.removeAllAnnotations();
-    getVp()?.render();
-    setHasAnnotations(false);
+    setMeasurements([]);
+    rulerRef.current = { start: null, end: null };
+    setRulerLive({ start: null, end: null });
   };
 
-  const sliderNavigate = (i: number) => {
-    const vp = getVp();
-    if (!vp) return;
-    void vp.setImageIdIndex(i);
-    vp.render();
-  };
+  const sliderNavigate = (i: number) => { setCurrentIndex(i); syncMeta(i); };
 
-  /* ───────── Hidden file input ───────── */
-  const fileInput = (
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept=".dcm,.dicom,.DCM,application/dicom"
-      multiple
-      onChange={handleFileInput}
-      style={{ display: 'none' }}
-    />
-  );
+  /* ═══════════ Derived ═══════════ */
+  const hasImages = images.length > 0;
 
-  const hasImages = imageIds.length > 0;
-
-  /* ═══════════════ RENDER ═══════════════
-     IMPORTANT: the <div ref={elementRef}> must ALWAYS stay in the DOM so that
-     the engine useEffect can attach Cornerstone to it when csReady fires.
-     The drop-zone is shown as an absolute overlay on top when no images are loaded.
-  ═══════════════════════════════════════ */
+  /* ═══════════════ RENDER ═══════════════ */
   return (
     <Paper
       withBorder
       bg="#000"
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', ...style }}
+      style={{
+        display: 'flex', flexDirection: 'column',
+        height: '100%', overflow: 'hidden', ...style,
+      }}
     >
-      {fileInput}
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".dcm,.dicom,.DCM,application/dicom"
+        multiple
+        onChange={handleFileInput}
+        style={{ display: 'none' }}
+      />
 
-      {/* ===== Toolbar (only when images loaded) ===== */}
+      {/* ===== Toolbar ===== */}
       {hasImages && (
         <Group
           gap={4} px="xs" py={4} bg="dark.8"
@@ -484,7 +596,7 @@ export function DicomViewer({ style }: DicomViewerProps) {
                 variant={activeTool === t ? 'filled' : 'subtle'}
                 color={activeTool === t ? 'blue' : 'gray'}
                 size="md"
-                onClick={() => switchTool(t)}
+                onClick={() => setActiveTool(t)}
               >
                 {t === 'wl' && <Sun size={16} />}
                 {t === 'zoom' && <ZoomIn size={16} />}
@@ -523,7 +635,10 @@ export function DicomViewer({ style }: DicomViewerProps) {
 
           <Menu shadow="md" width={200}>
             <Menu.Target>
-              <Button variant="subtle" color="gray" size="compact-xs" rightSection={<ChevronDown size={12} />}>
+              <Button
+                variant="subtle" color="gray" size="compact-xs"
+                rightSection={<ChevronDown size={12} />}
+              >
                 Presets W/L
               </Button>
             </Menu.Target>
@@ -545,7 +660,7 @@ export function DicomViewer({ style }: DicomViewerProps) {
 
           <Box style={{ flex: 1 }} />
 
-          {hasAnnotations && (
+          {measurements.length > 0 && (
             <Tooltip label="Limpar medições" position="bottom" withArrow>
               <ActionIcon variant="subtle" color="red" size="md" onClick={clearAnnotations}>
                 <Trash2 size={14} />
@@ -565,15 +680,18 @@ export function DicomViewer({ style }: DicomViewerProps) {
           </Tooltip>
 
           <Tooltip label="Carregar outros arquivos" position="bottom" withArrow>
-            <ActionIcon variant="subtle" color="gray" size="md" onClick={() => fileInputRef.current?.click()}>
+            <ActionIcon
+              variant="subtle" color="gray" size="md"
+              onClick={() => fileInputRef.current?.click()}
+            >
               <Upload size={16} />
             </ActionIcon>
           </Tooltip>
         </Group>
       )}
 
-      {/* ===== Slice nav bar ===== */}
-      {imageIds.length > 1 && (
+      {/* ===== Slice navigation ===== */}
+      {images.length > 1 && (
         <Group
           gap={8} px="xs" py={4} bg="dark.9"
           style={{ borderBottom: '1px solid #222', flexShrink: 0 }}
@@ -583,7 +701,7 @@ export function DicomViewer({ style }: DicomViewerProps) {
             <ActionIcon
               variant="subtle" color="gray" size="sm"
               disabled={currentIndex === 0}
-              onClick={() => goTo(-1)}
+              onClick={() => sliderNavigate(Math.max(0, currentIndex - 1))}
             >
               <ChevronLeft size={14} />
             </ActionIcon>
@@ -591,11 +709,11 @@ export function DicomViewer({ style }: DicomViewerProps) {
 
           <Box style={{ flex: 1 }}>
             <Slider
-              min={0} max={imageIds.length - 1} step={1}
+              min={0} max={images.length - 1} step={1}
               value={currentIndex}
               onChange={sliderNavigate}
               size="xs" color="blue"
-              label={(v) => (v + 1) + ' / ' + imageIds.length}
+              label={(v) => `${v + 1} / ${images.length}`}
               styles={{ thumb: { width: 12, height: 12 } }}
             />
           </Box>
@@ -603,45 +721,48 @@ export function DicomViewer({ style }: DicomViewerProps) {
           <Tooltip label="Próxima imagem (↓/→)" position="bottom" withArrow>
             <ActionIcon
               variant="subtle" color="gray" size="sm"
-              disabled={currentIndex === imageIds.length - 1}
-              onClick={() => goTo(1)}
+              disabled={currentIndex === images.length - 1}
+              onClick={() => sliderNavigate(Math.min(images.length - 1, currentIndex + 1))}
             >
               <ChevronRight size={14} />
             </ActionIcon>
           </Tooltip>
 
           <Text size="xs" c="gray.4" style={{ minWidth: 60, textAlign: 'right' }}>
-            {currentIndex + 1} / {imageIds.length}
+            {currentIndex + 1} / {images.length}
           </Text>
         </Group>
       )}
 
-      {/* ===== Main area ===== */}
+      {/* ===== Main canvas area ===== */}
       <Box
+        ref={containerRef}
         style={{
-          flex: 1,
-          minHeight: 0,
-          position: 'relative',
-          overflow: 'hidden',
+          flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
           cursor: hasImages ? TOOL_LABEL[activeTool].cursor : 'default',
         }}
         onDragOver={(e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
       >
-        {/* ─── Cornerstone renders its canvas here — ALWAYS in DOM ─── */}
-        <div ref={elementRef} style={{ width: '100%', height: '100%' }} />
+        {/* Canvas — always in DOM */}
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: hasImages ? 'block' : 'none' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onWheel={handleWheel}
+          onContextMenu={(e) => e.preventDefault()}
+        />
 
-        {/* ─── Drop-zone overlay — shown when no images loaded ─── */}
+        {/* Drop-zone overlay */}
         {!hasImages && (
           <Box
             style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
+              position: 'absolute', inset: 0, display: 'flex',
+              flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               background: isDragOver ? 'rgba(66,99,235,0.12)' : '#0a0a0a',
               border: isDragOver ? '2px dashed #4263eb' : '2px dashed #333',
               transition: 'background 0.2s, border-color 0.2s',
@@ -679,28 +800,39 @@ export function DicomViewer({ style }: DicomViewerProps) {
           </Box>
         )}
 
-        {/* ─── HUD ─── */}
+        {/* HUD */}
         {hasImages && (
           <Box style={{ position: 'absolute', top: 8, left: 8, pointerEvents: 'none' }}>
-            <Text size="xs" c="yellow" ff="monospace">WC: {wlInfo.wc}  WW: {wlInfo.ww}</Text>
-            {imageIds.length > 1 && (
+            <Text size="xs" c="yellow" ff="monospace">
+              WC: {Math.round(wc)}  WW: {Math.round(ww)}
+            </Text>
+            <Text size="xs" c="yellow" ff="monospace">
+              Zoom: {(zoom * 100).toFixed(0)}%
+            </Text>
+            {images.length > 1 && (
               <Text size="xs" c="yellow" ff="monospace">
-                Imagem: {currentIndex + 1} / {imageIds.length}
+                Imagem: {currentIndex + 1} / {images.length}
               </Text>
             )}
             {error && (
-              <Text size="xs" c="red.4" ff="monospace" style={{ maxWidth: 520, whiteSpace: 'pre-wrap' }}>
+              <Text
+                size="xs" c="red.4" ff="monospace"
+                style={{ maxWidth: 520, whiteSpace: 'pre-wrap' }}
+              >
                 {error}
               </Text>
             )}
           </Box>
         )}
 
-        {/* ─── Metadata overlay ─── */}
+        {/* Metadata overlay */}
         {hasImages && showMetadata && dicomMeta && (
           <Paper
             p="xs" bg="rgba(0,0,0,0.85)"
-            style={{ position: 'absolute', top: 8, right: 8, maxWidth: 280, borderRadius: 8, zIndex: 10 }}
+            style={{
+              position: 'absolute', top: 8, right: 8,
+              maxWidth: 280, borderRadius: 8, zIndex: 10,
+            }}
           >
             <Text size="xs" fw={700} c="white" mb={4}>Metadados DICOM</Text>
             {(
@@ -711,8 +843,10 @@ export function DicomViewer({ style }: DicomViewerProps) {
                 ['Modalidade', dicomMeta.modality],
                 ['Estudo', dicomMeta.studyDescription],
                 ['Série', dicomMeta.seriesDescription],
-                ['Dimensões', dicomMeta.columns && dicomMeta.rows ? `${dicomMeta.columns} × ${dicomMeta.rows}` : ''],
-                ['Bits', dicomMeta.bitsAllocated ? `${dicomMeta.bitsStored} / ${dicomMeta.bitsAllocated}` : ''],
+                ['Dimensões', dicomMeta.columns && dicomMeta.rows
+                  ? `${dicomMeta.columns} × ${dicomMeta.rows}` : ''],
+                ['Bits', dicomMeta.bitsAllocated
+                  ? `${dicomMeta.bitsStored} / ${dicomMeta.bitsAllocated}` : ''],
                 ['Pixel Spacing', dicomMeta.pixelSpacing
                   ? `${dicomMeta.pixelSpacing[0].toFixed(2)} × ${dicomMeta.pixelSpacing[1].toFixed(2)} mm`
                   : ''],
@@ -728,7 +862,7 @@ export function DicomViewer({ style }: DicomViewerProps) {
           </Paper>
         )}
 
-        {/* ─── Bottom badges ─── */}
+        {/* Bottom badges */}
         {hasImages && (
           <>
             <Badge
