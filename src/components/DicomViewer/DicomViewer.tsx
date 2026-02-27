@@ -373,29 +373,42 @@ export function DicomViewer({ style }: DicomViewerProps) {
     const st = stateRef.current;
 
     /* Finalise ruler measurement */
-    if (st.activeTool === 'ruler' && rulerRef.current.start && rulerRef.current.end) {
-      const m = st.images[st.currentIndex]?.metadata;
-      if (m) {
-        const dist = calculateDistance(rulerRef.current.start, rulerRef.current.end, m.pixelSpacing);
-        if (dist.distancePx > 3) {
-          setMeasurements((prev) => [
-            ...prev,
-            {
-              id: 'meas-' + Date.now(),
-              startImg: rulerRef.current.start!,
-              endImg: rulerRef.current.end!,
-              distanceMm: dist.distanceMm,
-              distancePx: dist.distancePx,
-            },
-          ]);
+    const start = rulerRef.current.start;
+    const end = rulerRef.current.end;
+
+    if (start && end) {
+      const startImg = { x: start.x, y: start.y };
+      const endImg = { x: end.x, y: end.y };
+
+      if (
+        Number.isFinite(startImg.x) && Number.isFinite(startImg.y) &&
+        Number.isFinite(endImg.x) && Number.isFinite(endImg.y)
+      ) {
+        const m = st.images[st.currentIndex]?.metadata;
+        if (m) {
+          const dist = calculateDistance(startImg, endImg, m.pixelSpacing);
+          if (Number.isFinite(dist.distancePx) && dist.distancePx > 3) {
+            setMeasurements((prev) => [
+              ...prev,
+              {
+                id: 'meas-' + Date.now(),
+                startImg,
+                endImg,
+                distanceMm: dist.distanceMm,
+                distancePx: dist.distancePx,
+              },
+            ]);
+          }
         }
       }
+
       rulerRef.current = { start: null, end: null };
       setRulerLive({ start: null, end: null });
     }
 
     dragRef.current.active = false;
-  }, []);
+    requestRender();
+  }, [requestRender]);
 
   /* ═══════════ Scroll ═══════════ */
 
