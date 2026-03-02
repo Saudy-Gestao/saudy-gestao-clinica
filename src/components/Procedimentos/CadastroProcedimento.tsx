@@ -21,7 +21,7 @@ import {
   Tabs
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Pencil } from 'lucide-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -34,6 +34,7 @@ interface ProcedureForm {
   name: string;
   description: string;
   price: number | null;
+  durationMinutes: number | null;
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   modalities: string[];
@@ -43,10 +44,13 @@ interface ProcedureForm {
 interface ProcedureItem {
   id: string;
   name: string;
+  description: string;
   price: number | null;
+  durationMinutes: number | null;
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   modalities: string[];
+  doctorIds: string[];
   doctorsCount: number;
 }
 
@@ -54,6 +58,7 @@ const INITIAL_FORM: ProcedureForm = {
   name: '',
   description: '',
   price: null,
+  durationMinutes: null,
   acceptsInsurance: false,
   acceptedInsurances: [],
   modalities: [],
@@ -85,6 +90,9 @@ export function CadastroProcedimento() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastCreatedName, setLastCreatedName] = useState<string | null>(null);
+  const [lastSaveAction, setLastSaveAction] = useState<'create' | 'update'>('create');
+  const [editingProcedureId, setEditingProcedureId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('cadastro');
 
   const doctorLabelById = useMemo(() => {
     return doctorOptions.reduce<Record<string, string>>((acc, option) => {
@@ -104,44 +112,50 @@ export function CadastroProcedimento() {
     return `R$ ${Number(value).toFixed(2).replace('.', ',')}`;
   };
 
+  const mapProcedureList = (list: any[]): ProcedureItem[] => list.map((it: any) => ({
+    id: String(it.id ?? it.procedureId ?? ''),
+    name: it.name || 'Procedimento',
+    description: String(it.description || ''),
+    price: it.price !== undefined && it.price !== null ? Number(it.price) : null,
+    durationMinutes: it.durationMinutes !== undefined && it.durationMinutes !== null ? Number(it.durationMinutes) : null,
+    acceptsInsurance: Boolean(it.acceptsInsurance),
+    acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
+    modalities: Array.isArray(it.modalities) ? it.modalities : [],
+    doctorIds: Array.isArray(it.doctors)
+      ? it.doctors
+        .map((doctor: any) => String(doctor?.doctorId || ''))
+        .filter((doctorId: string) => Boolean(doctorId))
+      : [],
+    doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
+  })).filter((item: ProcedureItem) => item.id);
+
+  const refreshProcedures = async () => {
+    setProceduresLoading(true);
+    try {
+      const data: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
+      const list: any[] = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.items)
+          ? data.items
+          : (Array.isArray(data?.data?.items)
+            ? data.data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : [])));
+      setProcedures(mapProcedureList(list));
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+        color: 'red',
+      });
+    } finally {
+      setProceduresLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadProcedures = async () => {
-      setProceduresLoading(true);
-      try {
-        const data: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const mapped: ProcedureItem[] = list.map((it: any) => ({
-          id: String(it.id ?? it.procedureId ?? ''),
-          name: it.name || 'Procedimento',
-          price: it.price !== undefined && it.price !== null ? Number(it.price) : null,
-          acceptsInsurance: Boolean(it.acceptsInsurance),
-          acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
-          modalities: Array.isArray(it.modalities) ? it.modalities : [],
-          doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
-        })).filter((item: ProcedureItem) => item.id);
-
-        setProcedures(mapped);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
-          color: 'red',
-        });
-      } finally {
-        setProceduresLoading(false);
-      }
-    };
-
-    loadProcedures();
+    refreshProcedures();
   }, []);
 
   useEffect(() => {
@@ -209,37 +223,27 @@ export function CadastroProcedimento() {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         price: form.price ?? null,
+        durationMinutes: form.durationMinutes ?? null,
         acceptsInsurance: form.acceptsInsurance,
         acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
         modalities: form.modalities,
         doctors,
       };
 
-      await procedureService.createProcedure(payload);
+      if (editingProcedureId) {
+        await procedureService.updateProcedure(editingProcedureId, payload);
+        setLastSaveAction('update');
+      } else {
+        await procedureService.createProcedure(payload);
+        setLastSaveAction('create');
+      }
+
       setLastCreatedName(form.name.trim());
       setShowSuccessModal(true);
       setForm(INITIAL_FORM);
+      setEditingProcedureId(null);
       setProcedureQuery('');
-      const refreshed: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
-      const list: any[] = Array.isArray(refreshed)
-        ? refreshed
-        : (Array.isArray(refreshed?.items)
-          ? refreshed.items
-          : (Array.isArray(refreshed?.data?.items)
-            ? refreshed.data.items
-            : (Array.isArray(refreshed?.data)
-              ? refreshed.data
-              : [])));
-      const mapped: ProcedureItem[] = list.map((it: any) => ({
-        id: String(it.id ?? it.procedureId ?? ''),
-        name: it.name || 'Procedimento',
-        price: it.price !== undefined && it.price !== null ? Number(it.price) : null,
-        acceptsInsurance: Boolean(it.acceptsInsurance),
-        acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
-        modalities: Array.isArray(it.modalities) ? it.modalities : [],
-        doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
-      })).filter((item: ProcedureItem) => item.id);
-      setProcedures(mapped);
+      await refreshProcedures();
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || 'Erro ao salvar procedimento';
       setErrorMessage(message);
@@ -251,7 +255,28 @@ export function CadastroProcedimento() {
 
   const handleCancel = () => {
     setForm(INITIAL_FORM);
+    setEditingProcedureId(null);
     navigate('/dashboard');
+  };
+
+  const handleStartEdit = (item: ProcedureItem) => {
+    setForm({
+      name: item.name,
+      description: item.description || '',
+      price: item.price,
+      durationMinutes: item.durationMinutes,
+      acceptsInsurance: item.acceptsInsurance,
+      acceptedInsurances: item.acceptsInsurance ? item.acceptedInsurances : [],
+      modalities: item.modalities,
+      doctorIds: item.doctorIds,
+    });
+    setEditingProcedureId(item.id);
+    setActiveTab('cadastro');
+  };
+
+  const handleCancelEdit = () => {
+    setForm(INITIAL_FORM);
+    setEditingProcedureId(null);
   };
 
   const handleAcceptsInsuranceChange = (checked: boolean) => {
@@ -292,7 +317,7 @@ export function CadastroProcedimento() {
             </Group>
           </Group>
 
-          <Tabs defaultValue="cadastro" keepMounted={false}>
+          <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'cadastro')} keepMounted={false}>
             <Tabs.List>
               <Tabs.Tab value="cadastro">Cadastrar</Tabs.Tab>
               <Tabs.Tab value="lista">Cadastrados</Tabs.Tab>
@@ -300,6 +325,12 @@ export function CadastroProcedimento() {
 
             <Tabs.Panel value="cadastro" pt="md">
               <Paper p="lg">
+                {editingProcedureId && (
+                  <Group justify="space-between" mb="sm" wrap="wrap">
+                    <Text size="sm" fw={600} c="blue">Editando procedimento</Text>
+                    <Button size="xs" variant="default" onClick={handleCancelEdit}>Cancelar edição</Button>
+                  </Group>
+                )}
                 <SectionTitle>Procedimento</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                   <TextInput
@@ -319,6 +350,17 @@ export function CadastroProcedimento() {
                     fixedDecimalScale
                     thousandSeparator="."
                     decimalSeparator="," 
+                  />
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <NumberInput
+                    label="Duração (minutos)"
+                    placeholder="Ex: 50"
+                    value={form.durationMinutes ?? undefined}
+                    onChange={(value) => setForm((prev) => ({ ...prev, durationMinutes: typeof value === 'number' ? value : null }))}
+                    min={1}
+                    step={5}
                   />
                 </SimpleGrid>
 
@@ -382,7 +424,7 @@ export function CadastroProcedimento() {
                     fullWidth={isMobile}
                     style={{ minWidth: isTablet ? undefined : 220 }}
                   >
-                    Salvar procedimento
+                    {editingProcedureId ? 'Atualizar procedimento' : 'Salvar procedimento'}
                   </Button>
                 </Group>
               </Paper>
@@ -412,15 +454,17 @@ export function CadastroProcedimento() {
                         <Table.Tr style={{ borderBottom: 'none' }}>
                           <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Preço</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Duração</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidades</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
+                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
                         {filteredProcedures.length === 0 ? (
                           <Table.Tr>
-                            <Table.Td colSpan={5}>
+                            <Table.Td colSpan={isTablet ? 2 : 7}>
                               <Text size="sm" c="dimmed" ta="center">Nenhum procedimento encontrado</Text>
                             </Table.Td>
                           </Table.Tr>
@@ -433,6 +477,13 @@ export function CadastroProcedimento() {
                               {!isTablet && (
                                 <Table.Td>
                                   <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{formatPrice(item.price)}</Text>
+                                </Table.Td>
+                              )}
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
+                                    {item.durationMinutes ? `${item.durationMinutes} min` : '-'}
+                                  </Text>
                                 </Table.Td>
                               )}
                               {!isTablet && (
@@ -450,6 +501,16 @@ export function CadastroProcedimento() {
                                   <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.doctorsCount}</Text>
                                 </Table.Td>
                               )}
+                              <Table.Td>
+                                <Button
+                                  size="compact-xs"
+                                  variant="light"
+                                  leftSection={<Pencil size={12} />}
+                                  onClick={() => handleStartEdit(item)}
+                                >
+                                  Editar
+                                </Button>
+                              </Table.Td>
                             </Table.Tr>
                           ))
                         )}
@@ -467,8 +528,16 @@ export function CadastroProcedimento() {
         opened={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
         variant="success"
-        title="Procedimento salvo"
-        message={lastCreatedName ? `Procedimento ${lastCreatedName} cadastrado com sucesso.` : 'Procedimento cadastrado com sucesso.'}
+        title={lastSaveAction === 'update' ? 'Procedimento atualizado' : 'Procedimento salvo'}
+        message={
+          lastCreatedName
+            ? (lastSaveAction === 'update'
+              ? `Procedimento ${lastCreatedName} atualizado com sucesso.`
+              : `Procedimento ${lastCreatedName} cadastrado com sucesso.`)
+            : (lastSaveAction === 'update'
+              ? 'Procedimento atualizado com sucesso.'
+              : 'Procedimento cadastrado com sucesso.')
+        }
         primary={{
           label: 'Cadastrar outro',
           onClick: () => setShowSuccessModal(false),

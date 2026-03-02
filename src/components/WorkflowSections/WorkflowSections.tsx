@@ -15,6 +15,7 @@ import {
   Warehouse,
   Wallet,
   DollarSign,
+  Brain,
   ChevronRight
 } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
@@ -96,6 +97,7 @@ export function WorkflowSections() {
         { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta', moduleName: 'consulta' },
         { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo', moduleName: 'laudo' },
         { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento', moduleName: 'envelopamento' },
+        { icon: Brain, label: 'Módulo TEA', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
         { icon: Folder, label: 'Documentos', desc: 'Gestão documental', moduleName: 'documentos' },
       ]
     },
@@ -110,6 +112,7 @@ export function WorkflowSections() {
         { icon: ClipboardList, label: 'Cadastro de Procedimentos', desc: 'Procedimentos e modalidades', route: '/cadastro-procedimento', moduleName: 'cadastro-procedimento' },
         { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio', moduleName: 'cadastro-convenio' },
         { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente', moduleName: 'cadastro-paciente' },
+        { icon: Warehouse, label: 'Cadastro de Salas', desc: 'Salas por filial', route: '/cadastro-sala', moduleName: 'cadastro-sala' },
       ]
     }
   ];
@@ -159,7 +162,14 @@ export function WorkflowSections() {
                   minHeight: 96,
                   height: '100%'
                 }}
-                onClick={() => item.route && navigate(item.route)}
+                onClick={() => {
+                  if (!item.route) return;
+                  if (item.moduleName === 'modulo-tea') {
+                    navigate(item.route, { state: { fromModuleHub: true } });
+                    return;
+                  }
+                  navigate(item.route);
+                }}
               >
                 <Group justify="space-between" align="flex-start">
                   <Group>
