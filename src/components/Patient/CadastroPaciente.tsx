@@ -23,7 +23,7 @@ import {
   Badge
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -31,6 +31,7 @@ import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
 import patientService from '../../services/patientService';
 import insuranceService from '../../services/insuranceService';
+import teaProfileService from '../../services/teaProfileService';
 import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
@@ -225,6 +226,9 @@ export function CadastroPaciente() {
   const [form, setForm] = useState<PatientForm>({ ...INITIAL_PATIENT_FORM });
   const [activeTab, setActiveTab] = useState('cadastro');
   const [patients, setPatients] = useState<PatientListItem[]>([]);
+  // maps to quickly locate profile id if PIT exists
+  const [teaProfileMap, setTeaProfileMap] = useState<Record<string,string>>({});
+  const [teaProfileCpfMap, setTeaProfileCpfMap] = useState<Record<string,string>>({});
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -390,6 +394,44 @@ export function CadastroPaciente() {
     return map[normalized] || normalized;
   };
 
+  // fetch all TEA profiles and build map of patientId→profileId only when a PIT exists
+  const loadTeaProfiles = async () => {
+    try {
+      const data: any = await teaProfileService.list({ limit: 1000 });
+      const list: any[] = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.items) ? data.items : []);
+
+      const pits = await Promise.all(
+        list.map(async (p: any) => {
+          try {
+            const pitRes: any = await teaProfileService.getPit(String(p.id || p.teaProfileId || ''));
+            return pitRes?.item ? String(p.id || p.teaProfileId || '') : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const mapById: Record<string,string> = {};
+      const mapByCpf: Record<string,string> = {};
+      list.forEach((p: any, idx: number) => {
+        const profId = String(p.id || p.teaProfileId || '');
+        if (!profId) return;
+        if (pits[idx]) {
+          const pid = String(p.patient?.id || p.patientId || '');
+          const cpf = String(p.patient?.cpf || p.patient?.cpf || '').replace(/\D/g, '');
+          if (pid) mapById[pid] = profId;
+          if (cpf) mapByCpf[cpf] = profId;
+        }
+      });
+      setTeaProfileMap(mapById);
+      setTeaProfileCpfMap(mapByCpf);
+    } catch {
+      // silent
+    }
+  };
+
   useEffect(() => {
     const loadPatients = async () => {
       setPatientsLoading(true);
@@ -424,6 +466,7 @@ export function CadastroPaciente() {
       }
     };
 
+    loadTeaProfiles();
     loadPatients();
   }, []);
 
@@ -1019,6 +1062,20 @@ export function CadastroPaciente() {
                                 >
                                   <Eye size={16} />
                                 </ActionIcon>
+                                { (teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || '']) && (
+                                  <ActionIcon
+                                    variant="subtle"
+                                    title="Abrir PIT desse paciente"
+                                    style={{ color: 'var(--mantine-color-text)' }}
+                                    onClick={() => {
+                                      const profId = teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || ''];
+                                      console.log('navigating to pit', profId, item);
+                                      navigate('/tea/pit', { state: { teaProfileId: profId } });
+                                    }}
+                                  >
+                                    <ClipboardList size={16} />
+                                  </ActionIcon>
+                                )}
                                 <ActionIcon
                                   variant="subtle"
                                   style={{ color: 'var(--mantine-color-text)' }}

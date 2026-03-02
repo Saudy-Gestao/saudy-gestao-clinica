@@ -31,6 +31,7 @@ import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
 import doctorService from '../../services/doctorService';
+import sectorService from '../../services/sectorService';
 import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
@@ -108,6 +109,7 @@ interface DoctorForm {
   city: string;
   state: string;
   zipCode: string;
+  roomId: string;
   isActive: boolean;
   workingDays: string[];
   workingHoursStart: string;
@@ -154,6 +156,7 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   city: '',
   state: '',
   zipCode: '',
+  roomId: '',
   isActive: true,
   workingDays: [],
   workingHoursStart: '',
@@ -209,6 +212,7 @@ export function CadastroMedico() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+  const [roomOptions, setRoomOptions] = useState<Array<{ value: string; label: string }>>([]);
 
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
@@ -224,6 +228,13 @@ export function CadastroMedico() {
     if (!q) return doctors;
     return doctors.filter((item) => item.name.toLowerCase().includes(q));
   }, [doctors, doctorQuery]);
+
+  const roomLabelById = useMemo(() => {
+    return roomOptions.reduce<Record<string, string>>((acc, item) => {
+      acc[item.value] = item.label;
+      return acc;
+    }, {});
+  }, [roomOptions]);
 
   const isEditing = Boolean(editingDoctorId);
 
@@ -294,6 +305,7 @@ export function CadastroMedico() {
       city: getString(raw.city),
       state: getString(raw.state),
       zipCode: getString(raw.zipCode),
+      roomId: getString(raw.roomId),
       isActive: getBoolean(raw.isActive, true),
       workingDays,
       workingHoursStart: getString(raw.workingHoursStart),
@@ -336,6 +348,35 @@ export function CadastroMedico() {
     };
 
     loadDoctors();
+  }, []);
+
+  useEffect(() => {
+    const loadRooms = async () => {
+      try {
+        const data: unknown = await sectorService.listSectors();
+        const list = getApiList(data);
+        const mapped = list
+          .map((item: ApiRecord) => {
+            const id = getString(item.id);
+            const name = getString(item.name);
+            const branch = isRecord(item.branch) ? item.branch : null;
+            const branchName = branch ? getString(branch.tradeName ?? branch.socialName) : '';
+            if (!id || !name) return null;
+            return {
+              value: id,
+              label: branchName ? `${name} (${branchName})` : name,
+            };
+          })
+          .filter((item): item is { value: string; label: string } => Boolean(item));
+
+        setRoomOptions(mapped);
+      } catch {
+        // Não bloqueia o cadastro de médico se salas falharem ao carregar.
+        setRoomOptions([]);
+      }
+    };
+
+    loadRooms();
   }, []);
 
   const statesOptions = [
@@ -416,6 +457,7 @@ export function CadastroMedico() {
         city: form.city || undefined,
         state: form.state || undefined,
         zipCode: form.zipCode || undefined,
+        roomId: form.roomId || null,
         workingDays: form.workingDays || [],
         workingHoursStart: form.workingHoursStart || undefined,
         workingHoursEnd: form.workingHoursEnd || undefined,
@@ -652,6 +694,17 @@ export function CadastroMedico() {
                     min={0}
                     prefix="R$ "
                   />
+                  <Select
+                    label="Sala vinculada"
+                    placeholder="Selecione uma sala"
+                    data={roomOptions}
+                    value={form.roomId}
+                    onChange={(v) => { setForm({ ...form, roomId: v || '' }); clearFieldError('roomId'); }}
+                    clearable
+                    searchable
+                    error={fieldErrors.roomId}
+                    nothingFoundMessage="Nenhuma sala encontrada"
+                  />
                 </SimpleGrid>
                 <Textarea
                   label="Biografia"
@@ -857,6 +910,14 @@ export function CadastroMedico() {
                 })()}
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
+              <Text size="sm">
+                <Text fw={600} span>Sala:</Text>{' '}
+                {(() => {
+                  const roomId = getString(selectedDoctor?.raw?.roomId);
+                  if (!roomId) return '-';
+                  return roomLabelById[roomId] || roomId;
+                })()}
+              </Text>
               <Text size="sm"><Text fw={600} span>Outras especialidades:</Text> {formatDetailValue(selectedDoctor?.raw?.specialties)}</Text>
               <Text size="sm"><Text fw={600} span>Valor consulta:</Text> {formatCurrencyValue(selectedDoctor?.raw?.consultationFee)}</Text>
             </SimpleGrid>

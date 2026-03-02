@@ -4,6 +4,18 @@ export interface CreateProcedurePayload {
   name: string;
   description?: string;
   price?: number | null;
+  durationMinutes?: number | null;
+  acceptsInsurance?: boolean;
+  acceptedInsurances?: string[];
+  modalities?: string[];
+  doctors?: { doctorId: string; doctorName?: string | null }[];
+}
+
+export interface UpdateProcedurePayload {
+  name?: string;
+  description?: string;
+  price?: number | null;
+  durationMinutes?: number | null;
   acceptsInsurance?: boolean;
   acceptedInsurances?: string[];
   modalities?: string[];
@@ -14,6 +26,12 @@ export default {
   async createProcedure(payload: CreateProcedurePayload) {
     const url = '/procedures/procedures/';
     const res = await api.post(url, payload);
+    return res.data;
+  },
+
+  async updateProcedure(id: string, payload: UpdateProcedurePayload) {
+    const url = `/procedures/procedures/${id}`;
+    const res = await api.put(url, payload);
     return res.data;
   },
 

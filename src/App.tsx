@@ -27,6 +27,15 @@ import { CadastroPaciente } from './components/Patient/CadastroPaciente';
 import { CadastroProcedimento } from './components/Procedimentos/CadastroProcedimento';
 import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
+import { CadastroSala } from './components/Salas/CadastroSala';
+import { CadastroTEA } from './components/TEA/CadastroTEA';
+import { TeaHome } from './components/TEA/TeaHome';
+import { TeaEvolucao } from './components/TEA/TeaEvolucao';
+import { TeaPIT } from './components/TEA/TeaPIT';
+import { TeaRelatorios } from './components/TEA/TeaRelatorios';
+import { TeaPreReserva } from './components/TEA/TeaPreReserva';
+import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
+import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = authService.isAuthenticated();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -121,6 +130,50 @@ function App() {
           <Route
             path="/cadastro-cliente"
             element={<ProtectedRoute><CadastroCliente /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-sala"
+            element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea"
+            element={<ProtectedRoute><TeaHome /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/cadastro"
+            element={<ProtectedRoute><CadastroTEA forcedSubmodule="cadastro" /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/pacientes"
+            element={<ProtectedRoute><CadastroTEA forcedSubmodule="pacientes" /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/plano"
+            element={<ProtectedRoute><CadastroTEA forcedSubmodule="plano" /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/evolucao"
+            element={<ProtectedRoute><TeaEvolucao /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/pit"
+            element={<ProtectedRoute><TeaPIT /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/pre-reserva"
+            element={<ProtectedRoute><TeaPreReserva /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/relatorios"
+            element={<ProtectedRoute><TeaRelatorios /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/desmarcacao-lote"
+            element={<ProtectedRoute><TeaDesmarcacaoLote /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/agenda-semanal"
+            element={<ProtectedRoute><TeaAgendaSemanal /></ProtectedRoute>}
           />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
