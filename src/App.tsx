@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { MantineProvider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
@@ -26,6 +27,7 @@ import { CadastroMedico } from './components/Medicos/CadastroMedico';
 import { CadastroPaciente } from './components/Patient/CadastroPaciente';
 import { CadastroProcedimento } from './components/Procedimentos/CadastroProcedimento';
 import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
+import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
@@ -46,6 +48,18 @@ function App() {
     key: 'mantine-color-scheme',
     defaultValue: 'light',
   });
+  const [, setAuthVersion] = useState(0);
+
+  useEffect(() => {
+    const onAuthChanged = () => {
+      setAuthVersion((prev) => prev + 1);
+    };
+
+    window.addEventListener('auth:changed', onAuthChanged);
+    return () => {
+      window.removeEventListener('auth:changed', onAuthChanged);
+    };
+  }, []);
 
   return (
     <MantineProvider theme={theme} forceColorScheme={colorScheme}>
@@ -126,6 +140,10 @@ function App() {
           <Route
             path="/cadastro-convenio"
             element={<ProtectedRoute><CadastroConvenio /></ProtectedRoute>}
+          />
+          <Route
+            path="/autorizacao-convenio"
+            element={<ProtectedRoute><AutorizacaoConvenio /></ProtectedRoute>}
           />
           <Route
             path="/cadastro-cliente"

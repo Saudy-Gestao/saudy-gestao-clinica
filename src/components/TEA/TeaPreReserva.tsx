@@ -254,22 +254,15 @@ const STATUS_FLOW_ORDER: TeaPreReservationStatus[] = [
   'PENDING_SCHEDULING',
   'RESERVED',
   'PROPOSED',
-  'PENDING_AUTHORIZATION',
-  'AUTHORIZED',
 ];
 
-const STATUS_BULK_OPTIONS = STATUS_OPTIONS.filter((item) => (
-  item.value === 'PENDING_SCHEDULING'
-  || item.value === 'RESERVED'
-  || item.value === 'PROPOSED'
-  || item.value === 'PENDING_AUTHORIZATION'
-  || item.value === 'AUTHORIZED'
-  || item.value === 'CANCELED'
-));
+const isAuthorizationManagedStatus = (status?: string) => (
+  status === 'PENDING_AUTHORIZATION' || status === 'AUTHORIZED'
+);
 
 const getTherapyStatusOptions = (currentStatus?: string): Array<{ value: TeaPreReservationStatus; label: string }> => {
   const current = String(currentStatus || '') as TeaPreReservationStatus;
-  if (current === 'CONVERTED' || current === 'EXPIRED') {
+  if (current === 'CONVERTED' || current === 'EXPIRED' || isAuthorizationManagedStatus(current)) {
     return STATUS_OPTIONS.filter((item) => item.value === current);
   }
 
@@ -279,8 +272,6 @@ const getTherapyStatusOptions = (currentStatus?: string): Array<{ value: TeaPreR
       item.value === 'PENDING_SCHEDULING'
       || item.value === 'RESERVED'
       || item.value === 'PROPOSED'
-      || item.value === 'PENDING_AUTHORIZATION'
-      || item.value === 'AUTHORIZED'
       || item.value === 'CANCELED'
     ));
   }
@@ -304,7 +295,6 @@ export function TeaPreReserva() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [badgeFilter, setBadgeFilter] = useState<string | null>(null);
-  const [draftStatusByGroupKey, setDraftStatusByGroupKey] = useState<Record<string, TeaPreReservationStatus>>({});
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [suggestionsByTherapyId, setSuggestionsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [loadingSuggestionsId, setLoadingSuggestionsId] = useState<string | null>(null);
@@ -444,20 +434,28 @@ export function TeaPreReserva() {
     );
   }, [checklistGroupReservations, selectedChecklistProcedure]);
 
-  const checklistSelectedProcedureReservationIds = useMemo(
-    () => checklistSelectedProcedureReservations
-      .map((item) => String(item?.preReservationId || ''))
-      .filter(Boolean),
-    [checklistSelectedProcedureReservations],
-  );
+  const checklistCanConvertByProcedure = useMemo(() => {
+    const byProcedure = new Map<string, boolean>();
+    checklistProcedureOptions.forEach((procedure) => {
+      const procedureItems = checklistItems.filter(
+        (item) => (item.procedureName || 'Procedimento não definido') === procedure,
+      );
+      byProcedure.set(
+        procedure,
+        procedureItems.length > 0 && procedureItems.every((item) => item.valid),
+      );
+    });
+    return byProcedure;
+  }, [checklistItems, checklistProcedureOptions]);
 
-  const checklistSelectedProcedureCanConvert = useMemo(() => {
-    if (!selectedChecklistProcedure) return false;
-    const selectedItems = checklistItems.filter(
-      (item) => (item.procedureName || 'Procedimento não definido') === selectedChecklistProcedure,
-    );
-    return selectedItems.length > 0 && selectedItems.every((item) => item.valid);
-  }, [checklistItems, selectedChecklistProcedure]);
+  const checklistConvertibleReservations = useMemo(() => (
+    checklistGroupReservations.filter((reservation) => {
+      const procedure = getReservationProcedureName(reservation);
+      return checklistCanConvertByProcedure.get(procedure) === true;
+    })
+  ), [checklistCanConvertByProcedure, checklistGroupReservations]);
+
+  const checklistCanConvertAnyProcedure = checklistConvertibleReservations.length > 0;
 
 
   const filteredItems = useMemo(() => {
@@ -871,14 +869,22 @@ export function TeaPreReserva() {
     const scopedReservations = Array.isArray(reservationsToConvert)
       ? reservationsToConvert
       : checklistSelectedProcedureReservations;
-    const scopedReservationIds = scopedReservations
-      .map((item) => String(item?.preReservationId || ''))
-      .filter(Boolean);
+    const scopedReservationIds = Array.from(
+      new Set(
+        scopedReservations
+          .map((item) => String(item?.preReservationId || ''))
+          .filter(Boolean),
+      ),
+    );
+    const scopedProcedures = Array.from(new Set(scopedReservations.map(getReservationProcedureName)));
+    const hasInvalidScopedProcedure = scopedProcedures.some(
+      (procedure) => checklistCanConvertByProcedure.get(procedure) !== true,
+    );
 
-    if (!checklistSelectedProcedureCanConvert || scopedReservationIds.length === 0 || checklistItems.length === 0) {
+    if (scopedReservationIds.length === 0 || checklistItems.length === 0 || hasInvalidScopedProcedure) {
       showNotification({
         title: 'Checklist pendente',
-        message: 'O procedimento selecionado ainda possui pendências no checklist.',
+        message: 'Existe procedimento com pendência no checklist.',
         color: 'yellow',
       });
       return;
@@ -939,51 +945,11 @@ export function TeaPreReserva() {
   const renderReservationGroupCard = (group: ReservationGroup) => {
     const reservationStatuses = Array.from(new Set(group.reservations.map((item) => String(item?.status || ''))));
     const groupStatus = reservationStatuses.length === 1 ? reservationStatuses[0] : null;
-    const selectedGroupStatus = draftStatusByGroupKey[group.groupKey] || (groupStatus as TeaPreReservationStatus | null);
     const isGroupFullyConverted = group.reservations.length > 0
       && group.reservations.every((item) => String(item?.status || '') === 'CONVERTED');
     const hasReservedReservations = group.reservations.some((item) => String(item?.status || '') === 'RESERVED');
     const hasPendingApprovalReservations = group.reservations.some((item) => String(item?.status || '') === 'PROPOSED');
 
-    async function handleUpdateGroupStatus(group: ReservationGroup, resolvedStatus: TeaPreReservationStatus) {
-      if (!resolvedStatus) return;
-      const reservationIds = group.reservations
-      .map((item) => String(item?.preReservationId || ''))
-      .filter(Boolean);
-
-      if (reservationIds.length === 0) return;
-
-      setUpdatingId(group.groupKey);
-      try {
-      await Promise.all(
-        reservationIds.map((reservationId) =>
-        teaPreReservationService.updateStatus(reservationId, {
-          status: resolvedStatus,
-          applySeries: true,
-        }),
-        ),
-      );
-      setDraftStatusByGroupKey((prev) => {
-        const next = { ...prev };
-        delete next[group.groupKey];
-        return next;
-      });
-      showNotification({
-        title: 'Sucesso',
-        message: 'Status do PIT atualizado para todas as terapias',
-        color: 'green',
-      });
-      await loadPending();
-      } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
-        color: 'red',
-      });
-      } finally {
-      setUpdatingId(null);
-      }
-    }
     async function handleUpdateReservationStatus(reservationId: string, resolvedStatus: TeaPreReservationStatus) {
       if (!reservationId || !resolvedStatus) return;
 
@@ -1069,8 +1035,17 @@ export function TeaPreReserva() {
         const status = String(item?.status || '');
         return status !== 'CONVERTED' && status !== 'CANCELED';
       });
+      const anchorByTherapy = new Map<string, any>();
+      eligibleReservations.forEach((item) => {
+        const therapyId = String(item?.pitTherapyId || '');
+        if (!therapyId) return;
+        if (!anchorByTherapy.has(therapyId)) {
+          anchorByTherapy.set(therapyId, item);
+        }
+      });
+      const eligibleAnchors = Array.from(anchorByTherapy.values());
 
-      if (eligibleReservations.length === 0) {
+      if (eligibleAnchors.length === 0) {
         showNotification({
           title: 'Sem itens elegíveis',
           message: 'Este PIT não possui pré-reservas elegíveis para conversão.',
@@ -1079,20 +1054,20 @@ export function TeaPreReserva() {
         return;
       }
 
-      const procedureOptions = Array.from(new Set(eligibleReservations.map((item) => getReservationProcedureName(item))));
+      const procedureOptions = Array.from(new Set(eligibleAnchors.map((item) => getReservationProcedureName(item))));
 
       setChecklistLoading(true);
       setChecklistModalOpened(true);
       setChecklistGroupKey(group.groupKey);
       setChecklistGroupLabel(`${group.patientName} • PIT`);
-      setChecklistGroupReservations(eligibleReservations);
+      setChecklistGroupReservations(eligibleAnchors);
       setChecklistProcedureOptions(procedureOptions);
       setSelectedChecklistProcedure(procedureOptions[0] || null);
       setConversionReservationIds([]);
       setChecklistItems([]);
       try {
       const allItems: ConversionChecklistItem[] = [];
-      for (const reservation of eligibleReservations) {
+      for (const reservation of eligibleAnchors) {
         const reservationId = String(reservation?.preReservationId || '');
         if (!reservationId) continue;
         const procedureName = getReservationProcedureName(reservation);
@@ -1191,21 +1166,14 @@ export function TeaPreReserva() {
           {renderPitProgress(group.groupKey)}
 
           <Group grow align="flex-end">
-            <Select
-              label="Status do PIT"
-              placeholder={groupStatus ? undefined : 'Status misto entre terapias'}
-              data={STATUS_BULK_OPTIONS}
-              value={selectedGroupStatus}
-              onChange={(value) => {
-                if (!value) return;
-                const resolvedStatus = value as TeaPreReservationStatus;
-                setDraftStatusByGroupKey((prev) => ({
-                  ...prev,
-                  [group.groupKey]: resolvedStatus,
-                }));
-                handleUpdateGroupStatus(group, resolvedStatus);
-              }}
-            />
+            <Box>
+              <Text size="sm" fw={500} mb={6}>Status do PIT</Text>
+              <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                <Text size="sm" c={groupStatus ? undefined : 'dimmed'}>
+                  {groupStatus ? (STATUS_LABEL[groupStatus] || groupStatus) : 'Status misto entre terapias'}
+                </Text>
+              </Paper>
+            </Box>
             <Button
               variant="default"
               leftSection={<History size={16} />}
@@ -1289,12 +1257,22 @@ export function TeaPreReserva() {
                     value={item.status}
                     onChange={(value) => {
                       if (!value) return;
+                      if (isAuthorizationManagedStatus(item.status)) return;
                       handleUpdateReservationStatus(String(item.preReservationId), value as TeaPreReservationStatus);
                     }}
-                    disabled={!item?.preReservationId || updatingId === String(item.preReservationId)}
+                    disabled={
+                      !item?.preReservationId
+                      || updatingId === String(item.preReservationId)
+                      || isAuthorizationManagedStatus(item.status)
+                    }
                     style={{ minWidth: 220 }}
                   />
                 </Group>
+                {isAuthorizationManagedStatus(item.status) && (
+                  <Text size="xs" mt={4} c="dimmed">
+                    Status de autorização gerenciado no módulo Autorização Convênio.
+                  </Text>
+                )}
                 {item.status === 'AUTHORIZED' && item.authorizedAt && (
                   <Text size="xs" mt={4} c="teal">
                     Autorizado em: {dayjs(item.authorizedAt).format('DD/MM/YYYY HH:mm')}
@@ -2800,11 +2778,11 @@ export function TeaPreReserva() {
                 </Button>
                 <Button
                   color="green"
-                  disabled={!checklistSelectedProcedureCanConvert || checklistSelectedProcedureReservationIds.length === 0}
+                  disabled={!checklistCanConvertAnyProcedure}
                   loading={!!checklistGroupKey && updatingId === checklistGroupKey}
-                  onClick={() => openConversionConfirmationModal(checklistSelectedProcedureReservations)}
+                  onClick={() => openConversionConfirmationModal(checklistConvertibleReservations)}
                 >
-                  Finalizar Agendamento
+                  {`Finalizar Agendamento${checklistCanConvertAnyProcedure ? ` (${checklistConvertibleReservations.length})` : ''}`}
                 </Button>
               </Group>
             </>
