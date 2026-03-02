@@ -9,6 +9,12 @@ import type {
 } from '../types/auth';
 
 class AuthService {
+  private emitAuthChanged() {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:changed'));
+    }
+  }
+
   /**
    * Login do usuário
    */
@@ -18,6 +24,7 @@ class AuthService {
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      this.emitAuthChanged();
     }
     
     return response.data;
@@ -32,6 +39,7 @@ class AuthService {
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      this.emitAuthChanged();
     }
     
     return response.data;
@@ -46,6 +54,7 @@ class AuthService {
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      this.emitAuthChanged();
     }
     
     return response.data;
@@ -57,6 +66,7 @@ class AuthService {
   logout(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    this.emitAuthChanged();
   }
 
   /**
