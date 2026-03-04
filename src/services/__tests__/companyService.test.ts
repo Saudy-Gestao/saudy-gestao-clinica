@@ -36,7 +36,7 @@ describe('companyService', () => {
       user: expect.objectContaining({ name: 'A', email: 'a@b', password: 'p' }),
       sector: expect.objectContaining({ name: 'Admin' }),
       accesses: expect.any(Array),
-      branch: expect.objectContaining({ socialName: 'N' }),
+      branch: expect.objectContaining({ tradeName: 'N' }),
       branchesCount: 3,
     }));
     expect(res).toEqual({ ok: true });

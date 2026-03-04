@@ -32,7 +32,6 @@ const companyService = {
         phone: company.phone || '',
       },
       branch: {
-        socialName: company.nomeFantasia || company.razaoSocial,
         tradeName: company.nomeFantasia || company.razaoSocial,
         address: company.address || '',
         phone: company.phone || '',

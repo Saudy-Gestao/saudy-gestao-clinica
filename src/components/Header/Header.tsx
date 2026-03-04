@@ -153,7 +153,7 @@ export function Header() {
               size="sm"
               onClick={() => {
                 authService.logout();
-                navigate('/login', { replace: true });
+                window.location.href = '/login';
               }}
             >
               <LogOut size={16} color="white" />
