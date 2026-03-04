@@ -4,6 +4,18 @@ export interface CreateProcedurePayload {
   name: string;
   description?: string;
   price?: number | null;
+  durationMinutes?: number | null;
+  acceptsInsurance?: boolean;
+  acceptedInsurances?: string[];
+  modalities?: string[];
+  doctors?: { doctorId: string; doctorName?: string | null }[];
+}
+
+export interface UpdateProcedurePayload {
+  name?: string;
+  description?: string;
+  price?: number | null;
+  durationMinutes?: number | null;
   acceptsInsurance?: boolean;
   acceptedInsurances?: string[];
   modalities?: string[];

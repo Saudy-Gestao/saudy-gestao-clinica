@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { MantineProvider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
@@ -26,7 +27,17 @@ import { CadastroMedico } from './components/Medicos/CadastroMedico';
 import { CadastroPaciente } from './components/Patient/CadastroPaciente';
 import { CadastroProcedimento } from './components/Procedimentos/CadastroProcedimento';
 import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
+import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
+import { CadastroSala } from './components/Salas/CadastroSala';
+import { CadastroTEA } from './components/TEA/CadastroTEA';
+import { TeaHome } from './components/TEA/TeaHome';
+import { TeaEvolucao } from './components/TEA/TeaEvolucao';
+import { TeaPIT } from './components/TEA/TeaPIT';
+import { TeaRelatorios } from './components/TEA/TeaRelatorios';
+import { TeaPreReserva } from './components/TEA/TeaPreReserva';
+import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
+import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = authService.isAuthenticated();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -37,6 +48,18 @@ function App() {
     key: 'mantine-color-scheme',
     defaultValue: 'light',
   });
+  const [, setAuthVersion] = useState(0);
+
+  useEffect(() => {
+    const onAuthChanged = () => {
+      setAuthVersion((prev) => prev + 1);
+    };
+
+    window.addEventListener('auth:changed', onAuthChanged);
+    return () => {
+      window.removeEventListener('auth:changed', onAuthChanged);
+    };
+  }, []);
 
   return (
     <MantineProvider theme={theme} forceColorScheme={colorScheme}>
@@ -119,8 +142,56 @@ function App() {
             element={<ProtectedRoute><CadastroConvenio /></ProtectedRoute>}
           />
           <Route
+            path="/autorizacao-convenio"
+            element={<ProtectedRoute><AutorizacaoConvenio /></ProtectedRoute>}
+          />
+          <Route
             path="/cadastro-cliente"
             element={<ProtectedRoute><CadastroCliente /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-sala"
+            element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea"
+            element={<ProtectedRoute><TeaHome /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/cadastro"
+            element={<ProtectedRoute><CadastroTEA forcedSubmodule="cadastro" /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/pacientes"
+            element={<ProtectedRoute><CadastroTEA forcedSubmodule="pacientes" /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/plano"
+            element={<ProtectedRoute><CadastroTEA forcedSubmodule="plano" /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/evolucao"
+            element={<ProtectedRoute><TeaEvolucao /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/pit"
+            element={<ProtectedRoute><TeaPIT /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/pre-reserva"
+            element={<ProtectedRoute><TeaPreReserva /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/relatorios"
+            element={<ProtectedRoute><TeaRelatorios /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/desmarcacao-lote"
+            element={<ProtectedRoute><TeaDesmarcacaoLote /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/agenda-semanal"
+            element={<ProtectedRoute><TeaAgendaSemanal /></ProtectedRoute>}
           />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

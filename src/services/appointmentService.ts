@@ -11,12 +11,22 @@ export interface AppointmentPayload {
   time?: string;
   type?: string;
   status?: string;
+  authorizationStatus?: 'PENDING' | 'AUTHORIZED' | 'DENIED';
+  authorizationNotes?: string;
   observations?: string;
   totem?: number;
 }
 
 export default {
-  async list(params?: { search?: string; status?: string; specialty?: string; convenio?: string; limit?: number; offset?: number }) {
+  async list(params?: {
+    search?: string;
+    status?: string;
+    authorizationStatus?: string;
+    specialty?: string;
+    convenio?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const url = '/care/appointments/';
     const res = await api.get(url, { params });
     return res.data;

@@ -47,6 +47,7 @@ interface ProcedureItem {
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   modalities: string[];
+  doctorIds: string[];
   doctorsCount: number;
   isActive: boolean;
 }
@@ -188,7 +189,8 @@ export function CadastroProcedimento() {
       }
     };
 
-    loadProcedures();
+  useEffect(() => {
+    refreshProcedures();
   }, []);
 
   useEffect(() => {
@@ -323,6 +325,26 @@ export function CadastroProcedimento() {
     setForm(INITIAL_FORM);
     setDoctorSearchValue('');
     navigate('/dashboard');
+  };
+
+  const handleStartEdit = (item: ProcedureItem) => {
+    setForm({
+      name: item.name,
+      description: item.description || '',
+      price: item.price,
+      durationMinutes: item.durationMinutes,
+      acceptsInsurance: item.acceptsInsurance,
+      acceptedInsurances: item.acceptsInsurance ? item.acceptedInsurances : [],
+      modalities: item.modalities,
+      doctorIds: item.doctorIds,
+    });
+    setEditingProcedureId(item.id);
+    setActiveTab('cadastro');
+  };
+
+  const handleCancelEdit = () => {
+    setForm(INITIAL_FORM);
+    setEditingProcedureId(null);
   };
 
   const handleAcceptsInsuranceChange = (checked: boolean) => {
@@ -468,6 +490,17 @@ export function CadastroProcedimento() {
                   required
                   mb="md"
                 />
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <NumberInput
+                    label="Duração (minutos)"
+                    placeholder="Ex: 50"
+                    value={form.durationMinutes ?? undefined}
+                    onChange={(value) => setForm((prev) => ({ ...prev, durationMinutes: typeof value === 'number' ? value : null }))}
+                    min={1}
+                    step={5}
+                  />
+                </SimpleGrid>
 
                 <Textarea
                   mt="md"
@@ -800,8 +833,16 @@ export function CadastroProcedimento() {
         opened={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
         variant="success"
-        title="Procedimento salvo"
-        message={lastCreatedName ? `Procedimento ${lastCreatedName} cadastrado com sucesso.` : 'Procedimento cadastrado com sucesso.'}
+        title={lastSaveAction === 'update' ? 'Procedimento atualizado' : 'Procedimento salvo'}
+        message={
+          lastCreatedName
+            ? (lastSaveAction === 'update'
+              ? `Procedimento ${lastCreatedName} atualizado com sucesso.`
+              : `Procedimento ${lastCreatedName} cadastrado com sucesso.`)
+            : (lastSaveAction === 'update'
+              ? 'Procedimento atualizado com sucesso.'
+              : 'Procedimento cadastrado com sucesso.')
+        }
         primary={{
           label: 'Cadastrar outro',
           onClick: () => setShowSuccessModal(false),

@@ -22,11 +22,22 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const hadToken = Boolean(localStorage.getItem('token'));
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url || '');
+    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/forgot-password') || requestUrl.includes('/auth/verify-code') || requestUrl.includes('/auth/reset-password');
+
+    if (status === 401 && hadToken && !isAuthEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:changed'));
+        if (window.location.pathname !== '/login') {
+          window.location.replace('/login');
+        }
+      }
     }
+
     return Promise.reject(error);
   }
 );
