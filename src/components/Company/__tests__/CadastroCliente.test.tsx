@@ -6,6 +6,7 @@ import { CadastroCliente } from '../CadastroCliente';
 import companyService from '../../../services/companyService';
 import bcrypt from 'bcryptjs';
 import { vi, describe, it, beforeEach, expect } from 'vitest';
+import '@testing-library/jest-dom';
 
 vi.mock('../../../services/companyService');
 const mockedService = vi.mocked(companyService as any);

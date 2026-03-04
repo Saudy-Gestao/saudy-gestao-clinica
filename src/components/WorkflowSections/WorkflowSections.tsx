@@ -84,9 +84,9 @@ export function WorkflowSections() {
     {
       title: 'Fluxo do Paciente',
       items: [
-        { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
         { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/anamnese', moduleName: 'anamnese' },
+        { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
         { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/enfermagem', moduleName: 'enfermagem' },
       ]
     },
@@ -151,23 +151,23 @@ export function WorkflowSections() {
             {section.items.map((item, i) => (
               <Paper 
                 key={i} 
-                p="md" 
+                p="xs" 
                 withBorder 
                 style={{
                   cursor: item.route ? 'pointer' : 'default',
                   borderColor: 'var(--mantine-color-default-border)',
-                  minHeight: 96,
+                  minHeight: 60,
                   height: '100%'
                 }}
                 onClick={() => item.route && navigate(item.route)}
               >
                 <Group justify="space-between" align="flex-start">
-                  <Group>
-                    <ThemeIcon size="xl" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${accentColor}`, borderRadius: '8px' }}>
-                      <item.icon size={28} color={accentColor} />
+                  <Group gap="xs">
+                    <ThemeIcon size="md" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${accentColor}`, borderRadius: '6px' }}>
+                      <item.icon size={18} color={accentColor} />
                     </ThemeIcon>
                     <Box>
-                      <Text fw={500} lineClamp={1}>{item.label}</Text>
+                      <Text fw={500} size="sm" lineClamp={1}>{item.label}</Text>
                       <Text size="xs" c="dimmed" lineClamp={1}>{item.desc}</Text>
                     </Box>
                   </Group>

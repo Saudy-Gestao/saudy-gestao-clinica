@@ -8,7 +8,6 @@ import {
   Select,
   Textarea,
   TextInput,
-  NumberInput,
   MultiSelect,
   SimpleGrid,
   Stack,
@@ -24,7 +23,7 @@ import {
   Badge
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, Power } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -63,12 +62,6 @@ const getDate = (value: unknown): Date | null => {
   return null;
 };
 
-const getNumber = (value: unknown): number | null => {
-  if (typeof value === 'number' && !Number.isNaN(value)) return value;
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : parsed;
-};
-
 const getBoolean = (value: unknown, fallback = false): boolean => {
   if (typeof value === 'boolean') return value;
   if (value == null) return fallback;
@@ -99,7 +92,6 @@ interface DoctorForm {
   rg: string;
   specialty: string;
   specialties: string[];
-  consultationFee: number | null;
   biography: string;
   address: string;
   addressNumber: string;
@@ -109,9 +101,11 @@ interface DoctorForm {
   state: string;
   zipCode: string;
   isActive: boolean;
-  workingDays: string[];
-  workingHoursStart: string;
-  workingHoursEnd: string;
+  workingSchedules: Array<{
+    days: string[];
+    hoursStart: string;
+    hoursEnd: string;
+  }>;
 }
 
 interface DoctorListItem {
@@ -145,7 +139,6 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   rg: '',
   specialty: '',
   specialties: [],
-  consultationFee: null,
   biography: '',
   address: '',
   addressNumber: '',
@@ -155,9 +148,7 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   state: '',
   zipCode: '',
   isActive: true,
-  workingDays: [],
-  workingHoursStart: '',
-  workingHoursEnd: '',
+  workingSchedules: [],
 };
 
 export function CadastroMedico() {
@@ -258,19 +249,20 @@ export function CadastroMedico() {
     return normalized;
   };
 
-  const formatCurrencyValue = (value: unknown) => {
-    const num = Number(value);
-    if (Number.isNaN(num)) return '-';
-    return `R$ ${num.toFixed(2).replace('.', ',')}`;
-  };
-
   const populateFormFromDoctor = (raw: ApiRecord) => {
     const birthDate = getDate(raw.birthDate);
     const specialties = Array.isArray(raw.specialties)
       ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
       : [];
-    const workingDays = Array.isArray(raw.workingDays)
-      ? (raw.workingDays as unknown[]).map((item) => getString(item)).filter(Boolean)
+    const workingSchedules = Array.isArray(raw.workingSchedules)
+      ? (raw.workingSchedules as unknown[]).map((item: unknown) => {
+          const scheduleRecord = isRecord(item) ? item : {};
+          return {
+            days: Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean) : [],
+            hoursStart: getString(scheduleRecord.hoursStart),
+            hoursEnd: getString(scheduleRecord.hoursEnd),
+          };
+        }).filter((s) => s.days.length > 0)
       : [];
     setForm({
       nome: getString(raw.name ?? raw.nome),
@@ -285,7 +277,6 @@ export function CadastroMedico() {
       rg: getString(raw.rg),
       specialty: getString(raw.specialty),
       specialties,
-      consultationFee: getNumber(raw.consultationFee),
       biography: getString(raw.biography),
       address: getString(raw.address),
       addressNumber: getString(raw.addressNumber),
@@ -295,9 +286,7 @@ export function CadastroMedico() {
       state: getString(raw.state),
       zipCode: getString(raw.zipCode),
       isActive: getBoolean(raw.isActive, true),
-      workingDays,
-      workingHoursStart: getString(raw.workingHoursStart),
-      workingHoursEnd: getString(raw.workingHoursEnd),
+      workingSchedules,
     });
   };
 
@@ -371,9 +360,13 @@ export function CadastroMedico() {
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
     if (!data.specialty) errors.specialty = 'Especialidade é obrigatória';
-    if (data.consultationFee !== null && data.consultationFee < 0) errors.consultationFee = 'Valor da consulta inválido';
-    if (data.workingHoursStart && !/^\d{2}:\d{2}$/.test(data.workingHoursStart)) errors.workingHoursStart = 'Formato de início do horário inválido (HH:MM)';
-    if (data.workingHoursEnd && !/^\d{2}:\d{2}$/.test(data.workingHoursEnd)) errors.workingHoursEnd = 'Formato de fim do horário inválido (HH:MM)';
+    if (data.workingSchedules.length > 0) {
+      data.workingSchedules.forEach((schedule, idx) => {
+        if (!schedule.days.length) errors[`workingSchedules.${idx}.days`] = 'Selecione pelo menos um dia';
+        if (schedule.hoursStart && !/^\d{2}:\d{2}$/.test(schedule.hoursStart)) errors[`workingSchedules.${idx}.hoursStart`] = 'Formato inválido (HH:MM)';
+        if (schedule.hoursEnd && !/^\d{2}:\d{2}$/.test(schedule.hoursEnd)) errors[`workingSchedules.${idx}.hoursEnd`] = 'Formato inválido (HH:MM)';
+      });
+    }
     return errors;
   };
 
@@ -394,6 +387,13 @@ export function CadastroMedico() {
     setSaving(true);
 
     try {
+      // Converter workingSchedules para o formato esperado pelo backend
+      const validSchedules = form.workingSchedules.filter((s) => s.days.length > 0);
+      const allDays = new Set<string>();
+      validSchedules.forEach((schedule) => {
+        schedule.days.forEach((day) => allDays.add(day));
+      });
+
       const payload = {
         crm: form.crm.trim(),
         crmState: form.crmState.trim().toUpperCase(),
@@ -407,7 +407,6 @@ export function CadastroMedico() {
         rg: form.rg?.trim() || undefined,
         specialty: form.specialty || undefined,
         specialties: form.specialties || [],
-        consultationFee: form.consultationFee ?? undefined,
         biography: form.biography || undefined,
         address: form.address || undefined,
         addressNumber: form.addressNumber || undefined,
@@ -416,9 +415,10 @@ export function CadastroMedico() {
         city: form.city || undefined,
         state: form.state || undefined,
         zipCode: form.zipCode || undefined,
-        workingDays: form.workingDays || [],
-        workingHoursStart: form.workingHoursStart || undefined,
-        workingHoursEnd: form.workingHoursEnd || undefined,
+        // Formato esperado pelo backend
+        workingDays: Array.from(allDays),
+        workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
+        workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
       };
 
       if (editingDoctorId) {
@@ -503,6 +503,33 @@ export function CadastroMedico() {
     } catch (e: unknown) {
       const err = e as ApiError;
       const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir médico';
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
+    }
+  };
+
+  const handleToggleActive = async (item: DoctorListItem) => {
+    try {
+
+      setDoctors((prev) =>
+        prev.map((d) =>
+          d.id === item.id
+            ? {
+                ...d,
+                isActive: !d.isActive,
+                raw: { ...d.raw, isActive: !d.isActive },
+              }
+            : d
+        )
+      );
+
+      showNotification({
+        title: 'Status atualizado',
+        message: `Médico ${!item.isActive ? 'ativado' : 'desativado'} com sucesso.`,
+        color: 'green',
+      });
+    } catch (e: unknown) {
+      const err = e as ApiError;
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -642,16 +669,6 @@ export function CadastroMedico() {
                     value={form.specialties}
                     onChange={(v) => setForm({ ...form, specialties: v })}
                   />
-                  <NumberInput
-                    label="Valor da consulta (R$)"
-                    placeholder="0,00"
-                    value={form.consultationFee ?? undefined}
-                    onChange={(v) => { setForm({ ...form, consultationFee: typeof v === 'number' ? v : null }); clearFieldError('consultationFee'); }}
-                    decimalScale={2}
-                    error={fieldErrors.consultationFee}
-                    min={0}
-                    prefix="R$ "
-                  />
                 </SimpleGrid>
                 <Textarea
                   label="Biografia"
@@ -688,27 +705,74 @@ export function CadastroMedico() {
               {/* Horário de Trabalho */}
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Horário de Trabalho</SectionTitle>
-                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <MultiSelect
-                    label="Dias de trabalho"
-                    placeholder="Selecione os dias"
-                    data={daysOptions}
-                    value={form.workingDays}
-                    onChange={(v) => setForm({ ...form, workingDays: v })}
-                  />
-                  <TextInput
-                    label="Horário início"
-                    placeholder="08:00"
-                    value={form.workingHoursStart}
-                    onChange={(e) => setForm({ ...form, workingHoursStart: e.currentTarget.value })}
-                  />
-                  <TextInput
-                    label="Horário fim"
-                    placeholder="18:00"
-                    value={form.workingHoursEnd}
-                    onChange={(e) => setForm({ ...form, workingHoursEnd: e.currentTarget.value })}
-                  />
-                </SimpleGrid>
+                <Stack gap="md">
+                  {form.workingSchedules.map((schedule, idx) => (
+                    <Paper key={idx} p="md" bg="rgba(0,0,0,0.02)" withBorder radius="md">
+                      <Group justify="space-between" mb="md">
+                        <Text size="sm" fw={500}>Turno {idx + 1}</Text>
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              workingSchedules: form.workingSchedules.filter((_, i) => i !== idx),
+                            });
+                          }}
+                        >
+                          <Trash size={16} />
+                        </ActionIcon>
+                      </Group>
+                      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" mb="md">
+                        <MultiSelect
+                          label="Dias de trabalho"
+                          placeholder="Selecione os dias"
+                          data={daysOptions}
+                          value={schedule.days}
+                          onChange={(v) => {
+                            const updated = [...form.workingSchedules];
+                            updated[idx].days = v;
+                            setForm({ ...form, workingSchedules: updated });
+                          }}
+                        />
+                        <TextInput
+                          label="Horário início"
+                          placeholder="08:00"
+                          value={schedule.hoursStart}
+                          onChange={(e) => {
+                            const updated = [...form.workingSchedules];
+                            updated[idx].hoursStart = e.currentTarget.value;
+                            setForm({ ...form, workingSchedules: updated });
+                          }}
+                        />
+                        <TextInput
+                          label="Horário fim"
+                          placeholder="18:00"
+                          value={schedule.hoursEnd}
+                          onChange={(e) => {
+                            const updated = [...form.workingSchedules];
+                            updated[idx].hoursEnd = e.currentTarget.value;
+                            setForm({ ...form, workingSchedules: updated });
+                          }}
+                        />
+                      </SimpleGrid>
+                    </Paper>
+                  ))}
+                  <Button
+                    variant="light"
+                    onClick={() => {
+                      setForm({
+                        ...form,
+                        workingSchedules: [
+                          ...form.workingSchedules,
+                          { days: [], hoursStart: '', hoursEnd: '' },
+                        ],
+                      });
+                    }}
+                  >
+                    + Adicionar turno
+                  </Button>
+                </Stack>
               </Paper>
 
               {/* Botões finais */}
@@ -795,6 +859,7 @@ export function CadastroMedico() {
                                     setSelectedDoctor(item);
                                     setDetailsOpen(true);
                                   }}
+                                  title="Visualizar"
                                 >
                                   <Eye size={16} />
                                 </ActionIcon>
@@ -807,13 +872,23 @@ export function CadastroMedico() {
                                     populateFormFromDoctor(item.raw);
                                     setActiveTab('cadastro');
                                   }}
+                                  title="Editar"
                                 >
                                   <Pencil size={16} />
                                 </ActionIcon>
                                 <ActionIcon
                                   variant="subtle"
+                                  color={item.isActive ? 'orange' : 'green'}
+                                  onClick={() => handleToggleActive(item)}
+                                  title={item.isActive ? 'Desativar' : 'Ativar'}
+                                >
+                                  <Power size={16} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
                                   color="red"
                                   onClick={() => handleDeleteDoctor(item)}
+                                  title="Excluir"
                                 >
                                   <Trash size={16} />
                                 </ActionIcon>
@@ -858,7 +933,6 @@ export function CadastroMedico() {
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
               <Text size="sm"><Text fw={600} span>Outras especialidades:</Text> {formatDetailValue(selectedDoctor?.raw?.specialties)}</Text>
-              <Text size="sm"><Text fw={600} span>Valor consulta:</Text> {formatCurrencyValue(selectedDoctor?.raw?.consultationFee)}</Text>
             </SimpleGrid>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
@@ -872,11 +946,27 @@ export function CadastroMedico() {
             </SimpleGrid>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-              <Text size="sm"><Text fw={600} span>Dias de trabalho:</Text> {formatDetailValue(selectedDoctor?.raw?.workingDays)}</Text>
-              <Text size="sm"><Text fw={600} span>Início:</Text> {formatDetailValue(selectedDoctor?.raw?.workingHoursStart)}</Text>
-              <Text size="sm"><Text fw={600} span>Fim:</Text> {formatDetailValue(selectedDoctor?.raw?.workingHoursEnd)}</Text>
-              <Text size="sm"><Text fw={600} span>Biografia:</Text> {formatDetailValue(selectedDoctor?.raw?.biography)}</Text>
+              <Text size="sm"><Text fw={600} span>Dias de trabalho:</Text></Text>
             </SimpleGrid>
+            {Array.isArray(selectedDoctor?.raw?.workingSchedules) && selectedDoctor.raw.workingSchedules.length > 0 ? (
+              <Stack gap="xs">
+                {(selectedDoctor.raw.workingSchedules as unknown[]).map((schedule: unknown, idx: number) => {
+                  const scheduleRecord = isRecord(schedule) ? schedule : {};
+                  const days = Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean).join(', ') : '-';
+                  const hoursStart = getString(scheduleRecord.hoursStart);
+                  const hoursEnd = getString(scheduleRecord.hoursEnd);
+                  return (
+                    <Paper key={idx} p="xs" bg="rgba(0,0,0,0.02)" radius="sm">
+                      <Text size="sm">
+                        <Text fw={600} span>Turno {idx + 1}:</Text> {days} ({hoursStart}-{hoursEnd})
+                      </Text>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            ) : (
+              <Text size="sm" c="dimmed">-</Text>
+            )}
           </Stack>
         </Modal>
 

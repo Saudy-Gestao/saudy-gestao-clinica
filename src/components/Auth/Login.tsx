@@ -35,7 +35,7 @@ export function Login() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao fazer login',
+        message: error.response?.data?.message || error.response?.data?.error || 'Erro ao fazer login',
         color: 'red',
       });
     } finally {
