@@ -18,9 +18,12 @@
     "@mantine/hooks": "7.13.2",
     "@mantine/notifications": "7.13.2",
     "@tabler/icons-react": "^3.35.0",
+    "@tinymce/tinymce-react": "^5.1.1",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.19",
+    "dicom-parser": "^1.8.21",
+    "jpeg-lossless-decoder-js": "^2.1.2",
     "lucide-react": "^0.555.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -29,6 +32,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
@@ -38,16 +44,13 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^22.1.0",
     "postcss": "^8.5.6",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^1.0.0",
-    "@testing-library/react": "^14.0.0",
-    "@testing-library/jest-dom": "^6.0.0",
-    "@testing-library/user-event": "^14.0.0",
-    "jsdom": "^22.1.0"
+    "vitest": "^1.0.0"
   }
 }
