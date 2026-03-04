@@ -19,7 +19,8 @@ import {
   Center,
   Tabs,
   Badge,
-  Modal
+  Modal,
+  NumberInput
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Power, Pencil } from 'lucide-react';
@@ -37,6 +38,7 @@ interface ProcedureForm {
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   acceptedSubInsurances: Record<string, string[]>;
+  durationMinutes?: number | null;
   modalities: string[];
   doctorId: string | null;
 }
@@ -58,6 +60,7 @@ const INITIAL_FORM: ProcedureForm = {
   acceptsInsurance: false,
   acceptedInsurances: [],
   acceptedSubInsurances: {},
+  durationMinutes: null,
   modalities: [],
   doctorId: null,
 };
@@ -87,6 +90,7 @@ export function CadastroProcedimento() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastCreatedName, setLastCreatedName] = useState<string | null>(null);
+  const [lastSaveAction, setLastSaveAction] = useState<'create' | 'update'>('create');
   const [editingProcedureId, setEditingProcedureId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('cadastro');
   const [customInsuranceInput, setCustomInsuranceInput] = useState('');
@@ -150,8 +154,6 @@ export function CadastroProcedimento() {
     ],
   };
 
-
-
   useEffect(() => {
     const loadProcedures = async () => {
       setProceduresLoading(true);
@@ -175,6 +177,7 @@ export function CadastroProcedimento() {
           modalities: Array.isArray(it.modalities) ? it.modalities : [],
           doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
           isActive: Boolean(it.isActive ?? true),
+          doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
         })).filter((item: ProcedureItem) => item.id);
 
         setProcedures(mapped);
@@ -188,9 +191,7 @@ export function CadastroProcedimento() {
         setProceduresLoading(false);
       }
     };
-
-  useEffect(() => {
-    refreshProcedures();
+    loadProcedures();
   }, []);
 
   useEffect(() => {
@@ -263,6 +264,7 @@ export function CadastroProcedimento() {
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
+        durationMinutes: form.durationMinutes ?? null,
         acceptsInsurance: form.acceptsInsurance,
         acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
         acceptedSubInsurances: form.acceptsInsurance ? form.acceptedSubInsurances : {},
@@ -272,6 +274,7 @@ export function CadastroProcedimento() {
 
       if (editingProcedureId) {
         await procedureService.updateProcedure(editingProcedureId, payload);
+        setLastSaveAction('update');
         setEditingProcedureId(null);
         setForm(INITIAL_FORM);
         setDoctorSearchValue('');
@@ -279,6 +282,7 @@ export function CadastroProcedimento() {
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
         await procedureService.createProcedure(payload);
+        setLastSaveAction('create');
         setLastCreatedName(form.name.trim());
         setShowSuccessModal(true);
         setForm(INITIAL_FORM);
@@ -303,6 +307,7 @@ export function CadastroProcedimento() {
         modalities: Array.isArray(it.modalities) ? it.modalities : [],
         doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
         isActive: Boolean(it.isActive ?? true),
+        doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
       })).filter((item: ProcedureItem) => item.id);
       setProcedures(mapped);
     } catch (err: any) {
@@ -325,26 +330,6 @@ export function CadastroProcedimento() {
     setForm(INITIAL_FORM);
     setDoctorSearchValue('');
     navigate('/dashboard');
-  };
-
-  const handleStartEdit = (item: ProcedureItem) => {
-    setForm({
-      name: item.name,
-      description: item.description || '',
-      price: item.price,
-      durationMinutes: item.durationMinutes,
-      acceptsInsurance: item.acceptsInsurance,
-      acceptedInsurances: item.acceptsInsurance ? item.acceptedInsurances : [],
-      modalities: item.modalities,
-      doctorIds: item.doctorIds,
-    });
-    setEditingProcedureId(item.id);
-    setActiveTab('cadastro');
-  };
-
-  const handleCancelEdit = () => {
-    setForm(INITIAL_FORM);
-    setEditingProcedureId(null);
   };
 
   const handleAcceptsInsuranceChange = (checked: boolean) => {
@@ -427,6 +412,9 @@ export function CadastroProcedimento() {
       setForm({
         name: data.name || '',
         description: data.description || '',
+        durationMinutes: data.durationMinutes !== undefined && data.durationMinutes !== null
+          ? Number(data.durationMinutes)
+          : null,
         acceptsInsurance: Boolean(data.acceptsInsurance),
         acceptedInsurances: Array.isArray(data.acceptedInsurances) ? data.acceptedInsurances : [],
         acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},

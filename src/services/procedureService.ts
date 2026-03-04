@@ -7,6 +7,7 @@ export interface CreateProcedurePayload {
   durationMinutes?: number | null;
   acceptsInsurance?: boolean;
   acceptedInsurances?: string[];
+  acceptedSubInsurances?: Record<string, string[]>;
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
 }
@@ -18,16 +19,7 @@ export interface UpdateProcedurePayload {
   durationMinutes?: number | null;
   acceptsInsurance?: boolean;
   acceptedInsurances?: string[];
-  modalities?: string[];
-  doctors?: { doctorId: string; doctorName?: string | null }[];
-}
-
-export interface UpdateProcedurePayload {
-  name?: string;
-  description?: string;
-  price?: number | null;
-  acceptsInsurance?: boolean;
-  acceptedInsurances?: string[];
+  acceptedSubInsurances?: Record<string, string[]>;
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   isActive?: boolean;
