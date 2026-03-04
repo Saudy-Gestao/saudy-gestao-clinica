@@ -22,6 +22,7 @@ export interface CreateDoctorPayload {
   city?: string;
   state?: string;
   zipCode?: string;
+  roomId?: string | null;
   workingDays?: string[];
   workingHoursStart?: string;
   workingHoursEnd?: string;

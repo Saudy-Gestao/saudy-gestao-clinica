@@ -31,7 +31,10 @@ export function Cadastro() {
   };
 
   const handleCadastro = async () => {
-    const { email, documento, password, confirmPassword } = formData;
+    const email = formData.email.trim();
+    const documento = formData.documento.trim();
+    const password = formData.password;
+    const confirmPassword = formData.confirmPassword;
 
     if (!email || !documento || !password || !confirmPassword) {
       notifications.show({
@@ -64,7 +67,6 @@ export function Cadastro() {
             phone: '11999999999', // TODO: adicionar campo no formulário
           },
           branch: {
-            socialName: 'Filial Principal',
             tradeName: 'Filial Principal',
             address: 'Endereço padrão',
             phone: '11999999999',
@@ -81,14 +83,11 @@ export function Cadastro() {
             phone: '11999999999', // TODO: adicionar campo no formulário
             address: 'Endereço padrão', // TODO: adicionar campo no formulário
           },
-          accesses: [
-            {
-              description: 'Acesso completo ao sistema',
-            },
-          ],
+          accesses: [],
         };
 
         await AuthService.registerCompany(companyData);
+        await AuthService.login({ email, password });
       } else {
         // Registro de paciente - por enquanto simula
         // TODO: implementar registro de paciente quando houver endpoint
@@ -100,13 +99,13 @@ export function Cadastro() {
         message: 'Conta criada com sucesso!',
         color: 'green',
       });
-      
-      navigate('/login');
+
+      navigate(isEmpresa ? '/dashboard' : '/login');
     } catch (error: any) {
       console.error('Erro no registro:', error);
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao criar conta',
+        message: error.response?.data?.message || error.response?.data?.error || error.response?.data?.details || 'Erro ao criar conta',
         color: 'red',
       });
     } finally {

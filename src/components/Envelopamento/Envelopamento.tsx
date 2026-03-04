@@ -182,7 +182,7 @@ export function Envelopamento() {
   };  
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -192,10 +192,10 @@ export function Envelopamento() {
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Envelopamento
               </Text>
-              <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Preparação de docs
               </Text>
             </Box>
@@ -210,7 +210,7 @@ export function Envelopamento() {
 
           <Tabs.Panel value="cadastro" pt="xs">
             <Paper p="md" radius="md" withBorder>
-              <Title order={5} fw={600} c={DARK_BLUE} mb="sm">Cadastrar Envelopamento</Title>
+              <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm">Cadastrar Envelopamento</Title>
               <Box style={{ padding: 8 }}>
                 <Box className="floating-field" style={{ marginBottom: 8 }}>
                   <input type="text" value={envelopeData.nome} onChange={(e) => setEnvelopeData({ ...envelopeData, nome: e.currentTarget.value })} placeholder=" " />
@@ -266,7 +266,7 @@ export function Envelopamento() {
               <Group gap="md" align="flex-end">
                 <TextInput
                   placeholder={isMobile ? 'Buscar...' : 'Buscar por nome...'}
-                  leftSection={<Search size={16} color="#999" />}
+                  leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
                   value={query}
                   onChange={(e) => setQuery(e.currentTarget.value)}
                   radius="md"
@@ -363,7 +363,7 @@ export function Envelopamento() {
 
                           <ActionIcon
                             variant="subtle"
-                            color={DARK_BLUE}
+                            style={{ color: 'var(--mantine-color-text)' }}
                             onClick={() => { handleEditEnvelopment(r); }}
                             title="Editar"
                             aria-label="Editar"
@@ -379,7 +379,7 @@ export function Envelopamento() {
                             onClick={() => openEnvelope(r, true)}
                             title="Visualizar"
                             aria-label="Visualizar"
-                            style={{ color: '#001F54', cursor: 'pointer' }}
+                            style={{ color: 'var(--mantine-color-text)', cursor: 'pointer' }}
                           >
                             <Eye size={18} />
                           </ActionIcon>

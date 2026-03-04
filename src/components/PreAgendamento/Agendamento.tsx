@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Group,
@@ -80,8 +80,44 @@ const TIME_SLOTS = {
   'Noite': ['18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'],
 };
 
+const normalizeAppointmentStatus = (status?: string | null): string => {
+  const normalized = String(status || '').trim().toUpperCase();
+  if (normalized === 'AGENDADO') return 'AGENDADO';
+  if (normalized === 'CANCELADO') return 'CANCELADO';
+  if (normalized === 'PENDENTE') return 'PENDENTE';
+  return 'PENDENTE';
+};
+
+const sortAgendamentosByDateTime = (items: Agendamento[]): Agendamento[] => {
+  return [...items].sort((a, b) => {
+    const aStamp = dayjs(`${a.data}T${a.hora || '00:00'}:00`).valueOf();
+    const bStamp = dayjs(`${b.data}T${b.hora || '00:00'}:00`).valueOf();
+    return bStamp - aStamp;
+  });
+};
+
+const normalizeDateOnly = (value: unknown): string => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  const parsed = dayjs(raw);
+  if (!parsed.isValid()) return raw;
+  return parsed.format('YYYY-MM-DD');
+};
+
+const resolveTurnoFromTime = (time?: string): 'Manhã' | 'Tarde' | 'Noite' | null => {
+  const [hourRaw] = String(time || '').split(':');
+  const hour = Number(hourRaw);
+  if (!Number.isFinite(hour)) return null;
+  if (hour < 12) return 'Manhã';
+  if (hour < 18) return 'Tarde';
+  return 'Noite';
+};
+
 export function Agendamento() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const handledPrefillRef = useRef(false);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -116,10 +152,10 @@ export function Agendamento() {
   const [savingAgendamento, setSavingAgendamento] = useState(false);
 
   // Estados para os filtros
-  const [especialidade, setEspecialidade] = useState('');
-  const [convenio, setConvenio] = useState('');
-  const [dataHoraFiltro, setDataHoraFiltro] = useState<Date | null>(null);
-  const [turno, setTurno] = useState('');
+  const [especialidade, setEspecialidade] = useState<string | null>(null);
+  const [convenio, setConvenio] = useState<string | null>(null);
+  const [dataHoraFiltro, setDataHoraFiltro] = useState<Date | null>(new Date());
+  const [turno, setTurno] = useState<string[]>([]);
 
   // State for custom date picker
   const [pickerOpened, setPickerOpened] = useState(false);
@@ -140,10 +176,10 @@ export function Agendamento() {
     medicoNome: it.doctorName || it.doctor_name || it.doctor?.name || it.medicoNome || '',
     especialidade: it.specialty || it.procedure || it.procedureName || it.procedimento || it.especialidade || '',
     convenio: it.convenio || it.insurance || it.healthInsuranceName || '',
-    data: it.date || it.data || '',
+    data: normalizeDateOnly(it.date || it.data || ''),
     hora: it.time || it.hora || '',
     tipoConsulta: it.type || it.tipoConsulta || '',
-    status: it.status || '',
+    status: normalizeAppointmentStatus(it.status),
     observacoes: it.observations || it.observacoes || '',
     totem: it.totem ?? undefined,
   });
@@ -157,7 +193,7 @@ export function Agendamento() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data: any = await appointmentService.list();
+        const data: any = await appointmentService.list({ limit: 2000, offset: 0 });
         const list: any[] = Array.isArray(data)
           ? data
           : (Array.isArray(data?.items)
@@ -165,7 +201,7 @@ export function Agendamento() {
             : (Array.isArray(data?.data)
               ? data.data
               : []));
-        setAgendamentos(list.map(mapApiToAgendamento));
+        setAgendamentos(sortAgendamentosByDateTime(list.map(mapApiToAgendamento)));
       } catch (err: any) {
         showNotification({
           title: 'Erro',
@@ -336,12 +372,30 @@ export function Agendamento() {
     return TIME_SLOTS[period as keyof typeof TIME_SLOTS] || [];
   };
 
-  const filteredAgendamentos = agendamentos.filter(
-    (agendamento) =>
-      agendamento.pacienteNome.toLowerCase().includes(searchValue.toLowerCase()) ||
-      agendamento.pacienteCPF.includes(searchValue) ||
-      agendamento.medicoNome.toLowerCase().includes(searchValue.toLowerCase())
-  );
+  const filteredAgendamentos = agendamentos.filter((agendamento) => {
+    const normalizedSearch = searchValue.trim().toLowerCase();
+    const matchesSearch = !normalizedSearch
+      || agendamento.pacienteNome.toLowerCase().includes(normalizedSearch)
+      || agendamento.pacienteCPF.includes(normalizedSearch)
+      || agendamento.medicoNome.toLowerCase().includes(normalizedSearch);
+
+    const normalizedEspecialidade = String(especialidade || '').trim().toLowerCase();
+    const matchesEspecialidade = !normalizedEspecialidade
+      || agendamento.especialidade.toLowerCase().includes(normalizedEspecialidade)
+      || agendamento.tipoConsulta.toLowerCase().includes(normalizedEspecialidade);
+
+    const normalizedConvenio = String(convenio || '').trim().toLowerCase();
+    const matchesConvenio = !normalizedConvenio
+      || agendamento.convenio.toLowerCase().includes(normalizedConvenio);
+
+    const matchesDate = !dataHoraFiltro
+      || dayjs(agendamento.data).isSame(dayjs(dataHoraFiltro), 'day');
+
+    const matchesTurno = turno.length === 0
+      || turno.includes(resolveTurnoFromTime(agendamento.hora) || '');
+
+    return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesTurno;
+  });
 
   const handleEditAgendamento = (agendamento: Agendamento) => {
     setNovoAgendamento({
@@ -452,7 +506,7 @@ export function Agendamento() {
           status: current?.status || undefined,
           totem: current?.totem,
         });
-        setAgendamentos((prev) => prev.map((a) => (a.id === editingAgendamentoId ? mapApiToAgendamento(updated) : a)));
+        setAgendamentos((prev) => sortAgendamentosByDateTime(prev.map((a) => (a.id === editingAgendamentoId ? mapApiToAgendamento(updated) : a))));
         showNotification({
           title: 'Agendamento atualizado',
           message: 'Dados do agendamento atualizados com sucesso.',
@@ -471,10 +525,10 @@ export function Agendamento() {
       try {
         const created = await appointmentService.create({
           ...basePayload,
-          status: 'Pendente',
+          status: 'PENDENTE',
           totem: Math.floor(Math.random() * 100) + 1,
         });
-        setAgendamentos((prev) => [mapApiToAgendamento(created), ...prev]);
+        setAgendamentos((prev) => sortAgendamentosByDateTime([mapApiToAgendamento(created), ...prev]));
         showNotification({
           title: 'Agendamento criado',
           message: 'Agendamento realizado com sucesso.',
@@ -504,7 +558,7 @@ export function Agendamento() {
 
     try {
       const updated = await appointmentService.update(agendamentoId, { status: newStatus });
-      setAgendamentos((prev) => prev.map((a) => (a.id === agendamentoId ? mapApiToAgendamento(updated) : a)));
+      setAgendamentos((prev) => sortAgendamentosByDateTime(prev.map((a) => (a.id === agendamentoId ? mapApiToAgendamento(updated) : a))));
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -515,14 +569,14 @@ export function Agendamento() {
   };
 
   const rows = filteredAgendamentos.map((agendamento) => (
-    <Box key={agendamento.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #e9ecef' }}>
+    <Box key={agendamento.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
       {/* Time column - centered */}
       <Box style={{ minWidth: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Text size="sm" fw={400} style={{ color: '#495057' }}>{agendamento.hora}</Text>
+        <Text size="sm" fw={500} c="var(--mantine-color-text)">{agendamento.hora}</Text>
       </Box>
 
       {/* Vertical separator and main content */}
-      <Box onClick={() => handleEditAgendamento(agendamento)} style={{ borderLeft: !isMobile ? '1px solid #e9ecef' : 'none', paddingLeft: !isMobile ? 16 : 0, flex: 1, cursor: 'pointer' }}>
+      <Box onClick={() => handleEditAgendamento(agendamento)} style={{ borderLeft: !isMobile ? '1px solid var(--mantine-color-default-border)' : 'none', paddingLeft: !isMobile ? 16 : 0, flex: 1, cursor: 'pointer' }}>
         <Text fw={600} size="sm">{agendamento.pacienteNome}</Text>
         <Text size="xs" c="dimmed" mt={6}>
           {getResumoLinha(agendamento)}
@@ -534,12 +588,12 @@ export function Agendamento() {
         <Box style={{ minWidth: 140 }}>
           <Select
             data={[
-              { value: 'Pendente', label: 'Pendente' },
-              { value: 'Agendado', label: 'Agendado' },
-              { value: 'Cancelado', label: 'Cancelado' },
+              { value: 'PENDENTE', label: 'Pendente' },
+              { value: 'AGENDADO', label: 'Agendado' },
+              { value: 'CANCELADO', label: 'Cancelado' },
             ]}
             value={agendamento.status}
-            onChange={(value) => handleStatusChange(agendamento.id, value || 'Pendente')}
+            onChange={(value) => handleStatusChange(agendamento.id, value || 'PENDENTE')}
             size="xs"
             radius="md"
             w={120}
@@ -555,8 +609,44 @@ export function Agendamento() {
     return acc;
   }, {});
 
+  useEffect(() => {
+    if (handledPrefillRef.current) return;
+
+    const state = location.state as { prefillAppointment?: any; source?: string } | null;
+    if (!state?.prefillAppointment) return;
+
+    handledPrefillRef.current = true;
+
+    const appt = state.prefillAppointment;
+    const specialty = String(appt.specialty || appt.procedure || appt.procedureName || '').trim();
+    const specialties = specialty
+      ? specialty.split(',').map((item: string) => item.trim()).filter(Boolean)
+      : [];
+
+    setSelectedPatientId(appt.patientId || null);
+    setNovoAgendamento({
+      pacienteId: appt.patientId || '',
+      pacienteNome: appt.patientName || '',
+      pacienteCPF: appt.patientCpf || '',
+      especialidade: specialty,
+      convenio: appt.convenio || '',
+      data: appt.date ? new Date(`${appt.date}T00:00:00`) : null,
+      hora: appt.time || '',
+      profissional: appt.doctorName || '',
+      tipoConsulta: appt.type || '',
+      informacoes: appt.observations || '',
+    });
+    setSelectedSpecialties(specialties);
+    setSummaryItems(specialties);
+    setIsEditing(true);
+    setEditingAgendamentoId(String(appt.id || ''));
+    setModalOpen(true);
+
+    navigate('/agendamento', { replace: true, state: null });
+  }, [location.state, navigate]);
+
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
@@ -566,10 +656,10 @@ export function Agendamento() {
             <ChevronLeft size={28} />
           </ActionIcon>
           <Box>
-            <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+            <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
               Agendamento
             </Text>
-            <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+            <Text size="sm" c="dimmed">
               Consultas e exames
             </Text>
           </Box>
@@ -579,25 +669,31 @@ export function Agendamento() {
         <Box mb={isMobile ? 20 : 30}>
           <Group gap="md" align="flex-end" wrap="nowrap">
             {/* Filtros */}
-            <Box className="floating-field">
-              <input
-                type="text"
-                value={especialidade}
-                onChange={(e) => setEspecialidade(e.currentTarget.value)}
-                placeholder=" "
-              />
-              <label>Especialidade</label>
-            </Box>
+            <Select
+              label="Especialidade"
+              placeholder={proceduresLoading ? 'Carregando procedimentos...' : 'Selecione'}
+              data={procedureOptions}
+              value={especialidade}
+              onChange={setEspecialidade}
+              searchable
+              clearable
+              disabled={proceduresLoading}
+              nothingFoundMessage="Nenhum procedimento encontrado"
+              style={{ minWidth: 220 }}
+            />
 
-            <Box className="floating-field">
-              <input
-                type="text"
-                value={convenio}
-                onChange={(e) => setConvenio(e.currentTarget.value)}
-                placeholder=" "
-              />
-              <label>Convênio</label>
-            </Box>
+            <Select
+              label="Convênio"
+              placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione'}
+              data={insuranceOptions}
+              value={convenio}
+              onChange={setConvenio}
+              searchable
+              clearable
+              disabled={insurancesLoading}
+              nothingFoundMessage="Nenhum convênio encontrado"
+              style={{ minWidth: 220 }}
+            />
 
             <Popover 
               opened={pickerOpened} 
@@ -612,7 +708,7 @@ export function Agendamento() {
                 <TextInput
                   label="Data e Hora"
                   placeholder="Selecione data e hora"
-                  value={dataHoraFiltro ? dayjs(dataHoraFiltro).format('DD/MM/YYYY | HH:mm:ss') : ''}
+                  value={dataHoraFiltro ? dayjs(dataHoraFiltro).format('DD/MM/YYYY | HH:mm:ss') : dayjs().format('DD/MM/YYYY | HH:mm:ss')}
                   onClick={() => {
                     const initialDate = dataHoraFiltro || new Date();
                     setTempDate(initialDate);
@@ -659,8 +755,8 @@ export function Agendamento() {
                           onClick={() => setSelectedPeriod(period)}
                           bg={selectedPeriod === period ? DARK_BLUE : undefined}
                           style={{ 
-                            borderColor: selectedPeriod === period ? DARK_BLUE : '#dee2e6',
-                            color: selectedPeriod === period ? 'white' : '#495057'
+                            borderColor: selectedPeriod === period ? DARK_BLUE : 'var(--mantine-color-default-border)',
+                            color: selectedPeriod === period ? 'white' : 'var(--mantine-color-text)'
                           }}
                         >
                           {period}
@@ -675,13 +771,13 @@ export function Agendamento() {
                             key={time}
                             onClick={() => setTempTime(time)}
                             style={{
-                              backgroundColor: tempTime === time ? '#e7f5ff' : 'transparent',
-                              border: `1px solid ${tempTime === time ? '#1c7ed6' : '#dee2e6'}`,
+                              backgroundColor: tempTime === time ? 'rgba(28, 126, 214, 0.18)' : 'transparent',
+                              border: `1px solid ${tempTime === time ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-default-border)'}`,
                               borderRadius: 4,
                               padding: '4px 0',
                               textAlign: 'center',
                               fontSize: '0.875rem',
-                              color: tempTime === time ? '#1c7ed6' : '#495057',
+                              color: tempTime === time ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-text)',
                               cursor: 'pointer'
                             }}
                           >
@@ -694,11 +790,11 @@ export function Agendamento() {
                     <Group mt="md" justify="space-between">
                       <Group gap="xs">
                         <Group gap={4}>
-                          <Box w={12} h={12} style={{ border: '1px solid #dee2e6', borderRadius: 2 }} />
+                          <Box w={12} h={12} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 2 }} />
                           <Text size="xs" c="dimmed">Disponível</Text>
                         </Group>
                         <Group gap={4}>
-                          <Box w={12} h={12} bg="#e9ecef" style={{ borderRadius: 2 }} />
+                          <Box w={12} h={12} bg="var(--mantine-color-default)" style={{ borderRadius: 2 }} />
                           <Text size="xs" c="dimmed">Indisponível</Text>
                         </Group>
                       </Group>
@@ -708,7 +804,7 @@ export function Agendamento() {
                           setTempDate(new Date());
                           setViewedDate(new Date());
                           setTempTime(null);
-                          setDataHoraFiltro(null);
+                          setDataHoraFiltro(new Date());
                         }}>
                           Redefinir
                         </Button>
@@ -747,7 +843,7 @@ export function Agendamento() {
               </Popover.Dropdown>
             </Popover>
 
-            <Select
+            <MultiSelect
               label="Turno"
               placeholder="Selecione"
               data={[
@@ -756,14 +852,14 @@ export function Agendamento() {
                 { value: 'Noite', label: 'Noite' },
               ]}
               value={turno}
-              onChange={(value) => setTurno(value || '')}
+              onChange={setTurno}
               clearable
             />
 
             {/* Search Bar */}
             <TextInput
               placeholder={isMobile ? "Buscar..." : "Buscar por paciente, CPF ou médico..."}
-              leftSection={<Search size={16} color="#999" />}
+              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
               value={searchValue}
               onChange={(e) => setSearchValue(e.currentTarget.value)}
               radius="md"
@@ -832,7 +928,7 @@ export function Agendamento() {
         )}
 
         {/* Agendamentos List */}
-        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6}}>
+        <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6}}>
           {/* LIST */}
           {layout === 'list' && (
             <Box>
@@ -847,13 +943,13 @@ export function Agendamento() {
                 {filteredAgendamentos.length > 0 ? filteredAgendamentos.map(a => {
                   const isExpanded = expandedIds.includes(a.id);
                   return (
-                    <Box key={a.id} p="md" style={{ border: '1px solid #e9ecef', borderRadius: 8 }}>
+                    <Box key={a.id} p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
                       <Group justify="apart" align="flex-start">
                         <Box>
                           <Text fw={700}>{a.pacienteNome || '—'}</Text>
                           <Text size="xs" c="dimmed">{a.hora} • {a.tipoConsulta}</Text>
                         </Box>
-                        <Text size="xs" style={{ color: a.status ? '#16a34a' : '#6c757d' }}>{a.status || '—'}</Text>
+                        <Text size="xs" c={a.status ? 'green.5' : 'dimmed'}>{a.status || '—'}</Text>
                       </Group>
 
                       {!isExpanded ? (
@@ -894,7 +990,7 @@ export function Agendamento() {
                   </ActionIcon>
                 </Group>
                 <Group>
-                  <Button size="xs" variant={selectedDay ? 'outline' : 'filled'} onClick={() => { setSelectedDay(null); setDataHoraFiltro(null); }}>
+                  <Button size="xs" variant={selectedDay ? 'outline' : 'filled'} onClick={() => { setSelectedDay(null); setDataHoraFiltro(new Date()); }}>
                     Limpar seleção
                   </Button>
                 </Group>
@@ -953,9 +1049,9 @@ export function Agendamento() {
                           borderRadius: 8,
                           cursor: 'pointer',
                           background: isSelected ? DARK_BLUE : 'transparent',
-                          color: isSelected ? 'white' : isCurrentMonth ? undefined : '#adb5bd',
+                          color: isSelected ? 'white' : isCurrentMonth ? 'var(--mantine-color-text)' : 'var(--mantine-color-dimmed)',
                           boxShadow: isSelected ? '0 6px 18px rgba(0,0,0,0.06)' : undefined,
-                          border: isToday && !isSelected ? '1px solid #dee2e6' : undefined,
+                          border: isToday && !isSelected ? '1px solid var(--mantine-color-default-border)' : undefined,
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between'
@@ -993,7 +1089,7 @@ export function Agendamento() {
                 <Stack gap={8}>
                   {selectedDay && (agendamentosByDate[dayjs(selectedDay).format('YYYY-MM-DD')] || []).length > 0 ? (
                     (agendamentosByDate[dayjs(selectedDay).format('YYYY-MM-DD')] || []).map(a => (
-                      <Box key={a.id} style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, border: '1px solid #e9ecef', marginBottom: 8 }}>
+                      <Box key={a.id} style={{ padding: 12, background: 'var(--mantine-color-default)', borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', marginBottom: 8 }}>
                         <Group align="center" style={{ width: '100%' }}>
                           <Box style={{ flex: 1 }}>
                             <Text fw={600}>{a.hora} — {a.pacienteNome || '—'}</Text>
@@ -1169,7 +1265,7 @@ export function Agendamento() {
             }
           />
 
-          <Box style={{ border: '1px solid #e9ecef', borderRadius: 8, padding: 12 }}>
+          <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8, padding: 12 }}>
             <Text fw={600} size="sm" mb={6}>Resumo</Text>
             {summaryItems.length > 0 ? (
               summaryItems.map((item) => (

@@ -1,4 +1,4 @@
-import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon } from '@mantine/core';
+import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import userService from '../../services/userService';
@@ -15,13 +15,17 @@ import {
   Warehouse,
   Wallet,
   DollarSign,
+  Brain,
+  ShieldCheck,
   ChevronRight
 } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
+  const { colorScheme } = useMantineColorScheme();
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
+  const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
 
   const extractModulesFromAccesses = (accesses: any[]) => {
     const modules: string[] = [];
@@ -82,9 +86,9 @@ export function WorkflowSections() {
     {
       title: 'Fluxo do Paciente',
       items: [
-        { icon: UserPlus, label: 'Pré-atendimento', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
         { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/anamnese', moduleName: 'anamnese' },
+        { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
         { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/enfermagem', moduleName: 'enfermagem' },
       ]
     },
@@ -95,6 +99,8 @@ export function WorkflowSections() {
         { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo', moduleName: 'laudo' },
         { icon: FileText, label: 'Laudo por Exame', desc: 'Fila com editor de laudo', route: '/laudo-exames', moduleName: 'laudo' },
         { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento', moduleName: 'envelopamento' },
+        { icon: ShieldCheck, label: 'Autorização Convênio', desc: 'Autorizações pendentes', route: '/autorizacao-convenio', moduleName: 'autorizacao-convenio' },
+        { icon: Brain, label: 'Módulo TEA', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
         { icon: Folder, label: 'Documentos', desc: 'Gestão documental', moduleName: 'documentos' },
       ]
     },
@@ -109,6 +115,7 @@ export function WorkflowSections() {
         { icon: ClipboardList, label: 'Cadastro de Procedimentos', desc: 'Procedimentos e modalidades', route: '/cadastro-procedimento', moduleName: 'cadastro-procedimento' },
         { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio', moduleName: 'cadastro-convenio' },
         { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente', moduleName: 'cadastro-paciente' },
+        { icon: Warehouse, label: 'Cadastro de Salas', desc: 'Salas por filial', route: '/cadastro-sala', moduleName: 'cadastro-sala' },
       ]
     }
   ];
@@ -150,27 +157,34 @@ export function WorkflowSections() {
             {section.items.map((item, i) => (
               <Paper 
                 key={i} 
-                p="md" 
+                p="xs" 
                 withBorder 
                 style={{
                   cursor: item.route ? 'pointer' : 'default',
-                  borderColor: DARK_BLUE,
-                  minHeight: 96,
+                  borderColor: 'var(--mantine-color-default-border)',
+                  minHeight: 60,
                   height: '100%'
                 }}
-                onClick={() => item.route && navigate(item.route)}
+                onClick={() => {
+                  if (!item.route) return;
+                  if (item.moduleName === 'modulo-tea') {
+                    navigate(item.route, { state: { fromModuleHub: true } });
+                    return;
+                  }
+                  navigate(item.route);
+                }}
               >
                 <Group justify="space-between" align="flex-start">
-                  <Group>
-                    <ThemeIcon size="xl" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${DARK_BLUE}`, borderRadius: '8px' }}>
-                      <item.icon size={28} color={DARK_BLUE} />
+                  <Group gap="xs">
+                    <ThemeIcon size="md" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${accentColor}`, borderRadius: '6px' }}>
+                      <item.icon size={18} color={accentColor} />
                     </ThemeIcon>
                     <Box>
-                      <Text fw={500} lineClamp={1}>{item.label}</Text>
+                      <Text fw={500} size="sm" lineClamp={1}>{item.label}</Text>
                       <Text size="xs" c="dimmed" lineClamp={1}>{item.desc}</Text>
                     </Box>
                   </Group>
-                  {item.route && <ChevronRight size={16} color="#cbd5e0" />}
+                  {item.route && <ChevronRight size={16} color="var(--mantine-color-dimmed)" />}
                 </Group>
               </Paper>
             ))}

@@ -30,7 +30,6 @@ export interface CompanyRegisterData {
     phone: string;
   };
   branch: {
-    socialName: string;
     tradeName: string;
     address: string;
     phone: string;

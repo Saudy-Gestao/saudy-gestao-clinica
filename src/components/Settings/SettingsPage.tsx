@@ -15,6 +15,7 @@ import {
   Loader, 
   MultiSelect,
   Grid,
+  Badge,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -29,7 +30,7 @@ import {
   Trash, 
   Save,
   UserPlus,
-  ChevronLeft
+  ChevronLeft,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -53,7 +54,7 @@ import {
 } from '../../utils/validations';
 
 const PageContainer = ({ children }: { children: React.ReactNode }) => (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto" w="100%" style={{ flex: 1 }}>
         <Stack gap="lg">{children}</Stack>
@@ -63,7 +64,7 @@ const PageContainer = ({ children }: { children: React.ReactNode }) => (
 
 const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
     <Box mb="md">
-        <Title order={2} size="h3" fw={600} c={DARK_BLUE}>{title}</Title>
+        <Title order={2} size="h3" fw={600} c="var(--mantine-color-text)">{title}</Title>
         {desc && <Text c="dimmed" size="sm">{desc}</Text>}
     </Box>
 );
@@ -91,9 +92,39 @@ export function SettingsPage() {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<any | null>(null);
-  const [branchForm, setBranchForm] = useState({ socialName: '', tradeName: '', address: '', phone: '' });
+  const [branchForm, setBranchForm] = useState<{ tradeName: string; address: string; phone: string; type: 'Filial' | 'Matriz' }>({
+    tradeName: '',
+    address: '',
+    phone: '',
+    type: 'Filial',
+  });
   const [savingBranch, setSavingBranch] = useState(false);
   const [branchErrors, setBranchErrors] = useState<Record<string, string>>({});
+
+  const isBranchMatriz = (branch: any) => {
+    if (!branch) return false;
+
+    const raw = branch.isMatriz;
+    if (
+      raw === true ||
+      raw === 1 ||
+      raw === '1' ||
+      raw === 'true' ||
+      raw === 't' ||
+      raw === 'TRUE' ||
+      raw === 'T'
+    ) {
+      return true;
+    }
+
+    if (branch.type === 'Matriz' || branch.tipo === 'Matriz') return true;
+    return false;
+  };
+
+  const normalizeBranch = (branch: any) => ({
+    ...branch,
+    isMatriz: isBranchMatriz(branch),
+  });
 
   // Sectors
   const [sectors, setSectors] = useState<any[]>([]);
@@ -159,9 +190,10 @@ export function SettingsPage() {
           phone: comp.phone || '' 
         });
       }
+      // Forçar refetch dos branches
       fetchBranches();
     }
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, companies]);
 
   // Reload companies when userCompanyId is set
   useEffect(() => {
@@ -261,7 +293,9 @@ export function SettingsPage() {
     try {
       const data = await branchService.listBranches();
       // Filter by selected company
-      const filtered = (data || []).filter((b: any) => b.companyId === selectedCompanyId);
+      const filtered = (data || [])
+        .filter((b: any) => b.companyId === selectedCompanyId)
+        .map((b: any) => normalizeBranch(b));
       setBranches(filtered);
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar filiais', color: 'red' });
@@ -272,14 +306,19 @@ export function SettingsPage() {
 
   const openBranchModalForCreate = () => {
     setEditingBranch(null);
-    setBranchForm({ socialName: '', tradeName: '', address: '', phone: '' });
+    setBranchForm({ tradeName: '', address: '', phone: '', type: 'Filial' });
     setBranchErrors({});
     setBranchModalOpen(true);
   };
 
   const openBranchModalForEdit = (branch: any) => {
     setEditingBranch(branch);
-    setBranchForm({ socialName: branch.socialName || '', tradeName: branch.tradeName || '', address: branch.address || '', phone: branch.phone || '' });
+    setBranchForm({
+      tradeName: branch.tradeName || '',
+      address: branch.address || '',
+      phone: branch.phone || '',
+      type: isBranchMatriz(branch) ? 'Matriz' : 'Filial',
+    });
     setBranchErrors({});
     setBranchModalOpen(true);
   };
@@ -302,11 +341,31 @@ export function SettingsPage() {
     setBranchErrors({});
     setSavingBranch(true);
     try {
+      const payload = {
+        tradeName: branchForm.tradeName,
+        address: branchForm.address,
+        phone: branchForm.phone,
+        isMatriz: editingBranch ? branchForm.type === 'Matriz' : false,
+        type: editingBranch ? branchForm.type : 'Filial',
+      };
+
       if (editingBranch) {
-        await branchService.updateBranch(editingBranch.id, branchForm);
+        await branchService.updateBranch(editingBranch.id, payload);
+        setBranches((prev) =>
+          prev.map((branch) => {
+            if (branch.id === editingBranch.id) {
+              return normalizeBranch({ ...branch, ...payload, isMatriz: payload.isMatriz });
+            }
+            if (payload.isMatriz && branch.companyId === editingBranch.companyId) {
+              return normalizeBranch({ ...branch, isMatriz: false });
+            }
+            return normalizeBranch(branch);
+          })
+        );
         notifications.show({ title: 'Sucesso', message: 'Filial atualizada', color: 'green' });
       } else {
-        await branchService.createBranch({ ...branchForm, companyId: selectedCompanyId });
+        const created = await branchService.createBranch({ ...payload, companyId: selectedCompanyId });
+        setBranches((prev) => [...prev.map((branch) => normalizeBranch(branch)), normalizeBranch(created)]);
         notifications.show({ title: 'Sucesso', message: 'Filial criada', color: 'green' });
       }
       setBranchModalOpen(false);
@@ -409,8 +468,16 @@ export function SettingsPage() {
   // Users
   const fetchAccesses = async () => {
     try {
-      const data = await accessService.listAccesses();
-      setAccessesList(data || []);
+      // Buscar acessos do usuário autenticado
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        setAccessesList([]);
+        return;
+      }
+      
+      const user = JSON.parse(userStr);
+      const freshUser = await userService.getUser(user?.id);
+      setAccessesList(freshUser.accesses || []);
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar acessos', color: 'red' });
     }
@@ -590,11 +657,17 @@ export function SettingsPage() {
     setAccessErrors({});
     setSavingAccess(true);
     try {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      
       if (editingAccess) {
         await accessService.updateAccess(editingAccess.id, accessForm);
         notifications.show({ title: 'Sucesso', message: 'Acesso atualizado', color: 'green' });
       } else {
-        await accessService.createAccess(accessForm);
+        const newAccess = await accessService.createAccess(accessForm);
+        // Vincular o novo acesso ao usuário autenticado
+        if (currentUser?.id && newAccess?.id) {
+          await userService.addAccessToUser(currentUser.id, newAccess.id);
+        }
         notifications.show({ title: 'Sucesso', message: 'Acesso criado', color: 'green' });
       }
       setAccessModalOpen(false);
@@ -610,8 +683,19 @@ export function SettingsPage() {
   const handleDeleteAccess = async (id: string) => {
     if (!window.confirm('Excluir acesso?')) return;
     try {
-      await accessService.deleteAccess(id);
-      notifications.show({ title: 'Sucesso', message: 'Acesso excluído', color: 'green' });
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      // Remover acesso do usuário (ao invés de deletar do banco)
+      if (currentUser?.id) {
+        const user = await userService.getUser(currentUser.id);
+        const updatedAccessIds = (user.accesses || [])
+          .map((a: any) => a.id)
+          .filter((accessId: string) => accessId !== id);
+        await userService.updateUser(currentUser.id, { accessIds: updatedAccessIds });
+      }
+      
+      notifications.show({ title: 'Sucesso', message: 'Acesso removido', color: 'green' });
+      await refreshLoggedUserInStorage();
       fetchAccesses();
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir acesso', color: 'red' });
@@ -747,8 +831,8 @@ export function SettingsPage() {
                                     <Table.Thead>
                                         <Table.Tr style={{ borderBottom: 'none' }}>
                                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome Fantasia</Table.Th>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Razão Social</Table.Th>
                                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Telefone</Table.Th>
+                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>
                                             <Table.Th style={{ width: '100px' }}></Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
@@ -756,17 +840,28 @@ export function SettingsPage() {
                                         {(branches || []).map(branch => (
                                             <Table.Tr key={branch.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                                 <Table.Td><Text size="sm" fw={500}>{branch.tradeName}</Text></Table.Td>
-                                                <Table.Td><Text size="sm">{branch.socialName}</Text></Table.Td>
                                                 <Table.Td><Text size="sm">{branch.phone}</Text></Table.Td>
+                                                <Table.Td>
+                                                    <Badge 
+                                                  color={isBranchMatriz(branch) ? 'blue' : 'gray'} 
+                                                        variant="light" 
+                                                        size="sm"
+                                                  fw={isBranchMatriz(branch) ? 600 : 500}
+                                                    >
+                                                  {isBranchMatriz(branch) ? 'Matriz' : 'Filial'}
+                                                    </Badge>
+                                                </Table.Td>
                                                 <Table.Td>
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openBranchModalForEdit(branch)}><Edit size={16} /></ActionIcon>
-                                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteBranch(branch.id)}><Trash size={16} /></ActionIcon>
+                                                  {!isBranchMatriz(branch) && (
+                                                            <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteBranch(branch.id)}><Trash size={16} /></ActionIcon>
+                                                        )}
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
                                         ))}
-                                        {branches.length === 0 && <Table.Tr><Table.Td colSpan={4} align="center">Nenhuma filial cadastrada</Table.Td></Table.Tr>}
+                                        {branches.length === 0 && <Table.Tr><Table.Td colSpan={5} align="center">Nenhuma filial cadastrada</Table.Td></Table.Tr>}
                                     </Table.Tbody>
                                 </Table>
                             </Box>
@@ -778,12 +873,6 @@ export function SettingsPage() {
                                   value={branchForm.tradeName} 
                                   onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
                                   error={branchErrors.tradeName}
-                                />
-                                <FloatingInput 
-                                  label="Razão Social" 
-                                  value={branchForm.socialName} 
-                                  onChange={(e: any) => setBranchForm({ ...branchForm, socialName: e.currentTarget.value })} 
-                                  error={branchErrors.socialName}
                                 />
                                 <FloatingInput 
                                   label="Telefone" 

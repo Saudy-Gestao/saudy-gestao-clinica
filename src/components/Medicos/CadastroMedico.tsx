@@ -8,7 +8,6 @@ import {
   Select,
   Textarea,
   TextInput,
-  NumberInput,
   MultiSelect,
   SimpleGrid,
   Stack,
@@ -24,16 +23,62 @@ import {
   Badge
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, Power } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
 import doctorService from '../../services/doctorService';
+import sectorService from '../../services/sectorService';
 import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
+
+type ApiRecord = Record<string, unknown>;
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+      fields?: Record<string, string>;
+      details?: string;
+      error?: string;
+    };
+  };
+  message?: string;
+};
+
+const isRecord = (value: unknown): value is ApiRecord => typeof value === 'object' && value !== null;
+
+const getString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+const getDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+};
+
+const getBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (value == null) return fallback;
+  return Boolean(value);
+};
+
+const getApiList = (response: unknown): ApiRecord[] => {
+  if (Array.isArray(response)) return response as ApiRecord[];
+  const record = isRecord(response) ? response : {};
+  if (Array.isArray(record.items)) return record.items as ApiRecord[];
+  const nested = record.data;
+  if (Array.isArray(nested)) return nested as ApiRecord[];
+  const nestedRecord = isRecord(nested) ? nested : {};
+  if (Array.isArray(nestedRecord.items)) return nestedRecord.items as ApiRecord[];
+  return [];
+};
 
 interface DoctorForm {
   nome: string;
@@ -48,7 +93,6 @@ interface DoctorForm {
   rg: string;
   specialty: string;
   specialties: string[];
-  consultationFee: number | null;
   biography: string;
   address: string;
   addressNumber: string;
@@ -57,10 +101,13 @@ interface DoctorForm {
   city: string;
   state: string;
   zipCode: string;
+  roomId: string;
   isActive: boolean;
-  workingDays: string[];
-  workingHoursStart: string;
-  workingHoursEnd: string;
+  workingSchedules: Array<{
+    days: string[];
+    hoursStart: string;
+    hoursEnd: string;
+  }>;
 }
 
 interface DoctorListItem {
@@ -70,12 +117,12 @@ interface DoctorListItem {
   crmState: string;
   specialty: string;
   isActive: boolean;
-  raw: any;
+  raw: ApiRecord;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Title order={5} fw={600} c={DARK_BLUE} mb="sm" mt="md">
+    <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
       {children}
     </Title>
   );
@@ -94,7 +141,6 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   rg: '',
   specialty: '',
   specialties: [],
-  consultationFee: null,
   biography: '',
   address: '',
   addressNumber: '',
@@ -103,16 +149,20 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   city: '',
   state: '',
   zipCode: '',
+  roomId: '',
   isActive: true,
-  workingDays: [],
-  workingHoursStart: '',
-  workingHoursEnd: '',
+  workingSchedules: [],
 };
 
 export function CadastroMedico() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+
+  // Ensure the page starts at the top (header) when this route/component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -152,6 +202,17 @@ export function CadastroMedico() {
 
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+  const [roomOptions, setRoomOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   const filteredDoctors = useMemo(() => {
     const q = doctorQuery.trim().toLowerCase();
@@ -159,32 +220,38 @@ export function CadastroMedico() {
     return doctors.filter((item) => item.name.toLowerCase().includes(q));
   }, [doctors, doctorQuery]);
 
+  const roomLabelById = useMemo(() => {
+    return roomOptions.reduce<Record<string, string>>((acc, item) => {
+      acc[item.value] = item.label;
+      return acc;
+    }, {});
+  }, [roomOptions]);
+
   const isEditing = Boolean(editingDoctorId);
 
-  const formatDetailValue = (value: any) => {
+  const formatDetailValue = (value: unknown) => {
     if (value === null || value === undefined || value === '') return '-';
     if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
     return String(value);
   };
 
-  const formatDateValue = (value: any) => {
-    if (!value) return '-';
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
+  const formatDateValue = (value: unknown) => {
+    const date = getDate(value);
+    if (!date) return '-';
     return date.toLocaleDateString('pt-BR');
   };
 
-  const formatCpfValue = (value: any) => {
+  const formatCpfValue = (value: unknown) => {
     if (!value) return '-';
     return formatCPF(String(value));
   };
 
-  const formatPhoneValue = (value: any) => {
+  const formatPhoneValue = (value: unknown) => {
     if (!value) return '-';
     return formatPhone(String(value));
   };
 
-  const formatGenderValue = (value: any) => {
+  const formatGenderValue = (value: unknown) => {
     const normalized = String(value || '').toUpperCase();
     if (!normalized) return '-';
     if (normalized === 'MALE') return 'Masculino';
@@ -193,40 +260,45 @@ export function CadastroMedico() {
     return normalized;
   };
 
-  const formatCurrencyValue = (value: any) => {
-    const num = Number(value);
-    if (Number.isNaN(num)) return '-';
-    return `R$ ${num.toFixed(2).replace('.', ',')}`;
-  };
-
-  const populateFormFromDoctor = (raw: any) => {
-    const birthDate = raw?.birthDate ? new Date(raw.birthDate) : null;
+  const populateFormFromDoctor = (raw: ApiRecord) => {
+    const birthDate = getDate(raw.birthDate);
+    const specialties = Array.isArray(raw.specialties)
+      ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
+      : [];
+    const workingSchedules = Array.isArray(raw.workingSchedules)
+      ? (raw.workingSchedules as unknown[]).map((item: unknown) => {
+          const scheduleRecord = isRecord(item) ? item : {};
+          return {
+            days: Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean) : [],
+            hoursStart: getString(scheduleRecord.hoursStart),
+            hoursEnd: getString(scheduleRecord.hoursEnd),
+          };
+        }).filter((s) => s.days.length > 0)
+      : [];
     setForm({
-      nome: raw?.name || raw?.nome || '',
-      crm: raw?.crm || '',
-      crmState: raw?.crmState || raw?.ufCrm || '',
-      email: raw?.email || '',
-      phone: raw?.phone || '',
-      cellphone: raw?.cellphone || '',
+      nome: getString(raw.name ?? raw.nome),
+      crm: getString(raw.crm),
+      crmState: getString(raw.crmState ?? raw.ufCrm),
+      email: getString(raw.email),
+      phone: getString(raw.phone),
+      cellphone: getString(raw.cellphone),
       birthDate,
       gender: (raw?.gender ? String(raw.gender).toLowerCase() : '') as Gender,
-      cpf: raw?.cpf || '',
-      rg: raw?.rg || '',
-      specialty: raw?.specialty || '',
-      specialties: Array.isArray(raw?.specialties) ? raw.specialties : [],
-      consultationFee: raw?.consultationFee ?? null,
-      biography: raw?.biography || '',
-      address: raw?.address || '',
-      addressNumber: raw?.addressNumber || '',
-      addressComplement: raw?.addressComplement || '',
-      neighborhood: raw?.neighborhood || '',
-      city: raw?.city || '',
-      state: raw?.state || '',
-      zipCode: raw?.zipCode || '',
-      isActive: raw?.isActive ?? true,
-      workingDays: Array.isArray(raw?.workingDays) ? raw.workingDays : [],
-      workingHoursStart: raw?.workingHoursStart || '',
-      workingHoursEnd: raw?.workingHoursEnd || '',
+      cpf: getString(raw.cpf),
+      rg: getString(raw.rg),
+      specialty: getString(raw.specialty),
+      specialties,
+      biography: getString(raw.biography),
+      address: getString(raw.address),
+      addressNumber: getString(raw.addressNumber),
+      addressComplement: getString(raw.addressComplement),
+      neighborhood: getString(raw.neighborhood),
+      city: getString(raw.city),
+      state: getString(raw.state),
+      zipCode: getString(raw.zipCode),
+      roomId: getString(raw.roomId),
+      isActive: getBoolean(raw.isActive, true),
+      workingSchedules,
     });
   };
 
@@ -234,20 +306,12 @@ export function CadastroMedico() {
     const loadDoctors = async () => {
       setDoctorsLoading(true);
       try {
-        const data: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+        const data: unknown = await doctorService.listDoctors();
+        const list = getApiList(data);
 
-        const mapped: DoctorListItem[] = list.map((item: any) => {
-          const name = item.name || item.nome || item.fullName || 'Médico';
-          const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+        const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
+          const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
+          const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
           return {
             id: String(item.id ?? item.doctorId ?? ''),
             name,
@@ -260,10 +324,11 @@ export function CadastroMedico() {
         }).filter((item: DoctorListItem) => item.id);
 
         setDoctors(mapped);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const err = e as ApiError;
         showNotification({
           title: 'Erro',
-          message: e?.response?.data?.message || e?.message || 'Erro ao carregar médicos',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
           color: 'red',
         });
       } finally {
@@ -272,6 +337,35 @@ export function CadastroMedico() {
     };
 
     loadDoctors();
+  }, []);
+
+  useEffect(() => {
+    const loadRooms = async () => {
+      try {
+        const data: unknown = await sectorService.listSectors();
+        const list = getApiList(data);
+        const mapped = list
+          .map((item: ApiRecord) => {
+            const id = getString(item.id);
+            const name = getString(item.name);
+            const branch = isRecord(item.branch) ? item.branch : null;
+            const branchName = branch ? getString(branch.tradeName ?? branch.socialName) : '';
+            if (!id || !name) return null;
+            return {
+              value: id,
+              label: branchName ? `${name} (${branchName})` : name,
+            };
+          })
+          .filter((item): item is { value: string; label: string } => Boolean(item));
+
+        setRoomOptions(mapped);
+      } catch {
+        // Não bloqueia o cadastro de médico se salas falharem ao carregar.
+        setRoomOptions([]);
+      }
+    };
+
+    loadRooms();
   }, []);
 
   const statesOptions = [
@@ -295,8 +389,6 @@ export function CadastroMedico() {
     { value: 'Domingo', label: 'Domingo' },
   ];
 
-  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
-
   const validateFields = (data: DoctorForm) => {
     const errors: Record<string,string> = {};
     if (!data.nome.trim()) errors.nome = 'Nome é obrigatório';
@@ -309,9 +401,13 @@ export function CadastroMedico() {
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
     if (!data.specialty) errors.specialty = 'Especialidade é obrigatória';
-    if (data.consultationFee !== null && data.consultationFee < 0) errors.consultationFee = 'Valor da consulta inválido';
-    if (data.workingHoursStart && !/^\d{2}:\d{2}$/.test(data.workingHoursStart)) errors.workingHoursStart = 'Formato de início do horário inválido (HH:MM)';
-    if (data.workingHoursEnd && !/^\d{2}:\d{2}$/.test(data.workingHoursEnd)) errors.workingHoursEnd = 'Formato de fim do horário inválido (HH:MM)';
+    if (data.workingSchedules.length > 0) {
+      data.workingSchedules.forEach((schedule, idx) => {
+        if (!schedule.days.length) errors[`workingSchedules.${idx}.days`] = 'Selecione pelo menos um dia';
+        if (schedule.hoursStart && !/^\d{2}:\d{2}$/.test(schedule.hoursStart)) errors[`workingSchedules.${idx}.hoursStart`] = 'Formato inválido (HH:MM)';
+        if (schedule.hoursEnd && !/^\d{2}:\d{2}$/.test(schedule.hoursEnd)) errors[`workingSchedules.${idx}.hoursEnd`] = 'Formato inválido (HH:MM)';
+      });
+    }
     return errors;
   };
 
@@ -332,6 +428,13 @@ export function CadastroMedico() {
     setSaving(true);
 
     try {
+      // Converter workingSchedules para o formato esperado pelo backend
+      const validSchedules = form.workingSchedules.filter((s) => s.days.length > 0);
+      const allDays = new Set<string>();
+      validSchedules.forEach((schedule) => {
+        schedule.days.forEach((day) => allDays.add(day));
+      });
+
       const payload = {
         crm: form.crm.trim(),
         crmState: form.crmState.trim().toUpperCase(),
@@ -345,7 +448,6 @@ export function CadastroMedico() {
         rg: form.rg?.trim() || undefined,
         specialty: form.specialty || undefined,
         specialties: form.specialties || [],
-        consultationFee: form.consultationFee ?? undefined,
         biography: form.biography || undefined,
         address: form.address || undefined,
         addressNumber: form.addressNumber || undefined,
@@ -354,9 +456,11 @@ export function CadastroMedico() {
         city: form.city || undefined,
         state: form.state || undefined,
         zipCode: form.zipCode || undefined,
-        workingDays: form.workingDays || [],
-        workingHoursStart: form.workingHoursStart || undefined,
-        workingHoursEnd: form.workingHoursEnd || undefined,
+        // Formato esperado pelo backend
+        workingDays: Array.from(allDays),
+        workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
+        workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
+        roomId: form.roomId || null
       };
 
       if (editingDoctorId) {
@@ -374,19 +478,11 @@ export function CadastroMedico() {
         setShowSuccessModal(true);
       }
       try {
-        const refreshed: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(refreshed)
-          ? refreshed
-          : (Array.isArray(refreshed?.items)
-            ? refreshed.items
-            : (Array.isArray(refreshed?.data?.items)
-              ? refreshed.data.items
-              : (Array.isArray(refreshed?.data)
-                ? refreshed.data
-                : [])));
-        const mapped: DoctorListItem[] = list.map((item: any) => {
-          const name = item.name || item.nome || item.fullName || 'Médico';
-          const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+        const refreshed: unknown = await doctorService.listDoctors();
+        const list = getApiList(refreshed);
+        const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
+          const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
+          const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
           return {
             id: String(item.id ?? item.doctorId ?? ''),
             name,
@@ -401,9 +497,10 @@ export function CadastroMedico() {
       } catch {
         // Silent refresh failure after save.
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as ApiError;
       // handle field-level errors returned by server
-      const serverFields: Record<string,string> | undefined = e?.response?.data?.fields;
+      const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;
       if (serverFields && typeof serverFields === 'object') {
         // map API field names to front-end form keys where necessary
         const mapped: Record<string,string> = {};
@@ -414,7 +511,7 @@ export function CadastroMedico() {
         setFieldErrors(mapped);
         showNotification({ title: 'Erro', message: Object.values(mapped)[0], color: 'red' });
       } else {
-        const msg = e?.response?.data?.message || e?.message || 'Erro ao registrar médico';
+        const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar médico';
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -445,14 +542,42 @@ export function CadastroMedico() {
       await doctorService.deleteDoctor(item.id);
       setDoctors((prev) => prev.filter((d) => d.id !== item.id));
       showNotification({ title: 'Médico excluído', message: 'Registro removido com sucesso.', color: 'green' });
-    } catch (e: any) {
-      const msg = e?.response?.data?.details || e?.response?.data?.error || e?.message || 'Erro ao excluir médico';
+    } catch (e: unknown) {
+      const err = e as ApiError;
+      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir médico';
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
+    }
+  };
+
+  const handleToggleActive = async (item: DoctorListItem) => {
+    try {
+
+      setDoctors((prev) =>
+        prev.map((d) =>
+          d.id === item.id
+            ? {
+                ...d,
+                isActive: !d.isActive,
+                raw: { ...d.raw, isActive: !d.isActive },
+              }
+            : d
+        )
+      );
+
+      showNotification({
+        title: 'Status atualizado',
+        message: `Médico ${!item.isActive ? 'ativado' : 'desativado'} com sucesso.`,
+        color: 'green',
+      });
+    } catch (e: unknown) {
+      const err = e as ApiError;
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1000} mx="auto">
@@ -464,10 +589,10 @@ export function CadastroMedico() {
             </ActionIcon>
 
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Cadastro de Médico
               </Text>
-              <Text size="sm" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Registro de médicos
               </Text>
             </Box>
@@ -491,8 +616,8 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); setFieldErrors((p) => { const { nome, ...rest } = p; return rest; }); }} error={fieldErrors.nome} required />
-                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { cpf, ...rest } = p; return rest; }); }} maxLength={14} error={fieldErrors.cpf} required />
+                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); clearFieldError('nome'); }} error={fieldErrors.nome} required />
+                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); clearFieldError('cpf'); }} maxLength={14} error={fieldErrors.cpf} required />
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
@@ -512,7 +637,7 @@ export function CadastroMedico() {
                             setFieldErrors((p) => ({ ...p, birthDate: 'Data de nascimento inválida' }));
                             setForm({ ...form, birthDate: null });
                           } else {
-                            setFieldErrors((p) => { const { birthDate, ...rest } = p; return rest; });
+                            clearFieldError('birthDate');
                             setForm({ ...form, birthDate: d });
                           }
                         }}
@@ -545,13 +670,13 @@ export function CadastroMedico() {
                     placeholder="Selecione"
                     data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
                     value={form.gender}
-                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); setFieldErrors((p) => { const { gender, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); clearFieldError('gender'); }}
                     error={fieldErrors.gender}
                     required
                   />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); setFieldErrors((p) => { const { email, ...rest } = p; return rest; }); }} required error={fieldErrors.email} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); setFieldErrors((p) => { const { phone, ...rest } = p; return rest; }); }} error={fieldErrors.phone} required />
+                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} required />
                   <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
                 </SimpleGrid>
               </Paper>
@@ -560,13 +685,13 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Profissionais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); setFieldErrors((p) => { const { crm, ...rest } = p; return rest; }); }} required error={fieldErrors.crm} />
+                  <TextInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
                   <Select
                     label="UF do CRM"
                     placeholder="Selecione"
                     data={statesOptions}
                     value={form.crmState}
-                    onChange={(v) => { setForm({ ...form, crmState: v || '' }); setFieldErrors((p) => { const { crmState, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, crmState: v || '' }); clearFieldError('crmState'); }}
                     required
                     error={fieldErrors.crmState}
                   />
@@ -575,7 +700,7 @@ export function CadastroMedico() {
                     placeholder="Escolha uma"
                     data={specialtyOptions}
                     value={form.specialty}
-                    onChange={(v) => { setForm({ ...form, specialty: v || '' }); setFieldErrors((p) => { const { specialty, ...rest } = p; return rest; }); }}
+                    onChange={(v) => { setForm({ ...form, specialty: v || '' }); clearFieldError('specialty'); }}
                     error={fieldErrors.specialty}
                     required
                   />
@@ -586,15 +711,16 @@ export function CadastroMedico() {
                     value={form.specialties}
                     onChange={(v) => setForm({ ...form, specialties: v })}
                   />
-                  <NumberInput
-                    label="Valor da consulta (R$)"
-                    placeholder="0,00"
-                    value={form.consultationFee ?? undefined}
-                    onChange={(v) => { setForm({ ...form, consultationFee: typeof v === 'number' ? v : null }); setFieldErrors((p) => { const { consultationFee, ...rest } = p; return rest; }); }}
-                    decimalScale={2}
-                    error={fieldErrors.consultationFee}
-                    min={0}
-                    prefix="R$ "
+                  <Select
+                    label="Sala vinculada"
+                    placeholder="Selecione uma sala"
+                    data={roomOptions}
+                    value={form.roomId}
+                    onChange={(v) => { setForm({ ...form, roomId: v || '' }); clearFieldError('roomId'); }}
+                    clearable
+                    searchable
+                    error={fieldErrors.roomId}
+                    nothingFoundMessage="Nenhuma sala encontrada"
                   />
                 </SimpleGrid>
                 <Textarea
@@ -632,27 +758,74 @@ export function CadastroMedico() {
               {/* Horário de Trabalho */}
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Horário de Trabalho</SectionTitle>
-                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <MultiSelect
-                    label="Dias de trabalho"
-                    placeholder="Selecione os dias"
-                    data={daysOptions}
-                    value={form.workingDays}
-                    onChange={(v) => setForm({ ...form, workingDays: v })}
-                  />
-                  <TextInput
-                    label="Horário início"
-                    placeholder="08:00"
-                    value={form.workingHoursStart}
-                    onChange={(e) => setForm({ ...form, workingHoursStart: e.currentTarget.value })}
-                  />
-                  <TextInput
-                    label="Horário fim"
-                    placeholder="18:00"
-                    value={form.workingHoursEnd}
-                    onChange={(e) => setForm({ ...form, workingHoursEnd: e.currentTarget.value })}
-                  />
-                </SimpleGrid>
+                <Stack gap="md">
+                  {form.workingSchedules.map((schedule, idx) => (
+                    <Paper key={idx} p="md" bg="rgba(0,0,0,0.02)" withBorder radius="md">
+                      <Group justify="space-between" mb="md">
+                        <Text size="sm" fw={500}>Turno {idx + 1}</Text>
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              workingSchedules: form.workingSchedules.filter((_, i) => i !== idx),
+                            });
+                          }}
+                        >
+                          <Trash size={16} />
+                        </ActionIcon>
+                      </Group>
+                      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" mb="md">
+                        <MultiSelect
+                          label="Dias de trabalho"
+                          placeholder="Selecione os dias"
+                          data={daysOptions}
+                          value={schedule.days}
+                          onChange={(v) => {
+                            const updated = [...form.workingSchedules];
+                            updated[idx].days = v;
+                            setForm({ ...form, workingSchedules: updated });
+                          }}
+                        />
+                        <TextInput
+                          label="Horário início"
+                          placeholder="08:00"
+                          value={schedule.hoursStart}
+                          onChange={(e) => {
+                            const updated = [...form.workingSchedules];
+                            updated[idx].hoursStart = e.currentTarget.value;
+                            setForm({ ...form, workingSchedules: updated });
+                          }}
+                        />
+                        <TextInput
+                          label="Horário fim"
+                          placeholder="18:00"
+                          value={schedule.hoursEnd}
+                          onChange={(e) => {
+                            const updated = [...form.workingSchedules];
+                            updated[idx].hoursEnd = e.currentTarget.value;
+                            setForm({ ...form, workingSchedules: updated });
+                          }}
+                        />
+                      </SimpleGrid>
+                    </Paper>
+                  ))}
+                  <Button
+                    variant="light"
+                    onClick={() => {
+                      setForm({
+                        ...form,
+                        workingSchedules: [
+                          ...form.workingSchedules,
+                          { days: [], hoursStart: '', hoursEnd: '' },
+                        ],
+                      });
+                    }}
+                  >
+                    + Adicionar turno
+                  </Button>
+                </Stack>
               </Paper>
 
               {/* Botões finais */}
@@ -734,30 +907,41 @@ export function CadastroMedico() {
                               <Group gap={6} wrap="nowrap">
                                 <ActionIcon
                                   variant="subtle"
-                                  color={DARK_BLUE}
+                                  style={{ color: 'var(--mantine-color-text)' }}
                                   onClick={() => {
                                     setSelectedDoctor(item);
                                     setDetailsOpen(true);
                                   }}
+                                  title="Visualizar"
                                 >
                                   <Eye size={16} />
                                 </ActionIcon>
                                 <ActionIcon
                                   variant="subtle"
-                                  color={DARK_BLUE}
+                                  style={{ color: 'var(--mantine-color-text)' }}
                                   onClick={() => {
                                     setSelectedDoctor(item);
                                     setEditingDoctorId(item.id);
                                     populateFormFromDoctor(item.raw);
                                     setActiveTab('cadastro');
                                   }}
+                                  title="Editar"
                                 >
                                   <Pencil size={16} />
                                 </ActionIcon>
                                 <ActionIcon
                                   variant="subtle"
+                                  color={item.isActive ? 'orange' : 'green'}
+                                  onClick={() => handleToggleActive(item)}
+                                  title={item.isActive ? 'Desativar' : 'Ativar'}
+                                >
+                                  <Power size={16} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
                                   color="red"
                                   onClick={() => handleDeleteDoctor(item)}
+                                  title="Excluir"
                                 >
                                   <Trash size={16} />
                                 </ActionIcon>
@@ -801,8 +985,15 @@ export function CadastroMedico() {
                 })()}
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
+              <Text size="sm">
+                <Text fw={600} span>Sala:</Text>{' '}
+                {(() => {
+                  const roomId = getString(selectedDoctor?.raw?.roomId);
+                  if (!roomId) return '-';
+                  return roomLabelById[roomId] || roomId;
+                })()}
+              </Text>
               <Text size="sm"><Text fw={600} span>Outras especialidades:</Text> {formatDetailValue(selectedDoctor?.raw?.specialties)}</Text>
-              <Text size="sm"><Text fw={600} span>Valor consulta:</Text> {formatCurrencyValue(selectedDoctor?.raw?.consultationFee)}</Text>
             </SimpleGrid>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
@@ -816,11 +1007,27 @@ export function CadastroMedico() {
             </SimpleGrid>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-              <Text size="sm"><Text fw={600} span>Dias de trabalho:</Text> {formatDetailValue(selectedDoctor?.raw?.workingDays)}</Text>
-              <Text size="sm"><Text fw={600} span>Início:</Text> {formatDetailValue(selectedDoctor?.raw?.workingHoursStart)}</Text>
-              <Text size="sm"><Text fw={600} span>Fim:</Text> {formatDetailValue(selectedDoctor?.raw?.workingHoursEnd)}</Text>
-              <Text size="sm"><Text fw={600} span>Biografia:</Text> {formatDetailValue(selectedDoctor?.raw?.biography)}</Text>
+              <Text size="sm"><Text fw={600} span>Dias de trabalho:</Text></Text>
             </SimpleGrid>
+            {Array.isArray(selectedDoctor?.raw?.workingSchedules) && selectedDoctor.raw.workingSchedules.length > 0 ? (
+              <Stack gap="xs">
+                {(selectedDoctor.raw.workingSchedules as unknown[]).map((schedule: unknown, idx: number) => {
+                  const scheduleRecord = isRecord(schedule) ? schedule : {};
+                  const days = Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean).join(', ') : '-';
+                  const hoursStart = getString(scheduleRecord.hoursStart);
+                  const hoursEnd = getString(scheduleRecord.hoursEnd);
+                  return (
+                    <Paper key={idx} p="xs" bg="rgba(0,0,0,0.02)" radius="sm">
+                      <Text size="sm">
+                        <Text fw={600} span>Turno {idx + 1}:</Text> {days} ({hoursStart}-{hoursEnd})
+                      </Text>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            ) : (
+              <Text size="sm" c="dimmed">-</Text>
+            )}
           </Stack>
         </Modal>
 

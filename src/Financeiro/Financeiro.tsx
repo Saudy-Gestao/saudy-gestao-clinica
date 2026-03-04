@@ -327,10 +327,10 @@ export function Financeiro() {
               <ChevronLeft size={isMobile ? 22 : 28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Financeiro
               </Text>
-              <Text size="sm" c="blue" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" c="dimmed">
                 Gestão financeira
               </Text>
             </Box>

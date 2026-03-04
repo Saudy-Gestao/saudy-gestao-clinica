@@ -107,16 +107,11 @@ export const validateCompanyForm = (form: {
  * Branch form validation
  */
 export const validateBranchForm = (form: {
-  socialName: string;
   tradeName: string;
   address?: string;
   phone?: string;
 }): ValidationResult => {
   const errors: Record<string, string> = {};
-
-  if (!form.socialName || !form.socialName.trim()) {
-    errors.socialName = 'Razão social é obrigatória';
-  }
 
   if (!form.tradeName || !form.tradeName.trim()) {
     errors.tradeName = 'Nome fantasia é obrigatório';
