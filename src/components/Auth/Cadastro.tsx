@@ -75,12 +75,12 @@ export function Cadastro() {
             legalName: 'Empresa Teste', // TODO: adicionar campo no formulário
             tradeName: 'Empresa Teste', // TODO: adicionar campo no formulário
             address: 'Endereço padrão', // TODO: adicionar campo no formulário
-            phone: '11999999999', // TODO: adicionar campo no formulário
+            phone: '', // TODO: adicionar campo no formulário
           },
           branch: {
             tradeName: 'Filial Principal',
             address: 'Endereço padrão',
-            phone: '11999999999',
+            phone: '',
           },
           sector: {
             name: 'Administração',
@@ -91,7 +91,7 @@ export function Cadastro() {
             birthDate: '1990-01-01', // TODO: adicionar campo no formulário
             email,
             password,
-            phone: '11999999999', // TODO: adicionar campo no formulário
+            phone: '', // TODO: adicionar campo no formulário
             address: 'Endereço padrão', // TODO: adicionar campo no formulário
           },
           accesses: [],
