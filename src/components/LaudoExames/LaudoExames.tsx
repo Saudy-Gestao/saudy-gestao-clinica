@@ -307,12 +307,12 @@ export function LaudoExames() {
   const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
   const [editorContent, setEditorContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<ReportTemplate[]>(MOCK_REPORT_TEMPLATES);
+  const [templates] = useState<ReportTemplate[]>(MOCK_REPORT_TEMPLATES);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateQuery, setTemplateQuery] = useState('');
   const [phraseQuery, setPhraseQuery] = useState('');
   const [selectedPhraseId, setSelectedPhraseId] = useState<string | null>(null);
-  const [phrases, setPhrases] = useState<ReportPhrase[]>(MOCK_REPORT_PHRASES);
+  const [phrases] = useState<ReportPhrase[]>(MOCK_REPORT_PHRASES);
   const [toolsExpanded, setToolsExpanded] = useState(true);
   const [headerExpanded, setHeaderExpanded] = useState(true);
   const [previousReportsModalOpen, setPreviousReportsModalOpen] = useState(false);
