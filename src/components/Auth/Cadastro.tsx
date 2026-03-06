@@ -10,6 +10,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import AuthService from '../../services/authService';
+import { validateCNPJ } from '../../utils/validations';
 
 export function Cadastro() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export function Cadastro() {
   const handleCadastro = async () => {
     const email = formData.email.trim();
     const documento = formData.documento.trim();
+    const cleanedDocumento = documento.replace(/\D/g, '');
     const password = formData.password;
     const confirmPassword = formData.confirmPassword;
 
@@ -54,13 +56,22 @@ export function Cadastro() {
       return;
     }
 
+    if (isEmpresa && !validateCNPJ(documento)) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Informe um CNPJ válido',
+        color: 'red',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       if (isEmpresa) {
         // Registro de empresa - chamada para API saudy-ms-auth
         const companyData = {
           company: {
-            cnpj: documento,
+            cnpj: cleanedDocumento,
             legalName: 'Empresa Teste', // TODO: adicionar campo no formulário
             tradeName: 'Empresa Teste', // TODO: adicionar campo no formulário
             address: 'Endereço padrão', // TODO: adicionar campo no formulário
