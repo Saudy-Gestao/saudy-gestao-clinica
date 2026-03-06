@@ -69,6 +69,34 @@ const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
     </Box>
 );
 
+const COMPANY_PLACEHOLDER_VALUES = new Set([
+  'empresa teste',
+  'endereco padrao',
+  'endereço padrão',
+]);
+
+const PLACEHOLDER_PHONE_DIGITS = new Set([
+  '11999999999',
+  '5511999999999',
+]);
+
+const sanitizeCompanyField = (value: unknown) => {
+  if (typeof value !== 'string') return '';
+
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (PLACEHOLDER_PHONE_DIGITS.has(digits)) return '';
+
+  const normalized = trimmed
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  return COMPANY_PLACEHOLDER_VALUES.has(normalized) ? '' : trimmed;
+};
+
 export function SettingsPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -183,11 +211,11 @@ export function SettingsPage() {
       const comp = companies.find((c) => c.id === selectedCompanyId);
       if (comp) {
         setCompanyForm({ 
-          cnpj: comp.cnpj || '', 
-          legalName: comp.legalName || '', 
-          tradeName: comp.tradeName || '', 
-          address: comp.address || '', 
-          phone: comp.phone || '' 
+          cnpj: sanitizeCompanyField(comp.cnpj),
+          legalName: sanitizeCompanyField(comp.legalName),
+          tradeName: sanitizeCompanyField(comp.tradeName),
+          address: sanitizeCompanyField(comp.address),
+          phone: sanitizeCompanyField(comp.phone),
         });
       }
       // Forçar refetch dos branches
