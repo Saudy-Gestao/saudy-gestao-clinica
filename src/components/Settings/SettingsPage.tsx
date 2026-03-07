@@ -16,6 +16,7 @@ import {
   MultiSelect,
   Grid,
   Badge,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -100,6 +101,8 @@ const sanitizeCompanyField = (value: unknown) => {
 export function SettingsPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
   const [activeTab, setActiveTab] = useState<string | null>('company');
   
   // Get user's company from logged user
@@ -746,16 +749,22 @@ export function SettingsPage() {
           return (
             <Button
               key={item.id}
-              variant={isActive ? 'light' : 'subtle'}
-              color={isActive ? 'darkBlue' : 'gray'}
+              variant="subtle"
+              color={isActive ? undefined : 'gray'}
               leftSection={<item.icon size={18} />}
               justify="flex-start"
               fullWidth
               onClick={() => setActiveTab(item.id)}
               styles={{
                 root: {
-                  color: isActive ? DARK_BLUE : undefined,
+                  color: isActive ? 'var(--mantine-color-text)' : undefined,
                   fontWeight: isActive ? 600 : 400,
+                  background: isActive
+                    ? (isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,31,84,0.10)')
+                    : 'transparent',
+                  border: isActive
+                    ? (isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,31,84,0.14)')
+                    : '1px solid transparent',
                 },
                 inner: {
                     justifyContent: 'flex-start'
@@ -1167,7 +1176,7 @@ export function SettingsPage() {
                                                     c="dimmed"
                                                     style={{ 
                                                       padding: '2px 8px', 
-                                                      background: '#e7f5ff', 
+                                                      background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff', 
                                                       borderRadius: 4,
                                                       whiteSpace: 'nowrap'
                                                     }}
@@ -1189,7 +1198,28 @@ export function SettingsPage() {
                                 </Table.Tbody>
                             </Table>
                         </Box>
-                        <Modal opened={accessModalOpen} onClose={() => setAccessModalOpen(false)} title={editingAccess ? 'Editar Acesso' : 'Novo Acesso'} centered>
+                        <Modal
+                          opened={accessModalOpen}
+                          onClose={() => setAccessModalOpen(false)}
+                          title={editingAccess ? 'Editar Acesso' : 'Novo Acesso'}
+                          centered
+                          styles={{
+                            content: {
+                              background: isDark ? 'var(--mantine-color-body)' : undefined,
+                              border: isDark ? '1px solid var(--mantine-color-default-border)' : undefined,
+                            },
+                            header: {
+                              background: isDark ? 'var(--mantine-color-body)' : undefined,
+                              borderBottom: isDark ? '1px solid var(--mantine-color-default-border)' : undefined,
+                            },
+                            body: {
+                              background: isDark ? 'var(--mantine-color-body)' : undefined,
+                            },
+                            title: {
+                              color: isDark ? 'var(--mantine-color-text)' : undefined,
+                            },
+                          }}
+                        >
                              <Stack pt="lg">
                                 <FloatingInput 
                                   label="Descrição" 
@@ -1222,6 +1252,15 @@ export function SettingsPage() {
                                     withAsterisk
                                     styles={{
                                       label: { marginBottom: 8, fontWeight: 500 },
+                                      input: isDark ? {
+                                        background: 'var(--mantine-color-default)',
+                                        borderColor: 'var(--mantine-color-default-border)',
+                                        color: 'var(--mantine-color-text)',
+                                      } : undefined,
+                                      pill: isDark ? {
+                                        background: 'rgba(255,255,255,0.08)',
+                                        color: 'var(--mantine-color-text)',
+                                      } : undefined,
                                     }}
                                     nothingFoundMessage="Nenhum módulo encontrado"
                                   />

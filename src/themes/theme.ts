@@ -2,23 +2,36 @@ import { createTheme } from '@mantine/core';
 
 export const theme = createTheme({
   primaryColor: 'darkBlue',
+  primaryShade: 6,
   colors: {
+    dark: [
+      '#dfe8ff',
+      '#bcccf2',
+      '#93a7dc',
+      '#6f88c0',
+      '#4f699e',
+      '#3a4f7b',
+      '#273861',
+      '#0A1128',
+      '#070d1f',
+      '#040814',
+    ],
     darkBlue: [
-      '#eef3f7',
-      '#dce4eb',
-      '#b6c8d9',
-      '#8daac5',
-      '#6b90b4',
-      '#5580aa',
-      '#4a78a5',
-      '#3b6690',
-      '#335b81',
-      '#264f71',
+      '#e8eeff',
+      '#cfdcff',
+      '#9fb8ff',
+      '#6f93ff',
+      '#4674ff',
+      '#2c5be8',
+      '#1f49bf',
+      '#173993',
+      '#112a6d',
+      '#0b1c48',
     ],
   },
-  fontFamily: 'Poppins, sans-serif',
+  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   headings: {
-    fontFamily: 'Poppins, sans-serif',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     fontWeight: '600',
   },
   components: {
@@ -42,4 +55,4 @@ export const theme = createTheme({
   },
 });
 
-export const DARK_BLUE = '#001f54'; // Cor aproximada do header e item ativo
+export const DARK_BLUE = '#0A2568';

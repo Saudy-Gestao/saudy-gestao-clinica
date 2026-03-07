@@ -22,7 +22,6 @@ import appointmentService from '../../services/appointmentService';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import doctorService from '../../services/doctorService';
 import sectorService from '../../services/sectorService';
-import { DARK_BLUE } from '../../themes/theme';
 
 type TeaAppointment = {
   id: string;
@@ -282,7 +281,7 @@ export function TeaAgendaSemanal() {
             Voltar
           </Button>
           <Box>
-            <Text fw={700} size="lg" style={{ color: DARK_BLUE }}>Agenda semanal TEA</Text>
+            <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Agenda semanal TEA</Text>
             <Text size="sm" c="dimmed">Visão macro dos agendamentos de todos os pacientes</Text>
           </Box>
         </Group>

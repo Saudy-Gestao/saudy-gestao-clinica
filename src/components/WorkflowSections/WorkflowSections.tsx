@@ -159,6 +159,7 @@ export function WorkflowSections() {
                 key={i} 
                 p="xs" 
                 withBorder 
+                className={colorScheme === 'dark' ? 'module-card-dark' : undefined}
                 style={{
                   cursor: item.route ? 'pointer' : 'default',
                   borderColor: 'var(--mantine-color-default-border)',

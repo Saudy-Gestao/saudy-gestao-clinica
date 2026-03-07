@@ -14,6 +14,7 @@ import {
   Table,
   Text,
   TextInput,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -58,6 +59,8 @@ const STATUS_COLOR: Record<ConvenioAuthorizationStatus, string> = {
 export function AutorizacaoConvenio() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const { colorScheme } = useMantineColorScheme();
+  const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-text)' : DARK_BLUE;
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<AuthorizationItem[]>([]);
@@ -139,7 +142,7 @@ export function AutorizacaoConvenio() {
               <ChevronLeft size={18} />
             </ActionIcon>
             <Box>
-              <Text fw={700} size="lg" c={DARK_BLUE}>Autorização de Convênio</Text>
+              <Text fw={700} size="lg" c={titleColor}>Autorização de Convênio</Text>
               <Text size="sm" c="dimmed">Central de autorização de Agendamentos e TEA</Text>
             </Box>
           </Group>

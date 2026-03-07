@@ -47,7 +47,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
     key: 'mantine-color-scheme',
-    defaultValue: 'light',
+    defaultValue: 'dark',
   });
   const [, setAuthVersion] = useState(0);
 
