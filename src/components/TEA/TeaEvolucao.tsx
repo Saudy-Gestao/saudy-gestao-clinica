@@ -63,8 +63,8 @@ export function TeaEvolucao() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
-  const heroBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)';
-  const cardBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-white)';
+  const heroBg = colorScheme === 'dark' ? 'var(--mantine-color-body)' : 'var(--mantine-color-gray-0)';
+  const cardBg = colorScheme === 'dark' ? 'var(--mantine-color-default)' : 'var(--mantine-color-white)';
 
   const [teaProfiles, setTeaProfiles] = useState<any[]>([]);
   const [teaProfileOptions, setTeaProfileOptions] = useState<TeaProfileOption[]>([]);

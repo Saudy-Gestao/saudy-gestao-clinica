@@ -79,7 +79,14 @@ export function PatientQueue() {
         <Group justify="space-between" mb="md">
           <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         </Group>
-        <Paper p="xl" withBorder>
+        <Paper
+          p="xl"
+          withBorder
+          style={colorScheme === 'dark' ? {
+            backgroundColor: 'transparent',
+            borderColor: 'var(--mantine-color-default-border)',
+          } : undefined}
+        >
           <Center>
             <Text c="dimmed">Nenhum paciente na fila no momento</Text>
           </Center>
@@ -103,12 +110,19 @@ export function PatientQueue() {
       <Stack gap="sm">
         {/* Active Item */}
         {firstPatient && (
-          <Paper p="md" bg={isMobile ? 'var(--mantine-color-default)' : DARK_BLUE} c={isMobile ? 'var(--mantine-color-text)' : 'white'} radius="md" withBorder={isMobile}>
+          <Paper
+            p="md"
+            bg={isMobile ? '#001F54' : DARK_BLUE}
+            c="white"
+            radius="md"
+            withBorder
+            style={colorScheme === 'dark' ? { borderColor: 'var(--mantine-color-default-border)' } : undefined}
+          >
             <Group justify="space-between">
               <Group>
                 <Box
-                  bg={isMobile ? 'var(--mantine-color-default-hover)' : DARK_BLUE}
-                  c={isMobile ? 'gray' : 'white'}
+                  bg={isMobile ? '#193a7a' : DARK_BLUE}
+                  c="white"
                   w={32}
                   h={32}
                   style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}
@@ -147,12 +161,20 @@ export function PatientQueue() {
 
         {/* Inactive Items */}
         {restPatients.map((patient) => (
-          <Paper key={patient.id} p="md" withBorder>
+          <Paper
+            key={patient.id}
+            p="md"
+            withBorder
+            style={colorScheme === 'dark' ? {
+              backgroundColor: '#0d1a43',
+              borderColor: 'var(--mantine-color-default-border)',
+            } : undefined}
+          >
             <Group justify="space-between">
               <Group>
                 <Box
-                  bg="var(--mantine-color-default-hover)"
-                  c="gray"
+                  bg={colorScheme === 'dark' ? '#001F54' : 'var(--mantine-color-default-hover)'}
+                  c={colorScheme === 'dark' ? 'white' : 'gray'}
                   w={32}
                   h={32}
                   style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}

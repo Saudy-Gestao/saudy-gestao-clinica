@@ -84,8 +84,8 @@ export function TeaPIT() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
-  const heroBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)';
-  const contentBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-white)';
+  const heroBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-gray-0)';
+  const contentBg = colorScheme === 'dark' ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-white)';
   const [teaProfiles, setTeaProfiles] = useState<any[]>([]);
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -374,7 +374,7 @@ export function TeaPIT() {
           </Box>
         </Group>
 
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: heroBg }}>
+        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', borderRadius: 12, background: heroBg }}>
           <Group gap="sm" mb="sm">
             <ThemeIcon size="lg" variant="light" color="teal"><ClipboardList size={16} /></ThemeIcon>
             <Text fw={700}>Configuração do PIT</Text>
@@ -439,7 +439,7 @@ export function TeaPIT() {
 
             <Stack gap="xs">
               {therapies.map((therapy, index) => (
-                <Paper key={therapy.id || `${index}-${therapy.procedureId || therapy.therapyType || 'therapy'}`} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: contentBg }}>
+                <Paper key={therapy.id || `${index}-${therapy.procedureId || therapy.therapyType || 'therapy'}`} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', borderRadius: 10, background: contentBg }}>
                   <Text size="sm" fw={600} c="dimmed" mb={6}>Terapia {index + 1}</Text>
                   <Group gap={6} mb={8}>
                     <ThemeIcon size="sm" variant="light" color="blue"><Layers3 size={12} /></ThemeIcon>

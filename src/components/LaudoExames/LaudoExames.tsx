@@ -18,6 +18,7 @@ import {
   ThemeIcon,
   Tooltip,
   Timeline,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -296,8 +297,18 @@ export function LaudoExames() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const { colorScheme } = useMantineColorScheme();
   const editorRef = useRef<any>(null);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const isDark = colorScheme === 'dark';
+  const pageBg = isDark ? 'var(--mantine-color-body)' : '#f8f9fa';
+  const panelBg = isDark ? 'transparent' : 'var(--mantine-color-white)';
+  const subtleBg = isDark ? 'rgba(255,255,255,0.03)' : 'var(--mantine-color-gray-0)';
+  const surfaceBg = isDark ? 'rgba(255,255,255,0.02)' : 'white';
+  const borderColor = isDark ? 'var(--mantine-color-default-border)' : '#e9ecef';
+  const titleColor = isDark ? 'var(--mantine-color-text)' : DARK_BLUE;
+  const subtitleColor = isDark ? 'var(--mantine-color-dimmed)' : `${DARK_BLUE}B3`;
+  const selectedRowBg = isDark ? 'rgba(255,255,255,0.06)' : '#edf2ff';
 
   const [query, setQuery] = useState('');
   const [examRows, setExamRows] = useState<ExamItem[]>(MOCK_EXAMS);
@@ -727,20 +738,20 @@ export function LaudoExames() {
   };
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: '100vh' }}>
+    <Box bg={pageBg} style={{ minHeight: '100vh' }}>
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group mb={isMobile ? 16 : 24} justify="space-between" align="center">
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color={isDark ? 'gray' : 'black'} size="xl" onClick={() => navigate('/dashboard')}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: DARK_BLUE }}>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: titleColor }}>
                 Laudo por Exame
               </Text>
-              <Text size="sm" style={{ color: DARK_BLUE, opacity: 0.7 }}>
+              <Text size="sm" style={{ color: subtitleColor }}>
                 Fila de exames para laudar (mock)
               </Text>
             </Box>
@@ -750,17 +761,24 @@ export function LaudoExames() {
         <Group gap="md" align="end" mb="md">
           <TextInput
             placeholder={isMobile ? 'Buscar...' : 'Buscar por paciente, exame ou ID...'}
-            leftSection={<Search size={16} color="#999" />}
+            leftSection={<Search size={16} color={isDark ? '#7d92c6' : '#999'} />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
             radius="md"
             size={isMobile ? 'sm' : 'md'}
             style={{ flex: 1 }}
+            styles={isDark ? {
+              input: {
+                backgroundColor: 'transparent',
+                borderColor,
+                color: 'var(--mantine-color-text)',
+              },
+            } : undefined}
           />
         </Group>
 
-        <Paper withBorder p="sm" style={{ minHeight: 560 }}>
-            <Title order={5} c={DARK_BLUE} mb="sm">
+        <Paper withBorder p="sm" style={{ minHeight: 560, borderColor, backgroundColor: panelBg }}>
+            <Title order={5} c={titleColor} mb="sm">
               Exames para laudar
             </Title>
 
@@ -782,7 +800,7 @@ export function LaudoExames() {
                     <Table.Tr
                       key={exam.id}
                       style={{
-                        backgroundColor: selectedExamId === exam.id ? '#edf2ff' : undefined,
+                        backgroundColor: selectedExamId === exam.id ? selectedRowBg : undefined,
                       }}
                     >
                       <Table.Td>
@@ -850,7 +868,15 @@ export function LaudoExames() {
           size={isMobile ? '100%' : '95%'}
           fullScreen={true}
           styles={{
+            header: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+              borderBottom: isDark ? `1px solid ${borderColor}` : undefined,
+            },
+            content: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
             body: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
               height: isMobile ? 'calc(100vh - 68px)' : 'calc(95vh - 68px)',
               overflowY: isMobile ? 'auto' : 'hidden',
               overflowX: 'hidden',
@@ -866,7 +892,7 @@ export function LaudoExames() {
             </Text>
           ) : (
             <Stack gap="sm" style={{ height: '100%', minHeight: 0 }}>
-              <Paper withBorder p="md" radius="md" bg="gray.0" style={{ display: headerExpanded ? 'block' : 'none' }}>
+              <Paper withBorder p="md" radius="md" bg={subtleBg} style={{ display: headerExpanded ? 'block' : 'none', borderColor }}>
                 <Group justify="space-between" align="flex-start" wrap="nowrap">
                   <Group wrap="nowrap" gap="lg">
                     {/* <Avatar size="xl" radius="md" color="darkBlue">
@@ -874,7 +900,7 @@ export function LaudoExames() {
                     </Avatar> */}
                     <Box>
                       <Group gap="xs" align="center" mb={4}>
-                        <Title order={3} c="dark.9" style={{ lineHeight: 1.2 }}>
+                        <Title order={3} c={isDark ? 'gray.0' : 'dark.9'} style={{ lineHeight: 1.2 }}>
                           {selectedExam.patientName}
                         </Title>
                         <Badge variant="light" color="darkBlue" size="lg" radius="sm">
@@ -906,7 +932,7 @@ export function LaudoExames() {
                             <Stethoscope size={14} />
                           </ThemeIcon>
                           <Text size="sm" c="dimmed">
-                            Solicitante: <Text span fw={500} c="dark.7">{selectedExam.requestingDoctor}</Text>
+                            Solicitante: <Text span fw={500} c={isDark ? 'gray.2' : 'dark.7'}>{selectedExam.requestingDoctor}</Text>
                           </Text>
                         </Group>
                       </Group>
@@ -947,7 +973,7 @@ export function LaudoExames() {
                   <Paper
                     withBorder
                     p="md"
-                    bg="gray.0"
+                    bg={subtleBg}
                     style={{
                       flex: isMobile ? '1 1 100%' : '0 0 320px',
                       display: 'flex',
@@ -955,6 +981,7 @@ export function LaudoExames() {
                       maxHeight: isMobile ? '35vh' : 'none',
                       overflow: 'hidden',
                       transition: 'all 0.3s ease',
+                      borderColor,
                     }}
                   >
                     <Button 
@@ -1004,7 +1031,7 @@ export function LaudoExames() {
                       leftSection={<Search size={16} />}
                     />
 
-                    <Text size="sm" fw={700} c="dark.8" mb={8}>Frases de laudo</Text>
+                    <Text size="sm" fw={700} c={isDark ? 'gray.1' : 'dark.8'} mb={8}>Frases de laudo</Text>
                     <Box style={{ minHeight: 0, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }}>
                       <Stack gap="xs" mb="md">
                         {filteredPhrases.length === 0 ? (
@@ -1020,14 +1047,14 @@ export function LaudoExames() {
                               shadow={selectedPhraseId === phrase.id ? 'sm' : 'none'}
                               style={{
                                 cursor: 'pointer',
-                                borderColor: selectedPhraseId === phrase.id ? DARK_BLUE : '#e9ecef',
-                                backgroundColor: 'white',
+                                borderColor: selectedPhraseId === phrase.id ? DARK_BLUE : borderColor,
+                                backgroundColor: selectedPhraseId === phrase.id ? selectedRowBg : surfaceBg,
                                 transition: 'all 0.2s ease',
                               }}
                               onClick={() => setSelectedPhraseId(phrase.id)}
                               onDoubleClick={() => insertPhrase(phrase.id)}
                             >
-                              <Text fw={600} size="sm" c="dark.9">{phrase.label}</Text>
+                              <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{phrase.label}</Text>
                               <Text size="xs" c="dimmed" lineClamp={2} mt={4}>{phrase.text}</Text>
                             </Paper>
                           ))
@@ -1035,9 +1062,9 @@ export function LaudoExames() {
                       </Stack>
                     </Box>
 
-                    <Divider my="sm" color="gray.3" />
+                    <Divider my="sm" color={isDark ? 'dark.3' : 'gray.3'} />
 
-                    <Text size="sm" fw={700} c="dark.8" mb={8}>Campos dinâmicos</Text>
+                    <Text size="sm" fw={700} c={isDark ? 'gray.1' : 'dark.8'} mb={8}>Campos dinâmicos</Text>
                     <Box style={{ minHeight: 0, maxHeight: 200, overflowY: 'auto' }}>
                       <Group gap="xs" wrap="wrap">
                         {REPORT_PLACEHOLDERS.map((item) => (
@@ -1110,12 +1137,13 @@ export function LaudoExames() {
                     withBorder
                     px="xs"
                     py={4}
-                    bg="gray.1"
+                    bg={subtleBg}
                     style={{
                       borderBottom: 'none',
                       borderBottomLeftRadius: 0,
                       borderBottomRightRadius: 0,
                       flexShrink: 0,
+                      borderColor,
                     }}
                   >
                     <Group gap={4} align="center">
@@ -1166,16 +1194,18 @@ export function LaudoExames() {
                       menubar: false,
                       resize: false,
                       plugins: ['lists', 'link', 'table', 'wordcount'],
+                      skin: isDark ? 'oxide-dark' : 'oxide',
+                      content_css: isDark ? 'dark' : 'default',
                       toolbar:
                         'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                      content_style: 'body { font-family:Poppins,sans-serif; font-size:14px; }',
+                      content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
                     }}
                   />
                   </Box>
                 </Box>
               </Group>
 
-              <Group justify="space-between" align="center" wrap="wrap" style={{ borderTop: '1px solid #e9ecef', paddingTop: 16, paddingBottom: 4 }}>
+              <Group justify="space-between" align="center" wrap="wrap" style={{ borderTop: `1px solid ${borderColor}`, paddingTop: 16, paddingBottom: 4 }}>
                 <Group gap="xs">
                   <ThemeIcon variant="light" color="gray" size="sm">
                     <Save size={14} />
@@ -1217,11 +1247,23 @@ export function LaudoExames() {
           centered
           size={isMobile ? '100%' : '75%'}
           fullScreen={isMobile}
+          styles={{
+            header: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+              borderBottom: isDark ? `1px solid ${borderColor}` : undefined,
+            },
+            content: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
+            body: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
+          }}
         >
           <Group justify="space-between" mb="sm" align="center">
-            <Text size="sm" c="dimmed">
-              {filteredTemplatesByQuery.length} padrões em {Object.keys(groupedTemplates).length} grupo(s)
-            </Text>
+              <Text size="sm" c="dimmed">
+                {filteredTemplatesByQuery.length} padrões em {Object.keys(groupedTemplates).length} grupo(s)
+              </Text>
           </Group>
 
           <Group align="stretch" gap="md" wrap={isMobile ? 'wrap' : 'nowrap'}>
@@ -1250,14 +1292,14 @@ export function LaudoExames() {
                     <Box key={group}>
                       <Paper
                         p="xs"
-                        bg="gray.1"
+                        bg={subtleBg}
                         radius="sm"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => toggleTemplateGroup(group)}
                       >
                         <Group gap="xs" align="center">
                           {expandedTemplateGroups[group] === false ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                          <Text size="sm" fw={700} c="dark.8">{group}</Text>
+                          <Text size="sm" fw={700} c={isDark ? 'gray.1' : 'dark.8'}>{group}</Text>
                           <Badge size="xs" variant="light" color="gray" ml="auto">{groupTemplates.length}</Badge>
                         </Group>
                       </Paper>
@@ -1271,13 +1313,13 @@ export function LaudoExames() {
                               shadow={selectedTemplateId === template.id ? 'sm' : 'none'}
                               style={{
                                 cursor: 'pointer',
-                                borderColor: selectedTemplateId === template.id ? DARK_BLUE : '#e9ecef',
-                                backgroundColor: selectedTemplateId === template.id ? '#f0f4ff' : 'white',
+                                borderColor: selectedTemplateId === template.id ? DARK_BLUE : borderColor,
+                                backgroundColor: selectedTemplateId === template.id ? selectedRowBg : surfaceBg,
                                 transition: 'all 0.15s ease',
                               }}
                               onClick={() => setSelectedTemplateId(template.id)}
                             >
-                              <Text fw={600} size="sm" c="dark.9">{template.name}</Text>
+                              <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{template.name}</Text>
                               <Text size="xs" c="dimmed">{template.examType}</Text>
                             </Paper>
                           ))}
@@ -1292,11 +1334,13 @@ export function LaudoExames() {
             <Paper
               withBorder
               p="md"
+              bg={panelBg}
               style={{
                 flex: 1,
                 minHeight: isMobile ? '42vh' : 420,
                 maxHeight: isMobile ? '42vh' : '60vh',
                 overflowY: 'auto',
+                borderColor,
               }}
             >
               {selectedTemplate ? (
@@ -1305,7 +1349,7 @@ export function LaudoExames() {
                     <Badge variant="light" color="darkBlue">{selectedTemplate.group}</Badge>
                     <Badge variant="outline" color="gray">{selectedTemplate.examType}</Badge>
                   </Group>
-                  <Title order={5} mb="sm" c="dark.9">{selectedTemplate.name}</Title>
+                  <Title order={5} mb="sm" c={isDark ? 'gray.0' : 'dark.9'}>{selectedTemplate.name}</Title>
                   <Box dangerouslySetInnerHTML={{ __html: selectedTemplate.content }} />
                 </>
               ) : (
@@ -1334,16 +1378,28 @@ export function LaudoExames() {
           centered
           size={isMobile ? '100%' : '75%'}
           fullScreen={isMobile}
+          styles={{
+            header: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+              borderBottom: isDark ? `1px solid ${borderColor}` : undefined,
+            },
+            content: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
+            body: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
+          }}
         >
           {selectedExam && (
             <>
-              <Paper withBorder p="sm" mb="md" bg="gray.0" radius="md">
+              <Paper withBorder p="sm" mb="md" bg={subtleBg} radius="md" style={{ borderColor }}>
                 <Group gap="sm">
                   <ThemeIcon variant="light" color="darkBlue" size="lg">
                     <History size={20} />
                   </ThemeIcon>
                   <Box>
-                    <Text fw={600} size="sm" c="dark.9">{selectedExam.patientName}</Text>
+                    <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{selectedExam.patientName}</Text>
                     <Text size="xs" c="dimmed">CPF: {selectedExam.cpf} • {previousReports.length} laudo(s) anterior(es)</Text>
                   </Box>
                 </Group>
@@ -1353,15 +1409,17 @@ export function LaudoExames() {
                 <Paper
                   withBorder
                   p="sm"
+                  bg={panelBg}
                   style={{
                     flex: isMobile ? '1 1 100%' : '0 0 340px',
                     maxHeight: isMobile ? '36vh' : '55vh',
                     overflowY: 'auto',
+                    borderColor,
                   }}
                 >
                   {previousReports.length === 0 ? (
                     <Stack align="center" justify="center" py="xl">
-                      <History size={40} color="#adb5bd" />
+                      <History size={40} color={isDark ? '#7d92c6' : '#adb5bd'} />
                       <Text size="sm" c="dimmed" ta="center">Nenhum laudo anterior encontrado para este paciente.</Text>
                     </Stack>
                   ) : (
@@ -1371,7 +1429,7 @@ export function LaudoExames() {
                           key={report.id}
                           bullet={<FileText size={14} />}
                           title={
-                            <Text fw={600} size="sm" c="dark.9" style={{ cursor: 'pointer' }} onClick={() => setSelectedPreviousReport(report)}>
+                            <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'} style={{ cursor: 'pointer' }} onClick={() => setSelectedPreviousReport(report)}>
                               {report.examType}
                             </Text>
                           }
@@ -1383,8 +1441,8 @@ export function LaudoExames() {
                             shadow={selectedPreviousReport?.id === report.id ? 'sm' : 'none'}
                             style={{
                               cursor: 'pointer',
-                              borderColor: selectedPreviousReport?.id === report.id ? DARK_BLUE : '#e9ecef',
-                              backgroundColor: selectedPreviousReport?.id === report.id ? '#f0f4ff' : 'white',
+                              borderColor: selectedPreviousReport?.id === report.id ? DARK_BLUE : borderColor,
+                              backgroundColor: selectedPreviousReport?.id === report.id ? selectedRowBg : surfaceBg,
                               transition: 'all 0.15s ease',
                             }}
                             onClick={() => setSelectedPreviousReport(report)}
@@ -1404,11 +1462,13 @@ export function LaudoExames() {
                 <Paper
                   withBorder
                   p="md"
+                  bg={panelBg}
                   style={{
                     flex: 1,
                     minHeight: isMobile ? '42vh' : 400,
                     maxHeight: isMobile ? '42vh' : '55vh',
                     overflowY: 'auto',
+                    borderColor,
                   }}
                 >
                   {selectedPreviousReport ? (
@@ -1446,9 +1506,21 @@ export function LaudoExames() {
           centered
           size={isMobile ? '100%' : '80%'}
           fullScreen={isMobile}
+          styles={{
+            header: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+              borderBottom: isDark ? `1px solid ${borderColor}` : undefined,
+            },
+            content: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
+            body: {
+              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
+            },
+          }}
         >
           <Stack>
-            <Box style={{ border: '1px solid #dee2e6', borderRadius: 8, overflow: 'hidden' }}>
+            <Box style={{ border: `1px solid ${borderColor}`, borderRadius: 8, overflow: 'hidden' }}>
               <iframe
                 ref={previewFrameRef}
                 title="Preview PDF"

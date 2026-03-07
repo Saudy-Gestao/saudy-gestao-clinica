@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 * {
   box-sizing: border-box;
@@ -7,11 +7,160 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--mantine-color-body);
   color: var(--mantine-color-text);
+}
+
+:root[data-mantine-color-scheme='dark'] {
+  --mantine-color-body: #0A1128;
+  --mantine-color-text: #eef3ff;
+  --mantine-color-dimmed: #8fa3d6;
+  --mantine-color-placeholder: #7d92c6;
+  --mantine-color-default: #001F54;
+  --mantine-color-default-hover: #16285b;
+  --mantine-color-default-color: #eef3ff;
+  --mantine-color-default-border: #2b3f73;
+}
+
+.module-card-dark {
+  background-color: #001F54;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.module-card-dark:hover {
+  background-color: #0A1128;
+  border-color: #3a5392 !important;
+}
+
+.tea-home-module-card {
+  background-color: #001F54;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.tea-home-module-card:hover {
+  background-color: #0A1128;
+  border-color: #3a5392 !important;
+}
+
+.login-light {
+  color: #2e2e2e;
+}
+
+.login-light .login-right-panel {
+  background-color: #ffffff !important;
+}
+
+.login-light .login-left-panel {
+  background-color: #001F54 !important;
+}
+
+.login-light .floating-field input {
+  color: #2e2e2e !important;
+  border-bottom-color: #adb5bd !important;
+  background-color: transparent !important;
+}
+
+.login-light .floating-field input:focus {
+  border-bottom-color: #001F54 !important;
+}
+
+.login-light .floating-field label {
+  color: #495057 !important;
+}
+
+.login-light .floating-field.has-value label,
+.login-light .floating-field.is-focused label,
+.login-light .floating-field input:focus + label,
+.login-light .floating-field input:not(:placeholder-shown) + label {
+  color: #001F54 !important;
+}
+
+.login-light a {
+  color: #0b63ce !important;
+}
+
+/* Dark mode compatibility layer for legacy hardcoded colors */
+:root[data-mantine-color-scheme='dark'] .mantine-Modal-content,
+:root[data-mantine-color-scheme='dark'] .mantine-Menu-dropdown,
+:root[data-mantine-color-scheme='dark'] .mantine-Popover-dropdown {
+  background-color: var(--mantine-color-default);
+  border-color: var(--mantine-color-default-border);
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Table-root {
+  color: var(--mantine-color-text);
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Table-th,
+:root[data-mantine-color-scheme='dark'] .mantine-Table-td {
+  border-color: var(--mantine-color-default-border) !important;
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Input-input,
+:root[data-mantine-color-scheme='dark'] .mantine-Select-input,
+:root[data-mantine-color-scheme='dark'] .mantine-Textarea-input,
+:root[data-mantine-color-scheme='dark'] .mantine-MultiSelect-input,
+:root[data-mantine-color-scheme='dark'] .mantine-DatePickerInput-input,
+:root[data-mantine-color-scheme='dark'] .mantine-NumberInput-input {
+  background-color: #10204d;
+  border-color: var(--mantine-color-default-border);
+  color: var(--mantine-color-text);
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Input-input::placeholder,
+:root[data-mantine-color-scheme='dark'] .mantine-Select-input::placeholder,
+:root[data-mantine-color-scheme='dark'] .mantine-Textarea-input::placeholder,
+:root[data-mantine-color-scheme='dark'] .mantine-MultiSelect-input::placeholder {
+  color: var(--mantine-color-placeholder);
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Input-input:focus,
+:root[data-mantine-color-scheme='dark'] .mantine-Select-input:focus,
+:root[data-mantine-color-scheme='dark'] .mantine-Textarea-input:focus,
+:root[data-mantine-color-scheme='dark'] .mantine-MultiSelect-input:focus,
+:root[data-mantine-color-scheme='dark'] .mantine-DatePickerInput-input:focus,
+:root[data-mantine-color-scheme='dark'] .mantine-NumberInput-input:focus {
+  border-color: #3a62c4;
+}
+
+/* Override frequent inline hardcoded legacy colors */
+:root[data-mantine-color-scheme='dark'] [style*='#e9ecef'],
+:root[data-mantine-color-scheme='dark'] [style*='#dee2e6'],
+:root[data-mantine-color-scheme='dark'] [style*='#f8f9fa'],
+:root[data-mantine-color-scheme='dark'] [style*='#ffffff'],
+:root[data-mantine-color-scheme='dark'] [style*='white'] {
+  border-color: var(--mantine-color-default-border) !important;
+}
+
+:root[data-mantine-color-scheme='dark'] [style*='backgroundColor: #f8f9fa'],
+:root[data-mantine-color-scheme='dark'] [style*='background-color: #f8f9fa'],
+:root[data-mantine-color-scheme='dark'] [style*='backgroundColor: #ffffff'],
+:root[data-mantine-color-scheme='dark'] [style*='background-color: #ffffff'],
+:root[data-mantine-color-scheme='dark'] [style*='backgroundColor: white'],
+:root[data-mantine-color-scheme='dark'] [style*='background-color: white'] {
+  background-color: var(--mantine-color-default) !important;
+}
+
+/* Login must always be light, even when app scheme is dark */
+:root[data-mantine-color-scheme='dark'] .login-light [style*='backgroundColor: #ffffff'],
+:root[data-mantine-color-scheme='dark'] .login-light [style*='background-color: #ffffff'],
+:root[data-mantine-color-scheme='dark'] .login-light [style*='backgroundColor: white'],
+:root[data-mantine-color-scheme='dark'] .login-light [style*='background-color: white'] {
+  background-color: #ffffff !important;
+}
+
+:root[data-mantine-color-scheme='dark'] [style*='color: #212529'],
+:root[data-mantine-color-scheme='dark'] [style*='color:#212529'],
+:root[data-mantine-color-scheme='dark'] [style*='color: #495057'],
+:root[data-mantine-color-scheme='dark'] [style*='color:#495057'],
+:root[data-mantine-color-scheme='dark'] [style*='color: #6c757d'],
+:root[data-mantine-color-scheme='dark'] [style*='color:#6c757d'],
+:root[data-mantine-color-scheme='dark'] [style*='color: #868e96'],
+:root[data-mantine-color-scheme='dark'] [style*='color:#868e96'] {
+  color: var(--mantine-color-dimmed) !important;
 }
 
 /* Floating label inputs */
@@ -171,5 +320,3 @@ button:disabled {
 .mantine-Select-root[data-unstyled] .mantine-Select-input {
   padding: 10px 0 6px;
 }
-
-

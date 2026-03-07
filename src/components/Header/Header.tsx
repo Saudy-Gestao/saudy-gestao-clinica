@@ -1,6 +1,6 @@
 import { Box, Group, Text, ActionIcon, Button } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { LogOut } from 'lucide-react';
+import { LogOut, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import UserMenu from './UserMenu';
@@ -112,28 +112,53 @@ export function Header() {
   return (
     <Box bg={DARK_BLUE} c="white" py="md" px="xl">
       <Group justify="space-between" wrap="nowrap">
-        <Group>
-          <Box bg="white" w={40} h={40} style={{ borderRadius: 8 }} />
-          <Text fw={500} size="lg">Logo Clínica</Text>
+        <Group
+          onClick={() => navigate('/dashboard')}
+          style={{ cursor: 'pointer' }}
+        >
+          <Box bg="white" w={40} h={40} style={{ borderRadius: 8, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+            <img src="/logo.png" alt="Saudy" style={{ width: 30, height: 30, objectFit: 'contain' }} />
+          </Box>
+          <Text fw={500} size="lg">Saudy</Text>
         </Group>
 
         {!isMobile && quickModules.length > 0 && (
-          <Group gap={8} style={{ flex: 1, justifyContent: 'center', overflow: 'hidden' }} wrap="nowrap">
+          <Group
+            gap={10}
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 999,
+              padding: '6px 10px',
+            }}
+            wrap="nowrap"
+          >
+            <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+              <Sparkles size={14} color="rgba(255,255,255,0.92)" />
+              <Text size="xs" fw={600} c="rgba(255,255,255,0.92)">
+                Mais usados
+              </Text>
+            </Group>
             {quickModules.map((module) => (
               <Button
                 key={module.key}
                 size="compact-xs"
-                variant="light"
-                color="blue"
+                variant="subtle"
                 onClick={() => navigate(module.route)}
                 style={{
-                  background: 'rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.14)',
                   color: 'white',
                   border: '1px solid rgba(255,255,255,0.18)',
+                  borderRadius: 999,
                   maxWidth: 170,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                  transition: 'all 120ms ease',
                 }}
               >
                 {module.label}

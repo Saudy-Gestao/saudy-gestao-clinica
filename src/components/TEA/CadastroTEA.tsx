@@ -148,12 +148,12 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const isStandaloneSubmodule = Boolean(forcedSubmodule);
 
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
-  const pageBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-8)' : '#f8f9fa';
-  const cardBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-white)';
-  const cardBorder = colorScheme === 'dark' ? 'var(--mantine-color-dark-4)' : '#e9ecef';
-  const shellBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-gray-0)';
-  const activeModuleBg = colorScheme === 'dark' ? 'rgba(59,130,246,0.16)' : 'var(--mantine-color-indigo-0)';
-  const activeModuleBorder = colorScheme === 'dark' ? 'rgba(96,165,250,0.52)' : 'var(--mantine-color-indigo-6)';
+  const pageBg = colorScheme === 'dark' ? 'var(--mantine-color-body)' : '#f8f9fa';
+  const cardBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-white)';
+  const cardBorder = colorScheme === 'dark' ? 'var(--mantine-color-default-border)' : '#e9ecef';
+  const shellBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-gray-0)';
+  const activeModuleBg = colorScheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'var(--mantine-color-indigo-0)';
+  const activeModuleBorder = colorScheme === 'dark' ? '#3a5392' : 'var(--mantine-color-indigo-6)';
 
   const [form, setForm] = useState<TeaForm>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
@@ -673,11 +673,12 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                         key={module.key}
                         p="xs"
                         withBorder
+                        className={colorScheme === 'dark' ? 'module-card-dark' : undefined}
                         style={{
                           cursor: module.enabled ? 'pointer' : 'not-allowed',
                           opacity: module.enabled ? 1 : 0.6,
                           borderColor: active ? activeModuleBorder : 'var(--mantine-color-default-border)',
-                          background: active ? activeModuleBg : 'transparent',
+                          background: active ? activeModuleBg : undefined,
                         }}
                         onClick={() => {
                           if (!module.enabled) return;
@@ -700,7 +701,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
               </Paper>
               <Transition mounted={enteredForm} transition="fade" duration={isFromModuleHub ? 280 : 220} timingFunction="ease">
                 {(formStyles) => (
-        <Stack gap="md" p="md" bg={cardBg} style={{ border: `1px solid ${cardBorder}`, borderRadius: 8, ...formStyles }}>
+        <Stack gap="md" p="md" bg={cardBg} style={{ border: `1px solid ${cardBorder}`, borderRadius: 12, ...formStyles }}>
           {activeSubmodule === 'cadastro' ? (
             <>
           <Group justify="space-between" align="center" wrap="wrap">

@@ -2796,7 +2796,7 @@ export function TeaPreReserva() {
             Voltar
           </Button>
           <Box>
-            <Text fw={700} size="lg" style={{ color: DARK_BLUE }}>Pré-reserva TEA</Text>
+            <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Pré-reserva TEA</Text>
             <Text size="sm" c="dimmed">Pendências de marcação com base no PIT</Text>
           </Box>
         </Group>

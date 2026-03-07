@@ -1,7 +1,7 @@
 import { Box, Group, Text, Paper, ThemeIcon, SimpleGrid, Button, useMantineColorScheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Brain, Users, ClipboardList, Activity, BarChart3, CalendarClock, CalendarX2, CalendarDays } from 'lucide-react';
+import { ChevronLeft, Brain, Users, ClipboardList, Activity, BarChart3, CalendarClock, CalendarX2, CalendarDays, ChevronRight } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 
@@ -85,8 +85,8 @@ export function TeaHome() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
-  const heroBg = colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)';
-  const cardBg = colorScheme === 'dark' ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-white)';
+  const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
+  const heroBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-gray-0)';
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
@@ -111,27 +111,32 @@ export function TeaHome() {
               return (
                 <Paper
                   key={module.key}
-                  p="md"
+                  p="xs"
                   withBorder
+                  className={colorScheme === 'dark' ? 'module-card-dark' : undefined}
                   style={{
                     borderColor: 'var(--mantine-color-default-border)',
                     cursor: module.enabled ? 'pointer' : 'not-allowed',
                     opacity: module.enabled ? 1 : 0.6,
-                    background: cardBg,
+                    minHeight: 60,
+                    height: '100%',
                   }}
                   onClick={() => {
                     if (!module.enabled) return;
                     navigate(module.route, { state: { fromModuleHub: true } });
                   }}
                 >
-                  <Group gap="sm" wrap="nowrap" align="flex-start">
-                    <ThemeIcon size="lg" variant="light" color="indigo">
-                      <Icon size={16} />
-                    </ThemeIcon>
-                    <Box>
-                      <Text fw={600}>{module.title}</Text>
-                      <Text size="xs" c="dimmed">{module.description}</Text>
-                    </Box>
+                  <Group justify="space-between" align="flex-start">
+                    <Group gap="xs" wrap="nowrap">
+                      <ThemeIcon size="md" variant="transparent" color="darkBlue" bg="transparent" style={{ border: `1px solid ${accentColor}`, borderRadius: '6px' }}>
+                        <Icon size={18} color={accentColor} />
+                      </ThemeIcon>
+                      <Box>
+                        <Text fw={500} size="sm" lineClamp={1}>{module.title}</Text>
+                        <Text size="xs" c="dimmed" lineClamp={1}>{module.description}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={16} color="var(--mantine-color-dimmed)" />
                   </Group>
                 </Paper>
               );

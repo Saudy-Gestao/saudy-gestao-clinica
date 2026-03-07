@@ -22,7 +22,6 @@ import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import teaProfileService from '../../services/teaProfileService';
 import teaPreReservationService from '../../services/teaPreReservationService';
-import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF } from '../../utils/formatters';
 
 type CancellationTherapyItem = {
@@ -235,7 +234,7 @@ export function TeaDesmarcacaoLote() {
             Voltar
           </Button>
           <Box>
-            <Text fw={700} size="lg" style={{ color: DARK_BLUE }}>Desmarcação em lote</Text>
+            <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Desmarcação em lote</Text>
             <Text size="sm" c="dimmed">Cancelar terapias recorrentes de um paciente TEA</Text>
           </Box>
         </Group>

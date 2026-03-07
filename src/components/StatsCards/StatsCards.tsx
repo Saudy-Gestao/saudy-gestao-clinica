@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Paper, SimpleGrid, Text, Loader, Center } from '@mantine/core';
+import { Paper, SimpleGrid, Text, Loader, Center, useMantineColorScheme } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import consultationService from '../../services/consultationService';
 import appointmentService from '../../services/appointmentService';
 
 export function StatsCards() {
+  const { colorScheme } = useMantineColorScheme();
   const [stats, setStats] = useState({
     atendimentoHoje: 0,
     agendamentosPendentes: 0,
@@ -85,7 +86,16 @@ export function StatsCards() {
         { label: 'Agendamentos pendentes', value: stats.agendamentosPendentes },
         { label: 'Em atendimento', value: stats.emAtendimento },
       ].map((stat, index) => (
-        <Paper key={index} p="lg" withBorder shadow="sm">
+        <Paper
+          key={index}
+          p="lg"
+          withBorder
+          shadow="none"
+          style={colorScheme === 'dark' ? {
+            backgroundColor: 'transparent',
+            borderColor: 'var(--mantine-color-default-border)',
+          } : undefined}
+        >
           <Text c="dimmed" size="sm" fw={500} mb="xs">{stat.label}</Text>
           <Text size="2.5rem" fw={500} style={{ lineHeight: 1 }}>
             {String(stat.value).padStart(2, '0')}
