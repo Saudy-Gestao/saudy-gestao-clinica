@@ -81,6 +81,9 @@ const PLACEHOLDER_PHONE_DIGITS = new Set([
   '5511999999999',
 ]);
 
+const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
+const BRANCH_QUOTAS_STORAGE_KEY = 'settings:branch-create-quotas';
+
 const sanitizeCompanyField = (value: unknown) => {
   if (typeof value !== 'string') return '';
 
@@ -96,6 +99,38 @@ const sanitizeCompanyField = (value: unknown) => {
     .toLowerCase();
 
   return COMPANY_PLACEHOLDER_VALUES.has(normalized) ? '' : trimmed;
+};
+
+const getStoredCompanyPrefill = () => {
+  const raw = localStorage.getItem(COMPANY_PREFILL_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      cnpj: sanitizeCompanyField(parsed?.cnpj),
+      legalName: sanitizeCompanyField(parsed?.legalName),
+      tradeName: sanitizeCompanyField(parsed?.tradeName),
+      address: sanitizeCompanyField(parsed?.address),
+      phone: sanitizeCompanyField(parsed?.phone),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const getStoredBranchQuotas = () => {
+  const raw = localStorage.getItem(BRANCH_QUOTAS_STORAGE_KEY);
+  if (!raw) return {} as Record<string, { allowedCreates: number; initialBranchCount: number }>;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, { allowedCreates: number; initialBranchCount: number }>)
+      : {};
+  } catch {
+    return {} as Record<string, { allowedCreates: number; initialBranchCount: number }>;
+  }
 };
 
 export function SettingsPage() {
@@ -131,6 +166,7 @@ export function SettingsPage() {
   });
   const [savingBranch, setSavingBranch] = useState(false);
   const [branchErrors, setBranchErrors] = useState<Record<string, string>>({});
+  const [branchQuota, setBranchQuota] = useState<{ allowedCreates: number; initialBranchCount: number } | null>(null);
 
   const isBranchMatriz = (branch: any) => {
     if (!branch) return false;
@@ -192,6 +228,11 @@ export function SettingsPage() {
   // --- Effects ---
 
   useEffect(() => {
+    const prefill = getStoredCompanyPrefill();
+    if (prefill) {
+      setCompanyForm(prefill);
+    }
+
     // Get logged user from localStorage
     const userStr = localStorage.getItem('user');
     if (userStr) {
@@ -220,11 +261,20 @@ export function SettingsPage() {
           address: sanitizeCompanyField(comp.address),
           phone: sanitizeCompanyField(comp.phone),
         });
+        localStorage.removeItem(COMPANY_PREFILL_STORAGE_KEY);
       }
       // Forçar refetch dos branches
       fetchBranches();
+
+      const quotas = getStoredBranchQuotas();
+      setBranchQuota(quotas[selectedCompanyId] || null);
+    } else {
+      setBranchQuota(null);
     }
   }, [selectedCompanyId, companies]);
+
+  const maxBranchesAllowed = branchQuota ? branchQuota.initialBranchCount + branchQuota.allowedCreates : null;
+  const reachedBranchLimit = maxBranchesAllowed !== null && branches.length >= maxBranchesAllowed;
 
   // Reload companies when userCompanyId is set
   useEffect(() => {
@@ -336,6 +386,15 @@ export function SettingsPage() {
   };
 
   const openBranchModalForCreate = () => {
+    if (reachedBranchLimit) {
+      notifications.show({
+        title: 'Limite atingido',
+        message: 'Voce atingiu o limite de filiais permitido no cadastro do cliente.',
+        color: 'yellow',
+      });
+      return;
+    }
+
     setEditingBranch(null);
     setBranchForm({ tradeName: '', address: '', phone: '', type: 'Filial' });
     setBranchErrors({});
@@ -356,6 +415,15 @@ export function SettingsPage() {
 
   const handleSaveBranch = async () => {
     if (!selectedCompanyId) return;
+
+    if (!editingBranch && reachedBranchLimit) {
+      notifications.show({
+        title: 'Limite atingido',
+        message: 'Nao e possivel criar mais filiais para esta empresa.',
+        color: 'red',
+      });
+      return;
+    }
     
     // Validate form
     const validation = validateBranchForm(branchForm);
@@ -859,8 +927,14 @@ export function SettingsPage() {
                     <Box>
                         <Group justify="space-between" mb="md">
                             <SectionTitle title="Filiais" desc="Gerencie as unidades da empresa." />
-                            <Button leftSection={<Plus size={16} />} onClick={openBranchModalForCreate} bg={DARK_BLUE} disabled={!selectedCompanyId}>Nova Filial</Button>
+                            <Button leftSection={<Plus size={16} />} onClick={openBranchModalForCreate} bg={DARK_BLUE} disabled={!selectedCompanyId || reachedBranchLimit}>Nova Filial</Button>
                         </Group>
+
+                        {maxBranchesAllowed !== null && (
+                          <Text size="sm" c={reachedBranchLimit ? 'red' : 'dimmed'} mb="md">
+                            Limite de filiais: {branches.length}/{maxBranchesAllowed}
+                          </Text>
+                        )}
 
                         {loadingBranches ? <Loader /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>

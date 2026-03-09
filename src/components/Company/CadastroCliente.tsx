@@ -16,7 +16,29 @@ import {
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import companyService from '../../services/companyService';
-import bcrypt from 'bcryptjs';
+
+const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
+const BRANCH_QUOTAS_STORAGE_KEY = 'settings:branch-create-quotas';
+
+function saveBranchCreateQuota(companyId: string, allowedCreates: number, initialBranchCount: number) {
+  const raw = localStorage.getItem(BRANCH_QUOTAS_STORAGE_KEY);
+  let map: Record<string, { allowedCreates: number; initialBranchCount: number }> = {};
+
+  if (raw) {
+    try {
+      map = JSON.parse(raw);
+    } catch {
+      map = {};
+    }
+  }
+
+  map[companyId] = {
+    allowedCreates,
+    initialBranchCount,
+  };
+
+  localStorage.setItem(BRANCH_QUOTAS_STORAGE_KEY, JSON.stringify(map));
+}
 
 function generatePassword(length = 12) {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -45,14 +67,13 @@ export function CadastroCliente() {
   const [address, setAddress] = useState('');
 
   // Step 3 - Branches
-  const [branches, setBranches] = useState<number | undefined>(1);
+  const [branches, setBranches] = useState<number | undefined>(0);
 
   const [submitting, setSubmitting] = useState(false);
 
   const handleGeneratePassword = () => {
     const p = generatePassword(12);
     setPlainPassword(p);
-    setShowPlainPassword(true);
   };
 
   const validateStep = (step: number) => {
@@ -83,8 +104,8 @@ export function CadastroCliente() {
     }
 
     if (step === 2) {
-      if (!branches || branches < 1) {
-        showNotification({ title: 'Erro', message: 'Informe o número de filiais (>= 1)', color: 'red' });
+      if (branches === undefined || branches < 0) {
+        showNotification({ title: 'Erro', message: 'Informe o número de filiais adicionais (>= 0)', color: 'red' });
         return false;
       }
     }
@@ -104,14 +125,13 @@ export function CadastroCliente() {
     setSubmitting(true);
 
     try {
-      // Hash password client-side (note: server should also hash/validate)
-      const hashed = await bcrypt.hash(plainPassword, 10);
+      const additionalBranchesAllowed = branches ?? 0;
 
       const payload = {
         admin: {
           name: adminName.trim(),
           email: adminEmail.trim(),
-          password: hashed,
+          password: plainPassword,
         },
         company: {
           cnpj: cnpj.trim(),
@@ -120,10 +140,26 @@ export function CadastroCliente() {
           nomeFantasia: nomeFantasia.trim() || undefined,
           address: address.trim() || undefined,
         },
-        branchesCount: branches || 1,
+        branchesCount: additionalBranchesAllowed,
       };
 
-      await companyService.createCompany(payload);
+      const result = await companyService.createCompany(payload);
+
+      localStorage.setItem(
+        COMPANY_PREFILL_STORAGE_KEY,
+        JSON.stringify({
+          cnpj: payload.company.cnpj,
+          legalName: payload.company.razaoSocial,
+          tradeName: payload.company.nomeFantasia || payload.company.razaoSocial,
+          address: payload.company.address || '',
+          phone: payload.company.phone || '',
+        })
+      );
+
+      if (result?.company?.id) {
+        const initialBranchCount = Array.isArray(result?.branches) ? result.branches.length : 1;
+        saveBranchCreateQuota(result.company.id, payload.branchesCount, initialBranchCount);
+      }
 
       showNotification({ title: 'Sucesso', message: 'Cliente cadastrado com sucesso', color: 'green' });
       // Important: show the generated password to the admin so they can share it once
@@ -160,19 +196,18 @@ export function CadastroCliente() {
 
                 <Group align="flex-end">
                   <PasswordInput
-                    label="Senha gerada"
+                    label="Senha de login"
                     value={plainPassword}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => setPlainPassword(e.currentTarget.value)}
-                    placeholder="Gerar senha"
+                    placeholder="Gere a senha"
                     visible={showPlainPassword}
                     onVisibilityChange={(v: boolean) => setShowPlainPassword(v)}
-                    readOnly={!showPlainPassword}
+                    readOnly
                     style={{ flex: 1 }}
                   />
                   <Button onClick={handleGeneratePassword}>Gerar senha</Button>
                 </Group>
 
-                <Text size="sm" c="dimmed">A senha é automaticamente hashed antes do envio. Guarde a senha gerada para compartilhar com o cliente.</Text>
+                <Text size="sm" c="dimmed">A senha e gerada automaticamente (nao editavel) e hashada no cadastro. O nome do administrador e apenas informativo.</Text>
               </Stack>
             </Stepper.Step>
 
@@ -188,8 +223,8 @@ export function CadastroCliente() {
 
             <Stepper.Step description="Filiais">
               <Stack>
-                <NumberInput label="Quantidade de filiais" value={branches} onChange={(v: string | number) => setBranches(typeof v === 'number' ? v : Number(v) || undefined)} min={1} />
-                <Text size="sm" c="dimmed">Informe quantas filiais essa empresa terá inicialmente.</Text>
+                <NumberInput label="Quantidade de filiais adicionais" value={branches} onChange={(v: string | number) => setBranches(typeof v === 'number' ? v : Number(v) || undefined)} min={0} />
+                <Text size="sm" c="dimmed">No cadastro sera criada apenas a matriz. Esse numero define quantas filiais adicionais poderao ser criadas no Settings.</Text>
               </Stack>
             </Stepper.Step>
 
