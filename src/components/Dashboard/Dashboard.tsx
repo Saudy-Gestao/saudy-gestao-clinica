@@ -113,20 +113,24 @@ export function Dashboard() {
             <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
           </Stack>
 
-          <Tooltip label="Reconhecimento Facial" position="left">
-            <Button
-              size="lg"
-              leftSection={<Camera size={20} />}
-              onClick={() => setFacialCaptureOpen(true)}
-              loading={recognizing}
-              bg={DARK_BLUE}
-              style={{
-                background: DARK_BLUE,
-              }}
-            >
-              Identificar Paciente
-            </Button>
-          </Tooltip>
+          <Button
+            size="lg"
+            leftSection={<Camera size={20} strokeWidth={2} />}
+            onClick={() => setFacialCaptureOpen(true)}
+            loading={recognizing}
+            variant="default"
+            radius="md"
+            styles={{
+              root: {
+                fontWeight: 500,
+                '&:hover': {
+                  backgroundColor: 'var(--mantine-color-default-hover)',
+                },
+              },
+            }}
+          >
+            Identificar Paciente
+          </Button>
         </Group>
 
         <StatsCards />
