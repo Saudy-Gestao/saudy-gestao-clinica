@@ -14,6 +14,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [leftImageSrc, setLeftImageSrc] = useState('/medicos.png');
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -76,13 +77,18 @@ export function Login() {
             minHeight: isMobile ? 300 : 'auto',
           }}
         >
-          <Image
-            src="/medicos.png"
-            alt="Equipe médica"
+          <img
+            src={leftImageSrc}
+            alt="Equipe medica"
+            onError={() => setLeftImageSrc('/logo.png')}
+            loading="eager"
+            decoding="sync"
             style={{
               width: isMobile ? '70%' : '74%',
               maxWidth: 560,
+              height: 'auto',
               objectFit: 'contain',
+              display: 'block',
             }}
           />
         </Box>
@@ -99,12 +105,12 @@ export function Login() {
         >
           <Box w="100%" maw={420}>
             <Stack gap="lg">
-              <Group justify="center" gap="md" mb="md">
+              <Stack align="center" gap={8} mb="md">
                 <Image src="/logo.png" alt="Saudy" fit="contain" style={{ width: 64, height: 64 }} />
-                <Text fw={700} c={DARK_BLUE} lh={1} style={{ fontSize: isMobile ? '2.25rem' : '2.75rem' }}>
+                <Text ta="center" fw={700} c={DARK_BLUE} lh={1} style={{ fontSize: isMobile ? '2.25rem' : '2.75rem' }}>
                   Saudy
                 </Text>
-              </Group>
+              </Stack>
 
               <Box mb="sm" ta="center">
                 <Text size="2.2rem" c="#2e2e2e">

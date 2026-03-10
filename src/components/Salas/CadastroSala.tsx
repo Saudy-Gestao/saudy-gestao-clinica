@@ -49,6 +49,9 @@ export function CadastroSala() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SalaRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -216,19 +219,21 @@ export function CadastroSala() {
   };
 
   const handleDelete = async (item: SalaRow) => {
-    const ok = window.confirm(`Excluir sala ${item.name}?`);
-    if (!ok) return;
-
+    setDeleting(true);
     try {
       await sectorService.deleteSector(item.id);
       showNotification({ title: 'Removido', message: 'Sala excluída', color: 'green' });
       setItems((prev) => prev.filter((it) => it.id !== item.id));
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
     } catch (err: any) {
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.error || err?.message || 'Erro ao excluir sala',
         color: 'red',
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -312,7 +317,15 @@ export function CadastroSala() {
                         <ActionIcon variant="subtle" color="blue" onClick={() => openModal(item)} aria-label="Editar sala">
                           <Pencil size={16} />
                         </ActionIcon>
-                        <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(item)} aria-label="Excluir sala">
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => {
+                            setDeleteTarget(item);
+                            setDeleteModalOpen(true);
+                          }}
+                          aria-label="Excluir sala"
+                        >
                           <Trash2 size={16} />
                         </ActionIcon>
                       </Group>
@@ -372,6 +385,38 @@ export function CadastroSala() {
           <Button bg={DARK_BLUE} c="white" onClick={handleSave} loading={saving}>
             {editingId ? 'Salvar alterações' : 'Cadastrar sala'}
           </Button>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteModalOpen(false);
+          setDeleteTarget(null);
+        }}
+        title="Confirmar exclusão"
+        centered
+      >
+        <Stack>
+          <Text size="sm" c="dimmed">
+            {`Confirma a exclusão da sala ${deleteTarget?.name || 'selecionada'}?`}
+          </Text>
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setDeleteTarget(null);
+              }}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button color="red" onClick={() => deleteTarget && handleDelete(deleteTarget)} loading={deleting}>
+              Excluir
+            </Button>
+          </Group>
         </Stack>
       </Modal>
     </Box>

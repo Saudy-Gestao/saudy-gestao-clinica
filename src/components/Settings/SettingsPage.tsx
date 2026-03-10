@@ -83,6 +83,8 @@ const PLACEHOLDER_PHONE_DIGITS = new Set([
 
 const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
 const BRANCH_QUOTAS_STORAGE_KEY = 'settings:branch-create-quotas';
+const ACCESS_TOTAL_VALUE = '__ACCESS_TOTAL__';
+const ACCESS_TOTAL_LABEL = 'Acesso total';
 
 const sanitizeCompanyField = (value: unknown) => {
   if (typeof value !== 'string') return '';
@@ -220,10 +222,61 @@ export function SettingsPage() {
   const [accessForm, setAccessForm] = useState({ description: '', moduleIds: [] as string[] });
   const [savingAccess, setSavingAccess] = useState(false);
   const [accessErrors, setAccessErrors] = useState<Record<string, string>>({});
+
+  // Delete confirmation modal
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmTitle, setDeleteConfirmTitle] = useState('Confirmar exclusao');
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState('Deseja realmente excluir este item?');
+  const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
+  const [deleteConfirmAction, setDeleteConfirmAction] = useState<null | (() => Promise<void>)>(null);
   
   // Modules
   const [modules, setModules] = useState<Module[]>([]);
   const [loadingModules, setLoadingModules] = useState(false);
+
+  const openDeleteConfirm = (title: string, message: string, action: () => Promise<void>) => {
+    setDeleteConfirmTitle(title);
+    setDeleteConfirmMessage(message);
+    setDeleteConfirmAction(() => action);
+    setDeleteConfirmOpen(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (deleteConfirmLoading) return;
+    setDeleteConfirmOpen(false);
+    setDeleteConfirmAction(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmAction) return;
+    setDeleteConfirmLoading(true);
+    try {
+      await deleteConfirmAction();
+      setDeleteConfirmOpen(false);
+      setDeleteConfirmAction(null);
+    } finally {
+      setDeleteConfirmLoading(false);
+    }
+  };
+
+  const getAllModuleIds = () => (Array.isArray(modules) ? modules.map((m) => m.id).filter(Boolean) : []);
+
+  const normalizeModuleSelection = (values: string[]) => {
+    const allModuleIds = getAllModuleIds();
+    const selectedIds = values.filter((v) => v !== ACCESS_TOTAL_VALUE);
+    const selectedAll = allModuleIds.length > 0 && allModuleIds.every((id) => selectedIds.includes(id));
+
+    if (values.includes(ACCESS_TOTAL_VALUE) || selectedAll) {
+      return [ACCESS_TOTAL_VALUE];
+    }
+
+    return selectedIds;
+  };
+
+  const expandModuleSelectionForSave = (values: string[]) => {
+    if (!values.includes(ACCESS_TOTAL_VALUE)) return values;
+    return getAllModuleIds();
+  };
 
   // --- Effects ---
 
@@ -355,8 +408,41 @@ export function SettingsPage() {
     setSavingCompany(true);
     try {
       await companyService.updateCompany(selectedCompanyId, companyForm);
+
+      // Keep matriz branch aligned with key company contact fields.
+      const matrizBranch = branches.find((branch) => isBranchMatriz(branch));
+      if (matrizBranch) {
+        const matrizPayload = {
+          tradeName: companyForm.tradeName,
+          address: companyForm.address,
+          phone: companyForm.phone,
+          type: 'Matriz' as const,
+        };
+
+        await branchService.updateBranch(matrizBranch.id, matrizPayload);
+      }
+
+      // Keep users' phone aligned with the company phone.
+      const allUsers = await userService.listUsers();
+      const companyUsers = (allUsers || []).filter((user: any) => (
+        user?.sector?.branch?.company?.id === selectedCompanyId ||
+        user?.sector?.branch?.companyId === selectedCompanyId
+      ));
+
+      const usersToUpdate = companyUsers.filter((user: any) => user?.phone !== companyForm.phone);
+      if (usersToUpdate.length > 0) {
+        await Promise.allSettled(
+          usersToUpdate.map((user: any) =>
+            userService.updateUser(user.id, { phone: companyForm.phone })
+          )
+        );
+      }
+
       notifications.show({ title: 'Sucesso', message: 'Empresa atualizada', color: 'green' });
       fetchCompanies();
+      fetchBranches();
+      fetchUsers();
+      refreshLoggedUserInStorage();
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao atualizar empresa', color: 'red' });
     } finally {
@@ -477,7 +563,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteBranch = async (id: string) => {
-    if (!window.confirm('Excluir filial?')) return;
     try {
       await branchService.deleteBranch(id);
       notifications.show({ title: 'Sucesso', message: 'Filial excluída', color: 'green' });
@@ -554,7 +639,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteSector = async (id: string) => {
-    if (!window.confirm('Excluir setor?')) return;
     try {
       await sectorService.deleteSector(id);
       notifications.show({ title: 'Sucesso', message: 'Setor excluído', color: 'green' });
@@ -680,7 +764,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (!window.confirm('Excluir usuário?')) return;
     try {
       await userService.deleteUser(id);
       notifications.show({ title: 'Sucesso', message: 'Usuário excluído', color: 'green' });
@@ -732,17 +815,26 @@ export function SettingsPage() {
       return;
     }
     setEditingAccess(access);
+    const accessModuleIds = access.modules?.map((m: any) => m.id) || [];
+    const allModuleIds = getAllModuleIds();
+    const shouldUseTotal = allModuleIds.length > 0 && allModuleIds.every((id) => accessModuleIds.includes(id));
+
     setAccessForm({ 
       description: access.description || '', 
-      moduleIds: access.modules?.map((m: any) => m.id) || [] 
+      moduleIds: shouldUseTotal ? [ACCESS_TOTAL_VALUE] : accessModuleIds,
     });
     setAccessErrors({});
     setAccessModalOpen(true);
   };
 
   const handleSaveAccess = async () => {
+    const payload = {
+      ...accessForm,
+      moduleIds: expandModuleSelectionForSave(accessForm.moduleIds || []),
+    };
+
     // Validate form
-    const validation = validateAccessForm(accessForm);
+    const validation = validateAccessForm(payload);
     if (!validation.isValid) {
       setAccessErrors(validation.errors);
       notifications.show({ 
@@ -759,10 +851,10 @@ export function SettingsPage() {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       
       if (editingAccess) {
-        await accessService.updateAccess(editingAccess.id, accessForm);
+        await accessService.updateAccess(editingAccess.id, payload);
         notifications.show({ title: 'Sucesso', message: 'Acesso atualizado', color: 'green' });
       } else {
-        const newAccess = await accessService.createAccess(accessForm);
+        const newAccess = await accessService.createAccess(payload);
         // Vincular o novo acesso ao usuário autenticado
         if (currentUser?.id && newAccess?.id) {
           await userService.addAccessToUser(currentUser.id, newAccess.id);
@@ -780,7 +872,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteAccess = async (id: string) => {
-    if (!window.confirm('Excluir acesso?')) return;
     try {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       
@@ -966,7 +1057,7 @@ export function SettingsPage() {
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openBranchModalForEdit(branch)}><Edit size={16} /></ActionIcon>
                                                   {!isBranchMatriz(branch) && (
-                                                            <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteBranch(branch.id)}><Trash size={16} /></ActionIcon>
+                                                            <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir filial', 'Deseja realmente excluir esta filial?', () => handleDeleteBranch(branch.id))}><Trash size={16} /></ActionIcon>
                                                         )}
                                                     </Group>
                                                 </Table.Td>
@@ -985,18 +1076,22 @@ export function SettingsPage() {
                                   onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
                                   error={branchErrors.tradeName}
                                 />
-                                <FloatingInput 
-                                  label="Telefone" 
-                                  value={branchForm.phone} 
-                                  onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })} 
-                                  error={branchErrors.phone}
-                                />
-                                <FloatingInput 
-                                  label="Endereço" 
-                                  value={branchForm.address} 
-                                  onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })} 
-                                  error={branchErrors.address}
-                                />
+                                {(!editingBranch || (editingBranch && !isBranchMatriz(editingBranch))) && (
+                                  <>
+                                    <FloatingInput 
+                                      label="Telefone" 
+                                      value={branchForm.phone} 
+                                      onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })} 
+                                      error={branchErrors.phone}
+                                    />
+                                    <FloatingInput 
+                                      label="Endereço" 
+                                      value={branchForm.address} 
+                                      onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })} 
+                                      error={branchErrors.address}
+                                    />
+                                  </>
+                                )}
                                 <Button fullWidth mt="md" onClick={handleSaveBranch} loading={savingBranch} bg={DARK_BLUE}>{editingBranch ? 'Salvar' : 'Criar'}</Button>
                             </Stack>
                         </Modal>
@@ -1038,7 +1133,7 @@ export function SettingsPage() {
                                                 <Table.Td>
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openSectorModalForEdit(sector)}><Edit size={16} /></ActionIcon>
-                                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteSector(sector.id)}><Trash size={16} /></ActionIcon>
+                                                        <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir setor', 'Deseja realmente excluir este setor?', () => handleDeleteSector(sector.id))}><Trash size={16} /></ActionIcon>
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
@@ -1132,7 +1227,7 @@ export function SettingsPage() {
                                                 <Table.Td>
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openUserModalForEdit(user)}><Edit size={16} /></ActionIcon>
-                                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteUser(user.id)}><Trash size={16} /></ActionIcon>
+                                                        <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir usuário', 'Deseja realmente excluir este usuário?', () => handleDeleteUser(user.id))}><Trash size={16} /></ActionIcon>
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
@@ -1228,11 +1323,11 @@ export function SettingsPage() {
                             <Button leftSection={<Plus size={16} />} onClick={openAccessModalForCreate} bg={DARK_BLUE}>Novo Acesso</Button>
                         </Group>
 
-                        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                            <Table horizontalSpacing="md" verticalSpacing="md">
+                        <Box style={{ overflowX: 'hidden', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                          <Table horizontalSpacing="md" verticalSpacing="md" style={{ tableLayout: 'fixed', width: '100%' }}>
                                 <Table.Thead>
                                     <Table.Tr style={{ borderBottom: 'none' }}>
-                                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>
+                                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: '220px' }}>Descrição</Table.Th>
                                         <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
                                         <Table.Th style={{ width: '100px' }}></Table.Th>
                                     </Table.Tr>
@@ -1240,30 +1335,33 @@ export function SettingsPage() {
                                 <Table.Tbody>
                                     {(accessesList || []).map(access => (
                                         <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                                            <Table.Td><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
+                                  <Table.Td style={{ width: '220px' }}><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
                                             <Table.Td>
-                                              <Group gap={4}>
-                                                {(access.modules || []).map((module: any) => (
-                                                  <Text 
-                                                    key={module.id} 
-                                                    size="xs" 
-                                                    c="dimmed"
-                                                    style={{ 
-                                                      padding: '2px 8px', 
-                                                      background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff', 
-                                                      borderRadius: 4,
-                                                      whiteSpace: 'nowrap'
-                                                    }}
-                                                  >
-                                                    {module.label}
-                                                  </Text>
-                                                )) || <Text size="xs" c="dimmed">Nenhum módulo</Text>}
-                                              </Group>
+                                              <Box style={{ overflowX: 'auto' }}>
+                                                <Group gap={4} wrap="nowrap">
+                                                  {(access.modules || []).map((module: any) => (
+                                                    <Text 
+                                                      key={module.id} 
+                                                      size="xs" 
+                                                      c="dimmed"
+                                                      style={{ 
+                                                        padding: '2px 8px', 
+                                                        background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff', 
+                                                        borderRadius: 4,
+                                                        whiteSpace: 'nowrap',
+                                                        flexShrink: 0,
+                                                      }}
+                                                    >
+                                                      {module.label}
+                                                    </Text>
+                                                  )) || <Text size="xs" c="dimmed">Nenhum módulo</Text>}
+                                                </Group>
+                                              </Box>
                                             </Table.Td>
                                             <Table.Td>
                                                 <Group gap={4} justify="flex-end">
                                                     <ActionIcon variant="subtle" color="blue" onClick={() => openAccessModalForEdit(access)}><Edit size={16} /></ActionIcon>
-                                                    <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteAccess(access.id)}><Trash size={16} /></ActionIcon>
+                                                    <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir acesso', 'Deseja realmente excluir este acesso?', () => handleDeleteAccess(access.id))}><Trash size={16} /></ActionIcon>
                                                 </Group>
                                             </Table.Td>
                                         </Table.Tr>
@@ -1312,14 +1410,17 @@ export function SettingsPage() {
                                     placeholder="Selecione os módulos"
                                     data={
                                       Array.isArray(modules) && modules.length > 0
-                                        ? modules.map((m) => ({
-                                            value: m.id || '',
-                                            label: m.label || m.name || 'Sem nome',
-                                          }))
+                                        ? [
+                                            { value: ACCESS_TOTAL_VALUE, label: ACCESS_TOTAL_LABEL },
+                                            ...modules.map((m) => ({
+                                              value: m.id || '',
+                                              label: m.label || m.name || 'Sem nome',
+                                            })),
+                                          ]
                                         : []
                                     }
                                     value={accessForm.moduleIds || []}
-                                    onChange={(value) => setAccessForm({ ...accessForm, moduleIds: value })}
+                                    onChange={(value) => setAccessForm({ ...accessForm, moduleIds: normalizeModuleSelection(value) })}
                                     searchable
                                     disabled={!modules || modules.length === 0}
                                     error={accessErrors.moduleIds}
@@ -1335,6 +1436,10 @@ export function SettingsPage() {
                                         background: 'rgba(255,255,255,0.08)',
                                         color: 'var(--mantine-color-text)',
                                       } : undefined,
+                                      pillsList: {
+                                        flexWrap: 'nowrap',
+                                        overflowX: 'auto',
+                                      },
                                     }}
                                     nothingFoundMessage="Nenhum módulo encontrado"
                                   />
@@ -1354,6 +1459,21 @@ export function SettingsPage() {
                     </Box>
                 )}
             </Paper>
+
+            <Modal
+              opened={deleteConfirmOpen}
+              onClose={closeDeleteConfirm}
+              title={deleteConfirmTitle}
+              centered
+            >
+              <Stack>
+                <Text size="sm" c="dimmed">{deleteConfirmMessage}</Text>
+                <Group justify="flex-end" mt="sm">
+                  <Button variant="default" onClick={closeDeleteConfirm} disabled={deleteConfirmLoading}>Cancelar</Button>
+                  <Button color="red" onClick={confirmDelete} loading={deleteConfirmLoading}>Excluir</Button>
+                </Group>
+              </Stack>
+            </Modal>
         </Grid.Col>
       </Grid>
     </PageContainer>
