@@ -185,24 +185,6 @@ export function Login() {
               >
                 Acessar conta
               </Button>
-
-              <Button
-                fullWidth
-                size="lg"
-                variant="outline"
-                c="#2e2e2e"
-                styles={{
-                  root: {
-                    borderColor: '#adb5bd',
-                    height: '56px',
-                    borderRadius: '8px',
-                    borderWidth: '1px',
-                  }
-                }}
-                onClick={() => navigate('/cadastro')}
-              >
-                Criar conta
-              </Button>
             </Stack>
           </Box>
         </Box>
