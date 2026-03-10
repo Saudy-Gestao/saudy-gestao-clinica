@@ -98,7 +98,6 @@ export function Cadastro() {
         };
 
         await AuthService.registerCompany(companyData);
-        await AuthService.login({ email, password });
       } else {
         // Registro de paciente - por enquanto simula
         // TODO: implementar registro de paciente quando houver endpoint
