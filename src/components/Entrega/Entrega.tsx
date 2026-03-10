@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, Popover, ActionIcon, Select, Textarea, Paper, Loader, Menu } from '@mantine/core';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, Popover, ActionIcon, Select, Textarea, Paper, Loader, Menu, Switch } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Calendar as CalendarIcon, MoreVertical } from 'lucide-react';
+import { Search, Plus, ChevronLeft, Calendar as CalendarIcon, MoreVertical, Settings } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import deliveryService from '../../services/deliveryService';
 import patientService from '../../services/patientService';
+import facialRecognitionService from '../../services/facialRecognitionService';
+import { FacialCapture } from '../common/FacialCapture';
 import { formatDateInput } from '../../utils/formatters';
 
 interface DeliveryRow {
@@ -40,6 +42,16 @@ export function Entrega() {
   const [patientById, setPatientById] = useState<Record<string, any>>({});
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+
+  // Estados para reconhecimento facial na entrega
+  const [requireFacialRecognition, setRequireFacialRecognition] = useState(() => {
+    const saved = localStorage.getItem('delivery:requireFacialRecognition');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
+  const [facialVerified, setFacialVerified] = useState(false);
+  const [verifyingFace, setVerifyingFace] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   const filtered = rows.filter((r) => r.nomeCompleto.toLowerCase().includes(query.toLowerCase()));
 
@@ -217,13 +229,67 @@ export function Entrega() {
       setDeliverToName('');
       setDeliverToCpf('');
     }
+    setFacialVerified(false); // Reset verificação facial
     setDeliverModalOpen(true);
+  };
+
+  const handleFacialVerification = async (imageBase64: string) => {
+    if (!deliverTarget) return;
+
+    setVerifyingFace(true);
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const unitId = user?.branchId || user?.branch?.id || '';
+
+      const result = await facialRecognitionService.scanFace({
+        image: imageBase64,
+        id_unidade: unitId,
+      });
+
+      // Verificar se o CPF reconhecido corresponde ao informado
+      const recognizedCpf = result.patient.cpf.replace(/\D/g, '');
+      const inputCpf = deliverToCpf.replace(/\D/g, '');
+
+      if (recognizedCpf === inputCpf) {
+        setFacialVerified(true);
+        showNotification({
+          title: 'Identidade verificada',
+          message: `${result.patient.name} identificado com sucesso! (Confiança: ${(result.trust * 100).toFixed(1)}%)`,
+          color: 'green',
+        });
+      } else {
+        showNotification({
+          title: 'Identidade não correspondente',
+          message: 'O CPF informado não corresponde à pessoa reconhecida.',
+          color: 'red',
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro na verificação facial:', error);
+      showNotification({
+        title: 'Erro na verificação',
+        message: error?.response?.data?.detail || 'Não foi possível verificar a identidade. Tente novamente.',
+        color: 'red',
+      });
+    } finally {
+      setVerifyingFace(false);
+    }
   };
 
   const handleDeliver = async () => {
     if (!deliverTarget) return;
     if (!deliverToName.trim() || !deliverToCpf.trim()) {
       showNotification({ title: 'Erro', message: 'Informe nome e CPF de quem recebeu', color: 'red' });
+      return;
+    }
+
+    // Verificar se reconhecimento facial é obrigatório e se foi validado
+    if (requireFacialRecognition && !facialVerified) {
+      showNotification({ 
+        title: 'Verificação facial obrigatória', 
+        message: 'É necessário verificar a identidade através do reconhecimento facial antes de realizar a entrega.', 
+        color: 'orange' 
+      });
       return;
     }
 
@@ -372,6 +438,14 @@ export function Entrega() {
               </Text>
             </Box>
           </Group>
+          <ActionIcon 
+            variant="default" 
+            size="lg" 
+            onClick={() => setSettingsModalOpen(true)}
+            title="Configurações"
+          >
+            <Settings size={20} />
+          </ActionIcon>
         </Group>
 
         {/* Search and Button Section */}
@@ -618,13 +692,97 @@ export function Entrega() {
               />
             </Box>
 
+            {requireFacialRecognition && (
+              <Box style={{ marginBottom: 8 }}>
+                <Paper p="sm" withBorder style={{ backgroundColor: facialVerified ? '#e7f5ff' : '#fff' }}>
+                  <Group justify="space-between" align="center">
+                    <Text size="sm" fw={500}>
+                      {facialVerified ? '✓ Identidade verificada' : 'Verificação facial obrigatória'}
+                    </Text>
+                    {!facialVerified && (
+                      <Button
+                        size="xs"
+                        variant="light"
+                        onClick={() => {
+                          if (!deliverToCpf.trim()) {
+                            showNotification({
+                              title: 'CPF obrigatório',
+                              message: 'Informe o CPF antes de fazer a verificação facial.',
+                              color: 'orange',
+                            });
+                            return;
+                          }
+                          setFacialCaptureOpen(true);
+                        }}
+                        loading={verifyingFace}
+                      >
+                        Verificar Identidade
+                      </Button>
+                    )}
+                  </Group>
+                </Paper>
+              </Box>
+            )}
+
             <Group justify="flex-end" mt={8}>
               <Button variant="default" onClick={() => setDeliverModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={handleDeliver} size="sm" loading={delivering} disabled={delivering}>Entregar</Button>
+              <Button 
+                bg={DARK_BLUE} 
+                onClick={handleDeliver} 
+                size="sm" 
+                loading={delivering} 
+                disabled={delivering || (requireFacialRecognition && !facialVerified)}
+              >
+                Entregar
+              </Button>
             </Group>
           </Box>
         </Stack>
       </Modal>
+
+      {/* Modal de Configurações */}
+      <Modal
+        opened={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        title="Configurações de Entrega"
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          <Paper p="md" withBorder>
+            <Switch
+              label="Exigir reconhecimento facial na entrega"
+              description="Quando ativado, será necessário verificar a identidade do paciente através do reconhecimento facial antes de realizar a entrega de exames/laudos."
+              checked={requireFacialRecognition}
+              onChange={(e) => {
+                const newValue = e.currentTarget.checked;
+                setRequireFacialRecognition(newValue);
+                localStorage.setItem('delivery:requireFacialRecognition', JSON.stringify(newValue));
+                showNotification({
+                  title: 'Configuração atualizada',
+                  message: newValue 
+                    ? 'Reconhecimento facial agora é obrigatório para entregas' 
+                    : 'Reconhecimento facial desativado para entregas',
+                  color: 'blue',
+                });
+              }}
+            />
+          </Paper>
+
+          <Group justify="flex-end">
+            <Button onClick={() => setSettingsModalOpen(false)}>Fechar</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal de Captura Facial */}
+      <FacialCapture
+        opened={facialCaptureOpen}
+        onClose={() => setFacialCaptureOpen(false)}
+        onCapture={handleFacialVerification}
+        title="Verificação de Identidade"
+        description="Posicione o rosto da pessoa que está recebendo o documento"
+      />
     </Box>
   );
 }

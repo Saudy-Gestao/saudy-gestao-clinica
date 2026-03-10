@@ -46,6 +46,18 @@ export default {
     return res.data;
   },
 
+  async getPatientById(id: string) {
+    const url = `/accounts/patients/${id}`;
+    const res = await api.get(url);
+    return res.data;
+  },
+
+  async getPatientByCpf(cpf: string) {
+    const url = '/accounts/patients/';
+    const res = await api.get(url, { params: { cpf } });
+    return res.data;
+  },
+
   async createPatient(payload: CreatePatientPayload) {
     const url = '/accounts/patients/';
     const res = await api.post(url, payload);
