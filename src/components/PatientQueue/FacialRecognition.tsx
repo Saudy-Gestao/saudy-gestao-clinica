@@ -43,14 +43,14 @@ export function FacialRecognition() {
 
       setRecognitionResult(result);
       
-      // Buscar consultas do dia para os pacientes reconhecidos
-      if (result.pacientes && result.pacientes.length > 0) {
-        await loadTodayAppointments(result.pacientes[0].id_medilab);
+      // Buscar consultas do dia para o paciente reconhecido
+      if (result.patient && result.patient.id) {
+        await loadTodayAppointments(result.patient.id);
       }
 
       showNotification({
         title: 'Reconhecimento bem-sucedido',
-        message: `Bem-vindo(a), ${result.responsavel.nome}!`,
+        message: `Bem-vindo(a), ${result.patient.name}!`,
         color: 'green',
       });
     } catch (error: any) {
@@ -233,9 +233,8 @@ export function FacialRecognition() {
                         <User size={30} color="white" />
                       </Box>
                       <Box style={{ flex: 1 }}>
-                        <Text fw={600} size="lg">{recognitionResult.responsavel.nome}</Text>
-                        <Text size="sm" c="dimmed">CPF: {recognitionResult.responsavel.cpf}</Text>
-                        <Text size="sm" c="dimmed">Parentesco: {recognitionResult.responsavel.parentesco}</Text>
+                        <Text fw={600} size="lg">{recognitionResult.patient.name}</Text>
+                        <Text size="sm" c="dimmed">CPF: {recognitionResult.patient.cpf}</Text>
                       </Box>
                     </Group>
                   </Card>
@@ -245,10 +244,10 @@ export function FacialRecognition() {
                       <Text fw={600}>Confiança do Reconhecimento</Text>
                       <Badge
                         size="lg"
-                        color={getTrustColor(recognitionResult.trust)}
+                        color={getTrustColor(String(recognitionResult.trust))}
                         variant="filled"
                       >
-                        {getTrustLabel(recognitionResult.trust)} - {(Number(recognitionResult.trust) * 100).toFixed(1)}%
+                        {getTrustLabel(String(recognitionResult.trust))} - {(recognitionResult.trust * 100).toFixed(1)}%
                       </Badge>
                     </Stack>
                   </Card>

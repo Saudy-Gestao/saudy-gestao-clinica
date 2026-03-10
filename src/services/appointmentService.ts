@@ -24,6 +24,11 @@ export default {
     authorizationStatus?: string;
     specialty?: string;
     convenio?: string;
+    patientId?: string;
+    patientCpf?: string;
+    date?: string;
+    startDate?: string;
+    endDate?: string;
     limit?: number;
     offset?: number;
   }) {

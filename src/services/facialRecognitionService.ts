@@ -25,19 +25,14 @@ export interface FacialScanRequest {
 }
 
 export interface FacialScanResponse {
-  responsavel: {
+  patient: {
     id: string;
-    nome: string;
+    name: string;
     cpf: string;
-    parentesco: string;
   };
-  pacientes: Array<{
-    id: string;
-    id_medilab: string;
-    nome?: string;
-  }>;
-  trust: string;
-  log_registered?: boolean;
+  trust: number;
+  imageUpdated?: boolean;
+  message?: string;
 }
 
 export interface FacialCreateRequest {

@@ -36,6 +36,7 @@ import teaProfileService from '../../services/teaProfileService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import ResultModal from '../common/ResultModal';
 import { FacialCapture } from '../common/FacialCapture';
+import { FacialInstructionsModal } from '../common/FacialInstructionsModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -242,6 +243,7 @@ export function CadastroPaciente() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Estados para reconhecimento facial
+  const [facialInstructionsOpen, setFacialInstructionsOpen] = useState(false);
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
   const [facialImage, setFacialImage] = useState<string | null>(null);
 
@@ -880,7 +882,7 @@ export function CadastroPaciente() {
                       </Box>
                       <Button 
                         leftSection={<Camera size={16} />}
-                        onClick={() => setFacialCaptureOpen(true)}
+                        onClick={() => setFacialInstructionsOpen(true)}
                         variant={facialImage ? 'outline' : 'filled'}
                         color={facialImage ? 'green' : DARK_BLUE}
                       >
@@ -1258,6 +1260,16 @@ export function CadastroPaciente() {
             <Text size="sm"><Text fw={600} span>Observações:</Text> {formatDetailValue(selectedPatient?.raw?.observations)}</Text>
           </Stack>
         </Modal>
+
+        {/* Modal de Instruções Faciais */}
+        <FacialInstructionsModal
+          opened={facialInstructionsOpen}
+          onClose={() => setFacialInstructionsOpen(false)}
+          onContinue={() => {
+            setFacialInstructionsOpen(false);
+            setFacialCaptureOpen(true);
+          }}
+        />
 
         {/* Modal de Captura Facial */}
         <FacialCapture

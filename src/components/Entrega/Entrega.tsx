@@ -247,14 +247,14 @@ export function Entrega() {
       });
 
       // Verificar se o CPF reconhecido corresponde ao informado
-      const recognizedCpf = result.responsavel.cpf.replace(/\D/g, '');
+      const recognizedCpf = result.patient.cpf.replace(/\D/g, '');
       const inputCpf = deliverToCpf.replace(/\D/g, '');
 
       if (recognizedCpf === inputCpf) {
         setFacialVerified(true);
         showNotification({
           title: 'Identidade verificada',
-          message: `${result.responsavel.nome} identificado com sucesso!`,
+          message: `${result.patient.name} identificado com sucesso! (Confiança: ${(result.trust * 100).toFixed(1)}%)`,
           color: 'green',
         });
       } else {
