@@ -17,6 +17,7 @@ import {
   Grid,
   Badge,
   useMantineColorScheme,
+  Switch,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -32,6 +33,7 @@ import {
   Save,
   UserPlus,
   ChevronLeft,
+  Settings,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -39,6 +41,7 @@ import { DARK_BLUE } from '../../themes/theme';
 // Services
 import companyService from '../../services/companyService';
 import branchService from '../../services/branchService';
+import branchSettingsService, { type BranchSettings } from '../../services/branchSettingsService';
 import sectorService from '../../services/sectorService';
 import userService from '../../services/userService';
 import accessService from '../../services/accessService';
@@ -233,6 +236,12 @@ export function SettingsPage() {
   // Modules
   const [modules, setModules] = useState<Module[]>([]);
   const [loadingModules, setLoadingModules] = useState(false);
+
+  // Branch Settings
+  const [selectedBranchForSettings, setSelectedBranchForSettings] = useState<string | null>(null);
+  const [branchSettings, setBranchSettings] = useState<BranchSettings | null>(null);
+  const [loadingBranchSettings, setLoadingBranchSettings] = useState(false);
+  const [savingBranchSettings, setSavingBranchSettings] = useState(false);
 
   const openDeleteConfirm = (title: string, message: string, action: () => Promise<void>) => {
     setDeleteConfirmTitle(title);
@@ -892,6 +901,58 @@ export function SettingsPage() {
     }
   };
 
+  // Branch Settings functions
+  const fetchBranchSettings = async (branchId: string) => {
+    if (!branchId) return;
+    setLoadingBranchSettings(true);
+    try {
+      const settings = await branchSettingsService.getBranchSettings(branchId);
+      setBranchSettings(settings);
+    } catch (error: any) {
+      notifications.show({ 
+        title: 'Erro', 
+        message: error.response?.data?.error || 'Erro ao carregar configurações', 
+        color: 'red' 
+      });
+    } finally {
+      setLoadingBranchSettings(false);
+    }
+  };
+
+  const handleToggleFacialRecognition = async (enabled: boolean) => {
+    if (!selectedBranchForSettings) return;
+    setSavingBranchSettings(true);
+    try {
+      const updated = await branchSettingsService.updateBranchSettings(
+        selectedBranchForSettings,
+        { requireFacialForReportDelivery: enabled }
+      );
+      setBranchSettings(updated);
+      notifications.show({ 
+        title: 'Sucesso', 
+        message: 'Configuração atualizada', 
+        color: 'green' 
+      });
+    } catch (error: any) {
+      notifications.show({ 
+        title: 'Erro', 
+        message: error.response?.data?.error || 'Erro ao atualizar configuração', 
+        color: 'red' 
+      });
+    } finally {
+      setSavingBranchSettings(false);
+    }
+  };
+
+  // Effect to load branch settings when branch is selected
+  useEffect(() => {
+    if (selectedBranchForSettings) {
+      fetchBranchSettings(selectedBranchForSettings);
+    } else {
+      setBranchSettings(null);
+    }
+  }, [selectedBranchForSettings]);
+
   // Common UI components (Moved outside to prevent re-renders)
   const renderTabList = () => (
     <Paper p="md" radius="md" withBorder shadow="sm" h="100%" style={{ minHeight: '400px' }}>
@@ -903,6 +964,7 @@ export function SettingsPage() {
           { id: 'sectors', label: 'Setores', icon: Layers },
           { id: 'users', label: 'Usuários', icon: Users },
           { id: 'accesses', label: 'Acessos', icon: Shield },
+          { id: 'branchSettings', label: 'Configurações', icon: Settings },
         ].map((item) => {
           const isActive = activeTab === item.id;
           return (
@@ -1456,6 +1518,100 @@ export function SettingsPage() {
                                 </Button>
                             </Stack>
                         </Modal>
+                    </Box>
+                )}
+
+                {activeTab === 'branchSettings' && (
+                    <Box>
+                        <SectionTitle 
+                            title="Configurações Gerais por Filial" 
+                            desc="Configure comportamentos específicos de cada filial do sistema." 
+                        />
+
+                        <Select 
+                            label="Filial"
+                            placeholder="Selecione uma filial" 
+                            data={(branches || []).map(b => ({ value: b.id, label: b.tradeName }))}
+                            value={selectedBranchForSettings}
+                            onChange={setSelectedBranchForSettings}
+                            mb="xl"
+                            searchable
+                            styles={{
+                                label: { marginBottom: 8, fontWeight: 500 },
+                                input: isDark ? {
+                                    background: 'var(--mantine-color-default)',
+                                    borderColor: 'var(--mantine-color-default-border)',
+                                    color: 'var(--mantine-color-text)',
+                                } : undefined,
+                            }}
+                        />
+
+                        {selectedBranchForSettings && (
+                            <>
+                                {loadingBranchSettings ? (
+                                    <Box style={{ textAlign: 'center', padding: '40px 0' }}>
+                                        <Loader size="md" />
+                                        <Text size="sm" c="dimmed" mt="md">Carregando configurações...</Text>
+                                    </Box>
+                                ) : (
+                                    <Stack gap="lg">
+                                        <Paper 
+                                            p="lg" 
+                                            radius="md" 
+                                            withBorder 
+                                            style={{ 
+                                                borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                                background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                            }}
+                                        >
+                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                                <Box style={{ flex: 1 }}>
+                                                    <Text fw={600} size="sm" mb={4}>
+                                                        Reconhecimento Facial para Entrega de Laudos
+                                                    </Text>
+                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                        Quando ativado, será obrigatório realizar o reconhecimento facial do paciente 
+                                                        antes de permitir a retirada de laudos médicos. Esta configuração se aplica 
+                                                        apenas aos pacientes cadastrados nesta filial.
+                                                    </Text>
+                                                </Box>
+                                                <Switch
+                                                    checked={branchSettings?.requireFacialForReportDelivery || false}
+                                                    onChange={(event) => handleToggleFacialRecognition(event.currentTarget.checked)}
+                                                    disabled={savingBranchSettings}
+                                                    size="lg"
+                                                    color={DARK_BLUE}
+                                                    styles={{
+                                                        track: {
+                                                            cursor: savingBranchSettings ? 'not-allowed' : 'pointer',
+                                                        },
+                                                    }}
+                                                />
+                                            </Group>
+                                            {savingBranchSettings && (
+                                                <Group gap="xs" mt="sm">
+                                                    <Loader size="xs" />
+                                                    <Text size="xs" c="dimmed">Salvando...</Text>
+                                                </Group>
+                                            )}
+                                        </Paper>
+
+                                        <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
+                                            💡 Dica: Mais configurações serão adicionadas em breve para personalizar 
+                                            o comportamento do sistema por filial.
+                                        </Text>
+                                    </Stack>
+                                )}
+                            </>
+                        )}
+
+                        {!selectedBranchForSettings && (
+                            <Box style={{ textAlign: 'center', padding: '60px 20px' }}>
+                                <Text size="sm" c="dimmed">
+                                    Selecione uma filial para visualizar e configurar suas opções específicas.
+                                </Text>
+                            </Box>
+                        )}
                     </Box>
                 )}
             </Paper>
