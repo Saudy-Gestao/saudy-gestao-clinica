@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   cpf?: string;
+  isAdmHubOnly?: boolean;
   role: 'patient' | 'doctor' | 'admin' | 'staff';
   createdAt: string;
 }
@@ -66,4 +67,15 @@ export interface PasswordStrength {
   minLength: boolean;
   hasNumber: boolean;
   hasSpecialChar: boolean;
+}
+
+export interface AdmRegisterRequestData {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface AdmVerifyCodeData {
+  email: string;
+  code: string;
 }

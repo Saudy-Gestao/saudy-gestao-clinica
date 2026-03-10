@@ -29,7 +29,18 @@ export function Adm() {
 
     setLoading(true);
     try {
-      await authService.login({ email: login, password });
+      const response = await authService.loginAdm({ email: login, password });
+
+      if (!response?.user || !(response.user as any).isAdmHubOnly) {
+        authService.logout();
+        notifications.show({
+          title: 'Acesso negado',
+          message: 'Esta conta não possui acesso ao ADM Hub',
+          color: 'red',
+        });
+        return;
+      }
+
       notifications.show({ title: 'Sucesso', message: 'Login ADM realizado', color: 'green' });
       navigate('/adm-hub');
     } catch (error: unknown) {
@@ -78,6 +89,10 @@ export function Adm() {
 
             <Button fullWidth size="lg" bg={DARK_BLUE} onClick={handleLogin} loading={loading} styles={{ root: { height: '56px', borderRadius: '8px' } }}>
               Entrar
+            </Button>
+
+            <Button fullWidth size="md" variant="outline" c={DARK_BLUE} onClick={() => navigate('/adm-register')}>
+              Registrar
             </Button>
 
             <Button variant="subtle" c="dimmed" size="sm" onClick={() => navigate('/login')}>

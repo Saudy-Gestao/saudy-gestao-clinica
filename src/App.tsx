@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { MantineProvider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
@@ -12,6 +12,7 @@ import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
 import { EsqueciSenha } from './components/Auth/EsqueciSenha';
 import { Adm } from './components/Auth/Adm';
+import { AdmRegister } from './components/Auth/AdmRegister';
 import { AdminHub } from './components/Admin/AdminHub';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
@@ -41,8 +42,25 @@ import { TeaPreReserva } from './components/TEA/TeaPreReserva';
 import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
+  const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
+  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente'];
+
+  if (!isAdmOnly && location.pathname === '/adm-hub') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (isAdmOnly && !admAllowedPaths.includes(location.pathname)) {
+    return <Navigate to="/adm-hub" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function App() {
@@ -51,6 +69,9 @@ function App() {
     defaultValue: 'dark',
   });
   const [, setAuthVersion] = useState(0);
+  const isAuthenticated = authService.isAuthenticated();
+  const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
+  const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
 
   useEffect(() => {
     const onAuthChanged = () => {
@@ -71,11 +92,15 @@ function App() {
           <Routes>
           <Route 
             path="/login" 
-            element={authService.isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Login />} 
+            element={isAuthenticated ? <Navigate to={isAdmOnly ? '/adm-hub' : '/dashboard'} replace /> : <Login />} 
           />
           <Route 
             path="/adm" 
-            element={localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <Adm />} 
+            element={isAuthenticated ? <Navigate to="/adm-hub" replace /> : <Adm />}
+          />
+          <Route
+            path="/adm-register"
+            element={isAuthenticated ? <Navigate to="/adm-hub" replace /> : <AdmRegister />}
           />
           <Route 
             path="/adm-hub"

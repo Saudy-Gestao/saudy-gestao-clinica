@@ -5,6 +5,8 @@ import type {
   CompanyRegisterData,
   AuthResponse, 
   ResetPasswordData,
+  AdmRegisterRequestData,
+  AdmVerifyCodeData,
   User 
 } from '../types/auth';
 
@@ -27,6 +29,21 @@ class AuthService {
       this.emitAuthChanged();
     }
     
+    return response.data;
+  }
+
+  /**
+   * Login dedicado para ADM Hub
+   */
+  async loginAdm(credentials: LoginCredentials): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/auth/adm/login', credentials);
+
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      this.emitAuthChanged();
+    }
+
     return response.data;
   }
 
@@ -88,6 +105,29 @@ class AuthService {
    */
   async resetPassword(data: ResetPasswordData): Promise<void> {
     await api.post('/auth/reset-password', data);
+  }
+
+  /**
+   * Solicita código para registro de administrador ADM Hub
+   */
+  async requestAdmRegisterCode(data: AdmRegisterRequestData): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/auth/adm/request-register-code', data);
+    return response.data;
+  }
+
+  /**
+   * Valida código do registro ADM e autentica usuário
+   */
+  async verifyAdmRegisterCode(data: AdmVerifyCodeData): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/auth/adm/verify-register-code', data);
+
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      this.emitAuthChanged();
+    }
+
+    return response.data;
   }
 
   /**
