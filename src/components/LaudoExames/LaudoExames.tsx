@@ -22,13 +22,20 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, X, ScanLine } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
 import { DARK_BLUE } from '../../themes/theme';
+import reportWorklistService from '../../services/reportWorklistService';
+import reportTemplateService from '../../services/reportTemplateService';
+import reportPhraseService from '../../services/reportPhraseService';
+import reportService from '../../services/reportService';
+import reportConfigService from '../../services/reportConfigService';
+import authService from '../../services/authService';
+import reportAddendumService from '../../services/reportAddendumService';
 
-type ExamStatus = 'pendente' | 'rascunho' | 'finalizado';
+type ExamStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type ExamPriority = 'normal' | 'urgente';
 
 interface ExamItem {
@@ -45,7 +52,10 @@ interface ExamItem {
   reportText: string;
   issuerSignedAt?: string;
   reviewerSignedAt?: string;
+  hasFinalizedAddendum?: boolean;
 }
+
+const isRichTextEmpty = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim().length === 0;
 
 interface ReportTemplate {
   id: string;
@@ -71,12 +81,6 @@ interface ReportPhrase {
   text: string;
 }
 
-interface LaudoTab {
-  id: string;
-  label: string;
-  content: string;
-}
-
 const MOCK_EXAMS: ExamItem[] = [
   {
     id: 'EX-001',
@@ -88,7 +92,7 @@ const MOCK_EXAMS: ExamItem[] = [
     requestingDoctor: 'Dra. Juliana Costa',
     assignedTo: 'Dr. Henrique Lima',
     priority: 'urgente',
-    status: 'pendente',
+    status: 'sem_laudo',
     reportText: '',
   },
   {
@@ -101,7 +105,7 @@ const MOCK_EXAMS: ExamItem[] = [
     requestingDoctor: 'Dr. Tiago Souza',
     assignedTo: 'Dra. Camila Neri',
     priority: 'normal',
-    status: 'rascunho',
+    status: 'laudado',
     reportText:
       '<h3>Descrição</h3><p>Fígado com dimensões preservadas e ecotextura homogênea.</p><h3>Conclusão</h3><p>Sem alterações ultrassonográficas significativas.</p>',
     issuerSignedAt: '23/02/2026 11:02',
@@ -272,14 +276,16 @@ const MOCK_REPORT_PHRASES: ReportPhrase[] = [
 ];
 
 const statusColor: Record<ExamStatus, string> = {
-  pendente: 'yellow',
-  rascunho: 'blue',
+  sem_laudo: 'gray',
+  laudado: 'blue',
+  revisado: 'cyan',
   finalizado: 'green',
 };
 
 const statusLabel: Record<ExamStatus, string> = {
-  pendente: 'Pendente',
-  rascunho: 'Rascunho',
+  sem_laudo: 'Sem laudo',
+  laudado: 'Laudado',
+  revisado: 'Revisado',
   finalizado: 'Finalizado',
 };
 
@@ -292,6 +298,15 @@ const REPORT_PLACEHOLDERS = [
   { key: '{{laudante}}', label: 'Laudante' },
   { key: '{{data_atual}}', label: 'Data atual' },
 ];
+
+const normalizeExamStatus = (status: any): ExamStatus => {
+  if (status === 'finalizado') return 'finalizado';
+  if (status === 'revisado') return 'revisado';
+  if (status === 'laudado') return 'laudado';
+  if (status === 'rascunho') return 'laudado';
+  if (status === 'pendente') return 'sem_laudo';
+  return 'sem_laudo';
+};
 
 export function LaudoExames() {
   const navigate = useNavigate();
@@ -311,32 +326,159 @@ export function LaudoExames() {
   const selectedRowBg = isDark ? 'rgba(255,255,255,0.06)' : '#edf2ff';
 
   const [query, setQuery] = useState('');
-  const [examRows, setExamRows] = useState<ExamItem[]>(MOCK_EXAMS);
+  const [examRows, setExamRows] = useState<ExamItem[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [templatePickerModalOpen, setTemplatePickerModalOpen] = useState(false);
   const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
   const [editorContent, setEditorContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [templates] = useState<ReportTemplate[]>(MOCK_REPORT_TEMPLATES);
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateQuery, setTemplateQuery] = useState('');
   const [phraseQuery, setPhraseQuery] = useState('');
   const [selectedPhraseId, setSelectedPhraseId] = useState<string | null>(null);
-  const [phrases] = useState<ReportPhrase[]>(MOCK_REPORT_PHRASES);
+  const [phrases, setPhrases] = useState<ReportPhrase[]>([]);
   const [toolsExpanded, setToolsExpanded] = useState(true);
   const [headerExpanded, setHeaderExpanded] = useState(true);
   const [previousReportsModalOpen, setPreviousReportsModalOpen] = useState(false);
   const [selectedPreviousReport, setSelectedPreviousReport] = useState<PreviousReport | null>(null);
   const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Record<string, boolean>>({});
-  const [laudoTabs, setLaudoTabs] = useState<LaudoTab[]>([]);
-  const [activeLaudoTabId, setActiveLaudoTabId] = useState<string | null>(null);
   const [dicomViewerVisible, setDicomViewerVisible] = useState(false);
+  const [previousReportsFromApi, setPreviousReportsFromApi] = useState<Record<string, PreviousReport[]>>({});
+  const [requiresReviewer, setRequiresReviewer] = useState(true);
+  const [signPasswordModalOpen, setSignPasswordModalOpen] = useState(false);
+  const [signPassword, setSignPassword] = useState('');
+  const [signRolePending, setSignRolePending] = useState<'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer' | null>(null);
+  const [signLoading, setSignLoading] = useState(false);
+  const [addendumModalOpen, setAddendumModalOpen] = useState(false);
+  const [addendumId, setAddendumId] = useState<string | null>(null);
+  const [addendumText, setAddendumText] = useState('');
+  const [addendumIssuerSignedAt, setAddendumIssuerSignedAt] = useState<string | null>(null);
+  const [addendumReviewerSignedAt, setAddendumReviewerSignedAt] = useState<string | null>(null);
+  const [addendumSavedAt, setAddendumSavedAt] = useState<string | null>(null);
+  const [addendumLoading, setAddendumLoading] = useState(false);
+  const [addendumSaving, setAddendumSaving] = useState(false);
+  const [addendumFinalizing, setAddendumFinalizing] = useState(false);
+  const [savingLaudo, setSavingLaudo] = useState(false);
+  const [finalizePasswordModalOpen, setFinalizePasswordModalOpen] = useState(false);
+  const [finalizePassword, setFinalizePassword] = useState('');
+  const [finalizeTarget, setFinalizeTarget] = useState<'laudo' | 'adendo' | null>(null);
+  const [finalizeLoading, setFinalizeLoading] = useState(false);
+
+  const requestSignature = (role: 'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer') => {
+    setSignRolePending(role);
+    setSignPassword('');
+    setSignPasswordModalOpen(true);
+  };
+
+  const requestFinalize = (target: 'laudo' | 'adendo') => {
+    setFinalizeTarget(target);
+    setFinalizePassword('');
+    setFinalizePasswordModalOpen(true);
+  };
+
+  const verifyCurrentUserPassword = async (password: string): Promise<boolean> => {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser?.email) return false;
+
+    try {
+      await authService.login({ email: currentUser.email, password });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const mapApiToExam = (it: any): ExamItem => ({
+    id: String(it.id || ''),
+    patientName: it.patientName || '',
+    cpf: it.patientCpf || '',
+    examType: it.examType || '',
+    scheduledAt: it.scheduledAt || '',
+    convenio: it.convenio || '',
+    requestingDoctor: it.requestingDoctor || '-',
+    assignedTo: it.assignedTo || '-',
+    priority: (it.priority === 'urgente' ? 'urgente' : 'normal') as ExamPriority,
+    status: normalizeExamStatus(it.status),
+    reportText: it.reportText || '',
+    issuerSignedAt: it.issuerSignedAt || undefined,
+    reviewerSignedAt: it.reviewerSignedAt || undefined,
+    hasFinalizedAddendum: Boolean(it.hasFinalizedAddendum),
+  });
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [worklistData, templateData, phraseData, configData] = await Promise.all([
+          reportWorklistService.list({ limit: 300, offset: 0 }),
+          reportTemplateService.list({ limit: 300, offset: 0 }),
+          reportPhraseService.list({ limit: 300, offset: 0 }),
+          reportConfigService.get(),
+        ]);
+
+        const worklist = Array.isArray(worklistData)
+          ? worklistData
+          : (Array.isArray(worklistData?.items)
+            ? worklistData.items
+            : (Array.isArray(worklistData?.data?.items)
+              ? worklistData.data.items
+              : []));
+        const templatesList = Array.isArray(templateData)
+          ? templateData
+          : (Array.isArray(templateData?.items)
+            ? templateData.items
+            : (Array.isArray(templateData?.data?.items)
+              ? templateData.data.items
+              : []));
+        const phrasesList = Array.isArray(phraseData)
+          ? phraseData
+          : (Array.isArray(phraseData?.items)
+            ? phraseData.items
+            : (Array.isArray(phraseData?.data?.items)
+              ? phraseData.data.items
+              : []));
+
+        setExamRows(worklist.map(mapApiToExam).filter((item: ExamItem) => item.id));
+        setTemplates(templatesList.map((item: any) => ({
+          id: String(item.id || ''),
+          name: item.name || '',
+          examType: item.examType || '',
+          group: item.group || 'Outros',
+          content: item.content || TEMPLATE_TEXT,
+        })).filter((item: ReportTemplate) => item.id));
+        setPhrases(phrasesList.map((item: any) => ({
+          id: String(item.id || ''),
+          examType: item.examType || '',
+          label: item.label || '',
+          text: item.text || '',
+        })).filter((item: ReportPhrase) => item.id));
+        setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
+      } catch (err: any) {
+        setExamRows(MOCK_EXAMS);
+        setTemplates(MOCK_REPORT_TEMPLATES);
+        setPhrases(MOCK_REPORT_PHRASES);
+        setRequiresReviewer(true);
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.',
+          color: 'red',
+        });
+      }
+    };
+
+    loadData();
+  }, []);
 
   const selectedExam = useMemo(
     () => examRows.find((exam) => exam.id === selectedExamId) || null,
     [examRows, selectedExamId],
   );
+
+  const isLaudoDirty = useMemo(() => {
+    if (!selectedExam) return false;
+    return editorContent !== (selectedExam.reportText || '');
+  }, [selectedExam, editorContent]);
 
   const filteredRows = useMemo(() => {
     return examRows.filter((exam) => {
@@ -379,8 +521,41 @@ export function LaudoExames() {
 
   const previousReports = useMemo(() => {
     if (!selectedExam) return [];
-    return MOCK_PREVIOUS_REPORTS[selectedExam.cpf] || [];
-  }, [selectedExam]);
+    return previousReportsFromApi[selectedExam.cpf] || MOCK_PREVIOUS_REPORTS[selectedExam.cpf] || [];
+  }, [selectedExam, previousReportsFromApi]);
+
+  useEffect(() => {
+    const loadPreviousReports = async () => {
+      if (!selectedExam?.cpf) return;
+      if (previousReportsFromApi[selectedExam.cpf]) return;
+
+      try {
+        const data: any = await reportService.list({ search: selectedExam.cpf, limit: 20, offset: 0 });
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : []));
+
+        const mapped = list.map((it: any) => ({
+          id: String(it.id || ''),
+          examType: it.exam || 'Exame',
+          date: it.scheduledFor || '-',
+          status: normalizeExamStatus(it.status),
+          summary: it.conclusion || it.description || 'Sem resumo',
+          content: it.description || TEMPLATE_TEXT,
+        })).filter((it: PreviousReport) => it.id);
+
+        setPreviousReportsFromApi((prev) => ({ ...prev, [selectedExam.cpf]: mapped }));
+      } catch {
+        // Keep fallback without blocking the editor flow.
+      }
+    };
+
+    loadPreviousReports();
+  }, [selectedExam, previousReportsFromApi]);
 
   const toggleTemplateGroup = (group: string) => {
     setExpandedTemplateGroups((prev) => ({ ...prev, [group]: !prev[group] }));
@@ -412,19 +587,10 @@ export function LaudoExames() {
   useEffect(() => {
     if (!selectedExam) {
       setEditorContent('');
-      setLaudoTabs([]);
-      setActiveLaudoTabId(null);
       return;
     }
 
-    const initialTab: LaudoTab = {
-      id: `laudo-${Date.now()}`,
-      label: 'Laudo 1',
-      content: selectedExam.reportText || TEMPLATE_TEXT,
-    };
-    setLaudoTabs([initialTab]);
-    setActiveLaudoTabId(initialTab.id);
-    setEditorContent(initialTab.content);
+    setEditorContent(selectedExam.reportText || '');
   }, [selectedExam]);
 
   useEffect(() => {
@@ -442,39 +608,6 @@ export function LaudoExames() {
     setSelectedPhraseId(firstPhrase?.id || null);
     setPhraseQuery('');
   }, [selectedExam, filteredTemplates, phrases]);
-
-  const upsertExam = (updater: (exam: ExamItem) => ExamItem) => {
-    if (!selectedExam) return;
-    setExamRows((previous) => previous.map((exam) => (exam.id === selectedExam.id ? updater(exam) : exam)));
-  };
-
-  const saveDraft = (notify = true, source: 'manual' | 'auto' = 'manual', contentOverride?: string) => {
-    if (!selectedExam) return;
-    const contentToSave = contentOverride ?? getAllLaudoContent();
-
-    const now = new Date().toLocaleString('pt-BR');
-    upsertExam((exam) => ({
-      ...exam,
-      status: exam.status === 'finalizado' ? 'finalizado' : 'rascunho',
-      reportText: contentToSave,
-    }));
-
-    if (contentOverride !== undefined) {
-      setEditorContent(contentToSave);
-    }
-
-    setLastSavedAt(now);
-
-    if (notify && source === 'manual') {
-      showNotification({
-        title: 'Rascunho salvo',
-        message: `Rascunho do exame ${selectedExam.id} salvo com sucesso.`,
-        color: 'green',
-      });
-    }
-  };
-
-
 
   const resolvePlaceholders = (content: string, exam: ExamItem) => {
     const replacements: Record<string, string> = {
@@ -494,6 +627,14 @@ export function LaudoExames() {
   };
 
   const insertPlaceholder = (placeholderKey: string) => {
+    if (selectedExam?.status === 'finalizado') {
+      showNotification({
+        title: 'Laudo finalizado',
+        message: 'Nao e permitido editar um laudo finalizado.',
+        color: 'yellow',
+      });
+      return;
+    }
     const htmlFragment = `<span>${placeholderKey}</span>`;
 
     if (editorRef.current) {
@@ -510,6 +651,61 @@ export function LaudoExames() {
     setModalOpen(true);
   };
 
+  const openAddendumModal = async () => {
+    if (!selectedExam) return;
+
+    setAddendumLoading(true);
+    setAddendumModalOpen(true);
+    try {
+      const data = await reportAddendumService.list({ worklistItemId: selectedExam.id, status: 'draft', limit: 1, offset: 0 });
+      const list = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.items) ? data.items : []);
+      const draft = list[0];
+
+      if (draft) {
+        setAddendumId(String(draft.id));
+        setAddendumText(String(draft.content || ''));
+        setAddendumIssuerSignedAt(draft.issuerSignedAt || null);
+        setAddendumReviewerSignedAt(draft.reviewerSignedAt || null);
+        setAddendumSavedAt(draft.savedAt || null);
+      } else {
+        setAddendumId(null);
+        setAddendumText('');
+        setAddendumIssuerSignedAt(null);
+        setAddendumReviewerSignedAt(null);
+        setAddendumSavedAt(null);
+      }
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao carregar adendo',
+        message: err?.response?.data?.message || err?.message || 'Não foi possível carregar o rascunho de adendo',
+        color: 'red',
+      });
+    } finally {
+      setAddendumLoading(false);
+    }
+  };
+
+  const ensureAddendumDraft = async () => {
+    if (!selectedExam) return null;
+    if (addendumId) return addendumId;
+
+    const created = await reportAddendumService.create({
+      worklistItemId: selectedExam.id,
+      content: addendumText,
+      status: 'draft',
+      issuerSignedAt: addendumIssuerSignedAt,
+      reviewerSignedAt: addendumReviewerSignedAt,
+      savedAt: addendumSavedAt,
+    });
+
+    const createdId = String(created?.id || '');
+    if (!createdId) return null;
+    setAddendumId(createdId);
+    return createdId;
+  };
+
   const closeModal = () => {
     setModalOpen(false);
     setTemplatePickerModalOpen(false);
@@ -520,65 +716,27 @@ export function LaudoExames() {
     setSelectedPhraseId(null);
     setTemplateQuery('');
     setPhraseQuery('');
-    setLaudoTabs([]);
-    setActiveLaudoTabId(null);
-  };
-
-  const switchLaudoTab = (tabId: string) => {
-    if (tabId === activeLaudoTabId) return;
-    const targetTab = laudoTabs.find(t => t.id === tabId);
-    if (!targetTab) return;
-    setLaudoTabs(prev => prev.map(tab =>
-      tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab
-    ));
-    setEditorContent(targetTab.content);
-    setActiveLaudoTabId(tabId);
-  };
-
-  const addLaudoTab = () => {
-    const newId = `laudo-${Date.now()}`;
-    const newLabel = `Laudo ${laudoTabs.length + 1}`;
-    const newTab: LaudoTab = {
-      id: newId,
-      label: newLabel,
-      content: TEMPLATE_TEXT,
-    };
-    setLaudoTabs(prev => [
-      ...prev.map(tab => tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab),
-      newTab,
-    ]);
-    setActiveLaudoTabId(newId);
-    setEditorContent(TEMPLATE_TEXT);
-  };
-
-  const removeLaudoTab = (tabId: string) => {
-    if (laudoTabs.length <= 1) return;
-    const synced = laudoTabs.map(tab =>
-      tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab
-    );
-    const filtered = synced.filter(tab => tab.id !== tabId);
-    setLaudoTabs(filtered);
-    if (tabId === activeLaudoTabId) {
-      const newActive = filtered[0];
-      setActiveLaudoTabId(newActive.id);
-      setEditorContent(newActive.content);
-    }
+    setSavingLaudo(false);
+    setAddendumId(null);
+    setAddendumText('');
+    setAddendumIssuerSignedAt(null);
+    setAddendumReviewerSignedAt(null);
+    setAddendumSavedAt(null);
   };
 
   const getAllLaudoContent = (): string => {
-    const allTabs = laudoTabs.map(tab =>
-      tab.id === activeLaudoTabId ? { ...tab, content: editorContent } : tab
-    );
-    if (allTabs.length === 1) return allTabs[0].content;
-    return allTabs.map((tab, index) => {
-      const pageBreak = index > 0
-        ? '<hr style="page-break-after: always; border: none; margin: 24px 0;" />'
-        : '';
-      return pageBreak + '<h2>' + tab.label + '</h2>' + tab.content;
-    }).join('');
+    return editorContent;
   };
 
   const applyTemplate = () => {
+    if (selectedExam?.status === 'finalizado') {
+      showNotification({
+        title: 'Laudo finalizado',
+        message: 'Nao e permitido editar um laudo finalizado.',
+        color: 'yellow',
+      });
+      return;
+    }
     if (!selectedTemplate) {
       showNotification({
         title: 'Selecione um padrão',
@@ -597,6 +755,14 @@ export function LaudoExames() {
   };
 
   const insertPhrase = (phraseId?: string) => {
+    if (selectedExam?.status === 'finalizado') {
+      showNotification({
+        title: 'Laudo finalizado',
+        message: 'Nao e permitido editar um laudo finalizado.',
+        color: 'yellow',
+      });
+      return;
+    }
     const phrase = filteredPhrases.find((item) => item.id === (phraseId || selectedPhraseId));
 
     if (!phrase) {
@@ -647,7 +813,7 @@ export function LaudoExames() {
           <h1>Laudo - ${selectedExam.examType}</h1>
           <div class="meta">Paciente: ${selectedExam.patientName} • CPF: ${selectedExam.cpf} • Exame: ${selectedExam.id}</div>
           <div class="block">${resolvedContent}</div>
-          <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'} • Revisor: ${selectedExam.reviewerSignedAt || 'Pendente'}</div>
+          <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'} • Revisor: ${requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Nao obrigatorio'}</div>
         </body>
       </html>
     `;
@@ -658,30 +824,61 @@ export function LaudoExames() {
     previewFrameRef.current?.contentWindow?.print();
   };
 
-  const signExam = (role: 'issuer' | 'reviewer') => {
+  const signExam = async (role: 'issuer' | 'reviewer') => {
     if (!selectedExam) return;
+    if (selectedExam.status === 'finalizado') {
+      showNotification({
+        title: 'Laudo finalizado',
+        message: 'Nao e permitido editar um laudo finalizado.',
+        color: 'yellow',
+      });
+      return;
+    }
+    if (role === 'reviewer' && !selectedExam.issuerSignedAt) {
+      showNotification({
+        title: 'Assinatura bloqueada',
+        message: 'A revisao so pode ser feita apos assinatura do emissor.',
+        color: 'yellow',
+      });
+      return;
+    }
+    if (role === 'issuer' && selectedExam.issuerSignedAt) return;
+    if (role === 'reviewer' && selectedExam.reviewerSignedAt) return;
 
     const signatureDate = new Date().toLocaleString('pt-BR');
 
-    setExamRows((prev) =>
-      prev.map((exam) => {
-        if (exam.id !== selectedExam.id) return exam;
+    const reportText = getAllLaudoContent();
+    const nextIssuer = role === 'issuer' ? signatureDate : selectedExam.issuerSignedAt;
+    const nextReviewer = role === 'reviewer' ? signatureDate : selectedExam.reviewerSignedAt;
+    const nextStatus: ExamStatus = nextReviewer ? 'revisado' : 'laudado';
 
-        const updatedExam = {
-          ...exam,
-          reportText: getAllLaudoContent(),
-          status: 'rascunho' as ExamStatus,
-          issuerSignedAt: role === 'issuer' ? signatureDate : exam.issuerSignedAt,
-          reviewerSignedAt: role === 'reviewer' ? signatureDate : exam.reviewerSignedAt,
-        };
+    setExamRows((prev) => prev.map((exam) => (
+      exam.id === selectedExam.id
+        ? {
+            ...exam,
+            reportText,
+            status: nextStatus,
+            issuerSignedAt: nextIssuer,
+            reviewerSignedAt: nextReviewer,
+          }
+        : exam
+    )));
 
-        if (updatedExam.issuerSignedAt && updatedExam.reviewerSignedAt) {
-          updatedExam.status = 'finalizado';
-        }
-
-        return updatedExam;
-      }),
-    );
+    try {
+      await reportWorklistService.update(selectedExam.id, {
+        reportText,
+        status: nextStatus,
+        issuerSignedAt: nextIssuer,
+        reviewerSignedAt: nextReviewer,
+      });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao assinar',
+        message: err?.response?.data?.message || err?.message || 'Falha ao registrar assinatura',
+        color: 'red',
+      });
+      return;
+    }
 
     setLastSavedAt(signatureDate);
     // showNotification({
@@ -694,7 +891,256 @@ export function LaudoExames() {
     // });
   };
 
-  const updateExam = (nextStatus: ExamStatus) => {
+  const confirmSignature = async () => {
+    if (!signRolePending || !selectedExam) return;
+    if (!signPassword.trim()) {
+      showNotification({ title: 'Senha obrigatoria', message: 'Informe sua senha para assinar.', color: 'yellow' });
+      return;
+    }
+
+    setSignLoading(true);
+    const ok = await verifyCurrentUserPassword(signPassword);
+    setSignLoading(false);
+
+    if (!ok) {
+      showNotification({ title: 'Senha invalida', message: 'Nao foi possivel validar sua senha.', color: 'red' });
+      return;
+    }
+
+    const role = signRolePending;
+    setSignPasswordModalOpen(false);
+    setSignPassword('');
+    setSignRolePending(null);
+
+    if (role === 'addendum-issuer') {
+      const now = new Date().toLocaleString('pt-BR');
+      try {
+        const draftId = await ensureAddendumDraft();
+        if (!draftId) throw new Error('Draft not found');
+        await reportAddendumService.update(draftId, {
+          content: addendumText,
+          issuerSignedAt: now,
+        });
+        setAddendumIssuerSignedAt(now);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro ao assinar adendo',
+          message: err?.response?.data?.message || err?.message || 'Não foi possível assinar o adendo',
+          color: 'red',
+        });
+        return;
+      }
+      showNotification({ title: 'Adendo assinado', message: 'Assinatura do emissor registrada no adendo.', color: 'green' });
+      return;
+    }
+
+    if (role === 'addendum-reviewer') {
+      if (!addendumIssuerSignedAt) {
+        showNotification({ title: 'Assinatura bloqueada', message: 'O revisor do adendo so pode assinar apos o emissor.', color: 'yellow' });
+        return;
+      }
+      const now = new Date().toLocaleString('pt-BR');
+      try {
+        const draftId = await ensureAddendumDraft();
+        if (!draftId) throw new Error('Draft not found');
+        await reportAddendumService.update(draftId, {
+          content: addendumText,
+          reviewerSignedAt: now,
+        });
+        setAddendumReviewerSignedAt(now);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro ao assinar adendo',
+          message: err?.response?.data?.message || err?.message || 'Não foi possível assinar o adendo',
+          color: 'red',
+        });
+        return;
+      }
+      showNotification({ title: 'Adendo assinado', message: 'Assinatura do revisor registrada no adendo.', color: 'green' });
+      return;
+    }
+
+    await signExam(role);
+  };
+
+  const saveLaudo = async () => {
+    if (!selectedExam) return;
+    if (selectedExam.status === 'finalizado') {
+      showNotification({ title: 'Laudo finalizado', message: 'Nao e permitido editar um laudo finalizado.', color: 'yellow' });
+      return;
+    }
+    if (!selectedExam.issuerSignedAt) {
+      showNotification({ title: 'Salvamento bloqueado', message: 'E necessario assinar como emissor antes de salvar.', color: 'yellow' });
+      return;
+    }
+
+    const reportText = getAllLaudoContent();
+    const nextStatus: ExamStatus = selectedExam.reviewerSignedAt ? 'revisado' : 'laudado';
+
+    setSavingLaudo(true);
+
+    setExamRows((prev) => prev.map((exam) => (
+      exam.id === selectedExam.id
+        ? { ...exam, status: nextStatus, reportText }
+        : exam
+    )));
+
+    try {
+      await reportWorklistService.update(selectedExam.id, {
+        status: nextStatus,
+        reportText,
+      });
+      setLastSavedAt(new Date().toLocaleString('pt-BR'));
+      showNotification({ title: 'Laudo salvo', message: `Laudo salvo com status ${statusLabel[nextStatus]}.`, color: 'green' });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao salvar',
+        message: err?.response?.data?.message || err?.message || 'Falha ao salvar laudo',
+        color: 'red',
+      });
+    } finally {
+      setSavingLaudo(false);
+    }
+  };
+
+  const unfinalizeExam = async (examId: string) => {
+    const exam = examRows.find((item) => item.id === examId);
+    if (!exam || exam.status !== 'finalizado') return;
+    if (exam.hasFinalizedAddendum) {
+      showNotification({
+        title: 'Desfinalizacao bloqueada',
+        message: 'Nao e permitido desfinalizar um laudo que ja possui adendo finalizado.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const nextStatus: ExamStatus = exam.reviewerSignedAt ? 'revisado' : (exam.issuerSignedAt ? 'laudado' : 'sem_laudo');
+
+    try {
+      const updated = await reportWorklistService.update(examId, { status: nextStatus });
+      setExamRows((prev) => prev.map((item) => {
+        if (item.id !== examId) return item;
+        return {
+          ...item,
+          ...mapApiToExam({ ...item, ...updated, status: nextStatus }),
+          status: nextStatus,
+        };
+      }));
+      showNotification({ title: 'Laudo desfinalizado', message: 'O laudo voltou para edicao.', color: 'green' });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Nao foi possivel desfinalizar o laudo',
+        color: 'red',
+      });
+    }
+  };
+
+  const saveAddendum = async () => {
+    if (!selectedExam) return;
+    if (isRichTextEmpty(addendumText)) {
+      showNotification({ title: 'Adendo vazio', message: 'Informe o texto do adendo.', color: 'yellow' });
+      return;
+    }
+    if (!addendumIssuerSignedAt) {
+      showNotification({ title: 'Salvamento bloqueado', message: 'Assine como emissor antes de salvar o adendo.', color: 'yellow' });
+      return;
+    }
+
+    const now = new Date().toLocaleString('pt-BR');
+    setAddendumSaving(true);
+
+    try {
+      const draftId = await ensureAddendumDraft();
+      if (!draftId) throw new Error('Draft not found');
+
+      await reportAddendumService.update(draftId, {
+        content: addendumText,
+        issuerSignedAt: addendumIssuerSignedAt,
+        reviewerSignedAt: addendumReviewerSignedAt,
+        savedAt: now,
+      });
+
+      setAddendumSavedAt(now);
+      showNotification({ title: 'Adendo salvo', message: 'Rascunho de adendo salvo com sucesso.', color: 'green' });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao salvar adendo',
+        message: err?.response?.data?.message || err?.message || 'Não foi possível salvar o rascunho de adendo',
+        color: 'red',
+      });
+    } finally {
+      setAddendumSaving(false);
+    }
+  };
+
+  const finalizeAddendum = async () => {
+    if (!selectedExam) return;
+    if (isRichTextEmpty(addendumText)) {
+      showNotification({ title: 'Adendo vazio', message: 'Informe o texto do adendo.', color: 'yellow' });
+      return;
+    }
+    if (!addendumIssuerSignedAt) {
+      showNotification({ title: 'Finalizacao bloqueada', message: 'Assine como emissor para finalizar o adendo.', color: 'yellow' });
+      return;
+    }
+    if (requiresReviewer && !addendumReviewerSignedAt) {
+      showNotification({ title: 'Finalizacao bloqueada', message: 'Este adendo exige assinatura do revisor para finalizar.', color: 'yellow' });
+      return;
+    }
+
+    const now = new Date().toLocaleString('pt-BR');
+    setAddendumFinalizing(true);
+    const addendumBlock = `
+      <hr />
+      <h3>Adendo (${now})</h3>
+      ${addendumText}
+      <p><strong>Assinaturas do adendo:</strong> Emissor: ${addendumIssuerSignedAt} ${requiresReviewer ? `| Revisor: ${addendumReviewerSignedAt || 'Pendente'}` : ''}</p>
+    `;
+    const nextText = `${selectedExam.reportText || ''}${addendumBlock}`;
+
+    try {
+      const draftId = await ensureAddendumDraft();
+      if (!draftId) throw new Error('Draft not found');
+
+      await reportAddendumService.update(draftId, {
+        content: addendumText,
+        issuerSignedAt: addendumIssuerSignedAt,
+        reviewerSignedAt: addendumReviewerSignedAt,
+        savedAt: addendumSavedAt,
+        status: 'finalizado',
+        finalizedAt: now,
+      });
+
+      await reportWorklistService.update(selectedExam.id, {
+        reportText: nextText,
+        status: 'finalizado',
+      });
+
+      setExamRows((prev) => prev.map((item) => (
+        item.id === selectedExam.id ? { ...item, reportText: nextText, status: 'finalizado', hasFinalizedAddendum: true } : item
+      )));
+      setEditorContent(nextText);
+      setAddendumId(null);
+      setAddendumText('');
+      setAddendumIssuerSignedAt(null);
+      setAddendumReviewerSignedAt(null);
+      setAddendumSavedAt(null);
+      setAddendumModalOpen(false);
+      showNotification({ title: 'Adendo salvo', message: 'Adendo adicionado ao laudo finalizado.', color: 'green' });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Não foi possível salvar o adendo',
+        color: 'red',
+      });
+    } finally {
+      setAddendumFinalizing(false);
+    }
+  };
+
+  const updateExam = async (nextStatus: ExamStatus) => {
     if (!selectedExam) {
       showNotification({
         title: 'Selecione um exame',
@@ -704,10 +1150,34 @@ export function LaudoExames() {
       return;
     }
 
-    if (nextStatus === 'rascunho') {
-      saveDraft(true, 'manual');
+    if (selectedExam.status === 'finalizado') {
+      showNotification({
+        title: 'Laudo finalizado',
+        message: 'Nao e permitido editar um laudo finalizado.',
+        color: 'yellow',
+      });
       return;
     }
+
+    if (!selectedExam.issuerSignedAt) {
+      showNotification({
+        title: 'Finalizacao bloqueada',
+        message: 'E necessario assinar como emissor antes de finalizar.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    if (requiresReviewer && !selectedExam.reviewerSignedAt) {
+      showNotification({
+        title: 'Finalizacao bloqueada',
+        message: 'Este laudo exige assinatura do revisor para finalizar.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const reportText = getAllLaudoContent();
 
     setExamRows((prev) =>
       prev.map((exam) =>
@@ -715,26 +1185,69 @@ export function LaudoExames() {
           ? {
               ...exam,
               status: nextStatus,
-              reportText: getAllLaudoContent(),
+              reportText,
             }
           : exam,
       ),
     );
 
+    try {
+      await reportWorklistService.update(selectedExam.id, {
+        status: nextStatus,
+        reportText,
+      });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao atualizar laudo',
+        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do laudo',
+        color: 'red',
+      });
+      return;
+    }
+
     const now = new Date();
     setLastSavedAt(now.toLocaleString('pt-BR'));
     showNotification({
-      title: nextStatus === 'finalizado' ? 'Laudo finalizado' : 'Rascunho salvo',
+      title: nextStatus === 'finalizado' ? 'Laudo finalizado' : 'Laudo salvo',
       message:
         nextStatus === 'finalizado'
           ? `O exame ${selectedExam.id} foi marcado como finalizado.`
-          : `Rascunho do exame ${selectedExam.id} salvo com sucesso.`,
+          : `Laudo salvo com sucesso.`,
       color: 'green',
     });
 
     if (nextStatus === 'finalizado') {
       closeModal();
     }
+  };
+
+  const confirmFinalizeWithPassword = async () => {
+    if (!finalizeTarget) return;
+    if (!finalizePassword.trim()) {
+      showNotification({ title: 'Senha obrigatoria', message: 'Informe sua senha para finalizar.', color: 'yellow' });
+      return;
+    }
+
+    setFinalizeLoading(true);
+    const ok = await verifyCurrentUserPassword(finalizePassword);
+
+    if (!ok) {
+      setFinalizeLoading(false);
+      showNotification({ title: 'Senha invalida', message: 'Nao foi possivel validar sua senha.', color: 'red' });
+      return;
+    }
+
+    setFinalizePasswordModalOpen(false);
+    setFinalizePassword('');
+
+    if (finalizeTarget === 'laudo') {
+      await updateExam('finalizado');
+    } else {
+      await finalizeAddendum();
+    }
+
+    setFinalizeTarget(null);
+    setFinalizeLoading(false);
   };
 
   return (
@@ -752,15 +1265,18 @@ export function LaudoExames() {
                 Laudo por Exame
               </Text>
               <Text size="sm" style={{ color: subtitleColor }}>
-                Fila de exames para laudar (mock)
+                Fila de exames para laudar
               </Text>
             </Box>
           </Group>
+          <Button variant="light" color="darkBlue" leftSection={<Settings size={16} />} onClick={() => navigate('/laudo-configuracoes')}>
+            Configurações de laudo
+          </Button>
         </Group>
 
         <Group gap="md" align="end" mb="md">
           <TextInput
-            placeholder={isMobile ? 'Buscar...' : 'Buscar por paciente, exame ou ID...'}
+            placeholder={isMobile ? 'Buscar...' : 'Buscar por paciente ou exame...'}
             leftSection={<Search size={16} color={isDark ? '#7d92c6' : '#999'} />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
@@ -809,7 +1325,7 @@ export function LaudoExames() {
                             {exam.patientName}
                           </Text>
                           <Text size="xs" c="dimmed">
-                            {exam.id} • {exam.scheduledAt}
+                            {exam.scheduledAt}
                           </Text>
                         </Stack>
                       </Table.Td>
@@ -844,14 +1360,23 @@ export function LaudoExames() {
                       </Table.Td>
 
                       <Table.Td>
-                        <Button
-                          variant="subtle"
-                          color="darkBlue"
-                          size="compact-sm"
-                          onClick={() => openExam(exam.id)}
-                        >
-                          Abrir laudo
-                        </Button>
+                        <Group gap={6}>
+                          <Tooltip label="Abrir laudo">
+                            <ActionIcon variant="subtle" color="darkBlue" onClick={() => openExam(exam.id)}>
+                              <Eye size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Desfinalizar">
+                            <ActionIcon
+                              variant="subtle"
+                              color="orange"
+                              disabled={exam.status !== 'finalizado' || Boolean(exam.hasFinalizedAddendum)}
+                              onClick={() => unfinalizeExam(exam.id)}
+                            >
+                              <RotateCcw size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
                       </Table.Td>
                     </Table.Tr>
                   ))}
@@ -1133,55 +1658,10 @@ export function LaudoExames() {
                     </Group>
                   )}
 
-                  <Paper
-                    withBorder
-                    px="xs"
-                    py={4}
-                    bg={subtleBg}
-                    style={{
-                      borderBottom: 'none',
-                      borderBottomLeftRadius: 0,
-                      borderBottomRightRadius: 0,
-                      flexShrink: 0,
-                      borderColor,
-                    }}
-                  >
-                    <Group gap={4} align="center">
-                      {laudoTabs.map((tab) => (
-                        <Button
-                          key={tab.id}
-                          variant={tab.id === activeLaudoTabId ? 'filled' : 'subtle'}
-                          color={tab.id === activeLaudoTabId ? 'darkBlue' : 'gray'}
-                          size="compact-sm"
-                          onClick={() => switchLaudoTab(tab.id)}
-                          styles={{ root: { fontWeight: tab.id === activeLaudoTabId ? 700 : 500 } }}
-                          rightSection={
-                            laudoTabs.length > 1 ? (
-                              <ActionIcon
-                                size={16}
-                                variant="transparent"
-                                color={tab.id === activeLaudoTabId ? 'white' : 'gray'}
-                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); removeLaudoTab(tab.id); }}
-                              >
-                                <X size={12} />
-                              </ActionIcon>
-                            ) : undefined
-                          }
-                        >
-                          {tab.label}
-                        </Button>
-                      ))}
-                      <Tooltip label="Adicionar laudo" position="bottom" withArrow>
-                        <ActionIcon variant="subtle" color="gray" size="sm" onClick={addLaudoTab}>
-                          <Plus size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Paper>
-
                   <Box style={{ flex: 1, minHeight: 0 }}>
                     <Editor
                     apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
+                    disabled={selectedExam.status === 'finalizado'}
                     onInit={(_event, editor) => {
                       editorRef.current = editor;
                     }}
@@ -1222,16 +1702,37 @@ export function LaudoExames() {
                   <Button variant="default" onClick={closeModal}>
                     Fechar
                   </Button>
-                  <Button variant="light" color="darkBlue" onClick={() => updateExam('rascunho')} leftSection={<Save size={16} />}>
-                    Salvar rascunho
+                  <Button variant="light" color="darkBlue" onClick={saveLaudo} loading={savingLaudo} leftSection={<Save size={16} />} disabled={selectedExam.status === 'finalizado' || !selectedExam.issuerSignedAt || savingLaudo || !isLaudoDirty}>
+                    {savingLaudo ? 'Salvando...' : (!isLaudoDirty && selectedExam.issuerSignedAt ? 'Laudo salvo' : 'Salvar laudo')}
                   </Button>
-                  <Button variant="light" color="green" onClick={() => signExam('issuer')} leftSection={<PenTool size={16} />}>
-                    Assinar emissor
+                  <Button
+                    variant="light"
+                    color="green"
+                    onClick={() => requestSignature('issuer')}
+                    leftSection={<PenTool size={16} />}
+                    disabled={selectedExam.status === 'finalizado' || Boolean(selectedExam.issuerSignedAt)}
+                  >
+                    {selectedExam.issuerSignedAt ? 'Emissor assinado' : 'Assinar emissor'}
                   </Button>
-                  <Button variant="light" color="blue" onClick={() => signExam('reviewer')} leftSection={<PenTool size={16} />}>
-                    Assinar revisor
+                  <Button
+                    variant="light"
+                    color="blue"
+                    onClick={() => requestSignature('reviewer')}
+                    leftSection={<PenTool size={16} />}
+                    disabled={selectedExam.status === 'finalizado' || !selectedExam.issuerSignedAt || Boolean(selectedExam.reviewerSignedAt)}
+                  >
+                    {selectedExam.reviewerSignedAt ? 'Revisor assinado' : 'Assinar revisor'}
                   </Button>
-                  <Button bg={DARK_BLUE} c="white" onClick={() => updateExam('finalizado')} leftSection={<CheckCircle size={16} />}>
+                  <Button variant="light" color="orange" onClick={openAddendumModal} leftSection={<Plus size={16} />} disabled={selectedExam.status !== 'finalizado' || Boolean(selectedExam.hasFinalizedAddendum)}>
+                    {selectedExam.hasFinalizedAddendum ? 'Adendo finalizado' : 'Adendo'}
+                  </Button>
+                  <Button
+                    bg={DARK_BLUE}
+                    c="white"
+                    onClick={() => requestFinalize('laudo')}
+                    leftSection={<CheckCircle size={16} />}
+                    disabled={selectedExam.status === 'finalizado' || !selectedExam.issuerSignedAt || (requiresReviewer && !selectedExam.reviewerSignedAt)}
+                  >
                     Finalizar laudo
                   </Button>
                 </Group>
@@ -1534,6 +2035,191 @@ export function LaudoExames() {
               </Button>
               <Button bg={DARK_BLUE} c="white" onClick={printPreview}>
                 Imprimir / Salvar PDF
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        <Modal
+          opened={signPasswordModalOpen}
+          onClose={() => {
+            if (signLoading) return;
+            setSignPasswordModalOpen(false);
+            setSignPassword('');
+            setSignRolePending(null);
+          }}
+          title={
+            signRolePending === 'issuer'
+              ? 'Confirmar assinatura do emissor'
+              : signRolePending === 'reviewer'
+                ? 'Confirmar assinatura do revisor'
+                : signRolePending === 'addendum-issuer'
+                  ? 'Confirmar assinatura do emissor do adendo'
+                  : 'Confirmar assinatura do revisor do adendo'
+          }
+          centered
+          zIndex={450}
+        >
+          <Stack>
+            <Text size="sm" c="dimmed">
+              Digite sua senha para confirmar a assinatura.
+            </Text>
+            <TextInput
+              label="Senha"
+              type="password"
+              value={signPassword}
+              onChange={(e) => setSignPassword(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirmSignature();
+                }
+              }}
+              autoFocus
+            />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => {
+                setSignPasswordModalOpen(false);
+                setSignPassword('');
+                setSignRolePending(null);
+              }} disabled={signLoading}>
+                Cancelar
+              </Button>
+              <Button bg={DARK_BLUE} c="white" onClick={confirmSignature} loading={signLoading} leftSection={<ShieldCheck size={16} />}>
+                Confirmar assinatura
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        <Modal
+          opened={addendumModalOpen}
+          onClose={() => {
+            setAddendumModalOpen(false);
+            setAddendumText('');
+            setAddendumIssuerSignedAt(null);
+            setAddendumReviewerSignedAt(null);
+            setAddendumSavedAt(null);
+          }}
+          title="Adicionar adendo"
+          centered
+          size="lg"
+          zIndex={300}
+        >
+          <Stack>
+            {addendumLoading && (
+              <Text size="sm" c="dimmed">Carregando adendo...</Text>
+            )}
+            <Text size="sm" c="dimmed">
+              Registre o adendo com assinatura. Para finalizar, sera solicitada a senha do usuario.
+            </Text>
+            <Group gap="xs">
+              <Badge variant="dot" color={addendumIssuerSignedAt ? 'green' : 'gray'}>
+                Emissor: {addendumIssuerSignedAt ? 'Assinado' : 'Pendente'}
+              </Badge>
+              <Badge variant="dot" color={addendumReviewerSignedAt ? 'green' : 'gray'}>
+                Revisor: {addendumReviewerSignedAt ? 'Assinado' : 'Pendente'}
+              </Badge>
+            </Group>
+            <Group gap="sm">
+              <Button
+                variant="light"
+                color="green"
+                leftSection={<PenTool size={16} />}
+                onClick={() => requestSignature('addendum-issuer')}
+                disabled={Boolean(addendumIssuerSignedAt) || addendumLoading || addendumSaving || addendumFinalizing}
+              >
+                {addendumIssuerSignedAt ? 'Emissor assinado' : 'Assinar emissor'}
+              </Button>
+              <Button
+                variant="light"
+                color="blue"
+                leftSection={<PenTool size={16} />}
+                onClick={() => requestSignature('addendum-reviewer')}
+                disabled={!addendumIssuerSignedAt || Boolean(addendumReviewerSignedAt) || addendumLoading || addendumSaving || addendumFinalizing}
+              >
+                {addendumReviewerSignedAt ? 'Revisor assinado' : 'Assinar revisor'}
+              </Button>
+            </Group>
+            <Box>
+              <Text size="sm" fw={500} mb={6}>Texto do adendo</Text>
+              <Editor
+                apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
+                value={addendumText}
+                onEditorChange={(value) => setAddendumText(value)}
+                disabled={addendumLoading || addendumSaving || addendumFinalizing}
+                init={{
+                  height: 260,
+                  menubar: false,
+                  plugins: ['lists', 'link', 'table', 'wordcount'],
+                  toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
+                  content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
+                }}
+              />
+            </Box>
+            <Text size="xs" c="dimmed">
+              {addendumSavedAt ? `Ultimo salvamento do adendo: ${addendumSavedAt}` : 'Adendo ainda nao salvo nesta sessao.'}
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => {
+                setAddendumModalOpen(false);
+                setAddendumId(null);
+                setAddendumText('');
+                setAddendumIssuerSignedAt(null);
+                setAddendumReviewerSignedAt(null);
+                setAddendumSavedAt(null);
+              }} disabled={addendumSaving || addendumFinalizing}>
+                Cancelar
+              </Button>
+              <Button variant="light" color="darkBlue" onClick={saveAddendum} loading={addendumSaving} disabled={!addendumIssuerSignedAt || addendumLoading || addendumFinalizing}>
+                Salvar adendo
+              </Button>
+              <Button bg={DARK_BLUE} c="white" onClick={() => requestFinalize('adendo')} loading={addendumFinalizing} disabled={!addendumIssuerSignedAt || (requiresReviewer && !addendumReviewerSignedAt) || addendumLoading || addendumSaving}>
+                Finalizar adendo
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        <Modal
+          opened={finalizePasswordModalOpen}
+          onClose={() => {
+            if (finalizeLoading) return;
+            setFinalizePasswordModalOpen(false);
+            setFinalizePassword('');
+            setFinalizeTarget(null);
+          }}
+          title={finalizeTarget === 'adendo' ? 'Confirmar finalizacao do adendo' : 'Confirmar finalizacao do laudo'}
+          centered
+          zIndex={460}
+        >
+          <Stack>
+            <Text size="sm" c="dimmed">
+              Digite sua senha para confirmar a finalizacao.
+            </Text>
+            <TextInput
+              label="Senha"
+              type="password"
+              value={finalizePassword}
+              onChange={(e) => setFinalizePassword(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirmFinalizeWithPassword();
+                }
+              }}
+              autoFocus
+            />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => {
+                setFinalizePasswordModalOpen(false);
+                setFinalizePassword('');
+                setFinalizeTarget(null);
+              }} disabled={finalizeLoading}>
+                Cancelar
+              </Button>
+              <Button bg={DARK_BLUE} c="white" onClick={confirmFinalizeWithPassword} loading={finalizeLoading} leftSection={<ShieldCheck size={16} />}>
+                Confirmar finalizacao
               </Button>
             </Group>
           </Stack>
