@@ -1,0 +1,755 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Modal,
+  Paper,
+  Select,
+  Stack,
+  Switch,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { showNotification } from '@mantine/notifications';
+import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Editor } from '@tinymce/tinymce-react';
+import { useNavigate } from 'react-router-dom';
+import { Header } from '../Header/Header';
+import { DARK_BLUE } from '../../themes/theme';
+import reportTemplateService from '../../services/reportTemplateService';
+import reportPhraseService from '../../services/reportPhraseService';
+import reportWorklistService from '../../services/reportWorklistService';
+import procedureService from '../../services/procedureService';
+import insuranceService from '../../services/insuranceService';
+import reportConfigService from '../../services/reportConfigService';
+
+type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
+type WorklistPriority = 'normal' | 'urgente';
+
+const stripHtml = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+interface TemplateItem {
+  id: string;
+  name: string;
+  examType: string;
+  group?: string;
+  content: string;
+}
+
+interface PhraseItem {
+  id: string;
+  examType: string;
+  label: string;
+  text: string;
+}
+
+interface WorklistItem {
+  id: string;
+  patientName: string;
+  patientCpf?: string;
+  examType: string;
+  scheduledAt?: string;
+  requestingDoctor?: string;
+  assignedTo?: string;
+  convenio?: string;
+  priority: WorklistPriority;
+  status: WorklistStatus;
+}
+
+export function LaudoConfiguracoes() {
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 799px)');
+
+  const [activeTab, setActiveTab] = useState<string | null>('templates');
+  const [requiresReviewer, setRequiresReviewer] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  const [templates, setTemplates] = useState<TemplateItem[]>([]);
+  const [phrases, setPhrases] = useState<PhraseItem[]>([]);
+  const [worklist, setWorklist] = useState<WorklistItem[]>([]);
+
+  const [examTypeOptions, setExamTypeOptions] = useState<{ value: string; label: string }[]>([]);
+  const [convenioOptions, setConvenioOptions] = useState<{ value: string; label: string }[]>([]);
+
+  const [templateQuery, setTemplateQuery] = useState('');
+  const [phraseQuery, setPhraseQuery] = useState('');
+  const [worklistQuery, setWorklistQuery] = useState('');
+
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [phraseModalOpen, setPhraseModalOpen] = useState(false);
+  const [worklistModalOpen, setWorklistModalOpen] = useState(false);
+
+  const [templateEditingId, setTemplateEditingId] = useState<string | null>(null);
+  const [phraseEditingId, setPhraseEditingId] = useState<string | null>(null);
+  const [worklistEditingId, setWorklistEditingId] = useState<string | null>(null);
+
+  const [templateForm, setTemplateForm] = useState({ name: '', examType: '', group: '', content: '' });
+  const [phraseForm, setPhraseForm] = useState({ examType: '', label: '', text: '' });
+  const [worklistForm, setWorklistForm] = useState({
+    patientName: '',
+    patientCpf: '',
+    examType: '',
+    scheduledAt: '',
+    requestingDoctor: '',
+    assignedTo: '',
+    convenio: '',
+    priority: 'normal' as WorklistPriority,
+    status: 'sem_laudo' as WorklistStatus,
+  });
+
+  const normalizeStatus = (status: any): WorklistStatus => {
+    if (status === 'finalizado') return 'finalizado';
+    if (status === 'revisado') return 'revisado';
+    if (status === 'laudado') return 'laudado';
+    if (status === 'rascunho') return 'laudado';
+    return 'sem_laudo';
+  };
+
+  const filteredTemplates = useMemo(() => {
+    const q = templateQuery.trim().toLowerCase();
+    if (!q) return templates;
+    return templates.filter((item) => item.name.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q));
+  }, [templates, templateQuery]);
+
+  const filteredPhrases = useMemo(() => {
+    const q = phraseQuery.trim().toLowerCase();
+    if (!q) return phrases;
+    return phrases.filter((item) => item.label.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || stripHtml(item.text).toLowerCase().includes(q));
+  }, [phrases, phraseQuery]);
+
+  const filteredWorklist = useMemo(() => {
+    const q = worklistQuery.trim().toLowerCase();
+    if (!q) return worklist;
+    return worklist.filter((item) => item.patientName.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
+  }, [worklist, worklistQuery]);
+
+  const loadAll = async () => {
+    try {
+      const [templatesData, phrasesData, worklistData, proceduresData, insurancesData, configData] = await Promise.all([
+        reportTemplateService.list({ limit: 400, offset: 0 }),
+        reportPhraseService.list({ limit: 400, offset: 0 }),
+        reportWorklistService.list({ limit: 400, offset: 0 }),
+        procedureService.listProcedures({ limit: 400, offset: 0 }),
+        insuranceService.listInsurances({ limit: 400, offset: 0 }),
+        reportConfigService.get(),
+      ]);
+
+      const templatesList = Array.isArray(templatesData)
+        ? templatesData
+        : (Array.isArray(templatesData?.items) ? templatesData.items : []);
+      const phrasesList = Array.isArray(phrasesData)
+        ? phrasesData
+        : (Array.isArray(phrasesData?.items) ? phrasesData.items : []);
+      const worklistList = Array.isArray(worklistData)
+        ? worklistData
+        : (Array.isArray(worklistData?.items) ? worklistData.items : []);
+      const proceduresList = Array.isArray(proceduresData)
+        ? proceduresData
+        : (Array.isArray(proceduresData?.items) ? proceduresData.items : []);
+      const insurancesList = Array.isArray(insurancesData)
+        ? insurancesData
+        : (Array.isArray(insurancesData?.items) ? insurancesData.items : []);
+
+      const mappedTemplates = templatesList.map((item: any) => ({
+        id: String(item.id || ''),
+        name: item.name || '',
+        examType: item.examType || '',
+        group: item.group || '',
+        content: item.content || '',
+      })).filter((item: TemplateItem) => item.id);
+
+      const mappedPhrases = phrasesList.map((item: any) => ({
+        id: String(item.id || ''),
+        examType: item.examType || '',
+        label: item.label || '',
+        text: item.text || '',
+      })).filter((item: PhraseItem) => item.id);
+
+      const mappedWorklist = worklistList.map((item: any) => ({
+        id: String(item.id || ''),
+        patientName: item.patientName || '',
+        patientCpf: item.patientCpf || '',
+        examType: item.examType || '',
+        scheduledAt: item.scheduledAt || '',
+        requestingDoctor: item.requestingDoctor || '',
+        assignedTo: item.assignedTo || '',
+        convenio: item.convenio || '',
+        priority: item.priority === 'urgente' ? 'urgente' : 'normal',
+        status: normalizeStatus(item.status),
+      })).filter((item: WorklistItem) => item.id);
+
+      setTemplates(mappedTemplates);
+      setPhrases(mappedPhrases);
+      setWorklist(mappedWorklist);
+      setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
+
+      const examTypes = new Set<string>();
+      proceduresList.forEach((item: any) => {
+        const name = String(item?.name || '').trim();
+        if (name) examTypes.add(name);
+      });
+      mappedTemplates.forEach((item: TemplateItem) => {
+        if (item.examType) examTypes.add(item.examType);
+      });
+      mappedPhrases.forEach((item: PhraseItem) => {
+        if (item.examType) examTypes.add(item.examType);
+      });
+      mappedWorklist.forEach((item: WorklistItem) => {
+        if (item.examType) examTypes.add(item.examType);
+      });
+
+      const convenios = new Set<string>();
+      insurancesList.forEach((item: any) => {
+        const name = String(item?.name || '').trim();
+        if (name) convenios.add(name);
+      });
+      mappedWorklist.forEach((item: WorklistItem) => {
+        if (item.convenio) convenios.add(item.convenio);
+      });
+
+      setExamTypeOptions(Array.from(examTypes).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value })));
+      setConvenioOptions(Array.from(convenios).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value })));
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar configuracoes do laudo',
+        color: 'red',
+      });
+    }
+  };
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  const handleRequiresReviewerChange = async (nextValue: boolean) => {
+    setRequiresReviewer(nextValue);
+    setSavingConfig(true);
+
+    try {
+      await reportConfigService.update({ requiresReviewer: nextValue });
+      showNotification({
+        title: 'Configuracao atualizada',
+        message: nextValue ? 'Laudo agora exige revisor para finalizacao.' : 'Laudo pode ser finalizado sem revisor.',
+        color: 'green',
+      });
+    } catch (err: any) {
+      setRequiresReviewer((prev) => !prev);
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar configuracao de revisor',
+        color: 'red',
+      });
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const openTemplateCreate = () => {
+    setTemplateEditingId(null);
+    setTemplateForm({ name: '', examType: '', group: '', content: '' });
+    setTemplateModalOpen(true);
+  };
+
+  const openPhraseCreate = () => {
+    setPhraseEditingId(null);
+    setPhraseForm({ examType: '', label: '', text: '' });
+    setPhraseModalOpen(true);
+  };
+
+  const openWorklistCreate = () => {
+    setWorklistEditingId(null);
+    setWorklistForm({
+      patientName: '',
+      patientCpf: '',
+      examType: '',
+      scheduledAt: '',
+      requestingDoctor: '',
+      assignedTo: '',
+      convenio: '',
+      priority: 'normal',
+      status: 'sem_laudo',
+    });
+    setWorklistModalOpen(true);
+  };
+
+  const saveTemplate = async () => {
+    if (!templateForm.name.trim() || !templateForm.examType || !templateForm.content.trim()) {
+      showNotification({ title: 'Campos obrigatorios', message: 'Nome, tipo de exame e conteudo sao obrigatorios.', color: 'red' });
+      return;
+    }
+
+    try {
+      if (templateEditingId) {
+        await reportTemplateService.update(templateEditingId, {
+          name: templateForm.name.trim(),
+          examType: templateForm.examType,
+          group: templateForm.group.trim() || undefined,
+          content: templateForm.content,
+        });
+      } else {
+        await reportTemplateService.create({
+          name: templateForm.name.trim(),
+          examType: templateForm.examType,
+          group: templateForm.group.trim() || undefined,
+          content: templateForm.content,
+        });
+      }
+
+      setTemplateModalOpen(false);
+      await loadAll();
+      showNotification({ title: 'Sucesso', message: 'Padrao de laudo salvo com sucesso.', color: 'green' });
+    } catch (err: any) {
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar padrao.', color: 'red' });
+    }
+  };
+
+  const savePhrase = async () => {
+    if (!phraseForm.label.trim() || !phraseForm.examType || !phraseForm.text.trim()) {
+      showNotification({ title: 'Campos obrigatorios', message: 'Tipo de exame, rotulo e frase sao obrigatorios.', color: 'red' });
+      return;
+    }
+
+    try {
+      if (phraseEditingId) {
+        await reportPhraseService.update(phraseEditingId, {
+          examType: phraseForm.examType,
+          label: phraseForm.label.trim(),
+          text: phraseForm.text,
+        });
+      } else {
+        await reportPhraseService.create({
+          examType: phraseForm.examType,
+          label: phraseForm.label.trim(),
+          text: phraseForm.text,
+        });
+      }
+
+      setPhraseModalOpen(false);
+      await loadAll();
+      showNotification({ title: 'Sucesso', message: 'Frase de laudo salva com sucesso.', color: 'green' });
+    } catch (err: any) {
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar frase.', color: 'red' });
+    }
+  };
+
+  const saveWorklist = async () => {
+    if (!worklistForm.patientName.trim() || !worklistForm.examType) {
+      showNotification({ title: 'Campos obrigatorios', message: 'Paciente e tipo de exame sao obrigatorios.', color: 'red' });
+      return;
+    }
+
+    try {
+      const payload = {
+        patientName: worklistForm.patientName.trim(),
+        patientCpf: worklistForm.patientCpf.trim() || undefined,
+        examType: worklistForm.examType,
+        scheduledAt: worklistForm.scheduledAt.trim() || undefined,
+        requestingDoctor: worklistForm.requestingDoctor.trim() || undefined,
+        assignedTo: worklistForm.assignedTo.trim() || undefined,
+        convenio: worklistForm.convenio || undefined,
+        priority: worklistForm.priority,
+        status: worklistForm.status,
+      };
+
+      if (worklistEditingId) {
+        await reportWorklistService.update(worklistEditingId, payload);
+      } else {
+        await reportWorklistService.create(payload);
+      }
+
+      setWorklistModalOpen(false);
+      await loadAll();
+      showNotification({ title: 'Sucesso', message: 'Item da fila salvo com sucesso.', color: 'green' });
+    } catch (err: any) {
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar item da fila.', color: 'red' });
+    }
+  };
+
+  return (
+    <Box style={{ minHeight: '100vh' }}>
+      <Header />
+      <Box p={isMobile ? 'sm' : 'xl'} maw={1300} mx="auto">
+        <Group justify="space-between" mb="md" align="center" wrap="wrap">
+          <Group>
+            <ActionIcon variant="default" size="xl" onClick={() => navigate('/laudo-exames')}>
+              <ChevronLeft size={24} />
+            </ActionIcon>
+            <Box>
+              <Title order={3} c={DARK_BLUE}>Configurações de Laudo</Title>
+              <Text c="dimmed" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM</Text>
+            </Box>
+          </Group>
+        </Group>
+
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="templates">Padrões</Tabs.Tab>
+            <Tabs.Tab value="phrases">Frases</Tabs.Tab>
+            <Tabs.Tab value="worklist">Fila de Laudo</Tabs.Tab>
+            <Tabs.Tab value="settings">Configurações</Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="templates" pt="md">
+            <Paper withBorder p="md">
+              <Group justify="space-between" mb="sm">
+                <TextInput placeholder="Buscar padrão..." value={templateQuery} onChange={(e) => setTemplateQuery(e.currentTarget.value)} style={{ flex: 1 }} />
+                <Button leftSection={<Plus size={16} />} onClick={openTemplateCreate}>Novo padrão</Button>
+              </Group>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Nome</Table.Th>
+                    <Table.Th>Exame</Table.Th>
+                    <Table.Th>Grupo</Table.Th>
+                    <Table.Th>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filteredTemplates.map((item) => (
+                    <Table.Tr key={item.id}>
+                      <Table.Td>{item.name}</Table.Td>
+                      <Table.Td>{item.examType}</Table.Td>
+                      <Table.Td>{item.group || '-'}</Table.Td>
+                      <Table.Td>
+                        <Group gap={6}>
+                          <ActionIcon variant="subtle" color="blue" onClick={() => {
+                            setTemplateEditingId(item.id);
+                            setTemplateForm({ name: item.name, examType: item.examType, group: item.group || '', content: item.content });
+                            setTemplateModalOpen(true);
+                          }}>
+                            <Pencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon variant="subtle" color="red" onClick={async () => {
+                            await reportTemplateService.remove(item.id);
+                            await loadAll();
+                          }}>
+                            <Trash2 size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Paper>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="phrases" pt="md">
+            <Paper withBorder p="md">
+              <Group justify="space-between" mb="sm">
+                <TextInput placeholder="Buscar frase..." value={phraseQuery} onChange={(e) => setPhraseQuery(e.currentTarget.value)} style={{ flex: 1 }} />
+                <Button leftSection={<Plus size={16} />} onClick={openPhraseCreate}>Nova frase</Button>
+              </Group>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Rótulo</Table.Th>
+                    <Table.Th>Exame</Table.Th>
+                    <Table.Th>Frase</Table.Th>
+                    <Table.Th>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filteredPhrases.map((item) => (
+                    <Table.Tr key={item.id}>
+                      <Table.Td>{item.label}</Table.Td>
+                      <Table.Td>{item.examType}</Table.Td>
+                      <Table.Td><Text lineClamp={2}>{stripHtml(item.text)}</Text></Table.Td>
+                      <Table.Td>
+                        <Group gap={6}>
+                          <ActionIcon variant="subtle" color="blue" onClick={() => {
+                            setPhraseEditingId(item.id);
+                            setPhraseForm({ examType: item.examType, label: item.label, text: item.text });
+                            setPhraseModalOpen(true);
+                          }}>
+                            <Pencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon variant="subtle" color="red" onClick={async () => {
+                            await reportPhraseService.remove(item.id);
+                            await loadAll();
+                          }}>
+                            <Trash2 size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Paper>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="worklist" pt="md">
+            <Paper withBorder p="md">
+              <Group justify="space-between" mb="sm">
+                <TextInput placeholder="Buscar item da fila..." value={worklistQuery} onChange={(e) => setWorklistQuery(e.currentTarget.value)} style={{ flex: 1 }} />
+                <Button leftSection={<Plus size={16} />} onClick={openWorklistCreate}>Novo item de fila</Button>
+              </Group>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Paciente</Table.Th>
+                    <Table.Th>Exame</Table.Th>
+                    <Table.Th>Convênio</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Prioridade</Table.Th>
+                    <Table.Th>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filteredWorklist.map((item) => (
+                    <Table.Tr key={item.id}>
+                      <Table.Td>{item.patientName}</Table.Td>
+                      <Table.Td>{item.examType}</Table.Td>
+                      <Table.Td>{item.convenio || '-'}</Table.Td>
+                      <Table.Td>
+                        <Badge color={item.status === 'finalizado' ? 'green' : item.status === 'revisado' ? 'cyan' : item.status === 'laudado' ? 'blue' : 'gray'} variant="light">
+                          {item.status === 'sem_laudo' ? 'Sem laudo' : item.status === 'laudado' ? 'Laudado' : item.status === 'revisado' ? 'Revisado' : 'Finalizado'}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge color={item.priority === 'urgente' ? 'red' : 'gray'} variant="light">
+                          {item.priority}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap={6}>
+                          <ActionIcon variant="subtle" color="blue" onClick={() => {
+                            setWorklistEditingId(item.id);
+                            setWorklistForm({
+                              patientName: item.patientName,
+                              patientCpf: item.patientCpf || '',
+                              examType: item.examType,
+                              scheduledAt: item.scheduledAt || '',
+                              requestingDoctor: item.requestingDoctor || '',
+                              assignedTo: item.assignedTo || '',
+                              convenio: item.convenio || '',
+                              priority: item.priority,
+                              status: item.status,
+                            });
+                            setWorklistModalOpen(true);
+                          }}>
+                            <Pencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon variant="subtle" color="red" onClick={async () => {
+                            await reportWorklistService.remove(item.id);
+                            await loadAll();
+                          }}>
+                            <Trash2 size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Paper>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="settings" pt="md">
+            <Paper withBorder p="md">
+              <Stack>
+                <Title order={5}>Regras de Finalização</Title>
+                <Switch
+                  label="Exigir assinatura de revisor na finalização"
+                  checked={requiresReviewer}
+                  onChange={(event) => handleRequiresReviewerChange(event.currentTarget.checked)}
+                  disabled={savingConfig}
+                />
+                <Text size="sm" c="dimmed">
+                  Quando habilitado, o laudo só pode ser finalizado após assinatura do emissor e do revisor.
+                </Text>
+              </Stack>
+            </Paper>
+          </Tabs.Panel>
+        </Tabs>
+      </Box>
+
+      <Modal opened={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateEditingId ? 'Editar padrão' : 'Novo padrão'} centered size="xl">
+        <Stack>
+          <TextInput
+            label="Nome"
+            value={templateForm.name}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setTemplateForm((prev) => ({ ...prev, name: value }));
+            }}
+            required
+          />
+          <Select
+            label="Tipo de exame"
+            data={examTypeOptions}
+            searchable
+            value={templateForm.examType || null}
+            onChange={(value) => setTemplateForm((prev) => ({ ...prev, examType: value || '' }))}
+            placeholder="Selecione o tipo de exame"
+            required
+          />
+          <TextInput
+            label="Grupo"
+            value={templateForm.group}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setTemplateForm((prev) => ({ ...prev, group: value }));
+            }}
+          />
+          <Box>
+            <Text size="sm" fw={500} mb={6}>Conteúdo do padrão</Text>
+            <Editor
+              apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
+              value={templateForm.content}
+              onEditorChange={(value) => setTemplateForm((prev) => ({ ...prev, content: value }))}
+              init={{
+                height: 300,
+                menubar: false,
+                plugins: ['lists', 'link', 'table', 'wordcount'],
+                toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
+                content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
+              }}
+            />
+          </Box>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setTemplateModalOpen(false)}>Cancelar</Button>
+            <Button bg={DARK_BLUE} c="white" onClick={saveTemplate}>Salvar</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal opened={phraseModalOpen} onClose={() => setPhraseModalOpen(false)} title={phraseEditingId ? 'Editar frase' : 'Nova frase'} centered size="lg">
+        <Stack>
+          <Select
+            label="Tipo de exame"
+            data={examTypeOptions}
+            searchable
+            value={phraseForm.examType || null}
+            onChange={(value) => setPhraseForm((prev) => ({ ...prev, examType: value || '' }))}
+            placeholder="Selecione o tipo de exame"
+            required
+          />
+          <TextInput
+            label="Rótulo"
+            value={phraseForm.label}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setPhraseForm((prev) => ({ ...prev, label: value }));
+            }}
+            required
+          />
+          <Box>
+            <Text size="sm" fw={500} mb={6}>Frase</Text>
+            <Editor
+              apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
+              value={phraseForm.text}
+              onEditorChange={(value) => setPhraseForm((prev) => ({ ...prev, text: value }))}
+              init={{
+                height: 260,
+                menubar: false,
+                plugins: ['lists', 'link', 'table', 'wordcount'],
+                toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
+                content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
+              }}
+            />
+          </Box>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setPhraseModalOpen(false)}>Cancelar</Button>
+            <Button bg={DARK_BLUE} c="white" onClick={savePhrase}>Salvar</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal opened={worklistModalOpen} onClose={() => setWorklistModalOpen(false)} title={worklistEditingId ? 'Editar item da fila' : 'Novo item da fila'} centered size="lg">
+        <Stack>
+          <TextInput
+            label="Paciente"
+            value={worklistForm.patientName}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setWorklistForm((prev) => ({ ...prev, patientName: value }));
+            }}
+            required
+          />
+          <TextInput
+            label="CPF"
+            value={worklistForm.patientCpf}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setWorklistForm((prev) => ({ ...prev, patientCpf: value }));
+            }}
+          />
+          <Select
+            label="Tipo de exame"
+            data={examTypeOptions}
+            searchable
+            value={worklistForm.examType || null}
+            onChange={(value) => setWorklistForm((prev) => ({ ...prev, examType: value || '' }))}
+            placeholder="Selecione o tipo de exame"
+            required
+          />
+          <Select
+            label="Convênio"
+            data={convenioOptions}
+            searchable
+            clearable
+            value={worklistForm.convenio || null}
+            onChange={(value) => setWorklistForm((prev) => ({ ...prev, convenio: value || '' }))}
+            placeholder="Selecione o convenio"
+          />
+          <TextInput
+            label="Data/Hora agendada"
+            value={worklistForm.scheduledAt}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setWorklistForm((prev) => ({ ...prev, scheduledAt: value }));
+            }}
+            placeholder="dd/mm/aaaa hh:mm"
+          />
+          <TextInput
+            label="Solicitante"
+            value={worklistForm.requestingDoctor}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setWorklistForm((prev) => ({ ...prev, requestingDoctor: value }));
+            }}
+          />
+          <TextInput
+            label="Laudante"
+            value={worklistForm.assignedTo}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setWorklistForm((prev) => ({ ...prev, assignedTo: value }));
+            }}
+          />
+          <Select
+            label="Prioridade"
+            data={[{ value: 'normal', label: 'Normal' }, { value: 'urgente', label: 'Urgente' }]}
+            value={worklistForm.priority}
+            onChange={(value) => setWorklistForm((prev) => ({ ...prev, priority: (value as WorklistPriority) || 'normal' }))}
+          />
+          <Select
+            label="Status"
+            data={[
+              { value: 'sem_laudo', label: 'Sem laudo' },
+              { value: 'laudado', label: 'Laudado' },
+              { value: 'revisado', label: 'Revisado' },
+              { value: 'finalizado', label: 'Finalizado' },
+            ]}
+            value={worklistForm.status}
+            onChange={(value) => setWorklistForm((prev) => ({ ...prev, status: (value as WorklistStatus) || 'sem_laudo' }))}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setWorklistModalOpen(false)}>Cancelar</Button>
+            <Button bg={DARK_BLUE} c="white" onClick={saveWorklist}>Salvar</Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </Box>
+  );
+}
