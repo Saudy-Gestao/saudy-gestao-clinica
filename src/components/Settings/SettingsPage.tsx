@@ -47,6 +47,7 @@ import userService from '../../services/userService';
 import accessService from '../../services/accessService';
 import { moduleService, type Module } from '../../services/moduleService';
 import { FloatingInput } from '../common/FloatingInput';
+import { isRoomSector } from '../../utils/sectorClassification';
 
 // Validations
 import {
@@ -147,6 +148,7 @@ export function SettingsPage() {
   
   // Get user's company from logged user
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [loggedBranchId, setLoggedBranchId] = useState<string | null>(null);
 
   // --- States ---
   
@@ -200,6 +202,7 @@ export function SettingsPage() {
 
   // Sectors
   const [sectors, setSectors] = useState<any[]>([]);
+  const [allSectors, setAllSectors] = useState<any[]>([]);
   const [loadingSectors, setLoadingSectors] = useState(false);
   const [selectedBranchForSectors, setSelectedBranchForSectors] = useState<string | null>(null);
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
@@ -214,7 +217,7 @@ export function SettingsPage() {
   const [selectedSectorForUsers, setSelectedSectorForUsers] = useState<string | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [userForm, setUserForm] = useState({ sectorId: '', accessIds: [] as string[], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
+  const [userForm, setUserForm] = useState({ branchId: '', sectorId: '', accessIds: [] as string[], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
   const [savingUser, setSavingUser] = useState(false);
   const [accessesList, setAccessesList] = useState<any[]>([]);
   const [userErrors, setUserErrors] = useState<Record<string, string>>({});
@@ -302,7 +305,9 @@ export function SettingsPage() {
         const user = JSON.parse(userStr);
         // Extract company ID from user's sector hierarchy
         const companyId = user.sector?.branch?.company?.id || user.sector?.branch?.companyId;
+        const branchId = user.branchId || user.branch?.id || user.sector?.branch?.id || null;
         setUserCompanyId(companyId);
+        setLoggedBranchId(branchId);
       } catch (error) {
         console.error('Error parsing user from localStorage:', error);
       }
@@ -347,11 +352,14 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (branches.length > 0 && !selectedBranchForSectors) {
-      setSelectedBranchForSectors(branches[0].id);
+      const preferredBranch = loggedBranchId
+        ? branches.find((branch: any) => branch.id === loggedBranchId)
+        : null;
+      setSelectedBranchForSectors(preferredBranch?.id || branches[0].id);
     } else if (branches.length === 0) {
       setSelectedBranchForSectors(null);
     }
-  }, [branches]);
+  }, [branches, loggedBranchId]);
 
   useEffect(() => {
     if (selectedBranchForSectors) {
@@ -585,12 +593,39 @@ export function SettingsPage() {
   const fetchSectors = async () => {
     if (!selectedBranchForSectors) {
         setSectors([]);
+        setAllSectors([]);
         return;
     }
     setLoadingSectors(true);
     try {
       const data = await sectorService.listSectors();
-      const filtered = (data || []).filter((s: any) => s.branchId === selectedBranchForSectors);
+      let availableSectors = (data || []).filter((sector: any) => !isRoomSector(sector));
+
+      // Fallback: when sectors endpoint returns empty, infer sectors from users payload.
+      if (availableSectors.length === 0) {
+        try {
+          const usersData = await userService.listUsers();
+          const inferredSectorsMap = new Map<string, any>();
+          (usersData || []).forEach((user: any) => {
+            const sector = user?.sector;
+            if (sector?.id) {
+              inferredSectorsMap.set(sector.id, {
+                id: sector.id,
+                name: sector.name || 'Sem nome',
+                description: sector.description || '',
+                branchId: sector.branchId || sector.branch?.id || '',
+              });
+            }
+          });
+          availableSectors = Array.from(inferredSectorsMap.values()).filter((sector: any) => !isRoomSector(sector));
+        } catch {
+          // Ignore fallback errors and keep empty state.
+        }
+      }
+
+      setAllSectors(availableSectors);
+
+      const filtered = availableSectors.filter((s: any) => s.branchId === selectedBranchForSectors);
       setSectors(filtered);
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar setores', color: 'red' });
@@ -716,7 +751,8 @@ export function SettingsPage() {
 
   const openUserModalForCreate = () => {
     setEditingUser(null);
-    setUserForm({ sectorId: selectedSectorForUsers || '', accessIds: [], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
+    const initialBranchId = loggedBranchId || selectedBranchForSectors || '';
+    setUserForm({ branchId: initialBranchId, sectorId: selectedSectorForUsers || '', accessIds: [], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
     setUserErrors({});
     setUserModalOpen(true);
   };
@@ -724,6 +760,7 @@ export function SettingsPage() {
   const openUserModalForEdit = (user: any) => {
     setEditingUser(user);
     setUserForm({ 
+        branchId: user.sector?.branchId || user.sector?.branch?.id || '',
         sectorId: user.sector?.id || '', 
         accessIds: user.accesses ? user.accesses.map((a: any) => a.id) : [], 
         name: user.name || '', 
@@ -1229,17 +1266,27 @@ export function SettingsPage() {
                     <Box>
                         <Group justify="space-between" mb="md">
                             <SectionTitle title="Usuários" desc="Gerencie acesso e permissões." />
-                            <Button leftSection={<UserPlus size={16} />} onClick={openUserModalForCreate} bg={DARK_BLUE} disabled={!selectedSectorForUsers}>Novo Usuário</Button>
+                            <Button
+                              leftSection={<UserPlus size={16} />}
+                              onClick={openUserModalForCreate}
+                              bg={DARK_BLUE}
+                              disabled={branches.length === 0}
+                            >
+                              Novo Usuário
+                            </Button>
                         </Group>
 
                          <Group mb="lg">
                             <Select 
                                 label="Filial"
                                 placeholder="Selecione..." 
-                                data={(branches || []).map(b => ({ value: b.id, label: b.tradeName }))}
+                                data={(branches || [])
+                                  .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
+                                  .map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                 value={selectedBranchForSectors}
                                 onChange={setSelectedBranchForSectors}
                                 style={{ flex: 1 }}
+                                disabled={!!loggedBranchId}
                             />
                             <Select 
                                 label="Setor"
@@ -1302,13 +1349,30 @@ export function SettingsPage() {
                         <Modal opened={userModalOpen} onClose={() => setUserModalOpen(false)} title={editingUser ? 'Editar Usuário' : 'Novo Usuário'} size="lg" centered>
                             <Grid pt="lg">
                                 <Grid.Col span={12}>
+                                    <Select
+                                        label="Filial"
+                                        data={(branches || [])
+                                          .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
+                                          .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                        value={userForm.branchId}
+                                        onChange={(v) => setUserForm({ ...userForm, branchId: v || '', sectorId: '' })}
+                                        mb="xs"
+                                        error={userErrors.branchId}
+                                        searchable
+                                        disabled={!!loggedBranchId}
+                                    />
+                                </Grid.Col>
+                                <Grid.Col span={12}>
                                     <Select 
                                         label="Setor" 
-                                        data={(sectors || []).map(s => ({ value: s.id, label: s.name }))}
+                                        data={(allSectors || [])
+                                          .filter((s: any) => s.branchId === userForm.branchId)
+                                          .map((s: any) => ({ value: s.id, label: s.name }))}
                                         value={userForm.sectorId}
                                         onChange={(v) => setUserForm({...userForm, sectorId: v || ''})}
                                         mb="xs"
                                         error={userErrors.sectorId}
+                                        disabled={!userForm.branchId}
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
