@@ -202,6 +202,8 @@ export function CadastroMedico() {
 
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DoctorListItem | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
   const [roomOptions, setRoomOptions] = useState<Array<{ value: string; label: string }>>([]);
 
@@ -533,15 +535,12 @@ export function CadastroMedico() {
   };
 
   const handleDeleteDoctor = async (item: DoctorListItem) => {
-    const name = item.name || 'este médico';
-    if (!window.confirm(`Tem certeza que deseja excluir ${name}?`)) {
-      return;
-    }
-
     try {
       await doctorService.deleteDoctor(item.id);
       setDoctors((prev) => prev.filter((d) => d.id !== item.id));
       showNotification({ title: 'Médico excluído', message: 'Registro removido com sucesso.', color: 'green' });
+      setDeleteConfirmOpen(false);
+      setDeleteTarget(null);
     } catch (e: unknown) {
       const err = e as ApiError;
       const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir médico';
@@ -940,7 +939,10 @@ export function CadastroMedico() {
                                 <ActionIcon
                                   variant="subtle"
                                   color="red"
-                                  onClick={() => handleDeleteDoctor(item)}
+                                  onClick={() => {
+                                    setDeleteTarget(item);
+                                    setDeleteConfirmOpen(true);
+                                  }}
                                   title="Excluir"
                                 >
                                   <Trash size={16} />
@@ -1042,6 +1044,16 @@ export function CadastroMedico() {
         />
 
         <ResultModal opened={showErrorModal} onClose={() => setShowErrorModal(false)} variant="error" title="Erro ao cadastrar médico" message={errorMessage || 'Erro ao registrar médico'} secondary={{ label: 'Fechar', onClick: () => setShowErrorModal(false) }} />
+
+        <ResultModal
+          opened={deleteConfirmOpen}
+          onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null); }}
+          variant="error"
+          title="Confirmar exclusão"
+          message={`Tem certeza que deseja excluir ${deleteTarget?.name || 'este médico'}?`}
+          primary={{ label: 'Excluir', onClick: () => { if (deleteTarget) handleDeleteDoctor(deleteTarget); } }}
+          secondary={{ label: 'Cancelar', onClick: () => { setDeleteConfirmOpen(false); setDeleteTarget(null); } }}
+        />
       </Box>
     </Box>
   );
