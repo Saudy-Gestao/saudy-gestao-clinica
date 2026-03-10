@@ -17,12 +17,28 @@ export function StatsCards() {
     const loadStats = async () => {
       try {
         setLoading(true);
-        
-        // Buscar dados em paralelo
-        const [consultationsData, appointmentsData] = await Promise.all([
+
+        // Buscar dados em paralelo e tratar 403 como falta de permissao sem toast de erro.
+        const [consultationsResult, appointmentsResult] = await Promise.allSettled([
           consultationService.list({ limit: 1000 }),
           appointmentService.list({ limit: 1000 }),
         ]);
+
+        const extractData = (result: PromiseSettledResult<any>) => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          }
+
+          const status = (result.reason as any)?.response?.status;
+          if (status === 403) {
+            return [];
+          }
+
+          throw result.reason;
+        };
+
+        const consultationsData = extractData(consultationsResult);
+        const appointmentsData = extractData(appointmentsResult);
 
         // Processar consultations
         const consultationsList = Array.isArray(consultationsData) 
