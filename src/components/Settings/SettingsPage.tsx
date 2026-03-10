@@ -222,10 +222,42 @@ export function SettingsPage() {
   const [accessForm, setAccessForm] = useState({ description: '', moduleIds: [] as string[] });
   const [savingAccess, setSavingAccess] = useState(false);
   const [accessErrors, setAccessErrors] = useState<Record<string, string>>({});
+
+  // Delete confirmation modal
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmTitle, setDeleteConfirmTitle] = useState('Confirmar exclusao');
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState('Deseja realmente excluir este item?');
+  const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
+  const [deleteConfirmAction, setDeleteConfirmAction] = useState<null | (() => Promise<void>)>(null);
   
   // Modules
   const [modules, setModules] = useState<Module[]>([]);
   const [loadingModules, setLoadingModules] = useState(false);
+
+  const openDeleteConfirm = (title: string, message: string, action: () => Promise<void>) => {
+    setDeleteConfirmTitle(title);
+    setDeleteConfirmMessage(message);
+    setDeleteConfirmAction(() => action);
+    setDeleteConfirmOpen(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (deleteConfirmLoading) return;
+    setDeleteConfirmOpen(false);
+    setDeleteConfirmAction(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmAction) return;
+    setDeleteConfirmLoading(true);
+    try {
+      await deleteConfirmAction();
+      setDeleteConfirmOpen(false);
+      setDeleteConfirmAction(null);
+    } finally {
+      setDeleteConfirmLoading(false);
+    }
+  };
 
   const getAllModuleIds = () => (Array.isArray(modules) ? modules.map((m) => m.id).filter(Boolean) : []);
 
@@ -531,7 +563,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteBranch = async (id: string) => {
-    if (!window.confirm('Excluir filial?')) return;
     try {
       await branchService.deleteBranch(id);
       notifications.show({ title: 'Sucesso', message: 'Filial excluída', color: 'green' });
@@ -608,7 +639,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteSector = async (id: string) => {
-    if (!window.confirm('Excluir setor?')) return;
     try {
       await sectorService.deleteSector(id);
       notifications.show({ title: 'Sucesso', message: 'Setor excluído', color: 'green' });
@@ -734,7 +764,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (!window.confirm('Excluir usuário?')) return;
     try {
       await userService.deleteUser(id);
       notifications.show({ title: 'Sucesso', message: 'Usuário excluído', color: 'green' });
@@ -843,7 +872,6 @@ export function SettingsPage() {
   };
 
   const handleDeleteAccess = async (id: string) => {
-    if (!window.confirm('Excluir acesso?')) return;
     try {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       
@@ -1029,7 +1057,7 @@ export function SettingsPage() {
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openBranchModalForEdit(branch)}><Edit size={16} /></ActionIcon>
                                                   {!isBranchMatriz(branch) && (
-                                                            <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteBranch(branch.id)}><Trash size={16} /></ActionIcon>
+                                                            <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir filial', 'Deseja realmente excluir esta filial?', () => handleDeleteBranch(branch.id))}><Trash size={16} /></ActionIcon>
                                                         )}
                                                     </Group>
                                                 </Table.Td>
@@ -1105,7 +1133,7 @@ export function SettingsPage() {
                                                 <Table.Td>
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openSectorModalForEdit(sector)}><Edit size={16} /></ActionIcon>
-                                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteSector(sector.id)}><Trash size={16} /></ActionIcon>
+                                                        <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir setor', 'Deseja realmente excluir este setor?', () => handleDeleteSector(sector.id))}><Trash size={16} /></ActionIcon>
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
@@ -1199,7 +1227,7 @@ export function SettingsPage() {
                                                 <Table.Td>
                                                     <Group gap={4} justify="flex-end">
                                                         <ActionIcon variant="subtle" color="blue" onClick={() => openUserModalForEdit(user)}><Edit size={16} /></ActionIcon>
-                                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteUser(user.id)}><Trash size={16} /></ActionIcon>
+                                                        <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir usuário', 'Deseja realmente excluir este usuário?', () => handleDeleteUser(user.id))}><Trash size={16} /></ActionIcon>
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
@@ -1333,7 +1361,7 @@ export function SettingsPage() {
                                             <Table.Td>
                                                 <Group gap={4} justify="flex-end">
                                                     <ActionIcon variant="subtle" color="blue" onClick={() => openAccessModalForEdit(access)}><Edit size={16} /></ActionIcon>
-                                                    <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteAccess(access.id)}><Trash size={16} /></ActionIcon>
+                                                    <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir acesso', 'Deseja realmente excluir este acesso?', () => handleDeleteAccess(access.id))}><Trash size={16} /></ActionIcon>
                                                 </Group>
                                             </Table.Td>
                                         </Table.Tr>
@@ -1431,6 +1459,21 @@ export function SettingsPage() {
                     </Box>
                 )}
             </Paper>
+
+            <Modal
+              opened={deleteConfirmOpen}
+              onClose={closeDeleteConfirm}
+              title={deleteConfirmTitle}
+              centered
+            >
+              <Stack>
+                <Text size="sm" c="dimmed">{deleteConfirmMessage}</Text>
+                <Group justify="flex-end" mt="sm">
+                  <Button variant="default" onClick={closeDeleteConfirm} disabled={deleteConfirmLoading}>Cancelar</Button>
+                  <Button color="red" onClick={confirmDelete} loading={deleteConfirmLoading}>Excluir</Button>
+                </Group>
+              </Stack>
+            </Modal>
         </Grid.Col>
       </Grid>
     </PageContainer>
