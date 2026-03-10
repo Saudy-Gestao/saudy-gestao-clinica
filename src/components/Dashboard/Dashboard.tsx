@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Text, Stack, Group, Button, Tooltip } from '@mantine/core';
+import { Box, Title, Text, Stack, Group, Button } from '@mantine/core';
 import { Camera } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -9,7 +9,6 @@ import { WorkflowSections } from '../WorkflowSections/WorkflowSections';
 import { FacialCapture } from '../common/FacialCapture';
 import { PatientInfoModal } from './PatientInfoModal';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
-import { DARK_BLUE } from '../../themes/theme';
 
 export function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
