@@ -20,10 +20,11 @@ import {
   Tabs,
   Table,
   Loader,
-  Badge
+  Badge,
+  Image
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList, Camera } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -32,7 +33,9 @@ import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '
 import patientService from '../../services/patientService';
 import insuranceService from '../../services/insuranceService';
 import teaProfileService from '../../services/teaProfileService';
+import facialRecognitionService from '../../services/facialRecognitionService';
 import ResultModal from '../common/ResultModal';
+import { FacialCapture } from '../common/FacialCapture';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -235,6 +238,10 @@ export function CadastroPaciente() {
   const [selectedPatient, setSelectedPatient] = useState<PatientListItem | null>(null);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Estados para reconhecimento facial
+  const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
+  const [facialImage, setFacialImage] = useState<string | null>(null);
 
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
@@ -574,6 +581,16 @@ export function CadastroPaciente() {
       return;
     }
 
+    // Validar foto facial no cadastro (não edição)
+    if (!editingPatientId && !facialImage) {
+      showNotification({ 
+        title: 'Foto facial obrigatória', 
+        message: 'É necessário capturar a foto do paciente para concluir o cadastro.', 
+        color: 'red' 
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       // Converte tipo sanguíneo para o formato enum do backend
@@ -630,13 +647,47 @@ export function CadastroPaciente() {
         setEditingPatientId(null);
         setForm({ ...INITIAL_PATIENT_FORM });
         setFieldErrors({});
+        setFacialImage(null);
         setActiveTab('lista');
         showNotification({ title: 'Paciente atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
-        await patientService.createPatient(payload);
+        // Primeiro cria o paciente
+        const createdPatient: any = await patientService.createPatient(payload);
+        const patientId = createdPatient?.id || createdPatient?.data?.id || createdPatient?.patient?.id;
+
+        // Depois registra a foto facial
+        if (facialImage && patientId) {
+          try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const unitId = user?.branchId || user?.branch?.id || '';
+
+            await facialRecognitionService.registerFace({
+              image: facialImage,
+              cpf: form.cpf,
+              nome: form.name.trim(),
+              parentesco: 'próprio',
+              id_unidade: unitId,
+              id_medilab: patientId,
+            });
+
+            showNotification({ 
+              title: 'Cadastro completo', 
+              message: 'Paciente cadastrado e reconhecimento facial registrado com sucesso.', 
+              color: 'green' 
+            });
+          } catch (faceError: any) {
+            console.error('Erro ao registrar foto facial:', faceError);
+            showNotification({ 
+              title: 'Aviso', 
+              message: 'Paciente cadastrado, mas não foi possível registrar a foto facial. Tente novamente mais tarde.', 
+              color: 'yellow' 
+            });
+          }
+        }
 
         setLastCreatedName(payload.name);
         setFieldErrors({});
+        setFacialImage(null);
         setShowSuccessModal(true);
       }
       try {
@@ -819,6 +870,49 @@ export function CadastroPaciente() {
                   <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
                   <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} error={fieldErrors.cellphone} required />
                 </SimpleGrid>
+
+                {/* Seção de Reconhecimento Facial */}
+                {!isEditing && (
+                  <Box mt="md" p="md" style={{ border: '2px dashed #e9ecef', borderRadius: 8 }}>
+                    <Group justify="space-between" align="center" mb="sm">
+                      <Box>
+                        <Text fw={600} size="sm">Reconhecimento Facial</Text>
+                        <Text size="xs" c="dimmed">Obrigatório para concluir o cadastro</Text>
+                      </Box>
+                      <Button 
+                        leftSection={<Camera size={16} />}
+                        onClick={() => setFacialCaptureOpen(true)}
+                        variant={facialImage ? 'outline' : 'filled'}
+                        color={facialImage ? 'green' : DARK_BLUE}
+                      >
+                        {facialImage ? 'Foto Capturada ✓' : 'Capturar Foto'}
+                      </Button>
+                    </Group>
+                    
+                    {facialImage && (
+                      <Center mt="sm">
+                        <Box style={{ position: 'relative', width: 200, height: 150 }}>
+                          <Image
+                            src={facialImage}
+                            alt="Foto do paciente"
+                            radius="md"
+                            fit="cover"
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                          <ActionIcon
+                            color="red"
+                            size="sm"
+                            radius="xl"
+                            style={{ position: 'absolute', top: -8, right: -8 }}
+                            onClick={() => setFacialImage(null)}
+                          >
+                            X
+                          </ActionIcon>
+                        </Box>
+                      </Center>
+                    )}
+                  </Box>
+                )}
               </Paper>
 
               <Paper p="md" withBorder radius="md">
@@ -1162,6 +1256,18 @@ export function CadastroPaciente() {
             <Text size="sm"><Text fw={600} span>Observações:</Text> {formatDetailValue(selectedPatient?.raw?.observations)}</Text>
           </Stack>
         </Modal>
+
+        {/* Modal de Captura Facial */}
+        <FacialCapture
+          opened={facialCaptureOpen}
+          onClose={() => setFacialCaptureOpen(false)}
+          onCapture={(imageBase64) => {
+            setFacialImage(imageBase64);
+            setFacialCaptureOpen(false);
+          }}
+          title="Captura Facial do Paciente"
+          description="Posicione o rosto do paciente no centro da câmera"
+        />
 
         <ResultModal
           opened={showSuccessModal}
