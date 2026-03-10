@@ -155,6 +155,7 @@ export const validateSectorForm = (form: {
  * User form validation
  */
 export const validateUserForm = (form: {
+  branchId: string;
   sectorId: string;
   name: string;
   birthDate: string;
@@ -164,6 +165,10 @@ export const validateUserForm = (form: {
   address?: string;
 }, isEditing: boolean = false): ValidationResult => {
   const errors: Record<string, string> = {};
+
+  if (!form.branchId) {
+    errors.branchId = 'Filial é obrigatória';
+  }
 
   if (!form.sectorId) {
     errors.sectorId = 'Setor é obrigatório';

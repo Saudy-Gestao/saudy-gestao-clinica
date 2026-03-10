@@ -49,11 +49,15 @@ export function Header() {
   const location = useLocation();
   const lastTrackedPathRef = useRef<string>('');
   const [quickModules, setQuickModules] = useState<ModuleUsageItem[]>([]);
-  const currentUser = authService.getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<any>(() => authService.getCurrentUser());
   const userKey = useMemo(
     () => String((currentUser as any)?.id || (currentUser as any)?.email || 'anonymous'),
     [currentUser],
   );
+  const unitLabel = useMemo(() => {
+    const branch = (currentUser as any)?.branch || (currentUser as any)?.sector?.branch;
+    return String(branch?.tradeName || branch?.name || 'Unidade não definida');
+  }, [currentUser]);
   const usageStorageKey = `saudy:module-usage:v1:${userKey}`;
 
   const currentTime = new Date();
@@ -62,6 +66,18 @@ export function Header() {
   const month = currentTime.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
   const year = currentTime.getFullYear();
   const dateStr = `${day} de ${month}, ${year}`;
+
+  useEffect(() => {
+    const refreshUser = () => setCurrentUser(authService.getCurrentUser());
+    window.addEventListener('auth:changed', refreshUser);
+    window.addEventListener('auth:user-updated', refreshUser as EventListener);
+    window.addEventListener('storage', refreshUser);
+    return () => {
+      window.removeEventListener('auth:changed', refreshUser);
+      window.removeEventListener('auth:user-updated', refreshUser as EventListener);
+      window.removeEventListener('storage', refreshUser);
+    };
+  }, []);
 
   useEffect(() => {
     const readTopModules = () => {
@@ -168,7 +184,12 @@ export function Header() {
         )}
 
         <Group gap="xl">
-          {!isMobile && <Text size="sm">{timeStr} | {dateStr}</Text>}
+          {!isMobile && (
+            <Box ta="right">
+              <Text size="sm">{timeStr} | {dateStr}</Text>
+              <Text size="xs" c="rgba(255,255,255,0.82)">Unidade: {unitLabel}</Text>
+            </Box>
+          )}
           <Group gap="xs" align="center">
             <UserMenu />
             <Text c="white" size="xs">|</Text>

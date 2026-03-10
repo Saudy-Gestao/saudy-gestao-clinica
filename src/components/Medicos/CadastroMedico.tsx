@@ -31,6 +31,7 @@ import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
 import doctorService from '../../services/doctorService';
 import sectorService from '../../services/sectorService';
+import { isRoomSector, stripRoomMarker } from '../../utils/sectorClassification';
 import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
@@ -347,6 +348,7 @@ export function CadastroMedico() {
         const data: unknown = await sectorService.listSectors();
         const list = getApiList(data);
         const mapped = list
+          .filter((item: ApiRecord) => isRoomSector(item))
           .map((item: ApiRecord) => {
             const id = getString(item.id);
             const name = getString(item.name);
@@ -355,7 +357,7 @@ export function CadastroMedico() {
             if (!id || !name) return null;
             return {
               value: id,
-              label: branchName ? `${name} (${branchName})` : name,
+              label: branchName ? `${name} (${branchName})` : stripRoomMarker(name) || name,
             };
           })
           .filter((item): item is { value: string; label: string } => Boolean(item));

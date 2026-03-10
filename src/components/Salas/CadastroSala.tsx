@@ -22,6 +22,7 @@ import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import branchService from '../../services/branchService';
 import sectorService from '../../services/sectorService';
+import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
 
 interface BranchOption {
   id: string;
@@ -129,10 +130,11 @@ export function CadastroSala() {
               : [])));
 
       const mapped: SalaRow[] = list
+        .filter((sector: any) => isRoomSector(sector))
         .map((sector: any) => ({
           id: String(sector.id || ''),
           name: sector.name || '',
-          description: sector.description || null,
+          description: stripRoomMarker(sector.description) || null,
           branchId: String(sector.branchId || ''),
         }))
         .filter((sector: SalaRow) => sector.id && sector.branchId === branchId);
@@ -191,7 +193,7 @@ export function CadastroSala() {
     try {
       const payload = {
         name: form.name.trim(),
-        description: form.description.trim() || undefined,
+        description: markRoomDescription(form.description || ''),
         branchId: form.branchId,
       };
 
