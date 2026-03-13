@@ -95,11 +95,15 @@ interface RulerDraw {
 
 interface DicomViewerProps {
   style?: React.CSSProperties;
+  /** optional binary data to load immediately */
+  initialData?: ArrayBuffer;
+  /** optional series of buffers to load when viewer mounts */
+  initialSeries?: ArrayBuffer[];
 }
 
 /* ─────────── Component ─────────── */
 
-export function DicomViewer({ style }: DicomViewerProps) {
+export function DicomViewer({ style, initialData, initialSeries }: DicomViewerProps) {
   /* — Refs — */
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -472,6 +476,7 @@ export function DicomViewer({ style }: DicomViewerProps) {
 
   /* ═══════════ Load files ═══════════ */
 
+  // helper used when user selects or drops local files
   const loadFiles = useCallback(async (files: File[]) => {
     if (!files.length || loadingRef.current) return;
     loadingRef.current = true;
@@ -541,6 +546,107 @@ export function DicomViewer({ style }: DicomViewerProps) {
     if (e.target.files?.length) loadFiles(Array.from(e.target.files));
     e.target.value = '';
   };
+
+  // load raw arraybuffer provided by parent (e.g. fetched from backend)
+  const loadBuffer = useCallback(async (ab: ArrayBuffer, name = 'remote.dcm') => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setError(null);
+    setLoadProgress({ loaded: 0, total: 1 });
+
+    try {
+      const img = parseDicomFile(ab);
+      const parsed: DicomImage[] = [img];
+      const names: string[] = [name];
+
+      const first = parsed[0];
+      const m = first.metadata;
+      const isMono1 = m.photometricInterpretation === 'MONOCHROME1';
+
+      setImages(parsed);
+      setFileNames(names);
+      setCurrentIndex(0);
+      setWc(m.windowCenter);
+      setWw(m.windowWidth);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+      setRotation(0);
+      setInvert(isMono1);
+      setMeasurements([]);
+      rulerRef.current = { start: null, end: null };
+      setRulerLive({ start: null, end: null });
+
+      setDicomMeta({
+        patientName: m.patientName,
+        patientId: m.patientId,
+        studyDate: m.studyDate,
+        modality: m.modality,
+        studyDescription: m.studyDescription,
+        seriesDescription: m.seriesDescription,
+        rows: m.rows,
+        columns: m.columns,
+        bitsAllocated: m.bitsAllocated,
+        bitsStored: m.bitsStored,
+        pixelSpacing: m.pixelSpacing,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao processar arquivo DICOM';
+      setError(msg);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
+
+  // if parent passed initial series, load everything; else single file
+  useEffect(() => {
+    if (initialSeries && initialSeries.length) {
+      // parse all buffers together so we retain the full series
+      const parsed: DicomImage[] = [];
+      const names: string[] = [];
+      try {
+        for (let i = 0; i < initialSeries.length; i++) {
+          const img = parseDicomFile(initialSeries[i]);
+          parsed.push(img);
+          names.push(`remote-${i}.dcm`);
+        }
+        const first = parsed[0];
+        const m = first.metadata;
+        const isMono1 = m.photometricInterpretation === 'MONOCHROME1';
+        setImages(parsed);
+        setFileNames(names);
+        setCurrentIndex(0);
+        setWc(m.windowCenter);
+        setWw(m.windowWidth);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setRotation(0);
+        setInvert(isMono1);
+        setMeasurements([]);
+        rulerRef.current = { start: null, end: null };
+        setRulerLive({ start: null, end: null });
+        setDicomMeta({
+          patientName: m.patientName,
+          patientId: m.patientId,
+          studyDate: m.studyDate,
+          modality: m.modality,
+          studyDescription: m.studyDescription,
+          seriesDescription: m.seriesDescription,
+          rows: m.rows,
+          columns: m.columns,
+          bitsAllocated: m.bitsAllocated,
+          bitsStored: m.bitsStored,
+          pixelSpacing: m.pixelSpacing,
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Erro ao processar arquivo DICOM';
+        setError(msg);
+      }
+    } else if (initialData) {
+      loadBuffer(initialData);
+    }
+  }, [initialData, initialSeries, loadBuffer]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
