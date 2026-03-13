@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput, Paper, Loader, Popover, Grid } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, User, ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, Plus, ChevronLeft, User, ExternalLink, Calendar as CalendarIcon, Pencil } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../themes/theme';
 import { DatePicker } from '@mantine/dates';
@@ -46,7 +46,7 @@ export function Header() {
 }
 
 interface InvoiceRow {
-  id: number;
+  id: string | number;
   codigo: string;
   emissao: string;
   vencimento: string;
@@ -55,6 +55,8 @@ interface InvoiceRow {
   valor: number;
   descontoPercent?: number;
   valorTotal: number;
+  nome?: string;
+  formaPagamento?: string;
 }
 
 
@@ -84,7 +86,7 @@ export function Faturamento() {
     desconto?: number;
   }>({ tipo: '', categoria: '', descricao: '', valor: undefined, vencimento: null, formaPagamento: '', nome: '', desconto: 0 });
 
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [showInvoiceSuccess, setShowInvoiceSuccess] = useState(false);
   const [lastInvoiceCode, setLastInvoiceCode] = useState<string | null>(null);
@@ -100,6 +102,26 @@ export function Faturamento() {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  const formatDateForApi = (d: Date | null) => {
+    if (!d) return undefined;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatBackendDate = (value?: string | null) => {
+    if (!value) return '';
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${day}/${month}/${year}`;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString('pt-BR');
   };
 
   const parseDate = (s: string) => {
@@ -135,8 +157,8 @@ export function Faturamento() {
         descricao: '',
         valor: r.valor,
         vencimento: parsed,
-        formaPagamento: '',
-        nome: '',
+        formaPagamento: r.formaPagamento || '',
+        nome: r.nome || '',
         desconto: r.descontoPercent ?? 0,
       });
       setDateInput(parsed ? formatDate(parsed) : '');
@@ -161,17 +183,53 @@ export function Faturamento() {
     }
 
     if (editingId) {
-      const updatedValor = invoiceData.valor ?? 0;
-      const updatedDiscount = invoiceData.desconto ?? 0;
-      setRows((prev) => prev.map((r) => r.id === editingId ? { ...r, valor: updatedValor, descontoPercent: updatedDiscount, valorTotal: updatedValor - (updatedValor * (updatedDiscount || 0) / 100) } : r));
-      setShowInvoiceSuccess(true);
-      setLastInvoiceCode(`FAT-${new Date().getFullYear()}-${String(editingId).padStart(3, '0')}`);
+      setSavingInvoice(true);
+      try {
+        const payload = {
+          patientName: invoiceData.nome || undefined,
+          dueDate: formatDateForApi(invoiceData.vencimento),
+          convention: invoiceData.categoria || invoiceData.tipo || undefined,
+          value: invoiceData.valor || 0,
+          discount: invoiceData.desconto ?? 0,
+          paymentMethod: invoiceData.formaPagamento || undefined,
+        };
+        const updated: any = await invoiceService.updateInvoice(editingId, payload);
+
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === editingId
+              ? {
+                  ...r,
+                  codigo: updated.number || r.codigo,
+                  nome: updated.patientName ?? invoiceData.nome ?? r.nome,
+                  vencimento: updated.dueDate ? formatBackendDate(updated.dueDate) : r.vencimento,
+                  convenio: updated.convention || invoiceData.categoria || invoiceData.tipo || r.convenio,
+                  valor: updated.value ?? invoiceData.valor ?? r.valor,
+                  descontoPercent: updated.discount ?? invoiceData.desconto ?? r.descontoPercent,
+                  valorTotal:
+                    updated.total ??
+                    ((updated.value ?? invoiceData.valor ?? r.valor) - (updated.discount ?? invoiceData.desconto ?? r.descontoPercent ?? 0)),
+                  formaPagamento: updated.paymentMethod ?? invoiceData.formaPagamento ?? r.formaPagamento,
+                }
+              : r,
+          ),
+        );
+        setLastInvoiceCode(updated.number || String(editingId));
+        setShowInvoiceSuccess(true);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.response?.data?.details || err?.message || 'Erro ao atualizar fatura';
+        setInvoiceErrorTitle('Erro ao atualizar fatura');
+        setInvoiceErrorMessage(msg);
+        setShowInvoiceError(true);
+      } finally {
+        setSavingInvoice(false);
+      }
     } else {
       setSavingInvoice(true);
       try {
         const payload = {
           patientName: invoiceData.nome || undefined,
-          dueDate: invoiceData.vencimento ? invoiceData.vencimento.toISOString().slice(0,10) : undefined,
+          dueDate: formatDateForApi(invoiceData.vencimento),
           convention: invoiceData.categoria || invoiceData.tipo || undefined,
           value: invoiceData.valor || 0,
           discount: invoiceData.desconto ?? 0,
@@ -180,12 +238,12 @@ export function Faturamento() {
         const created: any = await invoiceService.createInvoice(payload);
 
         const now = new Date();
-        const createdId = created.id ?? created.number ?? (rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1);
+        const createdId = created.id ?? created.number ?? `local-${rows.length + 1}`;
         const emissao = created.issuedAt ? new Date(created.issuedAt).toLocaleString('pt-BR') : `${now.toLocaleDateString()} | ${now.toLocaleTimeString()}`;
-        const venc = created.dueDate ? new Date(created.dueDate).toLocaleDateString('pt-BR') : (invoiceData.vencimento ? invoiceData.vencimento.toLocaleDateString() : emissao);
+        const venc = created.dueDate ? formatBackendDate(created.dueDate) : (invoiceData.vencimento ? formatDate(invoiceData.vencimento) : emissao);
 
         const newRow: InvoiceRow = {
-          id: Number(createdId),
+          id: created.id ?? createdId,
           codigo: (created.number as string) || `FAT-${new Date().getFullYear()}-${String(createdId).padStart(3, '0')}`,
           emissao: emissao,
           vencimento: venc,
@@ -194,6 +252,8 @@ export function Faturamento() {
           valor: created.value ?? created.amount ?? invoiceData.valor ?? 0,
           descontoPercent: created.discount ?? invoiceData.desconto ?? 0,
           valorTotal: (created.value ?? invoiceData.valor ?? 0) - ((created.value ?? invoiceData.valor ?? 0) * (created.discount ?? invoiceData.desconto ?? 0) / 100),
+          nome: created.patientName ?? invoiceData.nome,
+          formaPagamento: created.paymentMethod ?? invoiceData.formaPagamento,
         };
 
         setRows((prev) => [newRow, ...prev]);
@@ -231,7 +291,7 @@ export function Faturamento() {
             <ChevronLeft size={20} />
           </ActionIcon>
           <Box>
-            <Text fw={600} size={isMobile ? 'lg' : 'xl'} style={{ color: '#212529' }}>
+            <Text fw={600} size={isMobile ? 'lg' : 'xl'} c="white">
               Faturamento
             </Text>
             <Text size="sm" c="dimmed">
@@ -284,6 +344,7 @@ export function Faturamento() {
                   <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor</Table.Th>
                   <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Desconto</Table.Th>
                   <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor Total</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -339,6 +400,17 @@ export function Faturamento() {
                     <Table.Td>
                       <Text size="xs">R${r.valorTotal.toFixed(2)}</Text>
                     </Table.Td>
+
+                    <Table.Td>
+                      <ActionIcon
+                        variant="subtle"
+                        color="blue"
+                        onClick={() => openInvoice(r)}
+                        title="Editar fatura"
+                      >
+                        <Pencil size={16} />
+                      </ActionIcon>
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -362,7 +434,7 @@ export function Faturamento() {
       >
         <Box p="lg">
           <Group justify="space-between" align="center" mb="lg">
-            <Text fw={600} size="lg" c="#212529">Novo lançamento</Text>
+            <Text fw={600} size="lg" c="#212529">{editingId ? 'Editar fatura' : 'Novo lançamento'}</Text>
             <ActionIcon 
               variant="subtle" 
               color="gray" 
@@ -503,7 +575,7 @@ export function Faturamento() {
                 Cancelar
               </Button>
               <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingInvoice} disabled={savingInvoice}>
-                Salvar
+                {editingId ? 'Salvar alterações' : 'Salvar'}
               </Button>
             </Group>
           </Stack>
@@ -514,9 +586,16 @@ export function Faturamento() {
         opened={showInvoiceSuccess}
         onClose={() => setShowInvoiceSuccess(false)}
         variant="success"
-        title={'Fatura criada'}
-        message={lastInvoiceCode ? `Fatura ${lastInvoiceCode} criada com sucesso.` : 'Fatura criada com sucesso.'}
-        primary={{ label: 'Fechar', onClick: () => setShowInvoiceSuccess(false) }}
+        title={editingId ? 'Fatura atualizada' : 'Fatura criada'}
+        message={lastInvoiceCode ? `Fatura ${lastInvoiceCode} ${editingId ? 'atualizada' : 'criada'} com sucesso.` : `Fatura ${editingId ? 'atualizada' : 'criada'} com sucesso.`}
+        primary={{
+          label: 'Nova fatura',
+          onClick: () => {
+            setShowInvoiceSuccess(false);
+            openInvoice();
+          },
+        }}
+        secondary={{ label: 'Fechar', onClick: () => setShowInvoiceSuccess(false) }}
       />
 
       <ResultModal

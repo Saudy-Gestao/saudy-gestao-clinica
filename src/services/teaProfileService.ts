@@ -95,14 +95,47 @@ export default {
   async createEvolution(teaProfileId: string, payload: {
     therapeuticPlanId?: string;
     sessionDate?: string;
+    appointmentId?: string;
     professionalDoctorId?: string;
     professional?: string;
     interventionSummary?: string;
     patientResponse?: string;
     progressScore?: number;
+    sessionGoal?: string;
+    strategiesUsed?: string[];
+    engagementLevel?: string;
+    regulationLevel?: string;
+    behaviorLevel?: string;
+    familyFeedback?: string;
+    homePlan?: string;
+    alerts?: string;
     notes?: string;
   }) {
     const res = await api.post(`/care/tea-profiles/${teaProfileId}/evolutions`, payload);
+    return res.data;
+  },
+
+  async updateEvolution(teaProfileId: string, evolutionId: string, payload: {
+    therapeuticPlanId?: string;
+    sessionDate?: string;
+    appointmentId?: string;
+    professionalDoctorId?: string;
+    professional?: string;
+    interventionSummary?: string;
+    patientResponse?: string;
+    progressScore?: number;
+    sessionGoal?: string;
+    strategiesUsed?: string[];
+    engagementLevel?: string;
+    regulationLevel?: string;
+    behaviorLevel?: string;
+    familyFeedback?: string;
+    homePlan?: string;
+    alerts?: string;
+    notes?: string;
+    editReason: string;
+  }) {
+    const res = await api.put(`/care/tea-profiles/${teaProfileId}/evolutions/${evolutionId}`, payload);
     return res.data;
   },
 

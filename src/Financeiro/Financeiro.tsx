@@ -20,6 +20,7 @@ import {
   ActionIcon,
   Menu,
   Loader,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { Calendar as CalendarIcon, MoreVertical, ChevronLeft } from 'lucide-react';
 import { formatDateInput } from '../utils/formatters';
@@ -48,6 +49,8 @@ interface Lancamento {
 
 export function Financeiro() {
   const navigate = useNavigate();
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
   const [activeTab, setActiveTab] = useState<string | null>('todos');
@@ -218,7 +221,7 @@ export function Financeiro() {
   const getStatusColor = (status: string, dueDate?: string | null) => {
     if (isOverdue(status, dueDate)) return 'red';
     const s = String(status || '').toUpperCase();
-    if (s === 'PAID' || s === 'PAGO') return 'green';
+    if (s === 'PAID' || s === 'PAGO') return 'teal';
     if (s === 'PENDING' || s === 'PENDENTE') return 'yellow';
     return 'gray';
   };
@@ -263,7 +266,7 @@ export function Financeiro() {
   const rows = filteredLancamentos.map((lancamento) => (
     <Table.Tr key={lancamento.id}>
       <Table.Td>
-        <Avatar color="blue" radius="xl" size="md">
+        <Avatar color="darkBlue" radius="xl" size="md">
           {lancamento.nome.charAt(0).toUpperCase()}
         </Avatar>
       </Table.Td>
@@ -282,11 +285,16 @@ export function Financeiro() {
       <Table.Td>
         <Menu position="bottom-end" shadow="md">
           <Menu.Target>
-            <ActionIcon variant="subtle" color="gray">
+            <ActionIcon variant="subtle" color="darkBlue">
               <MoreVertical size={18} />
             </ActionIcon>
           </Menu.Target>
-              <Menu.Dropdown>
+              <Menu.Dropdown
+                style={isDark ? {
+                  backgroundColor: 'var(--mantine-color-default)',
+                  borderColor: 'var(--mantine-color-default-border)',
+                } : undefined}
+              >
             <Menu.Item
               color="green"
               disabled={(String(lancamento.status || '').toUpperCase() === 'PAID') || payingIds.includes(lancamento.id)}
@@ -316,11 +324,17 @@ export function Financeiro() {
   };
 
   return (
-    <Box style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}> 
+    <Box style={{ minHeight: '100vh', backgroundColor: 'var(--mantine-color-body)' }}>
       <Header />
 
       {/* Page Header */}
-      <Box style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e9ecef', padding: isMobile ? '12px 16px' : '16px 24px' }}>
+      <Box
+        style={{
+          backgroundColor: 'var(--mantine-color-body)',
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+          padding: isMobile ? '12px 16px' : '16px 24px',
+        }}
+      >
         <Container size="xl" px={isMobile ? 0 : 'md'}>
           <Group mb={isMobile ? 16 : 24} wrap="nowrap">
             <ActionIcon variant="default" color="black" size={isMobile ? 'lg' : 'xl'} onClick={() => navigate('/dashboard')}>
@@ -338,7 +352,14 @@ export function Financeiro() {
 
           <Group align="center" gap="md" wrap={isMobile ? 'wrap' : 'nowrap'}>
             <Tabs value={activeTab} onChange={setActiveTab} style={{ flexGrow: isMobile ? 1 : 0 }}>
-              <Tabs.List>
+              <Tabs.List
+                style={{
+                  backgroundColor: 'var(--mantine-color-default)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 10,
+                  padding: 4,
+                }}
+              >
                 <Tabs.Tab value="todos">Todos</Tabs.Tab>
                 <Tabs.Tab value="receita">Receita</Tabs.Tab>
                 <Tabs.Tab value="despesas">Despesas</Tabs.Tab>
@@ -350,6 +371,13 @@ export function Financeiro() {
               value={searchValue}
               onChange={(e) => setSearchValue(e.currentTarget.value)}
               style={{ flex: 1, minWidth: isMobile ? '100%' : 240 }}
+              styles={{
+                input: {
+                  backgroundColor: 'var(--mantine-color-default)',
+                  borderColor: 'var(--mantine-color-default-border)',
+                  color: 'var(--mantine-color-text)',
+                },
+              }}
             />
 
             <Button
@@ -374,25 +402,40 @@ export function Financeiro() {
 
         {/* Tabela */}
         {entriesLoading ? (
-          <Paper style={{ borderRadius: '8px', padding: 24, textAlign: 'center' }}>
+          <Paper
+            style={{
+              borderRadius: '8px',
+              padding: 24,
+              textAlign: 'center',
+              backgroundColor: 'var(--mantine-color-default)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Loader />
             <Text mt={8}>Carregando lançamentos...</Text>
           </Paper>
         ) : (
-          <Paper style={{ borderRadius: '8px', overflowX: 'auto' }}>
+          <Paper
+            style={{
+              borderRadius: '8px',
+              overflowX: 'auto',
+              backgroundColor: 'var(--mantine-color-default)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Table striped highlightOnHover>
-              <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
+              <Table.Thead style={{ backgroundColor: 'var(--mantine-color-body)' }}>
                 <Table.Tr>
-                  <Table.Th></Table.Th>
-                  <Table.Th>Nome</Table.Th>
-                  <Table.Th>Data/Hora</Table.Th>
-                  <Table.Th>Tipo</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Valor</Table.Th>
-                  <Table.Th>Desconto</Table.Th>
-                  <Table.Th>Valor Total</Table.Th>
-                  <Table.Th>Método Pagamento</Table.Th>
-                  <Table.Th>Ações</Table.Th>
+                  <Table.Th c="dimmed"></Table.Th>
+                  <Table.Th c="dimmed">Nome</Table.Th>
+                  <Table.Th c="dimmed">Data/Hora</Table.Th>
+                  <Table.Th c="dimmed">Tipo</Table.Th>
+                  <Table.Th c="dimmed">Status</Table.Th>
+                  <Table.Th c="dimmed">Valor</Table.Th>
+                  <Table.Th c="dimmed">Desconto</Table.Th>
+                  <Table.Th c="dimmed">Valor Total</Table.Th>
+                  <Table.Th c="dimmed">Método Pagamento</Table.Th>
+                  <Table.Th c="dimmed">Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>{rows}</Table.Tbody>
@@ -409,6 +452,23 @@ export function Financeiro() {
         centered
         size={isTablet ? 'lg' : 'md'}
         fullScreen={isMobile}
+        styles={{
+          content: {
+            backgroundColor: 'var(--mantine-color-default)',
+            border: '1px solid var(--mantine-color-default-border)',
+          },
+          header: {
+            backgroundColor: 'var(--mantine-color-default)',
+            borderBottom: '1px solid var(--mantine-color-default-border)',
+          },
+          body: {
+            backgroundColor: 'var(--mantine-color-default)',
+          },
+          title: {
+            color: 'var(--mantine-color-text)',
+            fontWeight: 600,
+          },
+        }}
       >
         <Stack gap="md">
           <Grid grow>
@@ -556,7 +616,12 @@ export function Financeiro() {
             <Button variant="default" onClick={handleModalClose}>
               Cancelar
             </Button>
-            <Button color="dark" onClick={handleSaveLancamento} loading={savingLancamento} disabled={savingLancamento}>
+            <Button
+              style={{ backgroundColor: DARK_BLUE, color: '#ffffff' }}
+              onClick={handleSaveLancamento}
+              loading={savingLancamento}
+              disabled={savingLancamento}
+            >
               {savingLancamento ? 'Salvando...' : 'Salvar'}
             </Button>
           </Group>

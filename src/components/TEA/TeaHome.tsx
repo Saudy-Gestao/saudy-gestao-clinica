@@ -1,7 +1,7 @@
 import { Box, Group, Text, Paper, ThemeIcon, SimpleGrid, Button, useMantineColorScheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Brain, Users, ClipboardList, Activity, BarChart3, CalendarClock, CalendarX2, CalendarDays, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Brain, Users, ClipboardList, Activity, BarChart3, CalendarClock, CalendarX2, CalendarDays, ChevronRight, FileCode2 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 
@@ -52,6 +52,14 @@ const SUBMODULES = [
     description: 'Registros por sessão do paciente',
     route: '/tea/evolucao',
     icon: Activity,
+    enabled: true,
+  },
+  {
+    key: 'evolucao-templates',
+    title: 'Templates de evolução',
+    description: 'Modelos por procedimento',
+    route: '/tea/evolucao-templates',
+    icon: FileCode2,
     enabled: true,
   },
   {

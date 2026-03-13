@@ -32,6 +32,7 @@ import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '
 import doctorService from '../../services/doctorService';
 import sectorService from '../../services/sectorService';
 import { isRoomSector, stripRoomMarker } from '../../utils/sectorClassification';
+import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
 
 type Gender = 'male' | 'female' | 'other' | '';
@@ -57,7 +58,26 @@ const getString = (value: unknown) => (typeof value === 'string' ? value : value
 const getDate = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date) return value;
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (dateOnlyMatch) {
+      const year = Number(dateOnlyMatch[1]);
+      const month = Number(dateOnlyMatch[2]) - 1;
+      const day = Number(dateOnlyMatch[3]);
+      const localDate = new Date(year, month, day);
+      if (
+        localDate.getFullYear() === year
+        && localDate.getMonth() === month
+        && localDate.getDate() === day
+      ) {
+        return localDate;
+      }
+    }
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'number') {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
   }
@@ -173,6 +193,14 @@ export function CadastroMedico() {
     return `${day}/${month}/${year}`;
   };
 
+  const formatDateForApi = (d: Date | null) => {
+    if (!d) return undefined;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const parseDate = (s: string) => {
     if (!s) return null;
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -206,6 +234,8 @@ export function CadastroMedico() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DoctorListItem | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
+  const [zipLoading, setZipLoading] = useState(false);
+  const [lastZipLookup, setLastZipLookup] = useState('');
   const [roomOptions, setRoomOptions] = useState<Array<{ value: string; label: string }>>([]);
 
   const clearFieldError = (field: string) => {
@@ -416,6 +446,44 @@ export function CadastroMedico() {
     return errors;
   };
 
+  const handleZipLookup = async (zipCode: string) => {
+    const normalizedZip = onlyDigits(zipCode);
+    if (normalizedZip.length !== 8) return;
+    if (lastZipLookup === normalizedZip) return;
+
+    setZipLoading(true);
+    try {
+      const result = await cepService.lookup(normalizedZip);
+      if (!result) {
+        showNotification({
+          title: 'CEP não encontrado',
+          message: 'Não foi possível localizar o endereço para este CEP.',
+          color: 'yellow',
+        });
+        return;
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        zipCode: normalizedZip,
+        address: result.street || prev.address,
+        neighborhood: result.neighborhood || prev.neighborhood,
+        city: result.city || prev.city,
+        state: result.state || prev.state,
+        addressComplement: prev.addressComplement || result.complement || '',
+      }));
+      setLastZipLookup(normalizedZip);
+    } catch {
+      showNotification({
+        title: 'Erro ao consultar CEP',
+        message: 'Falha ao buscar endereço automaticamente.',
+        color: 'red',
+      });
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
 
 
   const handleSave = async () => {
@@ -447,7 +515,7 @@ export function CadastroMedico() {
         email: form.email?.trim() || undefined,
         phone: form.phone || undefined,
         cellphone: form.cellphone || undefined,
-        birthDate: form.birthDate ? form.birthDate.toISOString().slice(0, 10) : undefined,
+        birthDate: formatDateForApi(form.birthDate),
         gender: form.gender ? form.gender.toUpperCase() : undefined,
         cpf: form.cpf,
         rg: form.rg?.trim() || undefined,
@@ -739,7 +807,19 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) })} maxLength={9} style={{ gridColumn: 'span 1' }} />
+                  <TextInput
+                    label="CEP"
+                    value={formatCEP(form.zipCode)}
+                    onChange={(e) => {
+                      const normalized = onlyDigits(e.currentTarget.value);
+                      setForm({ ...form, zipCode: normalized });
+                      if (normalized.length < 8) setLastZipLookup('');
+                    }}
+                    onBlur={() => void handleZipLookup(form.zipCode)}
+                    maxLength={9}
+                    style={{ gridColumn: 'span 1' }}
+                    rightSection={zipLoading ? <Loader size={16} /> : undefined}
+                  />
                   <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
                   <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
                 </SimpleGrid>

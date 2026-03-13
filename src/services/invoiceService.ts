@@ -18,6 +18,12 @@ export default {
     return res.data;
   },
 
+  async updateInvoice(id: string | number, payload: Partial<CreateInvoicePayload & { status?: string }>) {
+    const url = `/admin/invoices/${id}`;
+    const res = await api.put(url, payload);
+    return res.data;
+  },
+
   async getInvoices() {
     const url = '/admin/invoices/';
     const res = await api.get(url);

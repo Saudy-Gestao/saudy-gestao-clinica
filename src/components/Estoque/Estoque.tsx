@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput, Center, Loader } from '@mantine/core';
 import inventoryService from '../../services/inventoryService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, X } from 'lucide-react';
+import { Search, Plus, ChevronLeft, X, Pencil } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -268,6 +268,53 @@ export function Estoque() {
         setModalOpen(false);
         setShowItemSuccessModal(true);
       } else {
+        const existingByCode = items.find((it) => it.codigo.trim().toLowerCase() === form.codigo.trim().toLowerCase());
+
+        if (existingByCode) {
+          const qtyToAdd = normalizeNumber(form.quantidade) ?? 0;
+          const mergedQuantity = (existingByCode.quantidade ?? 0) + qtyToAdd;
+          const mergedMin = normalizeNumber(form.minimo) ?? existingByCode.minimo ?? 0;
+          const mergedPayload = {
+            name: form.nome || existingByCode.nome,
+            code: form.codigo,
+            category: form.categoria || existingByCode.categoria || '',
+            unit: form.unidade || existingByCode.unidade || '',
+            quantity: mergedQuantity,
+            minQuantity: mergedMin,
+            maxQuantity: normalizeNumber(form.maximo) ?? existingByCode.maximo ?? 0,
+            unitPrice: normalizeNumber(form.precoUnitario) ?? existingByCode.precoUnitario ?? 0,
+            expiryDate: formatISODate(form.validade) || undefined,
+            notes: undefined,
+          };
+
+          const updated = await inventoryService.updateItem(existingByCode.id, mergedPayload);
+
+          setItems((prev) => prev.map((p) => p.id === existingByCode.id ? ({
+            ...p,
+            nome: updated.name ?? p.nome,
+            codigo: updated.code ?? p.codigo,
+            categoria: updated.category ?? p.categoria,
+            unidade: updated.unit ?? p.unidade,
+            quantidade: updated.quantity ?? p.quantidade,
+            minimo: updated.minQuantity ?? p.minimo,
+            maximo: updated.maxQuantity ?? p.maximo,
+            precoUnitario: parseNumber(updated.unitPrice ?? p.precoUnitario),
+            validade: updated.expiryDate ? (new Date(updated.expiryDate)).toLocaleDateString('en-GB') : p.validade,
+            status: updated.status ? String(updated.status).toUpperCase() : ((updated.quantity ?? p.quantidade) <= (updated.minQuantity ?? p.minimo) ? 'LOW' : 'AVAILABLE'),
+          }) : p));
+
+          setLastItemAction('updated');
+          setLastCreatedItemName(updated.name || form.nome);
+          setModalOpen(false);
+          setShowItemSuccessModal(true);
+          showNotification({
+            title: 'Quantidade atualizada',
+            message: `Item já existente. Quantidade somada em ${qtyToAdd}.`,
+            color: 'blue',
+          });
+          return;
+        }
+
         const payload = {
           code: form.codigo,
           name: form.nome,
@@ -387,8 +434,9 @@ export function Estoque() {
                   {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Máx.</Table.Th>}
                   {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Preço Unit.</Table.Th>}
                   {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valid.</Table.Th>}
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Categoria</Table.Th>}
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Categoria</Table.Th>}
+                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, width: 90 }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -449,6 +497,17 @@ export function Estoque() {
                     <Text size="xs">{formatStatus(it.status)}</Text>
                   </Table.Td>
                 )}
+                <Table.Td>
+                  <ActionIcon
+                    variant="subtle"
+                    color="blue"
+                    onClick={() => openCadastrar(it)}
+                    aria-label={`Editar ${it.nome}`}
+                    title="Editar item"
+                  >
+                    <Pencil size={16} />
+                  </ActionIcon>
+                </Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -460,7 +519,7 @@ export function Estoque() {
       <Modal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={'Cadastrar item'}
+        title={editingId ? 'Editar item' : 'Cadastrar item'}
         size={isMobile ? '100%' : 520}
         centered={false}
         fullScreen={isMobile}
@@ -471,7 +530,7 @@ export function Estoque() {
       >
         <Stack gap={10}>
           <Box style={{ padding: 8 }}>
-            <Text size="sm" fw={600} mb={8}>Cadastrar item</Text>
+            <Text size="sm" fw={600} mb={8}>{editingId ? 'Editar item' : 'Cadastrar item'}</Text>
 
               <FloatingInput
               containerProps={{ style: { marginBottom: 8 } }}

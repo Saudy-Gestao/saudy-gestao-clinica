@@ -10,6 +10,7 @@ export interface CreateProcedurePayload {
   acceptedSubInsurances?: Record<string, string[]>;
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
+  procedureMaterials?: { inventoryItemId: string; quantity: number }[];
 }
 
 export interface UpdateProcedurePayload {
@@ -22,6 +23,7 @@ export interface UpdateProcedurePayload {
   acceptedSubInsurances?: Record<string, string[]>;
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
+  procedureMaterials?: { inventoryItemId: string; quantity: number }[];
   isActive?: boolean;
 }
 

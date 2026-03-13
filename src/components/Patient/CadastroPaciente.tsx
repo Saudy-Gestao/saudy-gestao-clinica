@@ -24,7 +24,7 @@ import {
   Image
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList, Camera } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList, Camera, Power } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -34,6 +34,8 @@ import patientService from '../../services/patientService';
 import insuranceService from '../../services/insuranceService';
 import teaProfileService from '../../services/teaProfileService';
 import facialRecognitionService from '../../services/facialRecognitionService';
+import cepService from '../../services/cepService';
+import branchSettingsService from '../../services/branchSettingsService';
 import ResultModal from '../common/ResultModal';
 import { FacialCapture } from '../common/FacialCapture';
 import { FacialInstructionsModal } from '../common/FacialInstructionsModal';
@@ -64,7 +66,26 @@ const getString = (value: unknown) => (typeof value === 'string' ? value : value
 const getDate = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date) return value;
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (dateOnlyMatch) {
+      const year = Number(dateOnlyMatch[1]);
+      const month = Number(dateOnlyMatch[2]) - 1;
+      const day = Number(dateOnlyMatch[3]);
+      const localDate = new Date(year, month, day);
+      if (
+        localDate.getFullYear() === year
+        && localDate.getMonth() === month
+        && localDate.getDate() === day
+      ) {
+        return localDate;
+      }
+    }
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === 'number') {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
   }
@@ -168,6 +189,14 @@ export function CadastroPaciente() {
     return `${day}/${month}/${year}`;
   };
 
+  const formatDateForApi = (d: Date | null) => {
+    if (!d) return undefined;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [datePopoverOpened, setDatePopoverOpened] = useState(false);
   const [birthDateInput, setBirthDateInput] = useState('');
 
@@ -185,6 +214,8 @@ export function CadastroPaciente() {
   const [, setHealthInsurancePopover] = useState(false);
   const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
   const [insurancesLoading, setInsurancesLoading] = useState(false);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [lastZipLookup, setLastZipLookup] = useState('');
 
   // Inputs temporários para campos que representam arrays — mantêm texto livre durante a digitação
   const [allergiesInput, setAllergiesInput] = useState('');
@@ -246,6 +277,7 @@ export function CadastroPaciente() {
   const [facialInstructionsOpen, setFacialInstructionsOpen] = useState(false);
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
   const [facialImage, setFacialImage] = useState<string | null>(null);
+  const [requireFacialForPatientRegistration, setRequireFacialForPatientRegistration] = useState(true);
 
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
@@ -511,6 +543,23 @@ export function CadastroPaciente() {
     loadInsurances();
   }, []);
 
+  useEffect(() => {
+    const loadBranchSettings = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const branchId = user?.branchId || user?.branch?.id || user?.sector?.branch?.id;
+        if (!branchId) return;
+        const settings = await branchSettingsService.getBranchSettings(branchId);
+        setRequireFacialForPatientRegistration(settings?.requireFacialForPatientRegistration ?? true);
+      } catch {
+        // fallback mantém comportamento atual (obrigatório)
+        setRequireFacialForPatientRegistration(true);
+      }
+    };
+
+    loadBranchSettings();
+  }, []);
+
   const statesOptions = [
     'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
   ].map((s) => ({ value: s, label: s }));
@@ -573,6 +622,44 @@ export function CadastroPaciente() {
     return date;
   }; 
 
+  const handleZipLookup = async (zipCode: string) => {
+    const normalizedZip = onlyDigits(zipCode);
+    if (normalizedZip.length !== 8) return;
+    if (lastZipLookup === normalizedZip) return;
+
+    setZipLoading(true);
+    try {
+      const result = await cepService.lookup(normalizedZip);
+      if (!result) {
+        showNotification({
+          title: 'CEP não encontrado',
+          message: 'Não foi possível localizar o endereço para este CEP.',
+          color: 'yellow',
+        });
+        return;
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        zipCode: normalizedZip,
+        address: result.street || prev.address,
+        neighborhood: result.neighborhood || prev.neighborhood,
+        city: result.city || prev.city,
+        state: result.state || prev.state,
+        addressComplement: prev.addressComplement || result.complement || '',
+      }));
+      setLastZipLookup(normalizedZip);
+    } catch {
+      showNotification({
+        title: 'Erro ao consultar CEP',
+        message: 'Falha ao buscar endereço automaticamente.',
+        color: 'red',
+      });
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     // clear previous field errors
     setFieldErrors({});
@@ -586,7 +673,7 @@ export function CadastroPaciente() {
     }
 
     // Validar foto facial no cadastro (não edição)
-    if (!editingPatientId && !facialImage) {
+    if (!editingPatientId && requireFacialForPatientRegistration && !facialImage) {
       showNotification({ 
         title: 'Foto facial obrigatória', 
         message: 'É necessário capturar a foto do paciente para concluir o cadastro.', 
@@ -614,7 +701,7 @@ export function CadastroPaciente() {
         email: form.email?.trim() || undefined,
         phone: form.phone || undefined,
         cellphone: form.cellphone || undefined,
-        birthDate: form.birthDate ? form.birthDate.toISOString().slice(0,10) : undefined,
+        birthDate: formatDateForApi(form.birthDate),
         gender: form.gender ? form.gender.toUpperCase() : undefined,
         cpf: form.cpf,
         rg: form.rg?.trim() || undefined,
@@ -638,7 +725,7 @@ export function CadastroPaciente() {
         hasHealthInsurance: !!form.hasHealthInsurance,
         healthInsuranceName: form.healthInsuranceName || undefined,
         healthInsuranceNumber: form.healthInsuranceNumber || undefined,
-        healthInsuranceExpiry: form.healthInsuranceExpiry ? form.healthInsuranceExpiry.toISOString().slice(0,10) : undefined,
+        healthInsuranceExpiry: formatDateForApi(form.healthInsuranceExpiry),
         bloodType: form.bloodType ? bloodTypeMap[form.bloodType] : undefined,
         allergies: form.allergies || [],
         chronicConditions: form.chronicConditions || [],
@@ -660,7 +747,7 @@ export function CadastroPaciente() {
         const patientId = createdPatient?.id || createdPatient?.data?.id || createdPatient?.patient?.id;
 
         // Depois registra a foto facial
-        if (facialImage && patientId) {
+        if (requireFacialForPatientRegistration && facialImage && patientId) {
           try {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const unitId = user?.branchId || user?.branch?.id || '';
@@ -754,6 +841,34 @@ export function CadastroPaciente() {
     } catch (e: unknown) {
       const err = e as ApiError;
       const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir paciente';
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
+    }
+  };
+
+  const handleToggleActive = async (item: PatientListItem) => {
+    try {
+      const currentIsActive = Boolean(item.raw?.isActive ?? true);
+      await patientService.updatePatient(item.id, { isActive: !currentIsActive });
+
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === item.id
+            ? {
+                ...p,
+                raw: { ...p.raw, isActive: !currentIsActive },
+              }
+            : p,
+        ),
+      );
+
+      showNotification({
+        title: 'Status atualizado',
+        message: `Paciente ${currentIsActive ? 'desativado' : 'ativado'} com sucesso.`,
+        color: 'green',
+      });
+    } catch (e: unknown) {
+      const err = e as ApiError;
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status do paciente';
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -873,7 +988,7 @@ export function CadastroPaciente() {
                 </SimpleGrid>
 
                 {/* Seção de Reconhecimento Facial */}
-                {!isEditing && (
+                {!isEditing && requireFacialForPatientRegistration && (
                   <Box mt="md" p="md" style={{ border: '2px dashed #e9ecef', borderRadius: 8 }}>
                     <Group justify="space-between" align="center" mb="sm">
                       <Box>
@@ -1056,7 +1171,20 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <TextInput label="CEP" value={formatCEP(form.zipCode)} onChange={(e) => { setForm({ ...form, zipCode: onlyDigits(e.currentTarget.value) }); clearFieldError('zipCode'); }} maxLength={9} error={fieldErrors.zipCode} />
+                  <TextInput
+                    label="CEP"
+                    value={formatCEP(form.zipCode)}
+                    onChange={(e) => {
+                      const normalized = onlyDigits(e.currentTarget.value);
+                      setForm({ ...form, zipCode: normalized });
+                      if (normalized.length < 8) setLastZipLookup('');
+                      clearFieldError('zipCode');
+                    }}
+                    onBlur={() => void handleZipLookup(form.zipCode)}
+                    maxLength={9}
+                    error={fieldErrors.zipCode}
+                    rightSection={zipLoading ? <Loader size={16} /> : undefined}
+                  />
                   <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} />
                   <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
                   <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
@@ -1182,6 +1310,14 @@ export function CadastroPaciente() {
                                   }}
                                 >
                                   <Pencil size={16} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color={item.raw?.isActive ? 'orange' : 'green'}
+                                  onClick={() => handleToggleActive(item)}
+                                  title={item.raw?.isActive ? 'Desativar' : 'Ativar'}
+                                >
+                                  <Power size={16} />
                                 </ActionIcon>
                                 <ActionIcon
                                   variant="subtle"

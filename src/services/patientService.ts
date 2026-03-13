@@ -35,6 +35,7 @@ export interface CreatePatientPayload {
   chronicConditions?: string[];
   currentMedications?: string[];
   observations?: string;
+  isActive?: boolean;
 }
 
 export type UpdatePatientPayload = Partial<CreatePatientPayload>;

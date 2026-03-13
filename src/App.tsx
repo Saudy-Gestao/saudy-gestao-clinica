@@ -41,6 +41,7 @@ import { TeaRelatorios } from './components/TEA/TeaRelatorios';
 import { TeaPreReserva } from './components/TEA/TeaPreReserva';
 import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
+import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -227,6 +228,10 @@ function App() {
           <Route
             path="/tea/agenda-semanal"
             element={<ProtectedRoute><TeaAgendaSemanal /></ProtectedRoute>}
+          />
+          <Route
+            path="/tea/evolucao-templates"
+            element={<ProtectedRoute><TeaEvolucaoTemplates /></ProtectedRoute>}
           />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

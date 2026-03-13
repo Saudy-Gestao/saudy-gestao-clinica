@@ -4,6 +4,7 @@ export interface BranchSettings {
   id: string;
   branchId: string;
   requireFacialForReportDelivery: boolean;
+  requireFacialForPatientRegistration: boolean;
 }
 
 const branchSettingsService = {
