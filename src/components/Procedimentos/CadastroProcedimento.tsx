@@ -998,16 +998,6 @@ export function CadastroProcedimento() {
                       }}
                     >
                       <Text size="sm" c="var(--mantine-color-text)">{insurance}</Text>
-                      bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : '#f1f3f5'}
-                      style={{
-                        borderRadius: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        border: colorScheme === 'dark' ? '1px solid var(--mantine-color-dark-4)' : '1px solid #dee2e6',
-                      }}
-                    >
-                      <Text size="sm" c={colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : 'var(--mantine-color-text)'}>{insurance}</Text>
                       <ActionIcon
                         size="xs"
                         variant="subtle"
@@ -1033,18 +1023,9 @@ export function CadastroProcedimento() {
                               borderRadius: 6,
                               border: '1px solid var(--mantine-color-blue-6)',
                               backgroundColor: 'rgba(0, 31, 84, 0.22)',
-                            bg={colorScheme === 'dark' ? 'rgba(34, 139, 230, 0.18)' : '#e7f5ff'}
-                            style={{
-                              borderRadius: 4,
-                              border: colorScheme === 'dark' ? '1px solid rgba(116, 192, 252, 0.55)' : '1px solid #74c0fc',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              fontSize: '0.75rem',
                             }}
                           >
                             <Text size="xs" c="var(--mantine-color-blue-1)">{sub}</Text>
-                            <Text size="xs" c={colorScheme === 'dark' ? 'var(--mantine-color-blue-1)' : 'var(--mantine-color-text)'}>{sub}</Text>
                             <ActionIcon
                               size="xs"
                               variant="subtle"
