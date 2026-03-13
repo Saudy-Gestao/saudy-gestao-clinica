@@ -20,7 +20,8 @@ import {
   Tabs,
   Badge,
   Modal,
-  NumberInput
+  NumberInput,
+  useMantineColorScheme
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Power, Pencil, X } from 'lucide-react';
@@ -82,6 +83,7 @@ export function CadastroProcedimento() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const { colorScheme } = useMantineColorScheme();
 
   const [form, setForm] = useState<ProcedureForm>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
@@ -842,8 +844,9 @@ export function CadastroProcedimento() {
                               key={item.id} 
                               style={{ 
                                 borderBottom: '1px solid #e9ecef',
-                                backgroundColor: item.isActive ? 'transparent' : '#f1f3f5',
-                                opacity: item.isActive ? 1 : 0.7
+                                  backgroundColor: item.isActive
+                                    ? 'transparent'
+                                    : (colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5')
                               }}
                             >
                               <Table.Td>
@@ -995,6 +998,16 @@ export function CadastroProcedimento() {
                       }}
                     >
                       <Text size="sm" c="var(--mantine-color-text)">{insurance}</Text>
+                      bg={colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : '#f1f3f5'}
+                      style={{
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        border: colorScheme === 'dark' ? '1px solid var(--mantine-color-dark-4)' : '1px solid #dee2e6',
+                      }}
+                    >
+                      <Text size="sm" c={colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : 'var(--mantine-color-text)'}>{insurance}</Text>
                       <ActionIcon
                         size="xs"
                         variant="subtle"
@@ -1020,6 +1033,10 @@ export function CadastroProcedimento() {
                               borderRadius: 6,
                               border: '1px solid var(--mantine-color-blue-6)',
                               backgroundColor: 'rgba(0, 31, 84, 0.22)',
+                            bg={colorScheme === 'dark' ? 'rgba(34, 139, 230, 0.18)' : '#e7f5ff'}
+                            style={{
+                              borderRadius: 4,
+                              border: colorScheme === 'dark' ? '1px solid rgba(116, 192, 252, 0.55)' : '1px solid #74c0fc',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 4,
@@ -1027,6 +1044,7 @@ export function CadastroProcedimento() {
                             }}
                           >
                             <Text size="xs" c="var(--mantine-color-blue-1)">{sub}</Text>
+                            <Text size="xs" c={colorScheme === 'dark' ? 'var(--mantine-color-blue-1)' : 'var(--mantine-color-text)'}>{sub}</Text>
                             <ActionIcon
                               size="xs"
                               variant="subtle"

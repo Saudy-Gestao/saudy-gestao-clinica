@@ -429,7 +429,8 @@ export function CadastroMedico() {
     if (!data.crm.trim()) errors.crm = 'CRM é obrigatório';
     if (!data.crmState) errors.crmState = 'UF do CRM é obrigatório';
     if (!data.email || !/^[\w-.]+@[\w-]+\.[\w-.]+$/.test(data.email)) errors.email = 'Email inválido';
-    if (!data.phone || !/^\d{10,11}$/.test(String(data.phone))) errors.phone = 'Telefone inválido';
+    if (data.phone && !/^\d{10,11}$/.test(String(data.phone))) errors.phone = 'Telefone inválido';
+    if (!data.cellphone || !/^\d{10,11}$/.test(String(data.cellphone))) errors.cellphone = 'Celular inválido';
     if (!/^\d{11}$/.test(data.cpf)) errors.cpf = 'CPF deve conter 11 dígitos numéricos';
     if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
@@ -745,8 +746,8 @@ export function CadastroMedico() {
                   />
 
                   <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} required />
-                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) })} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
+                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} required error={fieldErrors.cellphone} />
                 </SimpleGrid>
               </Paper>
 

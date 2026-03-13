@@ -53,6 +53,8 @@ interface ExamItem {
   issuerSignedAt?: string;
   reviewerSignedAt?: string;
   hasFinalizedAddendum?: boolean;
+  dicomUrl?: string;
+  dicomPath?: string;
 }
 
 const isRichTextEmpty = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim().length === 0;
@@ -405,6 +407,8 @@ export function LaudoExames() {
     issuerSignedAt: it.issuerSignedAt || undefined,
     reviewerSignedAt: it.reviewerSignedAt || undefined,
     hasFinalizedAddendum: Boolean(it.hasFinalizedAddendum),
+    dicomUrl: it.dicomUrl || undefined,
+    dicomPath: it.dicomPath || undefined,
   });
 
   useEffect(() => {
@@ -474,6 +478,58 @@ export function LaudoExames() {
     () => examRows.find((exam) => exam.id === selectedExamId) || null,
     [examRows, selectedExamId],
   );
+
+  // buffer that will be passed to the DicomViewer (single file)
+  const [initialDicomData, setInitialDicomData] = useState<ArrayBuffer | null>(null);
+  // optional series buffers
+  const [initialDicomSeries, setInitialDicomSeries] = useState<ArrayBuffer[] | null>(null);
+
+  // when a new exam is selected, try downloading whatever DICOMs exist
+  useEffect(() => {
+    if (!selectedExam) {
+      setInitialDicomData(null);
+      setInitialDicomSeries(null);
+      return;
+    }
+
+    // prefer fetching full series; fall back to single URL if provided
+    reportWorklistService
+      .fetchDicomSeries(selectedExam.id)
+      .then((buffers) => {
+        if (buffers && buffers.length > 0) {
+          setInitialDicomSeries(buffers);
+          setInitialDicomData(null);
+          setDicomViewerVisible(true);
+        } else if (selectedExam.dicomUrl) {
+          return reportWorklistService.fetchDicomUrl(selectedExam.dicomUrl).then((ab) => {
+            setInitialDicomData(ab);
+            setInitialDicomSeries(null);
+            setDicomViewerVisible(true);
+          });
+        } else {
+          setInitialDicomData(null);
+          setInitialDicomSeries(null);
+        }
+      })
+      .catch((err) => {
+        if (selectedExam.dicomUrl) {
+          // try single fallback if series lookup failed
+          reportWorklistService
+            .fetchDicomUrl(selectedExam.dicomUrl)
+            .then((ab) => {
+              setInitialDicomData(ab);
+              setInitialDicomSeries(null);
+              setDicomViewerVisible(true);
+            })
+            .catch(() => {});
+        }
+        showNotification({
+          title: 'Erro ao carregar DICOM',
+          message: err?.response?.data?.message || err?.message || String(err),
+          color: 'red',
+        });
+      });
+  }, [selectedExam, selectedExam?.dicomUrl]);
 
   const isLaudoDirty = useMemo(() => {
     if (!selectedExam) return false;
@@ -1618,7 +1674,11 @@ export function LaudoExames() {
 
                 {!isMobile && dicomViewerVisible && (
                   <Box style={{ flex: '1 1 50%', minWidth: 0, minHeight: 0 }}>
-                    <DicomViewer style={{ height: '100%' }} />
+                    <DicomViewer
+                      style={{ height: '100%' }}
+                      initialData={initialDicomData || undefined}
+                      initialSeries={initialDicomSeries || undefined}
+                    />
                   </Box>
                 )}
 
