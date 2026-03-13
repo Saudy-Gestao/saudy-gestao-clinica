@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
   Badge,
@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
@@ -332,6 +332,7 @@ export function LaudoExames() {
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [templatePickerModalOpen, setTemplatePickerModalOpen] = useState(false);
+  const location = useLocation();
   const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
   const [editorContent, setEditorContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -499,12 +500,12 @@ export function LaudoExames() {
         if (buffers && buffers.length > 0) {
           setInitialDicomSeries(buffers);
           setInitialDicomData(null);
-          setDicomViewerVisible(true);
+          // removido auto-show: setDicomViewerVisible(true);
         } else if (selectedExam.dicomUrl) {
           return reportWorklistService.fetchDicomUrl(selectedExam.dicomUrl).then((ab) => {
             setInitialDicomData(ab);
             setInitialDicomSeries(null);
-            setDicomViewerVisible(true);
+            // removido auto-show: setDicomViewerVisible(true);
           });
         } else {
           setInitialDicomData(null);
@@ -519,7 +520,7 @@ export function LaudoExames() {
             .then((ab) => {
               setInitialDicomData(ab);
               setInitialDicomSeries(null);
-              setDicomViewerVisible(true);
+              // removido auto-show: setDicomViewerVisible(true);
             })
             .catch(() => {});
         }
@@ -706,6 +707,14 @@ export function LaudoExames() {
     setSelectedExamId(examId);
     setModalOpen(true);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const itemId = params.get('itemId');
+    if (itemId) {
+      openExam(itemId);
+    }
+  }, [location.search]);
 
   const openAddendumModal = async () => {
     if (!selectedExam) return;
@@ -1417,9 +1426,19 @@ export function LaudoExames() {
 
                       <Table.Td>
                         <Group gap={6}>
-                          <Tooltip label="Abrir laudo">
-                            <ActionIcon variant="subtle" color="darkBlue" onClick={() => openExam(exam.id)}>
+                          <Tooltip label="Abrir Exame (DICOM)">
+                            <ActionIcon variant="subtle" color="cyan" onClick={() => navigate(`/dicom-viewer/${encodeURIComponent(exam.id)}`)}>
                               <Eye size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Abrir OHIF Viewer">
+                            <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/ohif/${encodeURIComponent(exam.id)}`)}>
+                              <Layers size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Abrir Laudo">
+                            <ActionIcon variant="subtle" color="darkBlue" onClick={() => openExam(exam.id)}>
+                              <FileText size={16} />
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Desfinalizar">
@@ -1600,7 +1619,7 @@ export function LaudoExames() {
                       fullWidth
                       leftSection={<ScanLine size={18} />}
                     >
-                      {dicomViewerVisible ? 'Ocultar imagem' : 'Imagem DICOM'}
+                      {dicomViewerVisible ? 'Ocultar imagem' : 'Visualizador DICOM'}
                     </Button>
 
                     <TextInput

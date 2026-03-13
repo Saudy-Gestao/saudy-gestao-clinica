@@ -20,6 +20,8 @@ import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
+import { DicomViewerPage } from './components/DicomViewer/DicomViewerPage';
+import { OhifViewer } from './components/OhifViewer/OhifViewer';
 import { Envelopamento } from './components/Envelopamento/Envelopamento';
 import { Entrega } from './components/Entrega/Entrega';
 import { Estoque } from './components/Estoque/Estoque';
@@ -136,6 +138,14 @@ function App() {
           <Route
             path="/laudo-exames"
             element={<ProtectedRoute><LaudoExames /></ProtectedRoute>}
+          />
+          <Route
+            path="/dicom-viewer/:key"
+            element={<ProtectedRoute><DicomViewerPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/ohif/:key"
+            element={<ProtectedRoute><OhifViewer /></ProtectedRoute>}
           />
           <Route
             path="/laudo-configuracoes"
