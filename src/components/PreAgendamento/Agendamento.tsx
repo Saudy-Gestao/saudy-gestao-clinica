@@ -82,6 +82,8 @@ const TIME_SLOTS = {
 
 const normalizeAppointmentStatus = (status?: string | null): string => {
   const normalized = String(status || '').trim().toUpperCase();
+  if (normalized === 'REALIZADO' || normalized === 'COMPLETED' || normalized === 'FINALIZADO' || normalized === 'ATENDIDO') return 'REALIZADO';
+  if (normalized === 'CANCELED') return 'CANCELADO';
   if (normalized === 'AGENDADO') return 'AGENDADO';
   if (normalized === 'CANCELADO') return 'CANCELADO';
   if (normalized === 'PENDENTE') return 'PENDENTE';
@@ -587,9 +589,10 @@ export function Agendamento() {
       <Box style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Box style={{ minWidth: 140 }}>
           <Select
-            data={[
+              data={[
               { value: 'PENDENTE', label: 'Pendente' },
               { value: 'AGENDADO', label: 'Agendado' },
+              { value: 'REALIZADO', label: 'Realizado' },
               { value: 'CANCELADO', label: 'Cancelado' },
             ]}
             value={agendamento.status}

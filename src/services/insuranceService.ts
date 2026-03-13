@@ -5,6 +5,7 @@ export interface CreateInsurancePayload {
   code?: string;
   description?: string;
   isActive?: boolean;
+  subInsurances?: string[];
 }
 
 export default {

@@ -1,0 +1,257 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Select,
+  Stack,
+  Text,
+  Textarea,
+  Badge,
+  ActionIcon,
+  Loader,
+  TagsInput,
+  Switch,
+  useMantineColorScheme,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { showNotification } from '@mantine/notifications';
+import { ChevronLeft, Pencil, Trash2 } from 'lucide-react';
+import { Header } from '../Header/Header';
+import { DARK_BLUE } from '../../themes/theme';
+import procedureService from '../../services/procedureService';
+import teaEvolutionTemplateService from '../../services/teaEvolutionTemplateService';
+
+const emptyForm = {
+  id: '',
+  procedureId: '',
+  name: '',
+  sessionGoal: '',
+  interventionSummary: '',
+  patientResponse: '',
+  familyFeedback: '',
+  homePlan: '',
+  strategiesUsed: [] as string[],
+  isActive: true,
+};
+
+export function TeaEvolucaoTemplates() {
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 799px)');
+  const { colorScheme } = useMantineColorScheme();
+  const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
+
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [items, setItems] = useState<any[]>([]);
+  const [procedureOptions, setProcedureOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [form, setForm] = useState({ ...emptyForm });
+
+  const isEditing = useMemo(() => Boolean(form.id), [form.id]);
+
+  const loadProcedures = async () => {
+    try {
+      const data: any = await procedureService.listProcedures({ limit: 300, offset: 0 });
+      const list: any[] = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.items) ? data.items : []);
+      setProcedureOptions(
+        list
+          .map((item: any) => {
+            const id = String(item?.id || '').trim();
+            const name = String(item?.name || '').trim();
+            return id && name ? { value: id, label: name } : null;
+          })
+          .filter(Boolean) as Array<{ value: string; label: string }>,
+      );
+    } catch {
+      setProcedureOptions([]);
+    }
+  };
+
+  const loadTemplates = async () => {
+    setLoading(true);
+    try {
+      const data: any = await teaEvolutionTemplateService.list({ limit: 200, offset: 0 });
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      setItems(list);
+    } catch (err: any) {
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Erro ao carregar templates', color: 'red' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProcedures();
+    loadTemplates();
+  }, []);
+
+  const handleSave = async () => {
+    if (!form.procedureId) {
+      showNotification({ title: 'Validação', message: 'Selecione o procedimento', color: 'yellow' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (isEditing) {
+        await teaEvolutionTemplateService.update(form.id, {
+          name: form.name || undefined,
+          sessionGoal: form.sessionGoal || undefined,
+          interventionSummary: form.interventionSummary || undefined,
+          patientResponse: form.patientResponse || undefined,
+          familyFeedback: form.familyFeedback || undefined,
+          homePlan: form.homePlan || undefined,
+          strategiesUsed: form.strategiesUsed,
+          isActive: form.isActive,
+        });
+      } else {
+        await teaEvolutionTemplateService.upsert({
+          procedureId: form.procedureId,
+          name: form.name || undefined,
+          sessionGoal: form.sessionGoal || undefined,
+          interventionSummary: form.interventionSummary || undefined,
+          patientResponse: form.patientResponse || undefined,
+          familyFeedback: form.familyFeedback || undefined,
+          homePlan: form.homePlan || undefined,
+          strategiesUsed: form.strategiesUsed,
+          isActive: form.isActive,
+        });
+      }
+
+      showNotification({ title: 'Sucesso', message: isEditing ? 'Template atualizado' : 'Template criado', color: 'green' });
+      setForm({ ...emptyForm });
+      await loadTemplates();
+    } catch (err: any) {
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Falha ao salvar template', color: 'red' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEdit = (item: any) => {
+    setForm({
+      id: String(item.id),
+      procedureId: String(item.procedureId || ''),
+      name: String(item.name || ''),
+      sessionGoal: String(item.sessionGoal || ''),
+      interventionSummary: String(item.interventionSummary || ''),
+      patientResponse: String(item.patientResponse || ''),
+      familyFeedback: String(item.familyFeedback || ''),
+      homePlan: String(item.homePlan || ''),
+      strategiesUsed: Array.isArray(item.strategiesUsed) ? item.strategiesUsed : [],
+      isActive: Boolean(item.isActive),
+    });
+  };
+
+  const handleDeactivate = async (id: string) => {
+    try {
+      await teaEvolutionTemplateService.deactivate(id);
+      showNotification({ title: 'Sucesso', message: 'Template desativado', color: 'green' });
+      await loadTemplates();
+    } catch (err: any) {
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Falha ao desativar template', color: 'red' });
+    }
+  };
+
+  return (
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header />
+
+      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
+        <Group mb={14}>
+          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
+            Voltar
+          </Button>
+          <Box>
+            <Text fw={800} size="lg" style={{ color: titleColor }}>Templates da Evolução TEA</Text>
+            <Text size="sm" c="dimmed">Padronize campos por procedimento</Text>
+          </Box>
+        </Group>
+
+        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+          <Stack gap="sm">
+            <Group grow align="flex-start">
+              <Select
+                label="Procedimento"
+                data={procedureOptions}
+                value={form.procedureId || null}
+                onChange={(value) => setForm((prev) => ({ ...prev, procedureId: value || '' }))}
+                searchable
+                clearable={false}
+              />
+              <Textarea
+                label="Nome interno do template"
+                value={form.name}
+                onChange={(e) => setForm((prev) => ({ ...prev, name: e.currentTarget.value }))}
+                minRows={1}
+              />
+            </Group>
+
+            <Textarea label="Objetivo padrão" minRows={2} value={form.sessionGoal} onChange={(e) => setForm((prev) => ({ ...prev, sessionGoal: e.currentTarget.value }))} />
+            <Textarea label="Intervenção padrão" minRows={2} value={form.interventionSummary} onChange={(e) => setForm((prev) => ({ ...prev, interventionSummary: e.currentTarget.value }))} />
+            <Textarea label="Resposta padrão" minRows={2} value={form.patientResponse} onChange={(e) => setForm((prev) => ({ ...prev, patientResponse: e.currentTarget.value }))} />
+            <TagsInput label="Estratégias padrão" value={form.strategiesUsed} onChange={(value) => setForm((prev) => ({ ...prev, strategiesUsed: value }))} />
+            <Group grow align="flex-start">
+              <Textarea label="Devolutiva padrão" minRows={2} value={form.familyFeedback} onChange={(e) => setForm((prev) => ({ ...prev, familyFeedback: e.currentTarget.value }))} />
+              <Textarea label="Plano de casa padrão" minRows={2} value={form.homePlan} onChange={(e) => setForm((prev) => ({ ...prev, homePlan: e.currentTarget.value }))} />
+            </Group>
+            <Switch
+              label="Template ativo"
+              checked={form.isActive}
+              onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.currentTarget.checked }))}
+            />
+
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setForm({ ...emptyForm })}>Limpar</Button>
+              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving}>{isEditing ? 'Atualizar' : 'Salvar template'}</Button>
+            </Group>
+          </Stack>
+        </Paper>
+
+        <Paper p="md" mt="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+          <Group mb="sm" justify="space-between">
+            <Text fw={700}>Templates cadastrados</Text>
+            {loading && <Loader size="sm" />}
+          </Group>
+
+          {items.length === 0 ? (
+            <Text size="sm" c="dimmed">Nenhum template cadastrado.</Text>
+          ) : (
+            <Stack gap="xs">
+              {items.map((item) => (
+                <Paper key={item.id} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                  <Group justify="space-between" align="flex-start">
+                    <Box>
+                      <Group gap={6}>
+                        <Text fw={700}>{item.procedure?.name || 'Procedimento'}</Text>
+                        <Badge color={item.isActive ? 'green' : 'gray'} variant="light">{item.isActive ? 'Ativo' : 'Inativo'}</Badge>
+                      </Group>
+                      {item.name && <Text size="xs" c="dimmed">{item.name}</Text>}
+                      {item.sessionGoal && <Text size="sm" mt={6}><b>Objetivo:</b> {item.sessionGoal}</Text>}
+                      {item.interventionSummary && <Text size="sm"><b>Intervenção:</b> {item.interventionSummary}</Text>}
+                      {Array.isArray(item.strategiesUsed) && item.strategiesUsed.length > 0 && (
+                        <Group gap={6} mt={6}>
+                          {item.strategiesUsed.map((s: string) => <Badge key={`${item.id}-${s}`} variant="outline">{s}</Badge>)}
+                        </Group>
+                      )}
+                    </Box>
+                    <Group gap={4}>
+                      <ActionIcon variant="subtle" color="blue" onClick={() => startEdit(item)}><Pencil size={16} /></ActionIcon>
+                      <ActionIcon variant="subtle" color="red" onClick={() => handleDeactivate(String(item.id))}><Trash2 size={16} /></ActionIcon>
+                    </Group>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+      </Box>
+    </Box>
+  );
+}
+
+export default TeaEvolucaoTemplates;

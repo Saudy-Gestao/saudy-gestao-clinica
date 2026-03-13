@@ -23,13 +23,15 @@ import {
   NumberInput
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Power, Pencil } from 'lucide-react';
+import { ChevronLeft, Power, Pencil, X } from 'lucide-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import doctorService from '../../services/doctorService';
 import procedureService from '../../services/procedureService';
+import insuranceService from '../../services/insuranceService';
+import inventoryService from '../../services/inventoryService';
 import ResultModal from '../common/ResultModal';
 
 interface ProcedureForm {
@@ -41,6 +43,7 @@ interface ProcedureForm {
   durationMinutes?: number | null;
   modalities: string[];
   doctorId: string | null;
+  procedureMaterials: { inventoryItemId: string; quantity: number }[];
 }
 
 interface ProcedureItem {
@@ -51,6 +54,7 @@ interface ProcedureItem {
   modalities: string[];
   doctorIds: string[];
   doctorsCount: number;
+  materialsCount: number;
   isActive: boolean;
 }
 
@@ -63,6 +67,7 @@ const INITIAL_FORM: ProcedureForm = {
   durationMinutes: null,
   modalities: [],
   doctorId: null,
+  procedureMaterials: [],
 };
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -86,6 +91,8 @@ export function CadastroProcedimento() {
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [doctorOptions, setDoctorOptions] = useState<{ value: string; label: string }[]>([]);
   const [doctorDirectory, setDoctorDirectory] = useState<Record<string, { name?: string }>>({});
+  const [loadingInsurances, setLoadingInsurances] = useState(false);
+  const [insuranceCatalog, setInsuranceCatalog] = useState<Array<{ value: string; label: string; subInsurances: string[] }>>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -96,6 +103,11 @@ export function CadastroProcedimento() {
   const [customInsuranceInput, setCustomInsuranceInput] = useState('');
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [doctorSearchValue, setDoctorSearchValue] = useState('');
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [materialOptions, setMaterialOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [materialDirectory, setMaterialDirectory] = useState<Record<string, { name: string; code?: string; unit?: string }>>({});
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [selectedMaterialQuantity, setSelectedMaterialQuantity] = useState<number | ''>(1);
 
   const doctorLabelById = useMemo(() => {
     return doctorOptions.reduce<Record<string, string>>((acc, option) => {
@@ -117,42 +129,25 @@ export function CadastroProcedimento() {
     { value: 'Emergencial', label: 'Emergencial' },
   ];
 
-  const insuranceOptions = [
-    { value: 'Unimed', label: 'Unimed' },
-    { value: 'Bradesco Saúde', label: 'Bradesco Saúde' },
-    { value: 'Amil', label: 'Amil' },
-    { value: 'Hapvida', label: 'Hapvida' },
-    { value: 'Sulamerica', label: 'Sulamerica' },
-    { value: 'MediService', label: 'Mediservice' },
-  ];
+  const insuranceOptions = useMemo(() => {
+    const merged = insuranceCatalog.map((item) => ({ value: item.value, label: item.label }));
+    form.acceptedInsurances.forEach((insurance) => {
+      const name = String(insurance || '').trim();
+      if (!name) return;
+      if (!merged.some((opt) => opt.value === name)) {
+        merged.push({ value: name, label: name });
+      }
+    });
+    return merged.sort((a, b) => a.label.localeCompare(b.label));
+  }, [insuranceCatalog, form.acceptedInsurances]);
 
-  const subInsuranceOptions: Record<string, { value: string; label: string }[]> = {
-    'Unimed': [
-      { value: 'Unimed Pacheco', label: 'Unimed Pacheco' },
-      { value: 'Unimed Empresarial', label: 'Unimed Empresarial' },
-      { value: 'Unimed Odonto', label: 'Unimed Odonto' },
-    ],
-    'Bradesco Saúde': [
-      { value: 'Bradesco Saúde Nacional', label: 'Bradesco Saúde Nacional' },
-      { value: 'Bradesco Saúde Hospitalar', label: 'Bradesco Saúde Hospitalar' },
-    ],
-    'Amil': [
-      { value: 'Amil Total', label: 'Amil Total' },
-      { value: 'Amil Empresarial', label: 'Amil Empresarial' },
-    ],
-    'Hapvida': [
-      { value: 'Hapvida Standard', label: 'Hapvida Standard' },
-      { value: 'Hapvida Plus', label: 'Hapvida Plus' },
-    ],
-    'Sulamerica': [
-      { value: 'SulAmérica Standard', label: 'SulAmérica Standard' },
-      { value: 'SulAmérica Executivo', label: 'SulAmérica Executivo' },
-    ],
-    'MediService': [
-      { value: 'MediService Plus', label: 'MediService Plus' },
-      { value: 'MediService Basic', label: 'MediService Basic' },
-    ],
-  };
+  const subInsuranceOptions = useMemo<Record<string, { value: string; label: string }[]>>(
+    () => insuranceCatalog.reduce<Record<string, { value: string; label: string }[]>>((acc, item) => {
+      acc[item.value] = (item.subInsurances || []).map((sub) => ({ value: sub, label: sub }));
+      return acc;
+    }, {}),
+    [insuranceCatalog],
+  );
 
   useEffect(() => {
     const loadProcedures = async () => {
@@ -176,6 +171,7 @@ export function CadastroProcedimento() {
           acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
           modalities: Array.isArray(it.modalities) ? it.modalities : [],
           doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
+          materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
           isActive: Boolean(it.isActive ?? true),
           doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
         })).filter((item: ProcedureItem) => item.id);
@@ -238,6 +234,101 @@ export function CadastroProcedimento() {
     loadDoctors();
   }, []);
 
+  useEffect(() => {
+    const loadInsurances = async () => {
+      setLoadingInsurances(true);
+      try {
+        const data: any = await insuranceService.listInsurances({ isActive: true, limit: 300, offset: 0 });
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const mapped = list
+          .map((item: any) => {
+            const name = String(item?.name || item?.nome || '').trim();
+            if (!name) return null;
+            const subInsurances = Array.isArray(item?.subInsurances)
+              ? item.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
+              : [];
+            return { value: name, label: name, subInsurances };
+          })
+          .filter((item: { value: string; label: string; subInsurances: string[] } | null): item is { value: string; label: string; subInsurances: string[] } => Boolean(item))
+          .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+
+        setInsuranceCatalog(mapped);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+          color: 'red',
+        });
+      } finally {
+        setLoadingInsurances(false);
+      }
+    };
+
+    loadInsurances();
+  }, []);
+
+  useEffect(() => {
+    const loadMaterials = async () => {
+      setLoadingMaterials(true);
+      try {
+        const data: any = await inventoryService.getItems();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const mapped = list
+          .filter((item: any) => item && item.id)
+          .map((item: any) => {
+            const id = String(item.id);
+            const name = String(item.name || '').trim();
+            const code = String(item.code || '').trim();
+            return {
+              id,
+              name: name || 'Material',
+              code: code || undefined,
+              unit: item.unit ? String(item.unit) : undefined,
+            };
+          });
+
+        setMaterialOptions(mapped.map((item: any) => ({
+          value: item.id,
+          label: item.code ? `${item.name} (${item.code})` : item.name,
+        })));
+        setMaterialDirectory(
+          mapped.reduce((acc: Record<string, { name: string; code?: string; unit?: string }>, item: any) => {
+            acc[item.id] = { name: item.name, code: item.code, unit: item.unit };
+            return acc;
+          }, {}),
+        );
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar materiais do estoque',
+          color: 'red',
+        });
+      } finally {
+        setLoadingMaterials(false);
+      }
+    };
+
+    loadMaterials();
+  }, []);
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       showNotification({
@@ -270,6 +361,7 @@ export function CadastroProcedimento() {
         acceptedSubInsurances: form.acceptsInsurance ? form.acceptedSubInsurances : {},
         modalities: form.modalities,
         doctors,
+        procedureMaterials: form.procedureMaterials,
       };
 
       if (editingProcedureId) {
@@ -277,6 +369,8 @@ export function CadastroProcedimento() {
         setLastSaveAction('update');
         setEditingProcedureId(null);
         setForm(INITIAL_FORM);
+        setSelectedMaterialId(null);
+        setSelectedMaterialQuantity(1);
         setDoctorSearchValue('');
         setActiveTab('lista');
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
@@ -286,6 +380,8 @@ export function CadastroProcedimento() {
         setLastCreatedName(form.name.trim());
         setShowSuccessModal(true);
         setForm(INITIAL_FORM);
+        setSelectedMaterialId(null);
+        setSelectedMaterialQuantity(1);
         setDoctorSearchValue('');
         setProcedureQuery('');
       }
@@ -306,6 +402,7 @@ export function CadastroProcedimento() {
         acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
         modalities: Array.isArray(it.modalities) ? it.modalities : [],
         doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
+        materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
         isActive: Boolean(it.isActive ?? true),
         doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
       })).filter((item: ProcedureItem) => item.id);
@@ -323,11 +420,15 @@ export function CadastroProcedimento() {
     if (editingProcedureId) {
       setEditingProcedureId(null);
       setForm(INITIAL_FORM);
+      setSelectedMaterialId(null);
+      setSelectedMaterialQuantity(1);
       setActiveTab('lista');
       setDoctorSearchValue('');
       return;
     }
     setForm(INITIAL_FORM);
+    setSelectedMaterialId(null);
+    setSelectedMaterialQuantity(1);
     setDoctorSearchValue('');
     navigate('/dashboard');
   };
@@ -376,6 +477,50 @@ export function CadastroProcedimento() {
     setForm((prev) => ({ ...prev, description: value }));
   };
 
+  const handleAddMaterial = () => {
+    if (!selectedMaterialId) return;
+    const quantity = Number(selectedMaterialQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      showNotification({
+        title: 'Quantidade inválida',
+        message: 'Informe uma quantidade maior que zero.',
+        color: 'red',
+      });
+      return;
+    }
+
+    setForm((prev) => {
+      const existing = prev.procedureMaterials.find((item) => item.inventoryItemId === selectedMaterialId);
+      if (existing) {
+        return {
+          ...prev,
+          procedureMaterials: prev.procedureMaterials.map((item) =>
+            item.inventoryItemId === selectedMaterialId
+              ? { ...item, quantity: item.quantity + Math.floor(quantity) }
+              : item,
+          ),
+        };
+      }
+      return {
+        ...prev,
+        procedureMaterials: [
+          ...prev.procedureMaterials,
+          { inventoryItemId: selectedMaterialId, quantity: Math.floor(quantity) },
+        ],
+      };
+    });
+
+    setSelectedMaterialId(null);
+    setSelectedMaterialQuantity(1);
+  };
+
+  const handleRemoveMaterial = (inventoryItemId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      procedureMaterials: prev.procedureMaterials.filter((item) => item.inventoryItemId !== inventoryItemId),
+    }));
+  };
+
   const handleToggleActive = async (item: ProcedureItem) => {
     try {
       await procedureService.updateProcedure(item.id, {
@@ -420,6 +565,14 @@ export function CadastroProcedimento() {
         acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},
         modalities: Array.isArray(data.modalities) ? data.modalities : [],
         doctorId,
+        procedureMaterials: Array.isArray(data?.materials)
+          ? data.materials
+              .map((item: any) => ({
+                inventoryItemId: String(item?.inventoryItemId || item?.inventoryItem?.id || '').trim(),
+                quantity: Number(item?.quantity || 0),
+              }))
+              .filter((item: { inventoryItemId: string; quantity: number }) => item.inventoryItemId && Number.isFinite(item.quantity) && item.quantity > 0)
+          : [],
       });
       setDoctorSearchValue('');
 
@@ -554,6 +707,79 @@ export function CadastroProcedimento() {
                   clearable
                 />
 
+                <SectionTitle>Materiais vinculados</SectionTitle>
+                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="md">
+                  <Select
+                    label="Material"
+                    placeholder={loadingMaterials ? 'Carregando materiais...' : 'Selecione um material'}
+                    data={materialOptions}
+                    value={selectedMaterialId}
+                    onChange={setSelectedMaterialId}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhum material"
+                    rightSection={loadingMaterials ? <Loader size={16} /> : undefined}
+                  />
+                  <NumberInput
+                    label="Quantidade por sessão"
+                    placeholder="Ex: 1"
+                    min={1}
+                    value={selectedMaterialQuantity}
+                    onChange={(value) => setSelectedMaterialQuantity(typeof value === 'number' ? value : '')}
+                  />
+                  <Group align="end">
+                    <Button variant="default" onClick={handleAddMaterial} fullWidth>
+                      Adicionar material
+                    </Button>
+                  </Group>
+                </SimpleGrid>
+
+                <Box mt="md" style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                  <Table horizontalSpacing="sm" verticalSpacing="sm">
+                    <Table.Thead>
+                      <Table.Tr style={{ borderBottom: 'none' }}>
+                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Material</Table.Th>
+                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Quantidade</Table.Th>
+                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: 90 }}>Ações</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {form.procedureMaterials.length === 0 ? (
+                        <Table.Tr>
+                          <Table.Td colSpan={3}>
+                            <Text size="sm" c="dimmed" ta="center">Nenhum material vinculado</Text>
+                          </Table.Td>
+                        </Table.Tr>
+                      ) : (
+                        form.procedureMaterials.map((material) => {
+                          const meta = materialDirectory[material.inventoryItemId];
+                          const label = meta?.code ? `${meta.name} (${meta.code})` : (meta?.name || material.inventoryItemId);
+                          return (
+                            <Table.Tr key={material.inventoryItemId}>
+                              <Table.Td>
+                                <Text size="sm">{label}</Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Text size="sm">{material.quantity}</Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={() => handleRemoveMaterial(material.inventoryItemId)}
+                                  title="Remover material"
+                                >
+                                  <X size={16} />
+                                </ActionIcon>
+                              </Table.Td>
+                            </Table.Tr>
+                          );
+                        })
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </Box>
+
                 <Group justify="space-between" mt="xl" wrap="wrap">
                   <Button variant="default" onClick={handleCancel} fullWidth={isMobile}>
                     Cancelar
@@ -598,14 +824,15 @@ export function CadastroProcedimento() {
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidades</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Materiais</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
                           <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
                         {filteredProcedures.length === 0 ? (
-                          <Table.Tr>
-                            <Table.Td colSpan={7}>
+                            <Table.Tr>
+                            <Table.Td colSpan={8}>
                               <Text size="sm" c="dimmed" ta="center">Nenhum procedimento encontrado</Text>
                             </Table.Td>
                           </Table.Tr>
@@ -635,6 +862,11 @@ export function CadastroProcedimento() {
                               {!isTablet && (
                                 <Table.Td>
                                   <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.doctorsCount}</Text>
+                                </Table.Td>
+                              )}
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.materialsCount}</Text>
                                 </Table.Td>
                               )}
                               {!isTablet && (
@@ -692,17 +924,19 @@ export function CadastroProcedimento() {
         <Stack gap="md">
           <MultiSelect
             label="Convênios aceitos"
-            placeholder="Selecione os convênios"
+            placeholder={loadingInsurances ? 'Carregando convênios...' : 'Selecione os convênios'}
             data={insuranceOptions}
-            value={form.acceptedInsurances.filter((insurance) => insuranceOptions.some((opt) => opt.value === insurance))}
+            value={form.acceptedInsurances}
             onChange={(values) => {
               setForm((prev) => ({ ...prev, acceptedInsurances: values }));
             }}
             searchable
             maxDropdownHeight={220}
+            nothingFoundMessage="Nenhum convênio encontrado"
+            disabled={loadingInsurances}
           />
 
-          {form.acceptedInsurances.filter((insurance) => insuranceOptions.some((opt) => opt.value === insurance)).map((insurance) => (
+          {form.acceptedInsurances.filter((insurance) => Array.isArray(subInsuranceOptions[insurance]) && subInsuranceOptions[insurance].length > 0).map((insurance) => (
             <MultiSelect
               key={insurance}
               label={`Sub-convênios de ${insurance}`}
@@ -751,10 +985,16 @@ export function CadastroProcedimento() {
                   <Stack key={insurance} gap={2}>
                     <Paper
                       p="xs"
-                      bg="#f1f3f5"
-                      style={{ borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+                      style={{
+                        borderRadius: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        backgroundColor: 'var(--mantine-color-default)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                      }}
                     >
-                      <Text size="sm">{insurance}</Text>
+                      <Text size="sm" c="var(--mantine-color-text)">{insurance}</Text>
                       <ActionIcon
                         size="xs"
                         variant="subtle"
@@ -776,10 +1016,17 @@ export function CadastroProcedimento() {
                           <Paper
                             key={sub}
                             p={4}
-                            bg="#e7f5ff"
-                            style={{ borderRadius: 4, border: '1px solid #74c0fc', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
+                            style={{
+                              borderRadius: 6,
+                              border: '1px solid var(--mantine-color-blue-6)',
+                              backgroundColor: 'rgba(0, 31, 84, 0.22)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: '0.75rem',
+                            }}
                           >
-                            <Text size="xs">{sub}</Text>
+                            <Text size="xs" c="var(--mantine-color-blue-1)">{sub}</Text>
                             <ActionIcon
                               size="xs"
                               variant="subtle"

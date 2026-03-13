@@ -28,6 +28,7 @@ interface InsuranceRow {
   code?: string | null;
   description?: string | null;
   isActive: boolean;
+  subInsurances: string[];
   createdAt?: string | null;
 }
 
@@ -51,7 +52,9 @@ export function CadastroConvenio() {
     code: '',
     description: '',
     isActive: true,
+    subInsurances: [] as string[],
   });
+  const [subInsuranceInput, setSubInsuranceInput] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,6 +86,9 @@ export function CadastroConvenio() {
           code: it.code || it.codigo || null,
           description: it.description || it.descricao || null,
           isActive: it.isActive ?? true,
+          subInsurances: Array.isArray(it.subInsurances)
+            ? it.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
+            : [],
           createdAt: it.createdAt || it.created_at || null,
         })).filter((it: InsuranceRow) => it.id);
 
@@ -109,11 +115,13 @@ export function CadastroConvenio() {
         code: item.code || '',
         description: item.description || '',
         isActive: item.isActive ?? true,
+        subInsurances: Array.isArray(item.subInsurances) ? item.subInsurances : [],
       });
     } else {
       setEditingId(null);
-      setForm({ name: '', code: '', description: '', isActive: true });
+      setForm({ name: '', code: '', description: '', isActive: true, subInsurances: [] });
     }
+    setSubInsuranceInput('');
     setModalOpen(true);
   };
 
@@ -131,6 +139,7 @@ export function CadastroConvenio() {
           code: form.code.trim() || undefined,
           description: form.description.trim() || undefined,
           isActive: form.isActive,
+          subInsurances: form.subInsurances,
         });
 
         setItems((prev) => prev.map((it) => it.id === editingId ? ({
@@ -139,6 +148,9 @@ export function CadastroConvenio() {
           code: updated.code ?? (form.code.trim() || null),
           description: updated.description ?? (form.description.trim() || null),
           isActive: updated.isActive ?? form.isActive,
+          subInsurances: Array.isArray(updated?.subInsurances)
+            ? updated.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
+            : form.subInsurances,
         }) : it));
 
         showNotification({ title: 'Atualizado', message: 'Convenio atualizado', color: 'green' });
@@ -148,6 +160,7 @@ export function CadastroConvenio() {
           code: form.code.trim() || undefined,
           description: form.description.trim() || undefined,
           isActive: form.isActive,
+          subInsurances: form.subInsurances,
         });
 
         const newItem: InsuranceRow = {
@@ -156,6 +169,9 @@ export function CadastroConvenio() {
           code: created.code || form.code.trim() || null,
           description: created.description || form.description.trim() || null,
           isActive: created.isActive ?? form.isActive,
+          subInsurances: Array.isArray(created?.subInsurances)
+            ? created.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
+            : form.subInsurances,
           createdAt: created.createdAt || created.created_at || null,
         };
 
@@ -165,7 +181,8 @@ export function CadastroConvenio() {
 
       setModalOpen(false);
       setEditingId(null);
-      setForm({ name: '', code: '', description: '', isActive: true });
+      setForm({ name: '', code: '', description: '', isActive: true, subInsurances: [] });
+      setSubInsuranceInput('');
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -177,18 +194,22 @@ export function CadastroConvenio() {
     }
   };
 
-  const handleDelete = async (item: InsuranceRow) => {
+  const handleDeactivate = async (item: InsuranceRow) => {
     setDeleting(true);
     try {
-      await insuranceService.deleteInsurance(item.id);
-      setItems((prev) => prev.filter((it) => it.id !== item.id));
-      showNotification({ title: 'Removido', message: 'Convenio excluido', color: 'green' });
+      const updated: any = await insuranceService.updateInsurance(item.id, { isActive: false });
+      setItems((prev) => prev.map((it) => (
+        it.id === item.id
+          ? { ...it, isActive: updated?.isActive ?? false }
+          : it
+      )));
+      showNotification({ title: 'Desativado', message: 'Convenio desativado com sucesso', color: 'green' });
       setDeleteModalOpen(false);
       setDeleteTarget(null);
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao excluir convenio',
+        message: err?.response?.data?.message || err?.message || 'Erro ao desativar convenio',
         color: 'red',
       });
     } finally {
@@ -210,6 +231,17 @@ export function CadastroConvenio() {
 
   const handleActiveChange = (checked: boolean) => {
     setForm((prev) => ({ ...prev, isActive: checked }));
+  };
+
+  const handleAddSubInsurance = () => {
+    const name = subInsuranceInput.trim();
+    if (!name) return;
+    setForm((prev) => (
+      prev.subInsurances.includes(name)
+        ? prev
+        : { ...prev, subInsurances: [...prev.subInsurances, name] }
+    ));
+    setSubInsuranceInput('');
   };
 
   return (
@@ -352,6 +384,33 @@ export function CadastroConvenio() {
               onChange={(e) => handleActiveChange(e?.currentTarget?.checked ?? !form.isActive)}
             />
 
+            <TextInput
+              mt="sm"
+              label="Subconvênio"
+              placeholder="Digite e pressione Enter"
+              value={subInsuranceInput}
+              onChange={(e) => setSubInsuranceInput(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddSubInsurance();
+                }
+              }}
+            />
+            <Group mt={6} gap="xs">
+              {form.subInsurances.map((sub) => (
+                <Button
+                  key={sub}
+                  size="compact-xs"
+                  variant="light"
+                  color="blue"
+                  onClick={() => setForm((prev) => ({ ...prev, subInsurances: prev.subInsurances.filter((item) => item !== sub) }))}
+                >
+                  {sub} ×
+                </Button>
+              ))}
+            </Group>
+
             <Group justify="flex-end" mt={16}>
               <Button variant="default" onClick={() => setModalOpen(false)} size="sm">
                 Cancelar
@@ -371,12 +430,12 @@ export function CadastroConvenio() {
           setDeleteModalOpen(false);
           setDeleteTarget(null);
         }}
-        title="Confirmar exclusão"
+        title="Confirmar desativação"
         centered
       >
         <Stack>
           <Text size="sm" c="dimmed">
-            {`Confirma a exclusão do convênio ${deleteTarget?.name || 'selecionado'}?`}
+            {`Confirma a desativação do convênio ${deleteTarget?.name || 'selecionado'}?`}
           </Text>
           <Group justify="flex-end">
             <Button
@@ -389,8 +448,8 @@ export function CadastroConvenio() {
             >
               Cancelar
             </Button>
-            <Button color="red" onClick={() => deleteTarget && handleDelete(deleteTarget)} loading={deleting}>
-              Excluir
+            <Button color="red" onClick={() => deleteTarget && handleDeactivate(deleteTarget)} loading={deleting}>
+              Desativar
             </Button>
           </Group>
         </Stack>

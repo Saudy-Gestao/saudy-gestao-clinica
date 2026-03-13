@@ -981,6 +981,31 @@ export function SettingsPage() {
     }
   };
 
+  const handleToggleFacialRecognitionForPatientRegistration = async (enabled: boolean) => {
+    if (!selectedBranchForSettings) return;
+    setSavingBranchSettings(true);
+    try {
+      const updated = await branchSettingsService.updateBranchSettings(
+        selectedBranchForSettings,
+        { requireFacialForPatientRegistration: enabled }
+      );
+      setBranchSettings(updated);
+      notifications.show({
+        title: 'Sucesso',
+        message: 'Configuração atualizada',
+        color: 'green'
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.error || 'Erro ao atualizar configuração',
+        color: 'red'
+      });
+    } finally {
+      setSavingBranchSettings(false);
+    }
+  };
+
   // Effect to load branch settings when branch is selected
   useEffect(() => {
     if (selectedBranchForSettings) {
@@ -1658,6 +1683,41 @@ export function SettingsPage() {
                                                     <Text size="xs" c="dimmed">Salvando...</Text>
                                                 </Group>
                                             )}
+                                        </Paper>
+
+                                        <Paper
+                                            p="lg"
+                                            radius="md"
+                                            withBorder
+                                            style={{
+                                                borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                                background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                            }}
+                                        >
+                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                                <Box style={{ flex: 1 }}>
+                                                    <Text fw={600} size="sm" mb={4}>
+                                                        Reconhecimento Facial no Cadastro de Paciente
+                                                    </Text>
+                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                        Quando ativado, será obrigatório capturar a foto facial durante o cadastro
+                                                        de pacientes desta filial. Quando desativado, o cadastro pode ser concluído
+                                                        sem a captura facial.
+                                                    </Text>
+                                                </Box>
+                                                <Switch
+                                                    checked={branchSettings?.requireFacialForPatientRegistration ?? true}
+                                                    onChange={(event) => handleToggleFacialRecognitionForPatientRegistration(event.currentTarget.checked)}
+                                                    disabled={savingBranchSettings}
+                                                    size="lg"
+                                                    color={DARK_BLUE}
+                                                    styles={{
+                                                        track: {
+                                                            cursor: savingBranchSettings ? 'not-allowed' : 'pointer',
+                                                        },
+                                                    }}
+                                                />
+                                            </Group>
                                         </Paper>
 
                                         <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
