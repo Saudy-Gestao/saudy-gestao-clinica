@@ -8,6 +8,7 @@ import {
   PinInput,
   Group,
   Checkbox,
+  Image,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -25,6 +26,7 @@ export function EsqueciSenha() {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [leftImageSrc, setLeftImageSrc] = useState('/medicos.png');
   const [passwordStrength, setPasswordStrength] = useState({
     minLength: false,
     hasNumber: false,
@@ -202,10 +204,10 @@ export function EsqueciSenha() {
   const renderEmailStep = () => (
     <Stack gap="lg">
       <Box mb="md">
-        <Text size="2rem" fw={400} mb="xs" style={{ lineHeight: 1.2 }}>
+        <Text size="2rem" fw={400} mb="xs" c="#2e2e2e" style={{ lineHeight: 1.2 }}>
           Alterar senha
         </Text>
-        <Text size="sm" c="dimmed">
+        <Text size="sm" c="#6b7280">
           Recupere sua senha e volte a acessar sua conta.
         </Text>
       </Box>
@@ -261,10 +263,10 @@ export function EsqueciSenha() {
   const renderCodeStep = () => (
     <Stack gap="lg" align="center">
       <Box w="100%" mb="md">
-        <Text size="2rem" fw={400} mb="xs" ta="center" style={{ lineHeight: 1.2 }}>
+        <Text size="2rem" fw={400} mb="xs" ta="center" c="#2e2e2e" style={{ lineHeight: 1.2 }}>
           Código de verificação
         </Text>
-        <Text size="sm" c="dimmed" ta="center">
+        <Text size="sm" c="#6b7280" ta="center">
           Insira o código enviado para seu e-mail
         </Text>
       </Box>
@@ -277,6 +279,13 @@ export function EsqueciSenha() {
         type="number"
         placeholder=""
         gap="md"
+        styles={{
+          input: {
+            backgroundColor: '#ffffff',
+            color: '#2e2e2e',
+            borderColor: '#cbd5e1',
+          },
+        }}
       />
 
       <Button
@@ -338,10 +347,10 @@ export function EsqueciSenha() {
   const renderNewPasswordStep = () => (
     <Stack gap="lg">
       <Box mb="md">
-        <Text size="2rem" fw={400} mb="xs" style={{ lineHeight: 1.2 }}>
+        <Text size="2rem" fw={400} mb="xs" c="#2e2e2e" style={{ lineHeight: 1.2 }}>
           Alterar senha
         </Text>
-        <Text size="sm" c="dimmed">
+        <Text size="sm" c="#6b7280">
           Cadastre uma senha mais forte e continue sua jornada.
         </Text>
       </Box>
@@ -379,7 +388,7 @@ export function EsqueciSenha() {
             readOnly
             styles={{
               input: { cursor: 'default', pointerEvents: 'none' },
-              label: { cursor: 'default' },
+              label: { cursor: 'default', color: '#2e2e2e' },
             }}
           />
           <Checkbox
@@ -388,7 +397,7 @@ export function EsqueciSenha() {
             readOnly
             styles={{
               input: { cursor: 'default', pointerEvents: 'none' },
-              label: { cursor: 'default' },
+              label: { cursor: 'default', color: '#2e2e2e' },
             }}
           />
           <Checkbox
@@ -397,7 +406,7 @@ export function EsqueciSenha() {
             readOnly
             styles={{
               input: { cursor: 'default', pointerEvents: 'none' },
-              label: { cursor: 'default' },
+              label: { cursor: 'default', color: '#2e2e2e' },
             }}
           />
         </Stack>
@@ -442,15 +451,17 @@ export function EsqueciSenha() {
 
   return (
     <Box
+      className="login-light"
       style={{
         minHeight: '100vh',
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
-        backgroundColor: isMobile ? DARK_BLUE : 'white',
+        backgroundColor: '#ffffff',
       }}
     >
       {/* Left/Top Side - Blue with Logo */}
       <Box
+        className="login-left-panel"
         style={{
           width: isMobile ? '100%' : '50%',
           height: isMobile ? '35vh' : '100vh',
@@ -462,20 +473,26 @@ export function EsqueciSenha() {
         }}
       >
         <Stack align="center" gap="lg">
-          <Box
-            bg="white"
-            w={isMobile ? 80 : 120}
-            h={isMobile ? 80 : 120}
-            style={{ borderRadius: 16 }}
+          <Image
+            src={leftImageSrc}
+            alt="Equipe medica"
+            onError={() => setLeftImageSrc('/logo.png')}
+            loading="eager"
+            decoding="sync"
+            style={{
+              width: isMobile ? '70%' : '74%',
+              maxWidth: 560,
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+            }}
           />
-          <Text c="white" size={isMobile ? "1.5rem" : "2rem"} fw={600}>
-            Saudy
-          </Text>
         </Stack>
       </Box>
 
       {/* Right/Bottom Side - Form */}
       <Box
+        className="login-right-panel"
         style={{
           flex: 1,
           display: 'flex',
