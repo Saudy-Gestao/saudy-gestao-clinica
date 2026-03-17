@@ -298,16 +298,39 @@ export function CadastroMedico() {
     const specialties = Array.isArray(raw.specialties)
       ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
       : [];
-    const workingSchedules = Array.isArray(raw.workingSchedules)
-      ? (raw.workingSchedules as unknown[]).map((item: unknown) => {
-          const scheduleRecord = isRecord(item) ? item : {};
-          return {
-            days: Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean) : [],
-            hoursStart: getString(scheduleRecord.hoursStart),
-            hoursEnd: getString(scheduleRecord.hoursEnd),
-          };
-        }).filter((s) => s.days.length > 0)
-      : [];
+    
+    // Reconstruct workingSchedules from backend format
+    let workingSchedules: Array<{
+      days: string[];
+      hoursStart: string;
+      hoursEnd: string;
+    }> = [];
+    
+    // Try to load from workingSchedules first (if already in frontend format)
+    if (Array.isArray(raw.workingSchedules)) {
+      workingSchedules = (raw.workingSchedules as unknown[]).map((item: unknown) => {
+        const scheduleRecord = isRecord(item) ? item : {};
+        return {
+          days: Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean) : [],
+          hoursStart: getString(scheduleRecord.hoursStart),
+          hoursEnd: getString(scheduleRecord.hoursEnd),
+        };
+      }).filter((s) => s.days.length > 0);
+    } 
+    // Otherwise, reconstruct from backend's workingDays, workingHoursStart, workingHoursEnd
+    else if (Array.isArray(raw.workingDays) && (raw.workingDays as unknown[]).length > 0) {
+      const days = (raw.workingDays as unknown[]).map((d) => getString(d)).filter(Boolean);
+      const hoursStart = getString(raw.workingHoursStart);
+      const hoursEnd = getString(raw.workingHoursEnd);
+      if (days.length > 0 && hoursStart && hoursEnd) {
+        workingSchedules = [{
+          days,
+          hoursStart,
+          hoursEnd,
+        }];
+      }
+    }
+    
     setForm({
       nome: getString(raw.name ?? raw.nome),
       crm: getString(raw.crm),
@@ -529,7 +552,8 @@ export function CadastroMedico() {
         city: form.city || undefined,
         state: form.state || undefined,
         zipCode: form.zipCode || undefined,
-        // Formato esperado pelo backend
+        // Persist all shifts (new format) while keeping legacy fields for compatibility
+        workingSchedules: validSchedules,
         workingDays: Array.from(allDays),
         workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
