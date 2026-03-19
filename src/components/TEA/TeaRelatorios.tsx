@@ -100,7 +100,7 @@ export function TeaRelatorios() {
   const loadTeaProfiles = async () => {
     setLoadingProfiles(true);
     try {
-      const data: any = await teaProfileService.list({ limit: 300, offset: 0 });
+      const data: any = await teaProfileService.list({ limit: 300, offset: 0, hasActivePit: true });
       const list: TeaProfileItem[] = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items) ? data.items : []);
@@ -187,7 +187,7 @@ export function TeaRelatorios() {
               <DateInput
                 label="Início do período"
                 value={startDate}
-                onChange={(value) => setStartDate(value ? new Date(value) : null)}
+                onChange={(value) => setStartDate(value || null)}
                 valueFormat="DD/MM/YYYY"
                 locale="pt-br"
                 clearable
@@ -195,7 +195,7 @@ export function TeaRelatorios() {
               <DateInput
                 label="Fim do período"
                 value={endDate}
-                onChange={(value) => setEndDate(value ? new Date(value) : null)}
+                onChange={(value) => setEndDate(value || null)}
                 valueFormat="DD/MM/YYYY"
                 locale="pt-br"
                 clearable

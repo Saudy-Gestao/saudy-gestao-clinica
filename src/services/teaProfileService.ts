@@ -32,7 +32,7 @@ export interface TeaUpsertPayload {
 }
 
 export default {
-  async list(params?: { search?: string; limit?: number; offset?: number }) {
+  async list(params?: { search?: string; limit?: number; offset?: number; hasActivePit?: boolean }) {
     const res = await api.get('/care/tea-profiles/', { params });
     return res.data;
   },
@@ -174,6 +174,11 @@ export default {
     }>;
   }) {
     const res = await api.post(`/care/tea-profiles/${teaProfileId}/pit/upsert`, payload);
+    return res.data;
+  },
+
+  async deletePit(teaProfileId: string) {
+    const res = await api.delete(`/care/tea-profiles/${teaProfileId}/pit`);
     return res.data;
   },
 };
