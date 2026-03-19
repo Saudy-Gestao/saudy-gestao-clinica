@@ -6,6 +6,7 @@ export interface AppointmentPayload {
   patientId?: string;
   doctorName?: string;
   specialty?: string;
+  durationMinutes?: number;
   convenio?: string;
   date?: string;
   time?: string;
