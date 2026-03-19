@@ -733,14 +733,51 @@ export function CadastroPaciente() {
         observations: form.observations || undefined,
       };
 
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const unitId = user?.branchId || user?.branch?.id || '';
+
+      const registerFacialIfNeeded = async (patientId: string) => {
+        if (!requireFacialForPatientRegistration || !facialImage || !patientId) return false;
+
+        await facialRecognitionService.registerFace({
+          image: facialImage,
+          cpf: form.cpf,
+          nome: form.name.trim(),
+          parentesco: 'próprio',
+          id_unidade: unitId,
+          id_medilab: patientId,
+        });
+
+        return true;
+      };
+
       if (editingPatientId) {
         await patientService.updatePatient(editingPatientId, payload);
+        let facialUpdated = false;
+        if (facialImage) {
+          try {
+            facialUpdated = await registerFacialIfNeeded(editingPatientId);
+          } catch (faceError: any) {
+            console.error('Erro ao atualizar foto facial:', faceError);
+            showNotification({
+              title: 'Dados atualizados com ressalva',
+              message: 'Os dados do paciente foram atualizados, mas não foi possível atualizar a foto facial. Tente novamente mais tarde.',
+              color: 'yellow'
+            });
+          }
+        }
         setEditingPatientId(null);
         setForm({ ...INITIAL_PATIENT_FORM });
         setFieldErrors({});
         setFacialImage(null);
         setActiveTab('lista');
-        showNotification({ title: 'Paciente atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
+        showNotification({
+          title: 'Paciente atualizado',
+          message: facialUpdated
+            ? 'Dados e foto facial atualizados com sucesso.'
+            : 'Dados atualizados com sucesso.',
+          color: 'green'
+        });
       } else {
         // Primeiro cria o paciente
         const createdPatient: any = await patientService.createPatient(payload);
@@ -749,17 +786,7 @@ export function CadastroPaciente() {
         // Depois registra a foto facial
         if (requireFacialForPatientRegistration && facialImage && patientId) {
           try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const unitId = user?.branchId || user?.branch?.id || '';
-
-            await facialRecognitionService.registerFace({
-              image: facialImage,
-              cpf: form.cpf,
-              nome: form.name.trim(),
-              parentesco: 'próprio',
-              id_unidade: unitId,
-              id_medilab: patientId,
-            });
+            await registerFacialIfNeeded(patientId);
 
             showNotification({ 
               title: 'Cadastro completo', 
@@ -988,12 +1015,16 @@ export function CadastroPaciente() {
                 </SimpleGrid>
 
                 {/* Seção de Reconhecimento Facial */}
-                {!isEditing && requireFacialForPatientRegistration && (
+                {requireFacialForPatientRegistration && (
                   <Box mt="md" p="md" style={{ border: '2px dashed #e9ecef', borderRadius: 8 }}>
                     <Group justify="space-between" align="center" mb="sm">
                       <Box>
                         <Text fw={600} size="sm">Reconhecimento Facial</Text>
-                        <Text size="xs" c="dimmed">Obrigatório para concluir o cadastro</Text>
+                        <Text size="xs" c="dimmed">
+                          {isEditing
+                            ? 'Cadastre ou atualize a foto facial do paciente'
+                            : 'Obrigatório para concluir o cadastro'}
+                        </Text>
                       </Box>
                       <Button 
                         leftSection={<Camera size={16} />}
@@ -1001,7 +1032,11 @@ export function CadastroPaciente() {
                         variant={facialImage ? 'outline' : 'filled'}
                         color={facialImage ? 'green' : DARK_BLUE}
                       >
-                        {facialImage ? 'Foto Capturada ✓' : 'Capturar Foto'}
+                        {facialImage
+                          ? 'Foto Capturada ✓'
+                          : isEditing
+                            ? 'Atualizar Foto'
+                            : 'Capturar Foto'}
                       </Button>
                     </Group>
                     
@@ -1306,6 +1341,7 @@ export function CadastroPaciente() {
                                     setSelectedPatient(item);
                                     setEditingPatientId(item.id);
                                     populateFormFromPatient(item.raw);
+                                    setFacialImage(null);
                                     setActiveTab('cadastro');
                                   }}
                                 >

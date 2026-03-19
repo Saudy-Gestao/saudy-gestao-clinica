@@ -35,6 +35,15 @@ export interface PreAttendancePayload {
   queue?: string;
   queueType?: string;
   agenda?: string;
+  doctorId?: string;
+  doctorName?: string;
+  checklistStartedAt?: string;
+  checklistCompletedAt?: string;
+  finalFacialValidationAt?: string;
+  finalFacialValidationStatus?: string;
+  finalFacialValidationTrust?: number;
+  finalFacialValidationName?: string;
+  finalFacialValidationCpf?: string;
 }
 
 export default {
