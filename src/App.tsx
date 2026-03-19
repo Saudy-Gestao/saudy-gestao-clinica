@@ -42,6 +42,7 @@ import { TeaPreReserva } from './components/TEA/TeaPreReserva';
 import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
+import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -109,6 +110,8 @@ function App() {
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
+          <Route path="/check-in" element={<PublicCheckIn />} />
+          <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 

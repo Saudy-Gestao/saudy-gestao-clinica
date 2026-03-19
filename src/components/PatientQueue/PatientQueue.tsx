@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, Paper, Button, Stack, Loader, Center } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
@@ -14,13 +15,16 @@ interface QueuePatient {
   type: string;
   doctor: string;
   position: number;
+  status: string;
 }
 
 export function PatientQueue() {
+  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const [queue, setQueue] = useState<QueuePatient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [callingId, setCallingId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadQueue = async () => {
@@ -34,7 +38,10 @@ export function PatientQueue() {
 
         // Mapear para formato da fila
         const queueData = list
-          .filter((item: any) => item.status !== 'finalizado' && item.status !== 'cancelado')
+          .filter((item: any) => {
+            const status = String(item.status || '').trim().toLowerCase();
+            return status === 'na fila da recepção';
+          })
           .slice(0, 10) // Limitar para 10 primeiros
           .map((item: any, index: number) => ({
             id: String(item.id),
@@ -43,6 +50,7 @@ export function PatientQueue() {
             type: item.queueType || 'Consulta',
             doctor: item.notes || 'Médico não definido',
             position: index + 1,
+            status: item.status || '',
           }));
 
         setQueue(queueData);
@@ -96,6 +104,34 @@ export function PatientQueue() {
   }
 
   const [firstPatient, ...restPatients] = queue;
+
+  const handleCallPatient = async (patient: QueuePatient) => {
+    try {
+      setCallingId(patient.id);
+      await preAttendanceService.update(patient.id, {
+        status: 'Em atendimento na recepção',
+        queueType: 'Autorização e Recepção',
+      });
+
+      setQueue((prev) => prev.filter((item) => item.id !== patient.id));
+
+      showNotification({
+        title: 'Paciente chamado',
+        message: `${patient.name} foi encaminhado para Autorização e Recepção.`,
+        color: 'green',
+      });
+
+      navigate('/pre-atendimento');
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao chamar paciente',
+        color: 'red',
+      });
+    } finally {
+      setCallingId(null);
+    }
+  };
 
   return (
     <Box mb={40}>
@@ -151,7 +187,13 @@ export function PatientQueue() {
                 </Box>
               </Group>
               {!isMobile && (
-                <Button bg="white" c={colorScheme === 'dark' ? 'dark' : 'darkBlue.9'} leftSection={<Play size={16} fill={colorScheme === 'dark' ? '#1a1b1e' : '#001f54'} />}>
+                <Button
+                  bg="white"
+                  c={colorScheme === 'dark' ? 'dark' : 'darkBlue.9'}
+                  leftSection={<Play size={16} fill={colorScheme === 'dark' ? '#1a1b1e' : '#001f54'} />}
+                  loading={callingId === firstPatient.id}
+                  onClick={() => handleCallPatient(firstPatient)}
+                >
                   Chamar
                 </Button>
               )}
@@ -203,7 +245,13 @@ export function PatientQueue() {
                 </Box>
               </Group>
               {!isMobile && (
-                <Button bg={DARK_BLUE} c="white" leftSection={<Play size={16} fill="white" />}>
+                <Button
+                  bg={DARK_BLUE}
+                  c="white"
+                  leftSection={<Play size={16} fill="white" />}
+                  loading={callingId === patient.id}
+                  onClick={() => handleCallPatient(patient)}
+                >
                   Chamar
                 </Button>
               )}
