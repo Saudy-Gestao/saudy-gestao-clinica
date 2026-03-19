@@ -74,4 +74,18 @@ export default {
     }
     return buffers;
   },
+
+  /**
+   * Ensure the target study exists in Orthanc for OHIF (rehydrates from GCS on cache miss).
+   */
+  async ensureOrthancStudy(key: string) {
+    const res = await api.post(`/dicom/${key}/ensure-orthanc`);
+    return res.data as {
+      key: string;
+      status: 'cache_hit' | 'cache_miss_rehydrated';
+      studyInstanceUid: string;
+      orthancStudyId: string | null;
+      uploadedInstances: number;
+    };
+  },
 };

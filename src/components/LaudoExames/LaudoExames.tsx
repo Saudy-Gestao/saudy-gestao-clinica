@@ -40,6 +40,7 @@ type ExamPriority = 'normal' | 'urgente';
 
 interface ExamItem {
   id: string;
+  dicomStudyUid?: string;
   patientName: string;
   cpf: string;
   examType: string;
@@ -395,6 +396,7 @@ export function LaudoExames() {
 
   const mapApiToExam = (it: any): ExamItem => ({
     id: String(it.id || ''),
+    dicomStudyUid: it.dicomStudyUid || undefined,
     patientName: it.patientName || '',
     cpf: it.patientCpf || '',
     examType: it.examType || '',
@@ -1377,7 +1379,10 @@ export function LaudoExames() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredRows.map((exam) => (
+                  {filteredRows.map((exam) => {
+                    const ohifKey = exam.dicomStudyUid || exam.id;
+
+                    return (
                     <Table.Tr
                       key={exam.id}
                       style={{
@@ -1432,7 +1437,7 @@ export function LaudoExames() {
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Abrir OHIF Viewer">
-                            <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/ohif/${encodeURIComponent(exam.id)}`)}>
+                            <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/ohif/${encodeURIComponent(ohifKey)}`)}>
                               <Layers size={16} />
                             </ActionIcon>
                           </Tooltip>
@@ -1454,7 +1459,8 @@ export function LaudoExames() {
                         </Group>
                       </Table.Td>
                     </Table.Tr>
-                  ))}
+                    );
+                  })}
                 </Table.Tbody>
               </Table>
             </Box>

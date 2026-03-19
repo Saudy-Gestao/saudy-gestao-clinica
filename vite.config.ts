@@ -6,6 +6,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/dicom-web': {
+        target: 'http://localhost:8042',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          Authorization: 'Basic b3J0aGFuYzpvcnRoYW5j',
+        },
+      },
       '/auth': {
         target: 'http://localhost:3000',
         changeOrigin: true,

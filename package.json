@@ -6,6 +6,8 @@
   "description": "Sistema de gestão clínica Saudy",
   "scripts": {
     "dev": "vite",
+    "copy-ohif": "node scripts/copy-ohif.js",
+    "prebuild": "node scripts/copy-ohif.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
