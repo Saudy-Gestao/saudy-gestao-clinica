@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers, Mic, MicOff } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers, Mic, MicOff, SpellCheck } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
@@ -388,6 +388,8 @@ export function LaudoExames() {
   const [addendumSaving, setAddendumSaving] = useState(false);
   const [addendumFinalizing, setAddendumFinalizing] = useState(false);
   const [savingLaudo, setSavingLaudo] = useState(false);
+  const [spellCheckModalOpen, setSpellCheckModalOpen] = useState(false);
+  const [spellCheckLoading, setSpellCheckLoading] = useState(false);
   const [finalizePasswordModalOpen, setFinalizePasswordModalOpen] = useState(false);
   const [finalizePassword, setFinalizePassword] = useState('');
   const [finalizeTarget, setFinalizeTarget] = useState<'laudo' | 'adendo' | null>(null);
@@ -518,6 +520,31 @@ export function LaudoExames() {
   const toggleDictation = () => {
     if (isDictating) stopDictation();
     else startDictation();
+  };
+
+  const handleSpellCheck = async () => {
+    const html = editorRef.current ? editorRef.current.getContent() : editorContent;
+    if (!html || html.replace(/<[^>]*>/g, '').trim().length === 0) {
+      showNotification({ title: 'Editor vazio', message: 'Digite algo antes de corrigir.', color: 'orange' });
+      return;
+    }
+    setSpellCheckLoading(true);
+    try {
+      const { correctedHtml } = await reportService.spellCheck(html);
+      if (editorRef.current) {
+        editorRef.current.setContent(correctedHtml);
+        setEditorContent(editorRef.current.getContent());
+      } else {
+        setEditorContent(correctedHtml);
+      }
+      showNotification({ title: 'Correção aplicada', message: 'O texto foi corrigido com sucesso.', color: 'green' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao corrigir o texto.';
+      showNotification({ title: 'Erro na correção', message: msg, color: 'red' });
+    } finally {
+      setSpellCheckLoading(false);
+      setSpellCheckModalOpen(false);
+    }
   };
   // ===========================
 
@@ -1899,6 +1926,18 @@ export function LaudoExames() {
                           {isDictating ? <MicOff size={16} /> : <Mic size={16} />}
                         </ActionIcon>
                       </Tooltip>
+                      <Tooltip label="Correção ortográfica" position="bottom" withArrow>
+                        <ActionIcon
+                          variant="default"
+                          size="md"
+                          radius="md"
+                          style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                          onClick={() => setSpellCheckModalOpen(true)}
+                          disabled={selectedExam?.status === 'finalizado'}
+                        >
+                          <SpellCheck size={16} />
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label={toolsExpanded ? "Ocultar ferramentas" : "Mostrar ferramentas"} position="bottom" withArrow>
                         <ActionIcon
                           variant="default"
@@ -2486,6 +2525,39 @@ export function LaudoExames() {
               </Button>
               <Button bg={DARK_BLUE} c="white" onClick={confirmFinalizeWithPassword} loading={finalizeLoading} leftSection={<ShieldCheck size={16} />}>
                 Confirmar finalizacao
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        {/* Modal Correção Ortográfica */}
+        <Modal
+          opened={spellCheckModalOpen}
+          onClose={() => setSpellCheckModalOpen(false)}
+          title="Correção Ortográfica"
+          centered
+          size="sm"
+        >
+          <Stack mt={"xs"} gap="md">
+            <Text size="sm">
+              Deseja realizar a correção ortográfica e gramatical no texto do laudo?
+            </Text>
+            <Text size="xs" c="dimmed">
+              O texto será analisado por IA e erros de escrita serão corrigidos automaticamente.
+              A formatação e termos médicos serão preservados.
+            </Text>
+            <Group justify="flex-end" gap="sm">
+              <Button variant="default" onClick={() => setSpellCheckModalOpen(false)} disabled={spellCheckLoading}>
+                Não
+              </Button>
+              <Button
+                bg={DARK_BLUE}
+                c="white"
+                leftSection={<SpellCheck size={16} />}
+                onClick={handleSpellCheck}
+                loading={spellCheckLoading}
+              >
+                Sim, corrigir
               </Button>
             </Group>
           </Stack>
