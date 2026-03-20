@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers, Mic, MicOff } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
@@ -392,6 +392,134 @@ export function LaudoExames() {
   const [finalizePassword, setFinalizePassword] = useState('');
   const [finalizeTarget, setFinalizeTarget] = useState<'laudo' | 'adendo' | null>(null);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
+
+  // ===== Ditado por voz =====
+  const [isDictating, setIsDictating] = useState(false);
+  const [dictationSupported] = useState(() => {
+    return typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  });
+  const recognitionRef = useRef<any>(null);
+  const shouldRestartRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consecutiveNetworkFailsRef = useRef(0);
+  const sessionStartedAtRef = useRef<number>(0);
+
+  const createRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      consecutiveNetworkFailsRef.current = 0; // reset ao receber resultado
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        }
+      }
+      if (finalTranscript) {
+        if (editorRef.current) {
+          editorRef.current.insertContent(finalTranscript);
+          setEditorContent(editorRef.current.getContent());
+        } else {
+          setEditorContent((prev) => prev + finalTranscript);
+        }
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return;
+      }
+      if (event.error === 'network') {
+        consecutiveNetworkFailsRef.current += 1;
+        recognitionRef.current = null; // impede onend de reiniciar diretamente
+
+        const elapsed = Date.now() - sessionStartedAtRef.current;
+        const isInstantFail = elapsed < 2000 && consecutiveNetworkFailsRef.current >= 3;
+
+        if (isInstantFail || consecutiveNetworkFailsRef.current > 8) {
+          // Muitas falhas instantâneas = problema real de conexão ou permissão
+          shouldRestartRef.current = false;
+          setIsDictating(false);
+          consecutiveNetworkFailsRef.current = 0;
+          showNotification({
+            title: 'Serviço de voz indisponível',
+            message: 'Não foi possível usar o reconhecimento de voz. Certifique-se de que o microfone está permitido e a internet está funcionando.',
+            color: 'orange',
+            autoClose: 7000,
+          });
+          return;
+        }
+
+        // Falha transitória (sessão expirou no Chrome, etc.) — reconecta silenciosamente
+        if (shouldRestartRef.current) {
+          const delay = Math.min(500 * consecutiveNetworkFailsRef.current, 3000);
+          sessionStartedAtRef.current = Date.now();
+          restartTimerRef.current = setTimeout(() => {
+            if (shouldRestartRef.current) {
+              const r = createRecognition();
+              recognitionRef.current = r;
+              try { r.start(); } catch { /* ignore */ }
+            }
+          }, delay);
+        }
+        return;
+      }
+      // outros erros desconhecidos
+      shouldRestartRef.current = false;
+      recognitionRef.current = null;
+      setIsDictating(false);
+      showNotification({ title: 'Erro no ditado', message: `Erro: ${event.error}`, color: 'red' });
+    };
+
+    recognition.onend = () => {
+      if (shouldRestartRef.current && recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch { /* ignore */ }
+      }
+    };
+
+    return recognition;
+  };
+
+  const startDictation = () => {
+    if (!dictationSupported) {
+      showNotification({ title: 'Não suportado', message: 'Seu navegador não suporta ditado por voz. Use Chrome ou Edge.', color: 'orange' });
+      return;
+    }
+    consecutiveNetworkFailsRef.current = 0;
+    sessionStartedAtRef.current = Date.now();
+    shouldRestartRef.current = true;
+    const recognition = createRecognition();
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsDictating(true);
+    showNotification({ title: 'Ditado iniciado', message: 'Fale agora. O texto será inserido no editor em tempo real.', color: 'green' });
+  };
+
+  const stopDictation = () => {
+    shouldRestartRef.current = false;
+    consecutiveNetworkFailsRef.current = 0;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsDictating(false);
+    showNotification({ title: 'Ditado encerrado', message: 'Gravação parada.', color: 'gray' });
+  };
+
+  const toggleDictation = () => {
+    if (isDictating) stopDictation();
+    else startDictation();
+  };
+  // ===========================
 
   const requestSignature = (role: 'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer') => {
     setSignRolePending(role);
@@ -802,6 +930,18 @@ export function LaudoExames() {
   };
 
   const closeModal = () => {
+    // parar ditado se estiver ativo
+    shouldRestartRef.current = false;
+    consecutiveNetworkFailsRef.current = 0;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsDictating(false);
     setModalOpen(false);
     setTemplatePickerModalOpen(false);
     setPdfPreviewModalOpen(false);
@@ -1746,6 +1886,19 @@ export function LaudoExames() {
                         zIndex: 10,
                       }}
                     >
+                      <Tooltip label={isDictating ? 'Parar ditado' : 'Ditar laudo por voz'} position="bottom" withArrow>
+                        <ActionIcon
+                          variant={isDictating ? 'filled' : 'default'}
+                          color={isDictating ? 'red' : undefined}
+                          size="md"
+                          radius="md"
+                          style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)', animation: isDictating ? 'pulse 1.2s infinite' : undefined }}
+                          onClick={toggleDictation}
+                          disabled={selectedExam?.status === 'finalizado'}
+                        >
+                          {isDictating ? <MicOff size={16} /> : <Mic size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label={toolsExpanded ? "Ocultar ferramentas" : "Mostrar ferramentas"} position="bottom" withArrow>
                         <ActionIcon
                           variant="default"
