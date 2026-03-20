@@ -20,6 +20,7 @@ type ModuleDefinition = ModuleUsageItem & {
 const MODULES: ModuleDefinition[] = [
   { key: 'pre-atendimento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
+  { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },
   { key: 'anamnese', label: 'Anamnese', route: '/anamnese', prefixes: ['/anamnese'] },
   { key: 'enfermagem', label: 'Enfermagem', route: '/enfermagem', prefixes: ['/enfermagem'] },
   { key: 'consulta', label: 'Consulta', route: '/consulta', prefixes: ['/consulta'] },

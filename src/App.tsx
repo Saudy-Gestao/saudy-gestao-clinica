@@ -16,6 +16,8 @@ import { AdmRegister } from './components/Auth/AdmRegister';
 import { AdminHub } from './components/Admin/AdminHub';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
+import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
+import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
@@ -113,6 +115,7 @@ function App() {
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route path="/check-in" element={<PublicCheckIn />} />
           <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
+          <Route path="/pre-agendamento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
@@ -128,6 +131,10 @@ function App() {
           <Route 
             path="/agendamento" 
             element={<ProtectedRoute><Agendamento /></ProtectedRoute>} 
+          />
+          <Route
+            path="/pre-agendamento"
+            element={<ProtectedRoute><PreAgendamento /></ProtectedRoute>}
           />
           <Route 
             path="/consulta" 
