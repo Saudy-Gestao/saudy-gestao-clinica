@@ -35,7 +35,10 @@
   <script type="text/javascript">
     const runtime = window.__ohif__ || {};
     const dicomWebRoot = runtime.dicomWebUrl || '/dicom-web';
-    
+
+    console.log('[OHIF index] runtime.dicomWebUrl', runtime.dicomWebUrl);
+    console.log('[OHIF index] computed dicomWebRoot', dicomWebRoot);
+
     window.config = window.config || {};
     window.config.servers = window.config.servers || {};
     window.config.servers.dicomWeb = [
