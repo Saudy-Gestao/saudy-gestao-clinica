@@ -18,11 +18,12 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, RefreshCcw, ShieldCheck, Upload, X } from 'lucide-react';
+import { ChevronLeft, RefreshCcw, ShieldCheck, Upload } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import convenioAuthorizationService, {
+  type ConvenioAuthorizationAttachment,
   type ConvenioAuthorizationSourceType,
   type ConvenioAuthorizationStatus,
 } from '../../services/convenioAuthorizationService';
@@ -42,6 +43,8 @@ type AuthorizationItem = {
   notes?: string | null;
   updatedAt?: string;
   sessionsCount?: number;
+  attachmentsCount?: number;
+  attachments?: ConvenioAuthorizationAttachment[];
 };
 
 const STATUS_OPTIONS: Array<{ value: ConvenioAuthorizationStatus; label: string }> = [
@@ -56,12 +59,6 @@ const STATUS_COLOR: Record<ConvenioAuthorizationStatus, string> = {
   DENIED: 'red',
 };
 
-const sanitizeAuthorizationNotes = (value?: string | null) => (
-  String(value || '')
-    .replace(/\[AUTH_DENIED\]\s*/g, '')
-    .trim()
-);
-
 export function AutorizacaoConvenio() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -74,8 +71,7 @@ export function AutorizacaoConvenio() {
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-  const [attachmentByRowKey, setAttachmentByRowKey] = useState<Record<string, string>>({});
-  const [, setAttachmentFileByRowKey] = useState<Record<string, File | null>>({});
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
 
   const summary = useMemo(() => {
     return items.reduce((acc, item) => {
@@ -114,30 +110,16 @@ export function AutorizacaoConvenio() {
     loadItems();
   }, [search, JSON.stringify(sourceFilter), JSON.stringify(statusFilter)]);
 
-  useEffect(() => {
-    setAttachmentByRowKey((prev) => {
-      const next = { ...prev };
-      items.forEach((item) => {
-        const rowKey = `${item.sourceType}-${item.id}`;
-        if (next[rowKey] === undefined) {
-          next[rowKey] = sanitizeAuthorizationNotes(item.notes);
-        }
-      });
-      return next;
-    });
-  }, [items]);
-
   const handleUpdateStatus = async (
     item: AuthorizationItem,
     status: ConvenioAuthorizationStatus,
   ) => {
     const rowKey = `${item.sourceType}-${item.id}`;
-    const attachment = String(attachmentByRowKey[rowKey] || '').trim();
     setUpdatingKey(rowKey);
     try {
       await convenioAuthorizationService.updateStatus(item.sourceType, item.id, {
         status,
-        notes: attachment || undefined,
+        notes: item.notes || undefined,
       });
       showNotification({
         title: 'Status atualizado',
@@ -156,9 +138,57 @@ export function AutorizacaoConvenio() {
     }
   };
 
-  const handleAttachmentSelect = (rowKey: string, file: File | null) => {
-    setAttachmentFileByRowKey((prev) => ({ ...prev, [rowKey]: file }));
-    setAttachmentByRowKey((prev) => ({ ...prev, [rowKey]: file ? file.name : '' }));
+  const fileToBase64 = async (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleAttachmentSelect = async (item: AuthorizationItem, file: File | null) => {
+    if (!file) return;
+    const rowKey = `${item.sourceType}-${item.id}`;
+    setUpdatingKey(rowKey);
+    try {
+      const fileBase64 = await fileToBase64(file);
+      await convenioAuthorizationService.uploadAttachment(item.sourceType, item.id, {
+        fileName: file.name,
+        fileBase64,
+        mimeType: file.type || undefined,
+      });
+      showNotification({
+        title: 'Anexo enviado',
+        message: `${file.name} anexado com sucesso.`,
+        color: 'green',
+      });
+      await loadItems();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao anexar',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Falha ao anexar documento',
+        color: 'red',
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  const handleOpenAttachment = async (attachmentId: string) => {
+    setOpeningAttachmentId(attachmentId);
+    try {
+      const blob = await convenioAuthorizationService.viewAttachment(attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao abrir anexo',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        color: 'red',
+      });
+    } finally {
+      setOpeningAttachmentId(null);
+    }
   };
 
   return (
@@ -322,26 +352,29 @@ export function AutorizacaoConvenio() {
                                     accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
                                     onChange={(e) => {
                                       const file = e.currentTarget.files?.[0] || null;
-                                      handleAttachmentSelect(rowKey, file);
+                                      handleAttachmentSelect(item, file);
                                       e.currentTarget.value = '';
                                     }}
                                   />
                                 </Button>
-                                {attachmentByRowKey[rowKey] && (
-                                  <Group gap={4} wrap="nowrap">
-                                    <Text size="xs" c="dimmed" lineClamp={1}>{attachmentByRowKey[rowKey]}</Text>
+                                {(item.attachmentsCount || 0) > 0 && (
+                                  <Text size="xs" c="dimmed">{item.attachmentsCount} anexo(s)</Text>
+                                )}
+                                {(item.attachments || []).slice(0, 3).map((doc) => (
+                                  <Group key={doc.id} gap={4} wrap="nowrap">
+                                    <Text size="xs" c="dimmed" lineClamp={1}>{doc.fileName}</Text>
                                     <ActionIcon
                                       size="xs"
                                       variant="subtle"
-                                      color="gray"
-                                      onClick={() => handleAttachmentSelect(rowKey, null)}
-                                      disabled={updatingKey === rowKey}
-                                      title="Remover anexo"
+                                      color="blue"
+                                      onClick={() => handleOpenAttachment(doc.id)}
+                                      loading={openingAttachmentId === doc.id}
+                                      title="Visualizar anexo"
                                     >
-                                      <X size={12} />
+                                      <Upload size={12} />
                                     </ActionIcon>
                                   </Group>
-                                )}
+                                ))}
                               </Stack>
                             </Table.Td>
                           </Table.Tr>
