@@ -129,6 +129,29 @@ const MOCK_EXAMS: ExamItem[] = [
     issuerSignedAt: '22/02/2026 17:20',
     reviewerSignedAt: '22/02/2026 17:48',
   },
+  {
+    id: 'EX-004',
+    patientName: 'Carlos Alberto Ferreira',
+    cpf: '444.555.666-77',
+    examType: 'Tomografia de crânio',
+    scheduledAt: '20/03/2026 08:30',
+    convenio: 'Unimed',
+    requestingDoctor: 'Dr. Rafael Mendonça',
+    assignedTo: 'Dra. Priscila Vaz',
+    priority: 'urgente',
+    status: 'revisado',
+    reportText: `<h3>Descrição</h3>
+<p>Exame realizado sem a administração de meio de contraste endovenoso.</p>
+<p>Parênquima encefálico com coeficientes de atenuação preservados. Não são identificadas áreas de hiperdensidade ou hipodensidade parenquimatosa sugestivas de sangramento agudo ou lesão isquêmica estabelecida.</p>
+<p>Sistema ventricular de morfologia e dimensões normais para a faixa etária. Sulcos corticais presentes e simétricos, sem evidência de apagamento.</p>
+<p>Estruturas da linha média centradas. Sela turca sem alterações. Cisternas basais pérvias.</p>
+<p>Órbitas, seios paranasais e mastoides com aspecto habitual. Partes moles do couro cabeludo sem alterações.</p>
+<h3>Conclusão</h3>
+<p>Tomografia computadorizada de crânio sem contraste <strong>sem alterações agudas</strong> ao presente exame. Correlacionar com o quadro clínico.</p>
+<h3>Observações</h3>
+<p>Sugere-se complementação com ressonância magnética caso a suspeita clínica de lesão de partes moles ou processo desmielinizante persista.</p>`,
+    issuerSignedAt: '20/03/2026 09:15',
+  },
 ];
 
 const TEMPLATE_TEXT = `
@@ -446,20 +469,25 @@ export function LaudoExames() {
               ? phraseData.data.items
               : []));
 
-        setExamRows(worklist.map(mapApiToExam).filter((item: ExamItem) => item.id));
-        setTemplates(templatesList.map((item: any) => ({
+        const mappedWorklist = worklist.map(mapApiToExam).filter((item: ExamItem) => item.id);
+        setExamRows(mappedWorklist.length > 0 ? mappedWorklist : MOCK_EXAMS);
+
+        const mappedTemplates = templatesList.map((item: any) => ({
           id: String(item.id || ''),
           name: item.name || '',
           examType: item.examType || '',
           group: item.group || 'Outros',
           content: item.content || TEMPLATE_TEXT,
-        })).filter((item: ReportTemplate) => item.id));
-        setPhrases(phrasesList.map((item: any) => ({
+        })).filter((item: ReportTemplate) => item.id);
+        setTemplates(mappedTemplates.length > 0 ? mappedTemplates : MOCK_REPORT_TEMPLATES);
+
+        const mappedPhrases = phrasesList.map((item: any) => ({
           id: String(item.id || ''),
           examType: item.examType || '',
           label: item.label || '',
           text: item.text || '',
-        })).filter((item: ReportPhrase) => item.id));
+        })).filter((item: ReportPhrase) => item.id);
+        setPhrases(mappedPhrases.length > 0 ? mappedPhrases : MOCK_REPORT_PHRASES);
         setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
       } catch (err: any) {
         setExamRows(MOCK_EXAMS);
