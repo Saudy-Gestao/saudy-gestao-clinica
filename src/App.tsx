@@ -35,6 +35,7 @@ import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
+import { WhatsAppPage } from './components/Settings/WhatsAppPage';
 import { TeaEvolucao } from './components/TEA/TeaEvolucao';
 import { TeaPIT } from './components/TEA/TeaPIT';
 import { TeaRelatorios } from './components/TEA/TeaRelatorios';
@@ -188,6 +189,10 @@ function App() {
           <Route
             path="/cadastro-sala"
             element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
+          />
+          <Route
+            path="/whatsapp"
+            element={<ProtectedRoute><WhatsAppPage /></ProtectedRoute>}
           />
           <Route
             path="/tea"

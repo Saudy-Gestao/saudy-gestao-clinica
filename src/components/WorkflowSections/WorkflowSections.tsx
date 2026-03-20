@@ -17,7 +17,8 @@ import {
   DollarSign,
   Brain,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  MessageCircle
 } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 
@@ -112,6 +113,7 @@ export function WorkflowSections() {
         { icon: Warehouse, label: 'Estoque', desc: 'Materiais e insumos', route: '/estoque', moduleName: 'estoque' },
         { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira', route: '/financeiro', moduleName: 'financeiro' },
         { icon: DollarSign, label: 'Faturamento', desc: 'Cobranças e NFs', route: '/faturamento', moduleName: 'faturamento' },
+        { icon: MessageCircle, label: 'WhatsApp', desc: 'Notificações e configurações', route: '/whatsapp', moduleName: 'whatsapp-config' },
         { icon: UserPlus, label: 'Cadastro de Médico', desc: 'Registro de médicos', route: '/cadastro-medico', moduleName: 'cadastro-medico' },
         { icon: ClipboardList, label: 'Cadastro de Procedimentos', desc: 'Procedimentos e modalidades', route: '/cadastro-procedimento', moduleName: 'cadastro-procedimento' },
         { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio', moduleName: 'cadastro-convenio' },
