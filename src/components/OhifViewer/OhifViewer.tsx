@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import reportWorklistService from '../../services/reportWorklistService';
 
-// In production (different frontend/backend hosts), set VITE_DICOMWEB_URL to
-// an absolute URL like https://<backend>/dicom-web. Fallback keeps local flow.
-const DICOMWEB_URL = import.meta.env.VITE_DICOMWEB_URL || '/dicom-web';
+// Reuse the same backend origin already configured via VITE_API_URL.
+// In dev VITE_API_URL is empty → '/dicom-web' goes through the Vite proxy.
+// In production VITE_API_URL='https://saudy-backend.onrender.com' → absolute URL.
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const DICOMWEB_URL = `${API_BASE}/dicom-web`;
 
 export function OhifViewer() {
   const { key } = useParams<{ key: string }>();
