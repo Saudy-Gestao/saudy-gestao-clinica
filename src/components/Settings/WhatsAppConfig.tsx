@@ -334,7 +334,7 @@ export function WhatsAppConfig() {
       </Group>
 
       <Alert icon={<IconInfoCircle size={16} />} mb="md" color="blue">
-        Integração com Twilio para envio de mensagens WhatsApp automatizadas aos pacientes.
+        Integração com Gupshup para envio de mensagens WhatsApp automatizadas aos pacientes.
       </Alert>
 
       <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'config')}>
@@ -358,20 +358,20 @@ export function WhatsAppConfig() {
           <Paper shadow="sm" p="xl">
             <form onSubmit={handleSaveConfig}>
               <Stack gap="md">
-                <Title order={4}>Credenciais Twilio</Title>
+                <Title order={4}>Credenciais Gupshup</Title>
                 
                 <TextInput
-                  label="Account SID"
-                  placeholder="Ex: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  label="API Key"
+                  placeholder="Ex: abc123xyz..."
                   required
                   value={configForm.accountSid}
                   onChange={(e) => setConfigForm(prev => ({ ...prev, accountSid: e.target.value }))}
                 />
 
                 <TextInput
-                  label="Auth Token"
-                  placeholder={hasExistingConfig ? "Deixe vazio para manter o atual" : "Cole aqui seu Auth Token do Twilio"}
-                  description={hasExistingConfig ? "Token atual configurado. Preencha apenas se quiser alterar." : undefined}
+                  label="App Name"
+                  placeholder={hasExistingConfig ? "Deixe vazio para manter o atual" : "Digite o nome do seu app no Gupshup"}
+                  description={hasExistingConfig ? "App Name atual configurado. Preencha apenas se quiser alterar." : undefined}
                   required={!hasExistingConfig}
                   type="password"
                   value={configForm.authToken}
@@ -380,8 +380,8 @@ export function WhatsAppConfig() {
 
                 <TextInput
                   label="Número de Origem (WhatsApp)"
-                  placeholder="Ex: whatsapp:+5511999999999"
-                  description="Número WhatsApp Business verificado no formato: whatsapp:+5511999999999"
+                  placeholder="Ex: 5511999999999"
+                  description="Número WhatsApp Business no formato: 5511999999999 (somente números, sem +)"
                   required
                   value={configForm.fromNumber}
                   onChange={(e) => setConfigForm(prev => ({ ...prev, fromNumber: e.target.value }))}
@@ -416,7 +416,7 @@ export function WhatsAppConfig() {
 
                 <Alert icon={<IconAlertCircle size={16} />} color="yellow">
                   <Text size="sm">
-                    <strong>Importante:</strong> Você precisa configurar sua conta no Twilio e obter aprovação
+                    <strong>Importante:</strong> Você precisa configurar sua conta na Gupshup e obter aprovação
                     do WhatsApp Business API antes de usar este recurso.
                   </Text>
                 </Alert>

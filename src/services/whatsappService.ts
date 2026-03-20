@@ -44,7 +44,7 @@ export interface WhatsAppMessageLog {
   message: string;
   status: string;
   errorMessage?: string;
-  twilioSid?: string;
+  providerMessageId?: string;
   sentAt?: string;
   deliveredAt?: string;
   readAt?: string;
