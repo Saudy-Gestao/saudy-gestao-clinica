@@ -30,8 +30,6 @@ import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
 import doctorService from '../../services/doctorService';
-import sectorService from '../../services/sectorService';
-import { isRoomSector, stripRoomMarker } from '../../utils/sectorClassification';
 import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
 
@@ -122,7 +120,6 @@ interface DoctorForm {
   city: string;
   state: string;
   zipCode: string;
-  roomId: string;
   isActive: boolean;
   workingSchedules: Array<{
     days: string[];
@@ -140,6 +137,12 @@ interface DoctorListItem {
   isActive: boolean;
   raw: ApiRecord;
 }
+
+type WorkingSchedule = {
+  days: string[];
+  hoursStart: string;
+  hoursEnd: string;
+};
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -170,9 +173,47 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   city: '',
   state: '',
   zipCode: '',
-  roomId: '',
   isActive: true,
   workingSchedules: [],
+};
+
+const getWorkingSchedulesFromRaw = (raw: ApiRecord): WorkingSchedule[] => {
+  const explicitSchedules = Array.isArray(raw.workingSchedules)
+    ? (raw.workingSchedules as unknown[])
+        .map((item: unknown) => {
+          const scheduleRecord = isRecord(item) ? item : {};
+          return {
+            days: Array.isArray(scheduleRecord.days)
+              ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean)
+              : [],
+            hoursStart: getString(scheduleRecord.hoursStart),
+            hoursEnd: getString(scheduleRecord.hoursEnd),
+          };
+        })
+        .filter((schedule) => schedule.days.length > 0 || schedule.hoursStart || schedule.hoursEnd)
+    : [];
+
+  if (explicitSchedules.length > 0) {
+    return explicitSchedules;
+  }
+
+  const workingDays = Array.isArray(raw.workingDays)
+    ? (raw.workingDays as unknown[]).map((day) => getString(day)).filter(Boolean)
+    : [];
+  const workingHoursStart = getString(raw.workingHoursStart);
+  const workingHoursEnd = getString(raw.workingHoursEnd);
+
+  if (workingDays.length > 0 || workingHoursStart || workingHoursEnd) {
+    return [
+      {
+        days: workingDays,
+        hoursStart: workingHoursStart,
+        hoursEnd: workingHoursEnd,
+      },
+    ];
+  }
+
+  return [];
 };
 
 export function CadastroMedico() {
@@ -236,8 +277,6 @@ export function CadastroMedico() {
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
   const [zipLoading, setZipLoading] = useState(false);
   const [lastZipLookup, setLastZipLookup] = useState('');
-  const [roomOptions, setRoomOptions] = useState<Array<{ value: string; label: string }>>([]);
-
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
       if (!(field in prev)) return prev;
@@ -252,13 +291,6 @@ export function CadastroMedico() {
     if (!q) return doctors;
     return doctors.filter((item) => item.name.toLowerCase().includes(q));
   }, [doctors, doctorQuery]);
-
-  const roomLabelById = useMemo(() => {
-    return roomOptions.reduce<Record<string, string>>((acc, item) => {
-      acc[item.value] = item.label;
-      return acc;
-    }, {});
-  }, [roomOptions]);
 
   const isEditing = Boolean(editingDoctorId);
 
@@ -284,6 +316,8 @@ export function CadastroMedico() {
     return formatPhone(String(value));
   };
 
+  const selectedDoctorSchedules = selectedDoctor ? getWorkingSchedulesFromRaw(selectedDoctor.raw) : [];
+
   const formatGenderValue = (value: unknown) => {
     const normalized = String(value || '').toUpperCase();
     if (!normalized) return '-';
@@ -298,16 +332,8 @@ export function CadastroMedico() {
     const specialties = Array.isArray(raw.specialties)
       ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
       : [];
-    const workingSchedules = Array.isArray(raw.workingSchedules)
-      ? (raw.workingSchedules as unknown[]).map((item: unknown) => {
-          const scheduleRecord = isRecord(item) ? item : {};
-          return {
-            days: Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean) : [],
-            hoursStart: getString(scheduleRecord.hoursStart),
-            hoursEnd: getString(scheduleRecord.hoursEnd),
-          };
-        }).filter((s) => s.days.length > 0)
-      : [];
+
+    const workingSchedules = getWorkingSchedulesFromRaw(raw);
     setForm({
       nome: getString(raw.name ?? raw.nome),
       crm: getString(raw.crm),
@@ -329,7 +355,6 @@ export function CadastroMedico() {
       city: getString(raw.city),
       state: getString(raw.state),
       zipCode: getString(raw.zipCode),
-      roomId: getString(raw.roomId),
       isActive: getBoolean(raw.isActive, true),
       workingSchedules,
     });
@@ -370,36 +395,6 @@ export function CadastroMedico() {
     };
 
     loadDoctors();
-  }, []);
-
-  useEffect(() => {
-    const loadRooms = async () => {
-      try {
-        const data: unknown = await sectorService.listSectors();
-        const list = getApiList(data);
-        const mapped = list
-          .filter((item: ApiRecord) => isRoomSector(item))
-          .map((item: ApiRecord) => {
-            const id = getString(item.id);
-            const name = getString(item.name);
-            const branch = isRecord(item.branch) ? item.branch : null;
-            const branchName = branch ? getString(branch.tradeName ?? branch.socialName) : '';
-            if (!id || !name) return null;
-            return {
-              value: id,
-              label: branchName ? `${name} (${branchName})` : stripRoomMarker(name) || name,
-            };
-          })
-          .filter((item): item is { value: string; label: string } => Boolean(item));
-
-        setRoomOptions(mapped);
-      } catch {
-        // Não bloqueia o cadastro de médico se salas falharem ao carregar.
-        setRoomOptions([]);
-      }
-    };
-
-    loadRooms();
   }, []);
 
   const statesOptions = [
@@ -529,11 +524,11 @@ export function CadastroMedico() {
         city: form.city || undefined,
         state: form.state || undefined,
         zipCode: form.zipCode || undefined,
-        // Formato esperado pelo backend
+        // Persist all shifts (new format) while keeping legacy fields for compatibility
+        workingSchedules: validSchedules,
         workingDays: Array.from(allDays),
         workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
-        roomId: form.roomId || null
       };
 
       if (editingDoctorId) {
@@ -780,17 +775,6 @@ export function CadastroMedico() {
                     data={specialtyOptions}
                     value={form.specialties}
                     onChange={(v) => setForm({ ...form, specialties: v })}
-                  />
-                  <Select
-                    label="Sala vinculada"
-                    placeholder="Selecione uma sala"
-                    data={roomOptions}
-                    value={form.roomId}
-                    onChange={(v) => { setForm({ ...form, roomId: v || '' }); clearFieldError('roomId'); }}
-                    clearable
-                    searchable
-                    error={fieldErrors.roomId}
-                    nothingFoundMessage="Nenhuma sala encontrada"
                   />
                 </SimpleGrid>
                 <Textarea
@@ -1070,14 +1054,6 @@ export function CadastroMedico() {
                 })()}
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
-              <Text size="sm">
-                <Text fw={600} span>Sala:</Text>{' '}
-                {(() => {
-                  const roomId = getString(selectedDoctor?.raw?.roomId);
-                  if (!roomId) return '-';
-                  return roomLabelById[roomId] || roomId;
-                })()}
-              </Text>
               <Text size="sm"><Text fw={600} span>Outras especialidades:</Text> {formatDetailValue(selectedDoctor?.raw?.specialties)}</Text>
             </SimpleGrid>
 
@@ -1094,13 +1070,12 @@ export function CadastroMedico() {
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
               <Text size="sm"><Text fw={600} span>Dias de trabalho:</Text></Text>
             </SimpleGrid>
-            {Array.isArray(selectedDoctor?.raw?.workingSchedules) && selectedDoctor.raw.workingSchedules.length > 0 ? (
+            {selectedDoctorSchedules.length > 0 ? (
               <Stack gap="xs">
-                {(selectedDoctor.raw.workingSchedules as unknown[]).map((schedule: unknown, idx: number) => {
-                  const scheduleRecord = isRecord(schedule) ? schedule : {};
-                  const days = Array.isArray(scheduleRecord.days) ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean).join(', ') : '-';
-                  const hoursStart = getString(scheduleRecord.hoursStart);
-                  const hoursEnd = getString(scheduleRecord.hoursEnd);
+                {selectedDoctorSchedules.map((schedule, idx: number) => {
+                  const days = schedule.days.length > 0 ? schedule.days.join(', ') : '-';
+                  const hoursStart = schedule.hoursStart;
+                  const hoursEnd = schedule.hoursEnd;
                   return (
                     <Paper key={idx} p="xs" bg="rgba(0,0,0,0.02)" radius="sm">
                       <Text size="sm">

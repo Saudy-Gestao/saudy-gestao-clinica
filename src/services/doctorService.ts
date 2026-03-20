@@ -26,6 +26,11 @@ export interface CreateDoctorPayload {
   workingDays?: string[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
+  workingSchedules?: Array<{
+    days: string[];
+    hoursStart: string;
+    hoursEnd: string;
+  }>;
 }
 
 export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;

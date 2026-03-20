@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput, Paper, Loader, Popover, Grid } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
@@ -67,7 +67,7 @@ export function Faturamento() {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [invoicesLoading] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -124,6 +124,12 @@ export function Faturamento() {
     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString('pt-BR');
   };
 
+  const formatBackendDateTime = (value?: string | null) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString('pt-BR');
+  };
+
   const parseDate = (s: string) => {
     if (!s) return null;
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -134,7 +140,50 @@ export function Faturamento() {
     const date = new Date(year, month, day);
     if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
     return date;
-  }; 
+  };
+
+  const mapInvoiceToRow = (invoice: any): InvoiceRow => {
+    const value = Number(invoice?.value ?? invoice?.amount ?? 0);
+    const discount = Number(invoice?.discount ?? 0);
+    const total = Number(invoice?.total ?? (value - discount));
+
+    return {
+      id: invoice?.id ?? invoice?.number ?? `local-${Date.now()}`,
+      codigo: invoice?.number || '-',
+      emissao: formatBackendDateTime(invoice?.issuedAt),
+      vencimento: formatBackendDate(invoice?.dueDate) || '-',
+      status: invoice?.status || '-',
+      convenio: invoice?.convention || invoice?.convention_name || '-',
+      valor: value,
+      descontoPercent: discount,
+      valorTotal: total,
+      nome: invoice?.patientName || '',
+      formaPagamento: invoice?.paymentMethod || '',
+    };
+  };
+
+  const loadInvoices = async () => {
+    setInvoicesLoading(true);
+    try {
+      const response: any = await invoiceService.getInvoices();
+      const items = Array.isArray(response) ? response : response?.items;
+
+      if (Array.isArray(items)) {
+        setRows(items.map(mapInvoiceToRow));
+      } else {
+        setRows([]);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar faturas';
+      showNotification({ title: 'Erro', message: msg, color: 'red' });
+    } finally {
+      setInvoicesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadInvoices();
+  }, []);
 
 
 
@@ -251,7 +300,7 @@ export function Faturamento() {
           convenio: created.convention || created.convention_name || invoiceData.categoria || '-',
           valor: created.value ?? created.amount ?? invoiceData.valor ?? 0,
           descontoPercent: created.discount ?? invoiceData.desconto ?? 0,
-          valorTotal: (created.value ?? invoiceData.valor ?? 0) - ((created.value ?? invoiceData.valor ?? 0) * (created.discount ?? invoiceData.desconto ?? 0) / 100),
+          valorTotal: created.total ?? ((created.value ?? invoiceData.valor ?? 0) - (created.discount ?? invoiceData.desconto ?? 0)),
           nome: created.patientName ?? invoiceData.nome,
           formaPagamento: created.paymentMethod ?? invoiceData.formaPagamento,
         };
@@ -291,7 +340,7 @@ export function Faturamento() {
             <ChevronLeft size={20} />
           </ActionIcon>
           <Box>
-            <Text fw={600} size={isMobile ? 'lg' : 'xl'} c="white">
+            <Text fw={600} size={isMobile ? 'lg' : 'xl'} c="black">
               Faturamento
             </Text>
             <Text size="sm" c="dimmed">

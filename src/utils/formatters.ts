@@ -35,3 +35,18 @@ export const formatDateInput = (s: string) => {
   if (v.length <= 4) return `${v.slice(0,2)}/${v.slice(2)}`;
   return `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;
 };
+
+// Parses API date values into local dates without UTC day shifting.
+export const parseApiDateToLocalDate = (value?: string | null): Date | null => {
+  if (!value) return null;
+
+  const dateOnlyMatch = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0, 0);
+};

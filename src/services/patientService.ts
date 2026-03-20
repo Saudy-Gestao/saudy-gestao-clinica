@@ -54,8 +54,8 @@ export default {
   },
 
   async getPatientByCpf(cpf: string) {
-    const url = '/accounts/patients/';
-    const res = await api.get(url, { params: { cpf } });
+    const url = `/accounts/patients/cpf/${cpf}`;
+    const res = await api.get(url);
     return res.data;
   },
 

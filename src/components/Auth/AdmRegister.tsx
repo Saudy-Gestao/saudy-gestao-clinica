@@ -20,6 +20,17 @@ export function AdmRegister() {
   const [step, setStep] = useState<'form' | 'code'>('form');
   const [loading, setLoading] = useState(false);
 
+  const passwordStrength = {
+    minLength: password.length >= 8,
+    hasNumber: /\d/.test(password),
+    hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+
+  const isPasswordValid =
+    passwordStrength.minLength &&
+    passwordStrength.hasNumber &&
+    passwordStrength.hasSpecialChar;
+
   const handleRequestCode = async () => {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -35,6 +46,15 @@ export function AdmRegister() {
 
     if (password !== confirmPassword) {
       notifications.show({ title: 'Erro', message: 'As senhas não coincidem', color: 'red' });
+      return;
+    }
+
+    if (!isPasswordValid) {
+      notifications.show({
+        title: 'Erro',
+        message: 'A senha deve ter no mínimo 8 caracteres, 1 número e 1 caractere especial',
+        color: 'red',
+      });
       return;
     }
 
@@ -113,6 +133,20 @@ export function AdmRegister() {
                 <FloatingInput label="Nome" value={name} onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
                 <FloatingInput label="E-mail" value={email} onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} />
                 <FloatingInput label="Senha" type="password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
+                <Box>
+                  <Text size="xs" c="dimmed" mb={6}>A senha deve conter:</Text>
+                  <Stack gap={2}>
+                    <Text size="xs" c={passwordStrength.minLength ? 'teal' : 'red'}>
+                      {passwordStrength.minLength ? 'OK' : 'X'} No mínimo 8 caracteres
+                    </Text>
+                    <Text size="xs" c={passwordStrength.hasNumber ? 'teal' : 'red'}>
+                      {passwordStrength.hasNumber ? 'OK' : 'X'} Pelo menos 1 número
+                    </Text>
+                    <Text size="xs" c={passwordStrength.hasSpecialChar ? 'teal' : 'red'}>
+                      {passwordStrength.hasSpecialChar ? 'OK' : 'X'} Pelo menos 1 caractere especial
+                    </Text>
+                  </Stack>
+                </Box>
                 <FloatingInput label="Confirmar senha" type="password" value={confirmPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)} />
 
                 <Button fullWidth size="lg" bg={DARK_BLUE} onClick={handleRequestCode} loading={loading}>

@@ -44,6 +44,7 @@ import branchService from '../../services/branchService';
 import branchSettingsService, { type BranchSettings } from '../../services/branchSettingsService';
 import sectorService from '../../services/sectorService';
 import userService from '../../services/userService';
+import doctorService from '../../services/doctorService';
 import accessService from '../../services/accessService';
 import { moduleService, type Module } from '../../services/moduleService';
 import { FloatingInput } from '../common/FloatingInput';
@@ -217,9 +218,10 @@ export function SettingsPage() {
   const [selectedSectorForUsers, setSelectedSectorForUsers] = useState<string | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [userForm, setUserForm] = useState({ branchId: '', sectorId: '', accessIds: [] as string[], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
+  const [userForm, setUserForm] = useState({ branchId: '', sectorId: '', doctorId: '', accessIds: [] as string[], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
   const [savingUser, setSavingUser] = useState(false);
   const [accessesList, setAccessesList] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
   const [userErrors, setUserErrors] = useState<Record<string, string>>({});
 
   // Accesses
@@ -314,6 +316,7 @@ export function SettingsPage() {
     }
     fetchCompanies();
     fetchAccesses();
+    fetchDoctors();
     fetchModules();
   }, []);
 
@@ -749,10 +752,19 @@ export function SettingsPage() {
     }
   };
 
+  const fetchDoctors = async () => {
+    try {
+      const data = await doctorService.listDoctors();
+      setDoctors(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar médicos', color: 'red' });
+    }
+  };
+
   const openUserModalForCreate = () => {
     setEditingUser(null);
     const initialBranchId = loggedBranchId || selectedBranchForSectors || '';
-    setUserForm({ branchId: initialBranchId, sectorId: selectedSectorForUsers || '', accessIds: [], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
+    setUserForm({ branchId: initialBranchId, sectorId: selectedSectorForUsers || '', doctorId: '', accessIds: [], name: '', birthDate: '', email: '', password: '', phone: '', address: '' });
     setUserErrors({});
     setUserModalOpen(true);
   };
@@ -762,6 +774,7 @@ export function SettingsPage() {
     setUserForm({ 
         branchId: user.sector?.branchId || user.sector?.branch?.id || '',
         sectorId: user.sector?.id || '', 
+        doctorId: user.doctor?.id || user.doctorId || '',
         accessIds: user.accesses ? user.accesses.map((a: any) => a.id) : [], 
         name: user.name || '', 
         birthDate: user.birthDate ? new Date(user.birthDate).toISOString().slice(0, 10) : '', 
@@ -791,6 +804,7 @@ export function SettingsPage() {
     setSavingUser(true);
     try {
       const payload: any = { ...userForm };
+        if (!payload.doctorId) payload.doctorId = null;
         if (!payload.password) delete payload.password;
 
       if (editingUser) {
@@ -802,12 +816,20 @@ export function SettingsPage() {
       }
       setUserModalOpen(false);
       fetchUsers();
+      fetchDoctors();
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar usuário', color: 'red' });
     } finally {
       setSavingUser(false);
     }
   };
+
+  const availableDoctorsForUserForm = (doctors || [])
+    .filter((doctor: any) => !userForm.branchId || doctor.branchId === userForm.branchId)
+    .map((doctor: any) => ({
+      value: doctor.id,
+      label: `${doctor.name}${doctor.specialty ? ` • ${doctor.specialty}` : ''}`,
+    }));
 
   const handleDeleteUser = async (id: string) => {
     try {
@@ -1380,7 +1402,7 @@ export function SettingsPage() {
                                           .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
                                           .map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                         value={userForm.branchId}
-                                        onChange={(v) => setUserForm({ ...userForm, branchId: v || '', sectorId: '' })}
+                                        onChange={(v) => setUserForm({ ...userForm, branchId: v || '', sectorId: '', doctorId: '' })}
                                         mb="xs"
                                         error={userErrors.branchId}
                                         searchable
@@ -1397,6 +1419,19 @@ export function SettingsPage() {
                                         onChange={(v) => setUserForm({...userForm, sectorId: v || ''})}
                                         mb="xs"
                                         error={userErrors.sectorId}
+                                        disabled={!userForm.branchId}
+                                    />
+                                </Grid.Col>
+                                <Grid.Col span={12}>
+                                    <Select
+                                        label="Médico vinculado"
+                                        placeholder="Opcional: vincule este usuário a um médico"
+                                        data={availableDoctorsForUserForm}
+                                        value={userForm.doctorId}
+                                        onChange={(v) => setUserForm({ ...userForm, doctorId: v || '' })}
+                                        mb="xs"
+                                        searchable
+                                        clearable
                                         disabled={!userForm.branchId}
                                     />
                                 </Grid.Col>

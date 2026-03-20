@@ -30,7 +30,7 @@ import doctorService from '../../services/doctorService';
 import appointmentService from '../../services/appointmentService';
 import teaEvolutionTemplateService from '../../services/teaEvolutionTemplateService';
 import { DARK_BLUE } from '../../themes/theme';
-import { formatCPF } from '../../utils/formatters';
+import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 
 interface TeaProfileOption {
   value: string;
@@ -196,7 +196,7 @@ export function TeaEvolucao() {
   const loadTeaProfiles = async () => {
     setLoading(true);
     try {
-      const data: any = await teaProfileService.list({ limit: 200, offset: 0 });
+      const data: any = await teaProfileService.list({ limit: 200, offset: 0, hasActivePit: true });
       const list: any[] = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items) ? data.items : []);
@@ -466,7 +466,7 @@ export function TeaEvolucao() {
   const handleStartEdit = (item: any) => {
     setEditingEvolutionId(String(item.id));
     setForm({
-      sessionDate: item.sessionDate ? new Date(item.sessionDate) : new Date(),
+      sessionDate: parseApiDateToLocalDate(item.sessionDate) || new Date(),
       therapeuticPlanId: item.therapeuticPlanId || '',
       appointmentId: item.appointmentId || '',
       professionalDoctorId: item.professionalDoctorId || '',
@@ -536,7 +536,7 @@ export function TeaEvolucao() {
               <DateInput
                 label="Data da sessão"
                 value={form.sessionDate}
-                onChange={(value) => setForm((prev) => ({ ...prev, sessionDate: value ? new Date(value) : null }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, sessionDate: value || null }))}
                 valueFormat="DD/MM/YYYY"
                 locale="pt-br"
               />
@@ -636,7 +636,10 @@ export function TeaEvolucao() {
               label="Objetivo trabalhado na sessão"
               minRows={2}
               value={form.sessionGoal}
-              onChange={(e) => setForm((prev) => ({ ...prev, sessionGoal: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setForm((prev) => ({ ...prev, sessionGoal: value }));
+              }}
             />
             <TagsInput
               label="Estratégias utilizadas"
@@ -673,14 +676,20 @@ export function TeaEvolucao() {
               label="Intervenção realizada"
               minRows={2}
               value={form.interventionSummary}
-              onChange={(e) => setForm((prev) => ({ ...prev, interventionSummary: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setForm((prev) => ({ ...prev, interventionSummary: value }));
+              }}
             />
 
             <Textarea
               label="Resposta do paciente"
               minRows={2}
               value={form.patientResponse}
-              onChange={(e) => setForm((prev) => ({ ...prev, patientResponse: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setForm((prev) => ({ ...prev, patientResponse: value }));
+              }}
             />
 
             <Group grow>
@@ -695,7 +704,10 @@ export function TeaEvolucao() {
                 label="Observações"
                 minRows={1}
                 value={form.notes}
-                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setForm((prev) => ({ ...prev, notes: value }));
+                }}
               />
             </Group>
             <Group grow align="flex-start">
@@ -703,20 +715,29 @@ export function TeaEvolucao() {
                 label="Devolutiva para família"
                 minRows={2}
                 value={form.familyFeedback}
-                onChange={(e) => setForm((prev) => ({ ...prev, familyFeedback: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setForm((prev) => ({ ...prev, familyFeedback: value }));
+                }}
               />
               <Textarea
                 label="Plano para casa / próxima sessão"
                 minRows={2}
                 value={form.homePlan}
-                onChange={(e) => setForm((prev) => ({ ...prev, homePlan: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setForm((prev) => ({ ...prev, homePlan: value }));
+                }}
               />
             </Group>
             <Textarea
               label="Alertas clínicos / riscos"
               minRows={2}
               value={form.alerts}
-              onChange={(e) => setForm((prev) => ({ ...prev, alerts: e.currentTarget.value }))}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setForm((prev) => ({ ...prev, alerts: value }));
+              }}
             />
             {editingEvolutionId && (
               <Textarea
@@ -724,7 +745,10 @@ export function TeaEvolucao() {
                 minRows={2}
                 required
                 value={form.editReason}
-                onChange={(e) => setForm((prev) => ({ ...prev, editReason: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setForm((prev) => ({ ...prev, editReason: value }));
+                }}
               />
             )}
 

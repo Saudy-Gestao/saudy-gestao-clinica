@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, RefreshCcw, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, RefreshCcw, ShieldCheck, Upload, X } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -56,6 +56,12 @@ const STATUS_COLOR: Record<ConvenioAuthorizationStatus, string> = {
   DENIED: 'red',
 };
 
+const sanitizeAuthorizationNotes = (value?: string | null) => (
+  String(value || '')
+    .replace(/\[AUTH_DENIED\]\s*/g, '')
+    .trim()
+);
+
 export function AutorizacaoConvenio() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -68,6 +74,8 @@ export function AutorizacaoConvenio() {
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
+  const [attachmentByRowKey, setAttachmentByRowKey] = useState<Record<string, string>>({});
+  const [, setAttachmentFileByRowKey] = useState<Record<string, File | null>>({});
 
   const summary = useMemo(() => {
     return items.reduce((acc, item) => {
@@ -106,14 +114,31 @@ export function AutorizacaoConvenio() {
     loadItems();
   }, [search, JSON.stringify(sourceFilter), JSON.stringify(statusFilter)]);
 
+  useEffect(() => {
+    setAttachmentByRowKey((prev) => {
+      const next = { ...prev };
+      items.forEach((item) => {
+        const rowKey = `${item.sourceType}-${item.id}`;
+        if (next[rowKey] === undefined) {
+          next[rowKey] = sanitizeAuthorizationNotes(item.notes);
+        }
+      });
+      return next;
+    });
+  }, [items]);
+
   const handleUpdateStatus = async (
     item: AuthorizationItem,
     status: ConvenioAuthorizationStatus,
   ) => {
     const rowKey = `${item.sourceType}-${item.id}`;
+    const attachment = String(attachmentByRowKey[rowKey] || '').trim();
     setUpdatingKey(rowKey);
     try {
-      await convenioAuthorizationService.updateStatus(item.sourceType, item.id, { status });
+      await convenioAuthorizationService.updateStatus(item.sourceType, item.id, {
+        status,
+        notes: attachment || undefined,
+      });
       showNotification({
         title: 'Status atualizado',
         message: `${item.patientName || 'Item'} atualizado para ${STATUS_OPTIONS.find((it) => it.value === status)?.label || status}.`,
@@ -129,6 +154,11 @@ export function AutorizacaoConvenio() {
     } finally {
       setUpdatingKey(null);
     }
+  };
+
+  const handleAttachmentSelect = (rowKey: string, file: File | null) => {
+    setAttachmentFileByRowKey((prev) => ({ ...prev, [rowKey]: file }));
+    setAttachmentByRowKey((prev) => ({ ...prev, [rowKey]: file ? file.name : '' }));
   };
 
   return (
@@ -210,12 +240,13 @@ export function AutorizacaoConvenio() {
                       <Table.Th>Data/Hora</Table.Th>
                       <Table.Th>Status</Table.Th>
                       <Table.Th>Ação</Table.Th>
+                      <Table.Th>Anexo</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {items.length === 0 ? (
                       <Table.Tr>
-                        <Table.Td colSpan={9}>
+                        <Table.Td colSpan={10}>
                           <Text size="sm" c="dimmed" ta="center" py="md">Nenhuma autorização encontrada</Text>
                         </Table.Td>
                       </Table.Tr>
@@ -273,6 +304,45 @@ export function AutorizacaoConvenio() {
                                 disabled={updatingKey === rowKey}
                                 leftSection={<ShieldCheck size={14} />}
                               />
+                            </Table.Td>
+                            <Table.Td>
+                              <Stack gap={4}>
+                                <Button
+                                  component="label"
+                                  size="xs"
+                                  variant="light"
+                                  color="indigo"
+                                  leftSection={<Upload size={14} />}
+                                  disabled={updatingKey === rowKey}
+                                >
+                                  Enviar documento
+                                  <input
+                                    type="file"
+                                    hidden
+                                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                                    onChange={(e) => {
+                                      const file = e.currentTarget.files?.[0] || null;
+                                      handleAttachmentSelect(rowKey, file);
+                                      e.currentTarget.value = '';
+                                    }}
+                                  />
+                                </Button>
+                                {attachmentByRowKey[rowKey] && (
+                                  <Group gap={4} wrap="nowrap">
+                                    <Text size="xs" c="dimmed" lineClamp={1}>{attachmentByRowKey[rowKey]}</Text>
+                                    <ActionIcon
+                                      size="xs"
+                                      variant="subtle"
+                                      color="gray"
+                                      onClick={() => handleAttachmentSelect(rowKey, null)}
+                                      disabled={updatingKey === rowKey}
+                                      title="Remover anexo"
+                                    >
+                                      <X size={12} />
+                                    </ActionIcon>
+                                  </Group>
+                                )}
+                              </Stack>
                             </Table.Td>
                           </Table.Tr>
                         );

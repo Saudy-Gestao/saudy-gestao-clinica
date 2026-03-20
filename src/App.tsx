@@ -22,7 +22,6 @@ import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
 import { DicomViewerPage } from './components/DicomViewer/DicomViewerPage';
 import { OhifViewer } from './components/OhifViewer/OhifViewer';
-import { Envelopamento } from './components/Envelopamento/Envelopamento';
 import { Entrega } from './components/Entrega/Entrega';
 import { Estoque } from './components/Estoque/Estoque';
 import { SettingsPage } from './components/Settings/SettingsPage';
@@ -44,6 +43,7 @@ import { TeaPreReserva } from './components/TEA/TeaPreReserva';
 import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
+import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -111,6 +111,8 @@ function App() {
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
+          <Route path="/check-in" element={<PublicCheckIn />} />
+          <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
@@ -150,10 +152,6 @@ function App() {
           <Route
             path="/laudo-configuracoes"
             element={<ProtectedRoute><LaudoConfiguracoes /></ProtectedRoute>}
-          />
-          <Route
-            path="/envelopamento"
-            element={<ProtectedRoute><Envelopamento /></ProtectedRoute>}
           />
           <Route
             path="/entrega"

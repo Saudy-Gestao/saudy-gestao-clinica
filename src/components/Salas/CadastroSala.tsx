@@ -22,6 +22,7 @@ import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import branchService from '../../services/branchService';
 import sectorService from '../../services/sectorService';
+import doctorService from '../../services/doctorService';
 import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
 
 interface BranchOption {
@@ -34,6 +35,15 @@ interface SalaRow {
   name: string;
   description?: string | null;
   branchId: string;
+  doctorId?: string | null;
+  doctorName?: string | null;
+}
+
+interface DoctorOption {
+  value: string;
+  label: string;
+  branchId: string;
+  roomId?: string | null;
 }
 
 export function CadastroSala() {
@@ -45,7 +55,9 @@ export function CadastroSala() {
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [items, setItems] = useState<SalaRow[]>([]);
+  const [doctorOptions, setDoctorOptions] = useState<DoctorOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -58,6 +70,7 @@ export function CadastroSala() {
     name: '',
     description: '',
     branchId: '',
+    doctorId: '',
   });
 
   const branchLabelById = useMemo(() => {
@@ -136,6 +149,8 @@ export function CadastroSala() {
           name: sector.name || '',
           description: stripRoomMarker(sector.description) || null,
           branchId: String(sector.branchId || ''),
+          doctorId: null,
+          doctorName: null,
         }))
         .filter((sector: SalaRow) => sector.id && sector.branchId === branchId);
 
@@ -159,6 +174,65 @@ export function CadastroSala() {
     loadSalas(selectedBranchId);
   }, [selectedBranchId]);
 
+  useEffect(() => {
+    const loadDoctors = async () => {
+      setLoadingDoctors(true);
+      try {
+        const data: any = await doctorService.listDoctors();
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data?.items)
+              ? data.data.items
+              : (Array.isArray(data?.data)
+                ? data.data
+                : [])));
+
+        const mapped = list
+          .map((doctor: any) => ({
+            value: String(doctor.id || ''),
+            label: doctor.name || 'Médico sem nome',
+            branchId: String(doctor.branchId || ''),
+            roomId: doctor.roomId ? String(doctor.roomId) : null,
+          }))
+          .filter((doctor: DoctorOption) => Boolean(doctor.value));
+
+        setDoctorOptions(mapped);
+      } catch {
+        setDoctorOptions([]);
+      } finally {
+        setLoadingDoctors(false);
+      }
+    };
+
+    loadDoctors();
+  }, []);
+
+  useEffect(() => {
+    if (!items.length) return;
+    const doctorByRoomId = doctorOptions.reduce<Record<string, DoctorOption>>((acc, doctor) => {
+      if (doctor.roomId) acc[doctor.roomId] = doctor;
+      return acc;
+    }, {});
+
+    setItems((prev) => prev.map((item) => {
+      const linkedDoctor = doctorByRoomId[item.id];
+      return {
+        ...item,
+        doctorId: linkedDoctor?.value || null,
+        doctorName: linkedDoctor?.label || null,
+      };
+    }));
+  }, [doctorOptions]);
+
+  const availableDoctorOptions = useMemo(() => {
+    if (!form.branchId) return [];
+    return doctorOptions
+      .filter((doctor) => doctor.branchId === form.branchId)
+      .map((doctor) => ({ value: doctor.value, label: doctor.label }));
+  }, [doctorOptions, form.branchId]);
+
   const openModal = (item?: SalaRow) => {
     if (item) {
       setEditingId(item.id);
@@ -166,6 +240,7 @@ export function CadastroSala() {
         name: item.name || '',
         description: item.description || '',
         branchId: item.branchId || selectedBranchId || '',
+        doctorId: item.doctorId || '',
       });
     } else {
       setEditingId(null);
@@ -173,9 +248,48 @@ export function CadastroSala() {
         name: '',
         description: '',
         branchId: selectedBranchId || '',
+        doctorId: '',
       });
     }
     setModalOpen(true);
+  };
+
+  const syncRoomDoctor = async (roomId: string, nextDoctorId: string | null) => {
+    const linkedDoctors = doctorOptions.filter((doctor) => doctor.roomId === roomId);
+
+    for (const doctor of linkedDoctors) {
+      if (doctor.value !== nextDoctorId) {
+        await doctorService.updateDoctor(doctor.value, { roomId: null });
+      }
+    }
+
+    if (nextDoctorId) {
+      await doctorService.updateDoctor(nextDoctorId, { roomId });
+    }
+  };
+
+  const refreshDoctors = async () => {
+    const data: any = await doctorService.listDoctors();
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
+
+    const mapped = list
+      .map((doctor: any) => ({
+        value: String(doctor.id || ''),
+        label: doctor.name || 'Médico sem nome',
+        branchId: String(doctor.branchId || ''),
+        roomId: doctor.roomId ? String(doctor.roomId) : null,
+      }))
+      .filter((doctor: DoctorOption) => Boolean(doctor.value));
+
+    setDoctorOptions(mapped);
   };
 
   const handleSave = async () => {
@@ -197,17 +311,26 @@ export function CadastroSala() {
         branchId: form.branchId,
       };
 
+      let roomId = editingId;
       if (editingId) {
         await sectorService.updateSector(editingId, payload);
         showNotification({ title: 'Atualizado', message: 'Sala atualizada', color: 'green' });
       } else {
-        await sectorService.createSector(payload);
+        const created: any = await sectorService.createSector(payload);
+        roomId = String(created?.id || '');
         showNotification({ title: 'Adicionado', message: 'Sala cadastrada', color: 'green' });
       }
 
+      if (!roomId) {
+        throw new Error('Não foi possível identificar a sala salva para vincular o médico.');
+      }
+
+      await syncRoomDoctor(roomId, form.doctorId || null);
+      await refreshDoctors();
+
       setModalOpen(false);
       setEditingId(null);
-      setForm({ name: '', description: '', branchId: selectedBranchId || '' });
+      setForm({ name: '', description: '', branchId: selectedBranchId || '', doctorId: '' });
       loadSalas(selectedBranchId);
     } catch (err: any) {
       showNotification({
@@ -298,12 +421,13 @@ export function CadastroSala() {
         ) : (
           <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
             <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-              <Table.Thead>
-                <Table.Tr style={{ borderBottom: 'none' }}>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
-                  {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+            <Table.Thead>
+              <Table.Tr style={{ borderBottom: 'none' }}>
+                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
+                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médico vinculado</Table.Th>}
+                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
+                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
+                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -312,6 +436,7 @@ export function CadastroSala() {
                     <Table.Td>
                       <Text fw={600}>{item.name}</Text>
                     </Table.Td>
+                    {!isMobile && <Table.Td><Text c="dimmed">{item.doctorName || '-'}</Text></Table.Td>}
                     {!isMobile && <Table.Td><Text c="dimmed">{item.description || '-'}</Text></Table.Td>}
                     {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
                     <Table.Td>
@@ -336,7 +461,7 @@ export function CadastroSala() {
                 ))}
                 {filteredItems.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={4} style={{ textAlign: 'center' }}>
+                    <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
                       <Text c="dimmed" py="md">Nenhuma sala encontrada para esta filial</Text>
                     </Table.Td>
                   </Table.Tr>
@@ -373,6 +498,16 @@ export function CadastroSala() {
               setForm((prev) => ({ ...prev, name: value }));
             }}
             required
+          />
+          <Select
+            label="Médico vinculado"
+            placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
+            value={form.doctorId}
+            onChange={(value) => setForm((prev) => ({ ...prev, doctorId: value || '' }))}
+            data={availableDoctorOptions}
+            searchable
+            clearable
+            nothingFoundMessage="Nenhum médico encontrado para esta filial"
           />
           <Textarea
             label="Descrição"
