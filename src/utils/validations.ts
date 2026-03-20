@@ -30,8 +30,9 @@ export const validateCNPJ = (cnpj: string): boolean => {
  */
 export const validateEmail = (email: string): boolean => {
   if (!email) return false;
+  const normalized = email.trim().toLowerCase();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return emailRegex.test(normalized);
 };
 
 /**

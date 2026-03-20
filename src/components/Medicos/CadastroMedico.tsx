@@ -28,7 +28,7 @@ import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
-import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
+import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
 import doctorService from '../../services/doctorService';
 import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
@@ -423,10 +423,10 @@ export function CadastroMedico() {
     if (!data.nome.trim()) errors.nome = 'Nome é obrigatório';
     if (!data.crm.trim()) errors.crm = 'CRM é obrigatório';
     if (!data.crmState) errors.crmState = 'UF do CRM é obrigatório';
-    if (!data.email || !/^[\w-.]+@[\w-]+\.[\w-.]+$/.test(data.email)) errors.email = 'Email inválido';
+    if (!data.email || !isValidEmail(data.email)) errors.email = 'Email inválido';
     if (data.phone && !/^\d{10,11}$/.test(String(data.phone))) errors.phone = 'Telefone inválido';
     if (!data.cellphone || !/^\d{10,11}$/.test(String(data.cellphone))) errors.cellphone = 'Celular inválido';
-    if (!/^\d{11}$/.test(data.cpf)) errors.cpf = 'CPF deve conter 11 dígitos numéricos';
+    if (!isValidCPF(data.cpf)) errors.cpf = 'CPF inválido';
     if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
@@ -507,7 +507,7 @@ export function CadastroMedico() {
         crm: form.crm.trim(),
         crmState: form.crmState.trim().toUpperCase(),
         name: form.nome.trim(),
-        email: form.email?.trim() || undefined,
+        email: normalizeEmail(form.email) || undefined,
         phone: form.phone || undefined,
         cellphone: form.cellphone || undefined,
         birthDate: formatDateForApi(form.birthDate),

@@ -755,7 +755,9 @@ export function TeaPreReserva() {
         current.regressedScheduledCount += 1;
       }
 
-      if (!hasPreReservation || status === 'PENDING_SCHEDULING') {
+      const isPendingScheduling = status === 'PENDING_SCHEDULING' || (!hasPreReservation && !status);
+
+      if (isPendingScheduling) {
         current.pendingCount += 1;
       } else if (status === 'CONVERTED') {
         current.convertedCount += 1;
@@ -790,10 +792,12 @@ export function TeaPreReserva() {
       let stage: PitProgressStage = 'PIT_GERADO';
       let stepIndex = 1;
 
-      if (value.convertedCount >= totalTherapies) {
+      const hasRegressionOrPendingAuthorization = value.regressedScheduledCount > 0 || value.inAuthorizationCount > 0;
+
+      if (value.convertedCount >= totalTherapies && !hasRegressionOrPendingAuthorization) {
         stage = 'AGENDADO_COMPLETO';
         stepIndex = 7;
-      } else if (value.convertedCount > 0 || value.regressedScheduledCount > 0) {
+      } else if (value.convertedCount > 0 || value.regressedScheduledCount > 0 || value.inAuthorizationCount > 0) {
         stage = 'AGENDADO_PARCIAL';
         stepIndex = 6;
       } else if (value.inAuthorizationCount > 0 || value.authorizedCount > 0) {
@@ -1250,16 +1254,27 @@ export function TeaPreReserva() {
           {renderPitProgress(group.groupKey)}
 
           <Group grow align="flex-end">
-            <Box>
-              <Text size="sm" fw={500} mb={6}>Status do PIT</Text>
-              <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+            <Stack gap={4}>
+              <Text size="xs" fw={500}>Status do PIT</Text>
+              <Paper
+                p={0}
+                withBorder
+                style={{
+                  borderColor: 'var(--mantine-color-default-border)',
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 12px',
+                }}
+              >
                 <Text size="sm" c={groupStatus ? undefined : 'dimmed'}>
                   {groupStatus ? (STATUS_LABEL[groupStatus] || groupStatus) : 'Status misto entre terapias'}
                 </Text>
               </Paper>
-            </Box>
+            </Stack>
             <Button
               variant="default"
+              h={36}
               leftSection={<History size={16} />}
               onClick={() => handleOpenGroupTimeline(group)}
             >
@@ -1269,6 +1284,7 @@ export function TeaPreReserva() {
               <Button
                 color="green"
                 variant="light"
+                h={36}
                 leftSection={<ListChecks size={16} />}
                 onClick={() => handleOpenGroupConversionChecklist(group)}
                 loading={updatingId === group.groupKey}

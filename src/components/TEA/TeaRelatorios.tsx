@@ -100,7 +100,7 @@ export function TeaRelatorios() {
   const loadTeaProfiles = async () => {
     setLoadingProfiles(true);
     try {
-      const data: any = await teaProfileService.list({ limit: 300, offset: 0, hasActivePit: true });
+      const data: any = await teaProfileService.list({ limit: 300, offset: 0 });
       const list: TeaProfileItem[] = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items) ? data.items : []);

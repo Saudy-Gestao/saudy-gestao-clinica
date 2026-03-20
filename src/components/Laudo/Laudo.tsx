@@ -8,6 +8,7 @@ import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import reportService from '../../services/reportService';
 import ResultModal from '../common/ResultModal';
+import { isValidCPF } from '../../utils/formatters';
 
 interface PatientRow {
   id: string;
@@ -108,9 +109,8 @@ export function Laudo() {
     }
 
     if (laudoData.cpf && laudoData.cpf.trim()) {
-      const digits = laudoData.cpf.replace(/\D/g, '');
-      if (digits.length !== 11) {
-        setErrors({ cpf: 'CPF inválido (11 dígitos)' });
+      if (!isValidCPF(laudoData.cpf)) {
+        setErrors({ cpf: 'CPF inválido' });
         showNotification({ title: 'Erro', message: 'CPF inválido', color: 'red' });
         return;
       }

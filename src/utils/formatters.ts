@@ -1,5 +1,34 @@
 export const onlyDigits = (s: string) => (s || '').toString().replace(/\D/g, '');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const normalizeEmail = (s: string) => (s || '').toString().trim().toLowerCase();
+
+export const isValidEmail = (s: string) => {
+  const email = normalizeEmail(s);
+  if (!email) return false;
+  return EMAIL_REGEX.test(email);
+};
+
+export const isValidCPF = (s: string) => {
+  const cpf = onlyDigits(s);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  const calcDigit = (base: string, factorStart: number) => {
+    let total = 0;
+    for (let i = 0; i < base.length; i += 1) {
+      total += Number(base[i]) * (factorStart - i);
+    }
+    const mod = total % 11;
+    return mod < 2 ? 0 : 11 - mod;
+  };
+
+  const firstDigit = calcDigit(cpf.slice(0, 9), 10);
+  const secondDigit = calcDigit(cpf.slice(0, 10), 11);
+  return firstDigit === Number(cpf[9]) && secondDigit === Number(cpf[10]);
+};
+
 export const formatCPF = (s: string) => {
   const v = onlyDigits(s).slice(0, 11);
   if (!v) return '';

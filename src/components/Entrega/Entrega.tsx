@@ -11,7 +11,7 @@ import deliveryService from '../../services/deliveryService';
 import patientService from '../../services/patientService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import { FacialCapture } from '../common/FacialCapture';
-import { formatDateInput } from '../../utils/formatters';
+import { formatDateInput, isValidCPF } from '../../utils/formatters';
 
 interface DeliveryRow {
   id: string;
@@ -280,6 +280,10 @@ export function Entrega() {
     if (!deliverTarget) return;
     if (!deliverToName.trim() || !deliverToCpf.trim()) {
       showNotification({ title: 'Erro', message: 'Informe nome e CPF de quem recebeu', color: 'red' });
+      return;
+    }
+    if (!isValidCPF(deliverToCpf)) {
+      showNotification({ title: 'Erro', message: 'CPF inválido de quem recebeu', color: 'red' });
       return;
     }
 

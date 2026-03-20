@@ -30,7 +30,7 @@ import patientService from '../../services/patientService';
 import teaProfileService from '../../services/teaProfileService';
 import doctorService from '../../services/doctorService';
 import { DARK_BLUE } from '../../themes/theme';
-import { onlyDigits, formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
+import { onlyDigits, formatCPF, isValidCPF, isValidEmail, normalizeEmail, parseApiDateToLocalDate } from '../../utils/formatters';
 
 type Gender = 'MALE' | 'FEMALE' | 'OTHER' | '';
 export type TeaSubmodule = 'cadastro' | 'pacientes' | 'plano' | 'evolucao' | 'relatorios';
@@ -219,10 +219,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const loadPatients = async () => {
     setPatientsLoading(true);
     try {
-      const [patientData, teaProfileData] = await Promise.all([
-        patientService.listPatients(),
-        teaProfileService.list({ limit: 500, offset: 0, hasActivePit: true }),
-      ]);
+      const patientData = await patientService.listPatients();
 
       const list: any[] = Array.isArray(patientData)
         ? patientData
@@ -236,26 +233,11 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                 ? patientData.data
                 : []))));
 
-      const teaProfiles: any[] = Array.isArray(teaProfileData)
-        ? teaProfileData
-        : (Array.isArray(teaProfileData?.items)
-          ? teaProfileData.items
-          : (Array.isArray(teaProfileData?.data?.items)
-            ? teaProfileData.data.items
-            : []));
-
-      const activePitPatientIds = new Set(
-        teaProfiles
-          .map((profile: any) => String(profile?.patient?.id || profile?.patientId || '').trim())
-          .filter(Boolean),
-      );
-
       const byId: Record<string, any> = {};
       const options = list
         .map((p: any) => {
           const id = String(p.id || '');
           if (!id) return null;
-          if (!activePitPatientIds.has(id)) return null;
           byId[id] = p;
           const name = String(p.name || '').trim();
           const cpf = String(p.cpf || '').trim();
@@ -333,7 +315,6 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         search: search || undefined,
         limit: 100,
         offset: 0,
-        hasActivePit: true,
       });
       const list: any[] = Array.isArray(data)
         ? data
@@ -406,8 +387,8 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         showNotification({ title: 'Erro', message: 'Nome do paciente é obrigatório', color: 'red' });
         return;
       }
-      if (cpfDigits.length !== 11) {
-        showNotification({ title: 'Erro', message: 'CPF deve conter 11 dígitos', color: 'red' });
+      if (!isValidCPF(cpfDigits)) {
+        showNotification({ title: 'Erro', message: 'CPF inválido', color: 'red' });
         return;
       }
       if (!form.birthDate) {
@@ -422,6 +403,10 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         showNotification({ title: 'Erro', message: 'Celular é obrigatório', color: 'red' });
         return;
       }
+      if (form.email.trim() && !isValidEmail(form.email)) {
+        showNotification({ title: 'Erro', message: 'Email inválido', color: 'red' });
+        return;
+      }
     }
 
     setSaving(true);
@@ -434,7 +419,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
           birthDate: form.birthDate ? dayjs(form.birthDate).format('YYYY-MM-DD') : undefined,
           gender: form.gender || undefined,
           cellphone: form.cellphone.trim() || undefined,
-          email: form.email.trim() || undefined,
+          email: normalizeEmail(form.email) || undefined,
           healthInsuranceName: form.healthInsuranceName.trim() || undefined,
           healthInsuranceNumber: form.healthInsuranceNumber.trim() || undefined,
         },
