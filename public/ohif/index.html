@@ -24,6 +24,11 @@
     const dicomWebUrl = params.get('dicomWebUrl') || '/dicom-web';
 
     window.__ohif__ = { studyUID, dicomWebUrl };
+
+    console.log('[OHIF index] location.href', window.location.href);
+    console.log('[OHIF index] location.search', window.location.search);
+    console.log('[OHIF index] params studyUID', studyUID);
+    console.log('[OHIF index] params dicomWebUrl', dicomWebUrl);
   </script>
 
   <script type="text/javascript" src="/ohif/app-config.js"></script>
