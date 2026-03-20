@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import reportWorklistService from '../../services/reportWorklistService';
 
-// Always use local proxy in development to avoid CORS and include Orthanc Basic Auth.
-const DICOMWEB_PROXY_URL = '/dicom-web';
+// In production (different frontend/backend hosts), set VITE_DICOMWEB_URL to
+// an absolute URL like https://<backend>/dicom-web. Fallback keeps local flow.
+const DICOMWEB_URL = import.meta.env.VITE_DICOMWEB_URL || '/dicom-web';
 
 export function OhifViewer() {
   const { key } = useParams<{ key: string }>();
@@ -13,7 +14,7 @@ export function OhifViewer() {
 
   const src = useMemo(() => {
     const study = encodeURIComponent(studyUid || key || '');
-    const server = encodeURIComponent(DICOMWEB_PROXY_URL);
+    const server = encodeURIComponent(DICOMWEB_URL);
 
     // Self-hosted OHIF within this app (uses /ohif/index.html).
     // The OHIF build is shipped under public/ohif/ and uses query string + hash routing.
@@ -44,7 +45,7 @@ export function OhifViewer() {
         }
 
         const study = encodeURIComponent(result.studyInstanceUid || key);
-        const server = encodeURIComponent(DICOMWEB_PROXY_URL);
+        const server = encodeURIComponent(DICOMWEB_URL);
         window.location.assign(`/ohif/index.html?dicomWebUrl=${server}&studyUID=${study}`);
       } catch (err: any) {
         if (!cancelled) {

@@ -22,22 +22,24 @@
   <script type="text/javascript">
     const params = new URLSearchParams(window.location.search);
     const studyUID = params.get('studyUID');
+    const dicomWebUrl = params.get('dicomWebUrl') || '/dicom-web';
 
-    window.__ohif__ = { studyUID };
+    window.__ohif__ = { studyUID, dicomWebUrl };
   </script>
 
   <script type="text/javascript" src="/ohif/app-config.js"></script>
   <script type="text/javascript">
     const runtime = window.__ohif__ || {};
+    const dicomWebRoot = runtime.dicomWebUrl || '/dicom-web';
     
     window.config = window.config || {};
     window.config.servers = window.config.servers || {};
     window.config.servers.dicomWeb = [
       {
         name: 'Orthanc',
-        wadoUriRoot: '/dicom-web',
-        qidoRoot: '/dicom-web',
-        wadoRoot: '/dicom-web',
+        wadoUriRoot: dicomWebRoot,
+        qidoRoot: dicomWebRoot,
+        wadoRoot: dicomWebRoot,
         qidoSupportsIncludeField: true,
         imageRendering: 'wadors',
         thumbnailRendering: 'wadors',
