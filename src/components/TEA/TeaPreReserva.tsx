@@ -28,7 +28,7 @@ import {
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
-import { formatCPF } from '../../utils/formatters';
+import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 
@@ -85,6 +85,12 @@ const WEEKDAY_TO_DAY_INDEX: Record<string, number> = {
   QUINTA: 4,
   SEXTA: 5,
   SABADO: 6,
+};
+
+const normalizeDateToIso = (value?: string | null) => {
+  const parsed = parseApiDateToLocalDate(value);
+  if (!parsed) return null;
+  return dayjs(parsed).format('YYYY-MM-DD');
 };
 
 type GroupTherapyContext = {
@@ -170,6 +176,7 @@ type PitProgressInfo = {
   stepIndex: number;
   totalTherapies: number;
   convertedCount: number;
+  regressedScheduledCount: number;
   pendingCount: number;
   pendingApprovalCount: number;
   pendingApprovalRequestedAt: string | null;
@@ -356,6 +363,76 @@ export function TeaPreReserva() {
     }
 
     return previewDates;
+  };
+
+  const buildPreferredWeekdayPreviewDates = (
+    startDate: string | undefined,
+    preferredWeekdays: string[] | undefined,
+    count = 5,
+  ) => {
+    const normalizedIndexes = Array.from(
+      new Set(
+        (preferredWeekdays || [])
+          .map((day) => WEEKDAY_TO_DAY_INDEX[String(day || '').toUpperCase()])
+          .filter((index): index is number => Number.isInteger(index)),
+      ),
+    ).sort((a, b) => a - b);
+
+    if (!normalizedIndexes.length) {
+      return buildRecurringPreviewDates(startDate ? [startDate] : [], count);
+    }
+
+    const base = startDate ? dayjs(startDate).startOf('day') : dayjs().startOf('day');
+    const today = dayjs().startOf('day');
+    const cursorStart = base.isBefore(today, 'day') ? today : base;
+    const result: string[] = [];
+    let cursor = cursorStart;
+
+    while (result.length < count && !cursor.isAfter(recurringUntilYearEnd, 'day')) {
+      if (normalizedIndexes.includes(cursor.day())) {
+        result.push(cursor.format('YYYY-MM-DD'));
+      }
+      cursor = cursor.add(1, 'day');
+    }
+
+    return result;
+  };
+
+  const buildWeeklySlotsFromPreferences = (
+    selectedDate: string,
+    preferredWeekdays: string[] | undefined,
+    weeklyFrequency: number,
+  ) => {
+    const limit = Math.max(1, Number(weeklyFrequency) || 1);
+    const indexes = Array.from(
+      new Set(
+        (preferredWeekdays || [])
+          .map((day) => WEEKDAY_TO_DAY_INDEX[String(day || '').toUpperCase()])
+          .filter((index): index is number => Number.isInteger(index)),
+      ),
+    );
+
+    if (!indexes.length) {
+      return Array.from({ length: limit }).map((_, idx) => ({
+        date: dayjs(selectedDate).add(idx, 'week').format('YYYY-MM-DD'),
+        time: '09:00',
+      }));
+    }
+
+    const slots: Array<{ date: string; time: string }> = [];
+    let cursor = dayjs(selectedDate).startOf('day');
+
+    while (slots.length < limit && !cursor.isAfter(recurringUntilYearEnd, 'day')) {
+      if (indexes.includes(cursor.day())) {
+        slots.push({
+          date: cursor.format('YYYY-MM-DD'),
+          time: '09:00',
+        });
+      }
+      cursor = cursor.add(1, 'day');
+    }
+
+    return slots;
   };
 
   const resolveTherapySlotsForAcceptance = (therapy: GroupTherapyContext, startDate?: string) => {
@@ -638,6 +715,7 @@ export function TeaPreReserva() {
     const byGroup = new Map<string, {
       therapyIds: Set<string>;
       convertedCount: number;
+      regressedScheduledCount: number;
       pendingCount: number;
       reservedCount: number;
       pendingApprovalCount: number;
@@ -659,6 +737,7 @@ export function TeaPreReserva() {
         byGroup.set(groupKey, {
           therapyIds: new Set<string>(),
           convertedCount: 0,
+          regressedScheduledCount: 0,
           pendingCount: 0,
           reservedCount: 0,
           pendingApprovalCount: 0,
@@ -671,6 +750,10 @@ export function TeaPreReserva() {
 
       const current = byGroup.get(groupKey)!;
       if (pitTherapyId) current.therapyIds.add(pitTherapyId);
+
+      if (status === 'PENDING_SCHEDULING' && String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE') {
+        current.regressedScheduledCount += 1;
+      }
 
       if (!hasPreReservation || status === 'PENDING_SCHEDULING') {
         current.pendingCount += 1;
@@ -710,7 +793,7 @@ export function TeaPreReserva() {
       if (value.convertedCount >= totalTherapies) {
         stage = 'AGENDADO_COMPLETO';
         stepIndex = 7;
-      } else if (value.convertedCount > 0) {
+      } else if (value.convertedCount > 0 || value.regressedScheduledCount > 0) {
         stage = 'AGENDADO_PARCIAL';
         stepIndex = 6;
       } else if (value.inAuthorizationCount > 0 || value.authorizedCount > 0) {
@@ -732,6 +815,7 @@ export function TeaPreReserva() {
         stepIndex,
         totalTherapies,
         convertedCount: value.convertedCount,
+        regressedScheduledCount: value.regressedScheduledCount,
         pendingCount: value.pendingCount,
         pendingApprovalCount: value.pendingApprovalCount,
         pendingApprovalRequestedAt: value.pendingApprovalRequestedAt,
@@ -753,16 +837,17 @@ export function TeaPreReserva() {
     const reservedCompleteActive = reservedTotal >= progress.totalTherapies;
     const inAuthorizationActive = progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0;
     const pendingApprovalActive = progress.pendingApprovalCount > 0 || inAuthorizationActive;
-    const scheduledPartialActive = progress.convertedCount > 0;
+    const scheduledPartialActive = progress.convertedCount > 0 || progress.regressedScheduledCount > 0;
     const scheduledCompleteActive = progress.convertedCount >= progress.totalTherapies;
     const authorizationDone = Math.min(progress.totalTherapies, progress.authorizedCount + progress.convertedCount);
     const authorizationRatio = progress.totalTherapies > 0 ? (authorizationDone / progress.totalTherapies) : 0;
     const authorizationStepIndex = PROGRESS_STEP_LABELS.indexOf('Em autorização');
     const pendingApprovalStepIndex = PROGRESS_STEP_LABELS.indexOf('Aguardando aprovação');
+    const stageFilledByStep: boolean[] = PROGRESS_STEP_LABELS.map((_, index) => index <= (progress.stepIndex - 1));
     const pendingRequested = progress.pendingApprovalRequestedAt ? dayjs(progress.pendingApprovalRequestedAt) : null;
     const pendingDeadline = progress.pendingApprovalDeadlineAt ? dayjs(progress.pendingApprovalDeadlineAt) : null;
     const hasLivePendingApproval = progress.pendingApprovalCount > 0;
-    const pendingApprovalStepCompleted = !hasLivePendingApproval && inAuthorizationActive;
+    const pendingApprovalStepCompleted = !hasLivePendingApproval && (inAuthorizationActive || stageFilledByStep[pendingApprovalStepIndex]);
     const pendingApprovalElapsedRatio = (() => {
       if (!hasLivePendingApproval) return pendingApprovalStepCompleted ? 1 : 0;
       if (!pendingRequested?.isValid() || !pendingDeadline?.isValid()) return 0.2;
@@ -772,15 +857,16 @@ export function TeaPreReserva() {
       const remainingRatio = Math.max(0, Math.min(1, remainingMs / totalMs));
       return 1 - remainingRatio;
     })();
+    const authorizationDisplayRatio = stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
 
     const activeByStep: boolean[] = [
-      true, // PIT gerado
-      reservedPartialActive,
-      reservedCompleteActive,
-      pendingApprovalActive,
-      inAuthorizationActive,
-      scheduledPartialActive,
-      scheduledCompleteActive,
+      stageFilledByStep[0], // PIT gerado
+      reservedPartialActive || stageFilledByStep[1],
+      reservedCompleteActive || stageFilledByStep[2],
+      pendingApprovalActive || stageFilledByStep[3],
+      inAuthorizationActive || stageFilledByStep[4],
+      scheduledPartialActive || stageFilledByStep[5],
+      scheduledCompleteActive || stageFilledByStep[6],
     ];
 
     return (
@@ -834,7 +920,7 @@ export function TeaPreReserva() {
                   {isAuthorizationStep && (
                     <Box
                       style={{
-                        width: `${Math.round(Math.max(0, Math.min(1, authorizationRatio)) * 100)}%`,
+                        width: `${Math.round(Math.max(0, Math.min(1, authorizationDisplayRatio)) * 100)}%`,
                         height: '100%',
                         backgroundColor: 'var(--mantine-color-teal-6)',
                         transition: 'width 180ms ease',
@@ -896,9 +982,7 @@ export function TeaPreReserva() {
       if (!pitTherapyId || uniqueTherapies.has(pitTherapyId)) return;
 
       const suggestedDateRaw = reservation?.slotSuggestion?.suggestedDate || reservation?.suggestedDate;
-      const suggestedDate = suggestedDateRaw && dayjs(suggestedDateRaw).isValid()
-        ? dayjs(suggestedDateRaw).format('YYYY-MM-DD')
-        : dayjs().format('YYYY-MM-DD');
+      const suggestedDate = normalizeDateToIso(suggestedDateRaw) || dayjs().format('YYYY-MM-DD');
       const suggestedTime = String(reservation?.slotSuggestion?.suggestedTime || reservation?.suggestedTime || '09:00');
 
       uniqueTherapies.set(pitTherapyId, {
@@ -1414,6 +1498,18 @@ export function TeaPreReserva() {
     return diffs.length > 0 ? Math.min(...diffs) : 15;
   }, [manualTimeRows]);
 
+  const manualWeeklyLimit = useMemo(
+    () => Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1)),
+    [manualSelectedTherapy],
+  );
+
+  const manualSelectedSessionCount = useMemo(
+    () => countManualSelectionGroups(manualSelectedSlots, manualSlotStepMinutes),
+    [manualSelectedSlots, manualSlotStepMinutes],
+  );
+
+  const manualSelectionComplete = manualSelectedSessionCount === manualWeeklyLimit;
+
 
   const loadPending = async (options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
@@ -1555,6 +1651,16 @@ export function TeaPreReserva() {
 
     const selectedSessions = countManualSelectionGroups(sortedSlots, manualSlotStepMinutes);
     const weeklyLimit = Math.max(1, Number(manualSelectedTherapy.weeklyFrequency || 1));
+
+    if (selectedSessions < weeklyLimit) {
+      showNotification({
+        title: 'Seleção incompleta',
+        message: `Selecione exatamente ${weeklyLimit} marcação(ões) semanal(is) para esta terapia.`,
+        color: 'yellow',
+      });
+      return;
+    }
+
     if (selectedSessions > weeklyLimit) {
       showNotification({
         title: 'Limite semanal excedido',
@@ -2030,11 +2136,23 @@ export function TeaPreReserva() {
     const reservationIds = conversionReservationIds;
     if (!Array.isArray(reservationIds) || reservationIds.length === 0) return;
 
+    const startDateByReservationId = checklistGroupReservations.reduce((acc, reservation) => {
+      const reservationId = String(reservation?.preReservationId || '');
+      const pitTherapyId = String(reservation?.pitTherapyId || '');
+      if (!reservationId || !pitTherapyId) return acc;
+      const selectedDate = acceptDateByTherapy[pitTherapyId];
+      if (selectedDate) acc[reservationId] = selectedDate;
+      return acc;
+    }, {} as Record<string, string>);
+
 
     setUpdatingId(checklistGroupKey || reservationIds[0]);
     try {
       const results = await Promise.allSettled(
-        reservationIds.map((reservationId) => teaPreReservationService.convertToAppointment(reservationId, { convertSeries: true })),
+        reservationIds.map((reservationId) => teaPreReservationService.convertToAppointment(reservationId, {
+          convertSeries: true,
+          seriesStartDate: startDateByReservationId[reservationId],
+        })),
       );
 
       const successCount = results.filter((result) => result.status === 'fulfilled').length;
@@ -2380,16 +2498,19 @@ export function TeaPreReserva() {
           <Stack gap={6}>
             {acceptTherapies.map((entry) => {
               const allDates = Array.from(new Set(entry.slots.map((s) => s.date))).sort((a,b)=>dayjs(a).valueOf()-dayjs(b).valueOf());
-              const dates = buildRecurringPreviewDates(allDates, 5);
+              const dates = acceptModalMode === 'conversion'
+                ? buildPreferredWeekdayPreviewDates(allDates[0], entry.therapy.preferredWeekdays, 8)
+                : buildRecurringPreviewDates(allDates, 5);
               const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dates[0] || '';
               
               // In conversion mode, calculate directly from weeklyFrequency
               // In suggestion mode, resolve from generated suggestions
               const selectedWeeklySlots = acceptModalMode === 'conversion'
-                ? Array.from({ length: entry.therapy.weeklyFrequency || 1 }).map((_, i) => ({
-                    date: dayjs(selectedDate).add(i, 'day').format('YYYY-MM-DD'),
-                    time: '09:00',
-                  }))
+                ? buildWeeklySlotsFromPreferences(
+                    selectedDate || dayjs().format('YYYY-MM-DD'),
+                    entry.therapy.preferredWeekdays,
+                    entry.therapy.weeklyFrequency || 1,
+                  )
                 : resolveTherapySlotsForAcceptance(entry.therapy, selectedDate);
               
               const weeks = getWeeksUntilYearEnd(selectedDate);
@@ -2521,6 +2642,8 @@ export function TeaPreReserva() {
                       const isSelected = manualSelectedSlots.some((selected) => selected.date === day.date && selected.time === time);
                       const isOccupied = !!slot?.occupied;
                       const isSelectable = !!slot?.selectable;
+                      const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
+                      const canAddNewSelection = !reachedWeeklyLimit || isSelected;
                       const isFree = !isOccupied && isSelectable && day.enabled;
                       const isUnavailable = !isOccupied && !isSelectable;
                       const stateLabel = isSelected
@@ -2537,7 +2660,7 @@ export function TeaPreReserva() {
                           key={`${day.date}-${time}`}
                           size="compact-xs"
                           variant="filled"
-                          disabled={!isSelectable || !manualSelectedTherapyId}
+                          disabled={!isSelectable || !manualSelectedTherapyId || !canAddNewSelection}
                           title={`${dayLabel} ${time} • ${stateLabel}`}
                           aria-label={`${dayLabel} ${time} • ${stateLabel}`}
                           onClick={() => {
@@ -2665,6 +2788,9 @@ export function TeaPreReserva() {
               <Badge color="gray" variant="light">Ocupado</Badge>
               <Badge color="indigo" variant="light">Livre</Badge>
               <Badge color="green" variant="filled">Selecionado</Badge>
+              <Badge color={manualSelectionComplete ? 'teal' : 'yellow'} variant="light">
+                Selecionado: {manualSelectedSessionCount}/{manualWeeklyLimit} por semana
+              </Badge>
             </Group>
             <Group gap="xs">
               <Button
@@ -2678,7 +2804,7 @@ export function TeaPreReserva() {
                 color="green"
                 onClick={handleManualConfirmReservation}
                 loading={manualSaving}
-                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || manualSaving}
+                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || !manualSelectionComplete || manualSaving}
               >
                 Confirmar reserva manual
               </Button>
@@ -2883,7 +3009,9 @@ export function TeaPreReserva() {
                       const completedCount = completedGroupForSamePit?.reservations?.length || 0;
                       const groupContext = buildGroupContextFromItems(group);
                       const removedTherapies = group.therapies.filter((item) => Boolean(item?.removedFromPit));
+                      const frequencyChangedTherapies = group.therapies.filter((item) => String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE');
                       const hasRemovedTherapyAlert = removedTherapies.length > 0;
+                      const hasFrequencyChangeAlert = frequencyChangedTherapies.length > 0;
                       const canScheduleGroup = groupContext.therapies.length > 0;
                       const totalSuggested = groupContext.therapies.reduce(
                         (acc, therapy) => acc + (suggestionsByTherapyId[therapy.pitTherapyId]?.length || 0),
@@ -2895,7 +3023,12 @@ export function TeaPreReserva() {
                           <Stack gap={8}>
                             <Group justify="space-between" align="center" wrap="wrap">
                               <Text fw={600}>{group.patientName}</Text>
-                              <Badge variant="light" color="gray">Pendente de marcação</Badge>
+                              <Group gap="xs">
+                                {hasFrequencyChangeAlert && (
+                                  <Badge variant="light" color="blue">Agendado parcial</Badge>
+                                )}
+                                <Badge variant="light" color="gray">Pendente de marcação</Badge>
+                              </Group>
                             </Group>
 
                             <Text size="xs" c="dimmed">
@@ -2924,6 +3057,16 @@ export function TeaPreReserva() {
                                       <Badge variant="light" color="red">Precisa desmarcar sessões</Badge>
                                     </Group>
                                   )}
+                                  {String(therapyItem?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE' && (
+                                    <Group gap={6} mb={4}>
+                                      <Badge variant="light" color="blue">Frequência alterada</Badge>
+                                      {Number.isFinite(Number(therapyItem?.previousWeeklyFrequency)) && Number.isFinite(Number(therapyItem?.currentWeeklyFrequency)) && (
+                                        <Badge variant="light" color="indigo">
+                                          {Number(therapyItem.previousWeeklyFrequency)}x {'>'} {Number(therapyItem.currentWeeklyFrequency)}x
+                                        </Badge>
+                                      )}
+                                    </Group>
+                                  )}
                                   <Text size="xs" c="dimmed">
                                     Frequência: {therapyItem.preferences?.weeklyFrequency || 1}x/semana
                                     {' • '}
@@ -2931,6 +3074,11 @@ export function TeaPreReserva() {
                                     {' • '}
                                     Turno: {therapyItem.preferences?.shift || 'Não definido'}
                                   </Text>
+                                  {String(therapyItem?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE' && therapyItem?.alertMessage && (
+                                    <Text size="xs" c="blue">
+                                      {String(therapyItem.alertMessage)}
+                                    </Text>
+                                  )}
                                   {therapyItem?.removedFromPit && therapyItem?.alertMessage && (
                                     <Text size="xs" c="orange">
                                       {String(therapyItem.alertMessage)}

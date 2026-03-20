@@ -20,7 +20,6 @@ import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
-import { Envelopamento } from './components/Envelopamento/Envelopamento';
 import { Entrega } from './components/Entrega/Entrega';
 import { Estoque } from './components/Estoque/Estoque';
 import { SettingsPage } from './components/Settings/SettingsPage';
@@ -143,10 +142,6 @@ function App() {
           <Route
             path="/laudo-configuracoes"
             element={<ProtectedRoute><LaudoConfiguracoes /></ProtectedRoute>}
-          />
-          <Route
-            path="/envelopamento"
-            element={<ProtectedRoute><Envelopamento /></ProtectedRoute>}
           />
           <Route
             path="/entrega"
