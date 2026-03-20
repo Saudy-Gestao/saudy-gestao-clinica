@@ -1,12 +1,13 @@
 import api from './api';
 
 export interface ReportWorklistPayload {
+  appointmentId?: string;
   externalStudyId?: string;
   accessionNumber?: string;
-  patientName: string;
+  patientName?: string;
   patientCpf?: string;
   patientBirthDate?: string;
-  examType: string;
+  examType?: string;
   scheduledAt?: string;
   convenio?: string;
   requestingDoctor?: string;

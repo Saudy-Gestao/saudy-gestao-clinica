@@ -17,7 +17,6 @@ import { AdminHub } from './components/Admin/AdminHub';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { Consulta } from './components/Consulta/Consulta';
-import { Laudo } from './components/Laudo/Laudo';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
 import { DicomViewerPage } from './components/DicomViewer/DicomViewerPage';
@@ -135,7 +134,7 @@ function App() {
           />
           <Route
             path="/laudo"
-            element={<ProtectedRoute><Laudo /></ProtectedRoute>}
+            element={<Navigate to="/laudo-exames" replace />}
           />
           <Route
             path="/laudo-exames"
