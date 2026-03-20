@@ -178,6 +178,8 @@ type PitProgressInfo = {
   convertedCount: number;
   regressedScheduledCount: number;
   pendingCount: number;
+  reservedPartialCount: number;
+  reservedCompleteCount: number;
   pendingApprovalCount: number;
   pendingApprovalRequestedAt: string | null;
   pendingApprovalDeadlineAt: string | null;
@@ -717,7 +719,8 @@ export function TeaPreReserva() {
       convertedCount: number;
       regressedScheduledCount: number;
       pendingCount: number;
-      reservedCount: number;
+      reservedPartialCount: number;
+      reservedCompleteCount: number;
       pendingApprovalCount: number;
       pendingApprovalRequestedAt: string | null;
       pendingApprovalDeadlineAt: string | null;
@@ -739,7 +742,8 @@ export function TeaPreReserva() {
           convertedCount: 0,
           regressedScheduledCount: 0,
           pendingCount: 0,
-          reservedCount: 0,
+          reservedPartialCount: 0,
+          reservedCompleteCount: 0,
           pendingApprovalCount: 0,
           pendingApprovalRequestedAt: null,
           pendingApprovalDeadlineAt: null,
@@ -762,7 +766,15 @@ export function TeaPreReserva() {
       } else if (status === 'CONVERTED') {
         current.convertedCount += 1;
       } else if (status === 'RESERVED') {
-        current.reservedCount += 1;
+        const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
+        const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
+        const weeklyComplete = weeklyReserved >= weeklyTarget;
+
+        if (weeklyComplete) {
+          current.reservedCompleteCount += 1;
+        } else {
+          current.reservedPartialCount += 1;
+        }
       } else if (status === 'PROPOSED') {
         current.pendingApprovalCount += 1;
         const requestedAt = item?.approvalRequestedAt ? dayjs(item.approvalRequestedAt) : null;
@@ -794,6 +806,8 @@ export function TeaPreReserva() {
 
       const hasRegressionOrPendingAuthorization = value.regressedScheduledCount > 0 || value.inAuthorizationCount > 0;
 
+      const reservedTotal = value.reservedPartialCount + value.reservedCompleteCount;
+
       if (value.convertedCount >= totalTherapies && !hasRegressionOrPendingAuthorization) {
         stage = 'AGENDADO_COMPLETO';
         stepIndex = 7;
@@ -806,10 +820,10 @@ export function TeaPreReserva() {
       } else if (value.pendingApprovalCount > 0) {
         stage = 'AGUARDANDO_APROVACAO';
         stepIndex = 4;
-      } else if (value.reservedCount >= totalTherapies) {
+      } else if (value.reservedCompleteCount >= totalTherapies) {
         stage = 'RESERVADO_COMPLETO';
         stepIndex = 3;
-      } else if (value.reservedCount > 0) {
+      } else if (reservedTotal > 0) {
         stage = 'RESERVADO_PARCIAL';
         stepIndex = 2;
       }
@@ -821,6 +835,8 @@ export function TeaPreReserva() {
         convertedCount: value.convertedCount,
         regressedScheduledCount: value.regressedScheduledCount,
         pendingCount: value.pendingCount,
+        reservedPartialCount: value.reservedPartialCount,
+        reservedCompleteCount: value.reservedCompleteCount,
         pendingApprovalCount: value.pendingApprovalCount,
         pendingApprovalRequestedAt: value.pendingApprovalRequestedAt,
         pendingApprovalDeadlineAt: value.pendingApprovalDeadlineAt,
@@ -836,9 +852,9 @@ export function TeaPreReserva() {
     const progress = pitProgressByGroupKey.get(groupKey);
     if (!progress) return null;
 
-    const reservedTotal = progress.totalTherapies - progress.pendingCount;
+    const reservedTotal = progress.reservedPartialCount + progress.reservedCompleteCount;
     const reservedPartialActive = reservedTotal > 0;
-    const reservedCompleteActive = reservedTotal >= progress.totalTherapies;
+    const reservedCompleteActive = progress.reservedCompleteCount >= progress.totalTherapies;
     const inAuthorizationActive = progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0;
     const pendingApprovalActive = progress.pendingApprovalCount > 0 || inAuthorizationActive;
     const scheduledPartialActive = progress.convertedCount > 0 || progress.regressedScheduledCount > 0;
@@ -1665,38 +1681,18 @@ export function TeaPreReserva() {
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
-    const selectedSessions = countManualSelectionGroups(sortedSlots, manualSlotStepMinutes);
-    const weeklyLimit = Math.max(1, Number(manualSelectedTherapy.weeklyFrequency || 1));
-
-    if (selectedSessions < weeklyLimit) {
-      showNotification({
-        title: 'Seleção incompleta',
-        message: `Selecione exatamente ${weeklyLimit} marcação(ões) semanal(is) para esta terapia.`,
-        color: 'yellow',
-      });
-      return;
-    }
-
-    if (selectedSessions > weeklyLimit) {
-      showNotification({
-        title: 'Limite semanal excedido',
-        message: `Essa terapia permite até ${weeklyLimit} marcação(ões) por semana no PIT.`,
-        color: 'yellow',
-      });
-      return;
-    }
-
     setManualSaving(true);
     try {
       const sessionAnchors = getManualSelectionAnchors(sortedSlots, manualSlotStepMinutes);
       const firstDate = sessionAnchors[0]?.date;
       const weeks = getWeeksUntilYearEnd(firstDate);
 
-      await teaPreReservationService.acceptGroup({
+      const acceptResult: any = await teaPreReservationService.acceptGroup({
         recurring: true,
         recurrenceWeeks: weeks,
         recurringUntilDate,
         expiresAt: dayjs().add(2, 'day').toISOString(),
+        status: 'RESERVED',
         items: sessionAnchors.map((slot) => ({
           pitTherapyId: manualSelectedTherapy.pitTherapyId,
           suggestedDate: slot.date,
@@ -1705,9 +1701,23 @@ export function TeaPreReserva() {
         })),
       });
 
+      const totalCreated = Number(acceptResult?.totalCreated || 0);
+      const skippedConflicts = Number(acceptResult?.skippedConflicts || 0);
+
+      if (totalCreated <= 0) {
+        showNotification({
+          title: 'Nenhum horário reservado',
+          message: skippedConflicts > 0
+            ? 'Os horários selecionados entraram em conflito e não puderam ser reservados.'
+            : 'Não foi possível reservar os horários selecionados.',
+          color: 'yellow',
+        });
+        return;
+      }
+
       showNotification({
         title: 'Sucesso',
-        message: `Reserva manual confirmada com ${selectedSessions} marcação(ões) semanal(is).`,
+        message: `Reserva manual confirmada com ${totalCreated} sessão(ões) criada(s).`,
         color: 'green',
       });
 
@@ -2823,7 +2833,7 @@ export function TeaPreReserva() {
                 color="green"
                 onClick={handleManualConfirmReservation}
                 loading={manualSaving}
-                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || !manualSelectionComplete || manualSaving}
+                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || manualSaving}
               >
                 Confirmar reserva manual
               </Button>
