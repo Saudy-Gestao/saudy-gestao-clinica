@@ -2737,22 +2737,16 @@ export function TeaPreReserva() {
 
                             setManualSelectedSlots((prev) => {
                               const toSignature = (slotItem: { date: string; time: string }) => `${slotItem.date}#${slotItem.time}`;
+                              const anchorSlot = { date: day.date, time };
+                              const anchorSignature = toSignature(anchorSlot);
                               const prevSignatureSet = new Set(prev.map(toSignature));
-                              const rangeSignatureSet = new Set(rangeSlots.map(toSignature));
-                              const isRangeAlreadySelected = rangeSlots.every((slotItem) => prevSignatureSet.has(toSignature(slotItem)));
 
-                              // Toggle behavior: clicking an already selected range removes it.
-                              if (isRangeAlreadySelected) {
-                                return prev.filter((slotItem) => !rangeSignatureSet.has(toSignature(slotItem)));
+                              // Toggle behavior: clicking an already selected start slot removes it.
+                              if (prevSignatureSet.has(anchorSignature)) {
+                                return prev.filter((slotItem) => toSignature(slotItem) !== anchorSignature);
                               }
 
-                              const merged = [...prev];
-                              rangeSlots.forEach((slotItem) => {
-                                const signature = toSignature(slotItem);
-                                if (!prevSignatureSet.has(signature)) {
-                                  merged.push(slotItem);
-                                }
-                              });
+                              const merged = [...prev, anchorSlot];
 
                               const normalizedMerged = merged.sort((a, b) => {
                                 const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
