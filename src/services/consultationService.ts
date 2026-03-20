@@ -2,6 +2,9 @@ import api from './api';
 
 export interface ConsultationPayload {
   patientName: string;
+  appointmentId?: string;
+  doctorId?: string;
+  doctorName?: string;
   convenio?: string;
   convenioStatus?: string;
   scheduledFor?: string;

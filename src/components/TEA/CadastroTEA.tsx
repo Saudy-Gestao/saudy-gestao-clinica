@@ -30,7 +30,7 @@ import patientService from '../../services/patientService';
 import teaProfileService from '../../services/teaProfileService';
 import doctorService from '../../services/doctorService';
 import { DARK_BLUE } from '../../themes/theme';
-import { onlyDigits, formatCPF } from '../../utils/formatters';
+import { onlyDigits, formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 
 type Gender = 'MALE' | 'FEMALE' | 'OTHER' | '';
 export type TeaSubmodule = 'cadastro' | 'pacientes' | 'plano' | 'evolucao' | 'relatorios';
@@ -131,6 +131,31 @@ function mapGender(value: any): Gender {
   return '';
 }
 
+function formatBirthDateInput(value: string): string {
+  const digits = onlyDigits(value).slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function parseBirthDateInput(value: string): Date | null {
+  const parts = value.split('/');
+  if (parts.length !== 3) return null;
+
+  const day = Number(parts[0]);
+  const month = Number(parts[1]);
+  const year = Number(parts[2]);
+  if (!Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year)) return null;
+
+  const date = new Date(year, month - 1, day);
+  const isValid =
+    date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day;
+
+  return isValid ? date : null;
+}
+
 export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -156,6 +181,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const activeModuleBorder = colorScheme === 'dark' ? '#3a5392' : 'var(--mantine-color-indigo-6)';
 
   const [form, setForm] = useState<TeaForm>(INITIAL_FORM);
+  const [birthDateInput, setBirthDateInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -193,24 +219,43 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const loadPatients = async () => {
     setPatientsLoading(true);
     try {
-      const data: any = await patientService.listPatients();
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.patients)
-          ? data.patients
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.patients)
-              ? data.data.patients
-              : (Array.isArray(data?.data)
-                ? data.data
+      const [patientData, teaProfileData] = await Promise.all([
+        patientService.listPatients(),
+        teaProfileService.list({ limit: 500, offset: 0, hasActivePit: true }),
+      ]);
+
+      const list: any[] = Array.isArray(patientData)
+        ? patientData
+        : (Array.isArray(patientData?.patients)
+          ? patientData.patients
+          : (Array.isArray(patientData?.items)
+            ? patientData.items
+            : (Array.isArray(patientData?.data?.patients)
+              ? patientData.data.patients
+              : (Array.isArray(patientData?.data)
+                ? patientData.data
                 : []))));
+
+      const teaProfiles: any[] = Array.isArray(teaProfileData)
+        ? teaProfileData
+        : (Array.isArray(teaProfileData?.items)
+          ? teaProfileData.items
+          : (Array.isArray(teaProfileData?.data?.items)
+            ? teaProfileData.data.items
+            : []));
+
+      const activePitPatientIds = new Set(
+        teaProfiles
+          .map((profile: any) => String(profile?.patient?.id || profile?.patientId || '').trim())
+          .filter(Boolean),
+      );
 
       const byId: Record<string, any> = {};
       const options = list
         .map((p: any) => {
           const id = String(p.id || '');
           if (!id) return null;
+          if (!activePitPatientIds.has(id)) return null;
           byId[id] = p;
           const name = String(p.name || '').trim();
           const cpf = String(p.cpf || '').trim();
@@ -237,6 +282,10 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   useEffect(() => {
     loadPatients();
   }, []);
+
+  useEffect(() => {
+    setBirthDateInput(form.birthDate ? dayjs(form.birthDate).format('DD/MM/YYYY') : '');
+  }, [form.birthDate]);
 
   useEffect(() => {
     const loadDoctors = async () => {
@@ -280,7 +329,12 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const loadTeaProfiles = async (search?: string) => {
     setTeaLoading(true);
     try {
-      const data: any = await teaProfileService.list({ search: search || undefined, limit: 100, offset: 0 });
+      const data: any = await teaProfileService.list({
+        search: search || undefined,
+        limit: 100,
+        offset: 0,
+        hasActivePit: true,
+      });
       const list: any[] = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items)
@@ -337,7 +391,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       ...prev,
       patientName: p.name || prev.patientName,
       patientCpf: p.cpf || prev.patientCpf,
-      birthDate: p.birthDate ? new Date(p.birthDate) : prev.birthDate,
+      birthDate: parseApiDateToLocalDate(p.birthDate) || prev.birthDate,
       gender: mapGender(p.gender) || prev.gender,
       cellphone: p.cellphone || prev.cellphone,
       email: p.email || prev.email,
@@ -441,7 +495,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     setForm({
       patientName: String(patient.name || ''),
       patientCpf: String(patient.cpf || ''),
-      birthDate: patient.birthDate ? new Date(patient.birthDate) : null,
+      birthDate: parseApiDateToLocalDate(patient.birthDate),
       gender: mapGender(patient.gender),
       cellphone: String(patient.cellphone || ''),
       email: String(patient.email || ''),
@@ -741,13 +795,22 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
           </Group>
 
           <Group grow>
-            <DateInput
+            <TextInput
               label="Data de nascimento"
-              placeholder="Selecione"
-              value={form.birthDate}
-              onChange={(value) => setForm((prev) => ({ ...prev, birthDate: value ? new Date(value) : null }))}
-              valueFormat="DD/MM/YYYY"
-              locale="pt-br"
+              placeholder="DD/MM/AAAA"
+              value={birthDateInput}
+              maxLength={10}
+              onChange={(e) => {
+                const masked = formatBirthDateInput(e.currentTarget.value);
+                setBirthDateInput(masked);
+
+                if (masked.length < 10) {
+                  setTeaField('birthDate', null);
+                  return;
+                }
+
+                setTeaField('birthDate', parseBirthDateInput(masked));
+              }}
             />
             <Select
               label="Gênero"
@@ -1068,7 +1131,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                       label="Prazo alvo"
                       placeholder="Selecione"
                       value={planForm.targetDate}
-                      onChange={(value) => setPlanForm((prev) => ({ ...prev, targetDate: value ? new Date(value) : null }))}
+                      onChange={(value) => setPlanForm((prev) => ({ ...prev, targetDate: value || null }))}
                       valueFormat="DD/MM/YYYY"
                       locale="pt-br"
                     />

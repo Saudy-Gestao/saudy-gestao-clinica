@@ -5,11 +5,11 @@ import userService from '../../services/userService';
 import {
   UserPlus,
   Calendar,
+  CalendarCheck,
   ClipboardList,
   HeartPulse,
   Stethoscope,
   FileText,
-  Mail,
   Folder,
   Package,
   Warehouse,
@@ -88,6 +88,7 @@ export function WorkflowSections() {
       title: 'Fluxo do Paciente',
       items: [
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
+        { icon: CalendarCheck, label: 'Pré-agendamento', desc: 'Pré-autorização e documentos', route: '/pre-agendamento', moduleName: 'pre-agendamento' },
         { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/anamnese', moduleName: 'anamnese' },
         { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
         { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/enfermagem', moduleName: 'enfermagem' },
@@ -100,7 +101,6 @@ export function WorkflowSections() {
         { icon: FileText, label: 'Laudo', desc: 'Emissão de laudos', route: '/laudo', moduleName: 'laudo' },
         { icon: FileText, label: 'Laudo por Exame', desc: 'Fila com editor de laudo', route: '/laudo-exames', moduleName: 'laudo' },
         { icon: FileText, label: 'Configurações de Laudo', desc: 'Padrões e frases', route: '/laudo-configuracoes', moduleName: 'laudo' },
-        { icon: Mail, label: 'Envelopamento', desc: 'Preparação de docs', route: '/envelopamento', moduleName: 'envelopamento' },
         { icon: ShieldCheck, label: 'Autorização Convênio', desc: 'Autorizações pendentes', route: '/autorizacao-convenio', moduleName: 'autorizacao-convenio' },
         { icon: Brain, label: 'Módulo TEA', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
         { icon: Folder, label: 'Documentos', desc: 'Gestão documental', moduleName: 'documentos' },

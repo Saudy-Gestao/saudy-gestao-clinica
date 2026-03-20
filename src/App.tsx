@@ -16,11 +16,14 @@ import { AdmRegister } from './components/Auth/AdmRegister';
 import { AdminHub } from './components/Admin/AdminHub';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
+import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
+import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
 import { Laudo } from './components/Laudo/Laudo';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
-import { Envelopamento } from './components/Envelopamento/Envelopamento';
+import { DicomViewerPage } from './components/DicomViewer/DicomViewerPage';
+import { OhifViewer } from './components/OhifViewer/OhifViewer';
 import { Entrega } from './components/Entrega/Entrega';
 import { Estoque } from './components/Estoque/Estoque';
 import { SettingsPage } from './components/Settings/SettingsPage';
@@ -43,6 +46,7 @@ import { TeaPreReserva } from './components/TEA/TeaPreReserva';
 import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
+import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -110,6 +114,9 @@ function App() {
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
+          <Route path="/check-in" element={<PublicCheckIn />} />
+          <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
+          <Route path="/pre-agendamento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
@@ -126,6 +133,10 @@ function App() {
             path="/agendamento" 
             element={<ProtectedRoute><Agendamento /></ProtectedRoute>} 
           />
+          <Route
+            path="/pre-agendamento"
+            element={<ProtectedRoute><PreAgendamento /></ProtectedRoute>}
+          />
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
@@ -139,12 +150,16 @@ function App() {
             element={<ProtectedRoute><LaudoExames /></ProtectedRoute>}
           />
           <Route
-            path="/laudo-configuracoes"
-            element={<ProtectedRoute><LaudoConfiguracoes /></ProtectedRoute>}
+            path="/dicom-viewer/:key"
+            element={<ProtectedRoute><DicomViewerPage /></ProtectedRoute>}
           />
           <Route
-            path="/envelopamento"
-            element={<ProtectedRoute><Envelopamento /></ProtectedRoute>}
+            path="/ohif/:key"
+            element={<ProtectedRoute><OhifViewer /></ProtectedRoute>}
+          />
+          <Route
+            path="/laudo-configuracoes"
+            element={<ProtectedRoute><LaudoConfiguracoes /></ProtectedRoute>}
           />
           <Route
             path="/entrega"

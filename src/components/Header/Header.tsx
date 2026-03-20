@@ -20,11 +20,11 @@ type ModuleDefinition = ModuleUsageItem & {
 const MODULES: ModuleDefinition[] = [
   { key: 'pre-atendimento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
+  { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },
   { key: 'anamnese', label: 'Anamnese', route: '/anamnese', prefixes: ['/anamnese'] },
   { key: 'enfermagem', label: 'Enfermagem', route: '/enfermagem', prefixes: ['/enfermagem'] },
   { key: 'consulta', label: 'Consulta', route: '/consulta', prefixes: ['/consulta'] },
   { key: 'laudo', label: 'Laudo', route: '/laudo', prefixes: ['/laudo'] },
-  { key: 'envelopamento', label: 'Envelopamento', route: '/envelopamento', prefixes: ['/envelopamento'] },
   { key: 'autorizacao-convenio', label: 'Autorização Convênio', route: '/autorizacao-convenio', prefixes: ['/autorizacao-convenio'] },
   { key: 'modulo-tea', label: 'Módulo TEA', route: '/tea', prefixes: ['/tea'] },
   { key: 'entrega', label: 'Entrega', route: '/entrega', prefixes: ['/entrega'] },

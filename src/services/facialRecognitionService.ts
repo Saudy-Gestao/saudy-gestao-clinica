@@ -8,6 +8,9 @@ const faceApi = axios.create({
 // Interceptor para adicionar token de autenticação
 faceApi.interceptors.request.use(
   (config) => {
+    if ((config as any).skipAuth) {
+      return config;
+    }
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -22,6 +25,7 @@ faceApi.interceptors.request.use(
 export interface FacialScanRequest {
   image: string; // Base64 da imagem
   id_unidade: string;
+  skipAuth?: boolean;
 }
 
 export interface FacialScanResponse {
@@ -59,7 +63,14 @@ const facialRecognitionService = {
    * Realiza o reconhecimento facial e retorna os dados do responsável e pacientes associados
    */
   async scanFace(request: FacialScanRequest): Promise<FacialScanResponse> {
-    const response = await faceApi.post('/facial/scan', request);
+    const response = await faceApi.post(
+      '/facial/scan',
+      {
+        image: request.image,
+        id_unidade: request.id_unidade,
+      },
+      request.skipAuth ? ({ skipAuth: true } as any) : undefined,
+    );
     return response.data;
   },
 

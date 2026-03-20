@@ -29,7 +29,7 @@ import teaProfileService from '../../services/teaProfileService';
 import doctorService from '../../services/doctorService';
 import procedureService from '../../services/procedureService';
 import { DARK_BLUE } from '../../themes/theme';
-import { formatCPF } from '../../utils/formatters';
+import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 
 interface TherapyItem {
   id?: string;
@@ -90,6 +90,7 @@ export function TeaPIT() {
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingPit, setDeletingPit] = useState(false);
 
   const [title, setTitle] = useState('PIT - Plano Integrado de Terapias');
   const [startDate, setStartDate] = useState<Date | null>(new Date());
@@ -105,6 +106,7 @@ export function TeaPIT() {
   const [removeTherapyModalOpened, setRemoveTherapyModalOpened] = useState(false);
   const [removeTherapyTargetIndex, setRemoveTherapyTargetIndex] = useState<number | null>(null);
   const [removeTherapyAction, setRemoveTherapyAction] = useState<'KEEP_FUTURE_APPOINTMENTS' | 'CANCEL_FUTURE_APPOINTMENTS'>('KEEP_FUTURE_APPOINTMENTS');
+  const [deletePitModalOpened, setDeletePitModalOpened] = useState(false);
 
   const teaProfileOptions = useMemo(
     () => teaProfiles.map((it: any) => ({
@@ -117,7 +119,7 @@ export function TeaPIT() {
   const loadTeaProfiles = async () => {
     setLoading(true);
     try {
-      const data: any = await teaProfileService.list({ limit: 200, offset: 0 });
+      const data: any = await teaProfileService.list({ limit: 200, offset: 0, hasActivePit: true });
       const list: any[] = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items) ? data.items : []);
@@ -215,8 +217,8 @@ export function TeaPIT() {
       }
 
       setTitle(String(pit.title || 'PIT - Plano Integrado de Terapias'));
-      setStartDate(pit.startDate ? new Date(pit.startDate) : null);
-      setReviewDate(pit.reviewDate ? new Date(pit.reviewDate) : null);
+      setStartDate(parseApiDateToLocalDate(pit.startDate));
+      setReviewDate(parseApiDateToLocalDate(pit.reviewDate));
       setStatus(String(pit.status || 'Ativo'));
       setNotes(String(pit.notes || ''));
 
@@ -359,6 +361,30 @@ export function TeaPIT() {
     }
   };
 
+  const handleDeletePit = async () => {
+    if (!selectedTeaProfileId) {
+      showNotification({ title: 'Atenção', message: 'Selecione um paciente TEA', color: 'yellow' });
+      return;
+    }
+
+    setDeletingPit(true);
+    try {
+      await teaProfileService.deletePit(selectedTeaProfileId);
+      showNotification({ title: 'Sucesso', message: 'PIT excluído com sucesso', color: 'green' });
+      setDeletePitModalOpened(false);
+      setSelectedTeaProfileId(null);
+      await loadTeaProfiles();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        color: 'red',
+      });
+    } finally {
+      setDeletingPit(false);
+    }
+  };
+
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
@@ -412,14 +438,14 @@ export function TeaPIT() {
               <DateInput
                 label="Início"
                 value={startDate}
-                onChange={(value) => setStartDate(value ? new Date(value) : null)}
+                onChange={(value) => setStartDate(value || null)}
                 valueFormat="DD/MM/YYYY"
                 locale="pt-br"
               />
               <DateInput
                 label="Revisão"
                 value={reviewDate}
-                onChange={(value) => setReviewDate(value ? new Date(value) : null)}
+                onChange={(value) => setReviewDate(value || null)}
                 valueFormat="DD/MM/YYYY"
                 locale="pt-br"
               />
@@ -573,11 +599,40 @@ export function TeaPIT() {
             </Stack>
 
             <Group justify="flex-end">
-              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>Salvar PIT</Button>
+              <Button
+                variant="outline"
+                color="red"
+                onClick={() => setDeletePitModalOpened(true)}
+                disabled={!selectedTeaProfileId || saving || deletingPit}
+              >
+                Excluir PIT
+              </Button>
+              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving || deletingPit}>Salvar PIT</Button>
             </Group>
           </Stack>
         </Paper>
       </Box>
+
+      <Modal
+        opened={deletePitModalOpened}
+        onClose={() => setDeletePitModalOpened(false)}
+        title="Excluir PIT"
+        centered
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Esta ação excluirá o PIT ativo do paciente e cancelará pré-reservas abertas vinculadas a ele.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeletePitModalOpened(false)} disabled={deletingPit}>
+              Voltar
+            </Button>
+            <Button color="red" onClick={handleDeletePit} loading={deletingPit}>
+              Confirmar exclusão
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={removeTherapyModalOpened}

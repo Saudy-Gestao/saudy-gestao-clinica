@@ -332,6 +332,7 @@ export function CadastroMedico() {
     const specialties = Array.isArray(raw.specialties)
       ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
       : [];
+
     const workingSchedules = getWorkingSchedulesFromRaw(raw);
     setForm({
       nome: getString(raw.name ?? raw.nome),
@@ -523,7 +524,8 @@ export function CadastroMedico() {
         city: form.city || undefined,
         state: form.state || undefined,
         zipCode: form.zipCode || undefined,
-        // Formato esperado pelo backend
+        // Persist all shifts (new format) while keeping legacy fields for compatibility
+        workingSchedules: validSchedules,
         workingDays: Array.from(allDays),
         workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,

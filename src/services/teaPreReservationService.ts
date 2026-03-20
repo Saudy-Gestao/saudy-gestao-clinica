@@ -65,7 +65,7 @@ export default {
     return res.data;
   },
 
-  async convertToAppointment(id: string, payload?: { overrideStatus?: string; observation?: string; convertSeries?: boolean }) {
+  async convertToAppointment(id: string, payload?: { overrideStatus?: string; observation?: string; convertSeries?: boolean; seriesStartDate?: string }) {
     const res = await api.post(`/care/tea-pre-reservations/${id}/convert-to-appointment`, payload || {});
     return res.data;
   },
