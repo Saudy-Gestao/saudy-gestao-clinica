@@ -37,6 +37,7 @@ import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils
 interface Patient extends NovoPatiente {
   id: string;
   patientId?: string;
+  appointmentId?: string;
   doctorId?: string;
   doctorName?: string;
   totem?: number;
@@ -261,6 +262,7 @@ export function PreAtendimento() {
     return {
       id: String(id),
       patientId: raw?.patientId || raw?.patient_id || raw?.patient?.id || undefined,
+      appointmentId: raw?.appointmentId || raw?.appointment_id || undefined,
       nomeCompleto,
       cpf: raw?.cpf || raw?.patientCpf || raw?.patient_cpf || raw?.patient?.cpf || '',
       dataNascimento: raw?.birthDate || raw?.birth_date || '',
@@ -664,6 +666,7 @@ export function PreAtendimento() {
 
       await consultationService.create({
         patientName: checklistPatient.nomeCompleto,
+        appointmentId: checklistPatient.appointmentId || undefined,
         doctorId: checklistPatient.doctorId || undefined,
         doctorName: checklistPatient.doctorName || extractDoctorNameFromAgenda(checklistPatient.agenda) || undefined,
         convenio: checklistData.atendimentoParticular || isPrivateCare(checklistPatient)
