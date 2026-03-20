@@ -94,6 +94,7 @@ export default {
     recurringUntilDate?: string;
     expiresAt?: string;
     status?: TeaPreReservationStatus;
+    replaceExistingByTherapy?: boolean;
     items: Array<{
       pitTherapyId: string;
       suggestedDate: string;
