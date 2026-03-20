@@ -19,7 +19,6 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
 import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
-import { Laudo } from './components/Laudo/Laudo';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
 import { DicomViewerPage } from './components/DicomViewer/DicomViewerPage';
@@ -140,10 +139,6 @@ function App() {
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
-          />
-          <Route
-            path="/laudo"
-            element={<ProtectedRoute><Laudo /></ProtectedRoute>}
           />
           <Route
             path="/laudo-exames"
