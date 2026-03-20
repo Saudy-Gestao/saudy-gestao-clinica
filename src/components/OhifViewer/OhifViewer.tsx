@@ -5,7 +5,7 @@ import reportWorklistService from '../../services/reportWorklistService';
 // Reuse the same backend origin already configured via VITE_API_URL.
 // In dev VITE_API_URL is empty → '/dicom-web' goes through the Vite proxy.
 // In production VITE_API_URL='https://saudy-backend.onrender.com' → absolute URL.
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = "https://saudy-backend.onrender.com";
 const DICOMWEB_URL = `${API_BASE}/dicom-web`;
 
 export function OhifViewer() {
