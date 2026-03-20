@@ -1816,14 +1816,23 @@ export function TeaPreReserva() {
           return false;
         };
 
-        const filtered = unique.filter((slot) => {
-          const weekday = dayjs(slot.date).day();
-          const weekdayOk = preferredWeekdaySet.size === 0 || preferredWeekdaySet.has(weekday);
-          const shiftOk = isShiftMatch(slot.time);
-          return weekdayOk && shiftOk;
-        });
+        const fullPool = [...unique].sort((a, b) => {
+          const weekdayA = dayjs(a.date).day();
+          const weekdayB = dayjs(b.date).day();
+          const weekdayScoreA = preferredWeekdaySet.size === 0 ? 1 : (preferredWeekdaySet.has(weekdayA) ? 1 : 0);
+          const weekdayScoreB = preferredWeekdaySet.size === 0 ? 1 : (preferredWeekdaySet.has(weekdayB) ? 1 : 0);
 
-        const fullPool = filtered.length > 0 ? filtered : unique;
+          if (weekdayScoreB !== weekdayScoreA) return weekdayScoreB - weekdayScoreA;
+
+          const shiftScoreA = shiftTokenSet.size === 0 ? 1 : (isShiftMatch(a.time) ? 1 : 0);
+          const shiftScoreB = shiftTokenSet.size === 0 ? 1 : (isShiftMatch(b.time) ? 1 : 0);
+
+          if (shiftScoreB !== shiftScoreA) return shiftScoreB - shiftScoreA;
+
+          const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+          if (dateDiff !== 0) return dateDiff;
+          return a.time.localeCompare(b.time);
+        });
         const slotsByWeekStart = new Map<string, Array<{ date: string; time: string }>>();
 
         fullPool.forEach((slot) => {
