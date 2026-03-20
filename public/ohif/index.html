@@ -29,63 +29,22 @@
   <script type="text/javascript" src="/ohif/app-config.js"></script>
   <script type="text/javascript">
     const runtime = window.__ohif__ || {};
-    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    if (isLocalDev) {
-      const ORTHANC_HTTP = 'http://localhost:8042';
-      const ORTHANC_HTTPS = 'https://localhost:8042';
-      const LOCAL_PROXY = '/dicom-web';
-
-      const rewriteDicomWebUrl = (value) => {
-        if (typeof value !== 'string') return value;
-        return value
-          .replace(ORTHANC_HTTP, LOCAL_PROXY)
-          .replace(ORTHANC_HTTPS, LOCAL_PROXY);
-      };
-
-      const originalFetch = window.fetch?.bind(window);
-      if (originalFetch) {
-        window.fetch = (input, init) => {
-          if (typeof input === 'string') {
-            return originalFetch(rewriteDicomWebUrl(input), init);
-          }
-
-          if (input instanceof Request) {
-            const rewritten = rewriteDicomWebUrl(input.url);
-            if (rewritten !== input.url) {
-              const req = new Request(rewritten, input);
-              return originalFetch(req, init);
-            }
-          }
-
-          return originalFetch(input, init);
-        };
-      }
-
-      const originalOpen = XMLHttpRequest.prototype.open;
-      XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
-        const rewritten = rewriteDicomWebUrl(url);
-        return originalOpen.call(this, method, rewritten, async, user, password);
-      };
-    }
-
-    if (isLocalDev) {
-      window.config = window.config || {};
-      window.config.servers = window.config.servers || {};
-      window.config.servers.dicomWeb = [
-        {
-          name: 'Orthanc',
-          wadoUriRoot: '/dicom-web',
-          qidoRoot: '/dicom-web',
-          wadoRoot: '/dicom-web',
-          qidoSupportsIncludeField: true,
-          imageRendering: 'wadors',
-          thumbnailRendering: 'wadors',
-          enableStudyLazyLoad: true,
-          supportsFuzzyMatching: true,
-        },
-      ];
-    }
+    
+    window.config = window.config || {};
+    window.config.servers = window.config.servers || {};
+    window.config.servers.dicomWeb = [
+      {
+        name: 'Orthanc',
+        wadoUriRoot: '/dicom-web',
+        qidoRoot: '/dicom-web',
+        wadoRoot: '/dicom-web',
+        qidoSupportsIncludeField: true,
+        imageRendering: 'wadors',
+        thumbnailRendering: 'wadors',
+        enableStudyLazyLoad: true,
+        supportsFuzzyMatching: true,
+      },
+    ];
 
     if (runtime.studyUID && !window.location.pathname.includes('/viewer/')) {
       const targetPath = '/ohif/index.html/viewer/' + encodeURIComponent(runtime.studyUID);
