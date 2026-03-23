@@ -116,6 +116,7 @@ export default {
     pitTherapyId?: string;
     cancelAll?: boolean;
     fromDate?: string;
+    weekdayIndex?: number;
     reason?: string;
   }) {
     const res = await api.post('/care/tea-pre-reservations/cancel-therapy-series', payload);

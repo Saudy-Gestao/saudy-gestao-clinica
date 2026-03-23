@@ -46,6 +46,8 @@ type AuthorizationItem = {
   sessionsCount?: number;
 };
 
+type InsuranceType = 'CONVENIO' | 'PARTICULAR';
+
 const STATUS_OPTIONS: Array<{ value: ConvenioAuthorizationStatus; label: string }> = [
   { value: 'PENDING', label: 'Pendente' },
   { value: 'AUTHORIZED', label: 'Autorizado' },
@@ -64,6 +66,10 @@ const sanitizeAuthorizationNotes = (value?: string | null) => (
     .trim()
 );
 
+const resolveInsuranceType = (item: AuthorizationItem): InsuranceType => (
+  item.insuranceType || (item.sourceType === 'TEA' ? 'CONVENIO' : 'PARTICULAR')
+);
+
 export function AutorizacaoConvenio() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -75,6 +81,7 @@ export function AutorizacaoConvenio() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
+  const [insuranceTypeFilter, setInsuranceTypeFilter] = useState<InsuranceType[]>([]);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [attachmentByRowKey, setAttachmentByRowKey] = useState<Record<string, string>>({});
   const [, setAttachmentFileByRowKey] = useState<Record<string, File | null>>({});
@@ -84,14 +91,19 @@ export function AutorizacaoConvenio() {
     objectUrl: string | null;
   } | null>(null);
 
+  const filteredItems = useMemo(() => {
+    if (insuranceTypeFilter.length === 0) return items;
+    return items.filter((item) => insuranceTypeFilter.includes(resolveInsuranceType(item)));
+  }, [items, insuranceTypeFilter]);
+
   const summary = useMemo(() => {
-    return items.reduce((acc, item) => {
+    return filteredItems.reduce((acc, item) => {
       if (item.status === 'PENDING') acc.pending += 1;
       if (item.status === 'AUTHORIZED') acc.authorized += 1;
       if (item.status === 'DENIED') acc.denied += 1;
       return acc;
     }, { pending: 0, authorized: 0, denied: 0 });
-  }, [items]);
+  }, [filteredItems]);
 
   const loadItems = async () => {
     setLoading(true);
@@ -327,6 +339,17 @@ export function AutorizacaoConvenio() {
                 onChange={(value) => setStatusFilter(value as ConvenioAuthorizationStatus[])}
                 clearable
               />
+              <MultiSelect
+                label="Tipo de Atendimento"
+                placeholder="Filtrar tipo"
+                data={[
+                  { value: 'CONVENIO', label: 'Convênio' },
+                  { value: 'PARTICULAR', label: 'Particular' },
+                ]}
+                value={insuranceTypeFilter}
+                onChange={(value) => setInsuranceTypeFilter(value as InsuranceType[])}
+                clearable
+              />
             </Group>
 
             {loading ? (
@@ -350,17 +373,16 @@ export function AutorizacaoConvenio() {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {items.length === 0 ? (
+                    {filteredItems.length === 0 ? (
                       <Table.Tr>
                         <Table.Td colSpan={11}>
                           <Text size="sm" c="dimmed" ta="center" py="md">Nenhuma autorização encontrada</Text>
                         </Table.Td>
                       </Table.Tr>
                     ) : (
-                      items.map((item) => {
+                      filteredItems.map((item) => {
                         const rowKey = `${item.sourceType}-${item.id}`;
-                        const resolvedInsuranceType = item.insuranceType
-                          || (item.sourceType === 'TEA' ? 'CONVENIO' : 'PARTICULAR');
+                        const resolvedInsuranceType = resolveInsuranceType(item);
                         return (
                           <Table.Tr key={rowKey}>
                             <Table.Td>

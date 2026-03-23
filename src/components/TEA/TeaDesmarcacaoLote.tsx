@@ -5,6 +5,7 @@ import {
   Group,
   Text,
   Button,
+  ActionIcon,
   Paper,
   Select,
   Stack,
@@ -17,7 +18,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, CalendarX2 } from 'lucide-react';
+import { ChevronLeft, CalendarX2, X } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import teaProfileService from '../../services/teaProfileService';
@@ -37,6 +38,26 @@ type CancellationTherapyItem = {
 
 type CancellationScope = 'single' | 'all';
 
+type WeekdayCancellationTarget = {
+  weekdayIndex: number;
+  weekdayLabel: string;
+  time: string;
+};
+
+const WEEKDAY_LABELS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+const getWeekdayLabel = (value: string) => {
+  const parsed = dayjs(value);
+  if (!parsed.isValid()) return 'Dia inválido';
+  return WEEKDAY_LABELS[parsed.day()] || 'Dia inválido';
+};
+
+const getWeekdayIndex = (value: string) => {
+  const parsed = dayjs(value);
+  if (!parsed.isValid()) return 99;
+  return parsed.day();
+};
+
 export function TeaDesmarcacaoLote() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -54,6 +75,9 @@ export function TeaDesmarcacaoLote() {
   const [selectedTherapy, setSelectedTherapy] = useState<CancellationTherapyItem | null>(null);
   const [cancellationScope, setCancellationScope] = useState<CancellationScope>('single');
   const [cancelReason, setCancelReason] = useState('');
+  const [weekdayModalOpened, setWeekdayModalOpened] = useState(false);
+  const [weekdayCancelTarget, setWeekdayCancelTarget] = useState<WeekdayCancellationTarget | null>(null);
+  const [cancelingWeekday, setCancelingWeekday] = useState(false);
 
   const teaProfileOptions = useMemo(
     () => teaProfiles.map((it: any) => ({
@@ -140,6 +164,11 @@ export function TeaDesmarcacaoLote() {
     setConfirmModalOpened(true);
   };
 
+  const openWeekdayCancelModal = (target: WeekdayCancellationTarget) => {
+    setWeekdayCancelTarget(target);
+    setWeekdayModalOpened(true);
+  };
+
   const totalSessionsAllTherapies = useMemo(
     () => therapies.reduce((acc, item) => acc + Number(item.totalSessions || 0), 0),
     [therapies],
@@ -178,6 +207,39 @@ export function TeaDesmarcacaoLote() {
       });
     } finally {
       setCanceling(false);
+    }
+  };
+
+  const handleConfirmWeekdayCancellation = async () => {
+    if (!selectedTeaProfileId || !weekdayCancelTarget) return;
+    setCancelingWeekday(true);
+    try {
+      const result: any = await teaPreReservationService.cancelTherapySeries({
+        teaProfileId: selectedTeaProfileId,
+        cancelAll: true,
+        fromDate: dayjs().format('YYYY-MM-DD'),
+        weekdayIndex: weekdayCancelTarget.weekdayIndex,
+        reason: `Desmarcação por dia da semana: ${weekdayCancelTarget.weekdayLabel}`,
+      });
+
+      const canceledAppointments = Number(result?.canceledAppointments || 0);
+      showNotification({
+        title: 'Sucesso',
+        message: `${canceledAppointments} sessão(ões) de ${weekdayCancelTarget.weekdayLabel} desmarcada(s).`,
+        color: 'green',
+      });
+
+      setWeekdayModalOpened(false);
+      setWeekdayCancelTarget(null);
+      await loadTherapies(selectedTeaProfileId);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao excluir horários desse dia',
+        color: 'red',
+      });
+    } finally {
+      setCancelingWeekday(false);
     }
   };
 
@@ -235,6 +297,45 @@ export function TeaDesmarcacaoLote() {
         </Stack>
       </Modal>
 
+      <Modal
+        opened={weekdayModalOpened}
+        onClose={() => {
+          if (cancelingWeekday) return;
+          setWeekdayModalOpened(false);
+          setWeekdayCancelTarget(null);
+        }}
+        title="Excluir horários do dia"
+        centered
+        size="sm"
+      >
+        <Stack gap="sm">
+          <Text size="sm">Deseja excluir os horários desse dia?</Text>
+          <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+            <Text size="sm" fw={700}>
+              Deseja excluir os horários da {weekdayCancelTarget?.weekdayLabel || '-'} • {weekdayCancelTarget?.time || '-'}?
+            </Text>
+            <Text size="xs" c="dimmed" mt={4}>
+              Apenas os horários desse dia da semana serão removidos. Os outros dias permanecem normais.
+            </Text>
+          </Paper>
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => {
+                setWeekdayModalOpened(false);
+                setWeekdayCancelTarget(null);
+              }}
+              disabled={cancelingWeekday}
+            >
+              Não
+            </Button>
+            <Button color="red" onClick={handleConfirmWeekdayCancellation} loading={cancelingWeekday}>
+              Sim
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
         <Group mb={14}>
           <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
@@ -285,7 +386,22 @@ export function TeaDesmarcacaoLote() {
             ) : (
               <Stack gap="xs">
                 {therapies.map((therapy) => {
-                  const previewSlots = therapy.slots.slice(0, 6);
+                  const weeklyPatternSlots = therapy.slots
+                    .map((slot) => ({
+                      weekdayLabel: getWeekdayLabel(slot.date),
+                      weekdayIndex: getWeekdayIndex(slot.date),
+                      time: String(slot.time || '').trim(),
+                    }))
+                    .filter((slot) => slot.weekdayLabel !== 'Dia inválido' && slot.time)
+                    .filter((slot, index, list) => (
+                      list.findIndex((candidate) => (
+                        candidate.weekdayIndex === slot.weekdayIndex && candidate.time === slot.time
+                      )) === index
+                    ))
+                    .sort((a, b) => {
+                      if (a.weekdayIndex !== b.weekdayIndex) return a.weekdayIndex - b.weekdayIndex;
+                      return a.time.localeCompare(b.time);
+                    });
                   return (
                     <Paper key={therapy.pitTherapyId} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                       <Stack gap={6}>
@@ -308,31 +424,47 @@ export function TeaDesmarcacaoLote() {
                         <Divider />
 
                         <Stack gap={3}>
-                          <Text size="xs" fw={600}>Próximas sessões</Text>
-                          {previewSlots.length > 0 ? (
+                          <Text size="xs" fw={600}>sessões</Text>
+                          {weeklyPatternSlots.length > 0 ? (
                             <Group gap={6} wrap="wrap">
-                              {previewSlots.map((slot) => (
-                                <Badge
-                                  key={`${slot.date}-${slot.time}`}
-                                  variant="filled"
-                                  color={colorScheme === 'dark' ? 'blue' : 'gray'}
-                                  styles={{
-                                    root: {
-                                      backgroundColor: colorScheme === 'dark'
-                                        ? 'rgba(96, 165, 250, 0.18)'
-                                        : undefined,
-                                      border: colorScheme === 'dark'
-                                        ? '1px solid rgba(96, 165, 250, 0.45)'
-                                        : undefined,
-                                      color: colorScheme === 'dark'
-                                        ? 'var(--mantine-color-blue-1)'
-                                        : undefined,
-                                      fontWeight: 700,
-                                    },
+                              {weeklyPatternSlots.map((slot) => (
+                                <Group
+                                  key={`${slot.weekdayIndex}-${slot.time}`}
+                                  gap={4}
+                                  wrap="nowrap"
+                                  style={{
+                                    display: 'inline-flex',
+                                    borderRadius: 999,
+                                    padding: '2px 6px 2px 10px',
+                                    backgroundColor: colorScheme === 'dark'
+                                      ? 'rgba(96, 165, 250, 0.18)'
+                                      : 'var(--mantine-color-gray-2)',
+                                    border: colorScheme === 'dark'
+                                      ? '1px solid rgba(96, 165, 250, 0.45)'
+                                      : '1px solid var(--mantine-color-gray-4)',
                                   }}
                                 >
-                                  {dayjs(slot.date).format('DD/MM')} • {slot.time}
-                                </Badge>
+                                  <Text
+                                    size="xs"
+                                    fw={700}
+                                    c={colorScheme === 'dark' ? 'var(--mantine-color-blue-1)' : 'var(--mantine-color-dark-7)'}
+                                  >
+                                    {slot.weekdayLabel} • {slot.time}
+                                  </Text>
+                                  <ActionIcon
+                                    size="xs"
+                                    variant="subtle"
+                                    color="red"
+                                    title={`Excluir horários de ${slot.weekdayLabel}`}
+                                    onClick={() => openWeekdayCancelModal({
+                                      weekdayIndex: slot.weekdayIndex,
+                                      weekdayLabel: slot.weekdayLabel,
+                                      time: slot.time,
+                                    })}
+                                  >
+                                    <X size={12} />
+                                  </ActionIcon>
+                                </Group>
                               ))}
                             </Group>
                           ) : (
