@@ -17,6 +17,7 @@ export interface WhatsAppMessageTemplate {
   type: 'APPOINTMENT_CREATED' | 'APPOINTMENT_CONFIRMATION' | 'APPOINTMENT_REMINDER' | 'APPOINTMENT_CANCELED';
   name: string;
   message: string;
+  hsmTemplateName?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -85,6 +86,7 @@ export default {
     type: string;
     name: string;
     message: string;
+    hsmTemplateName?: string;
     isActive?: boolean;
   }): Promise<WhatsAppMessageTemplate> {
     const res = await api.post('/care/whatsapp/templates', data);

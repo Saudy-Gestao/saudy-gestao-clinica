@@ -50,6 +50,7 @@ interface TemplateFormValues {
   type: string;
   name: string;
   message: string;
+  hsmTemplateName: string;
   isActive: boolean;
 }
 
@@ -83,6 +84,7 @@ export function WhatsAppConfig() {
     type: 'APPOINTMENT_CREATED',
     name: '',
     message: '',
+    hsmTemplateName: '',
     isActive: true,
   });
 
@@ -224,6 +226,7 @@ export function WhatsAppConfig() {
         type: 'APPOINTMENT_CREATED',
         name: '',
         message: '',
+        hsmTemplateName: '',
         isActive: true,
       });
       loadData();
@@ -286,6 +289,7 @@ export function WhatsAppConfig() {
         type: template.type,
         name: template.name,
         message: template.message,
+        hsmTemplateName: template.hsmTemplateName || '',
         isActive: template.isActive,
       });
     } else {
@@ -293,6 +297,7 @@ export function WhatsAppConfig() {
         type: 'APPOINTMENT_CREATED',
         name: '',
         message: '',
+        hsmTemplateName: '',
         isActive: true,
       });
     }
@@ -448,9 +453,16 @@ export function WhatsAppConfig() {
                   <Group justify="space-between" mb="xs">
                     <div>
                       <Text fw={500}>{template.name}</Text>
-                      <Badge size="sm" variant="light" mt={4}>
-                        {getMessageTypeLabel(template.type)}
-                      </Badge>
+                      <Group gap={4} mt={4}>
+                        <Badge size="sm" variant="light">
+                          {getMessageTypeLabel(template.type)}
+                        </Badge>
+                        {template.hsmTemplateName && (
+                          <Badge size="sm" variant="filled" color="green">
+                            HSM: {template.hsmTemplateName}
+                          </Badge>
+                        )}
+                      </Group>
                     </div>
                     <Group gap="xs">
                       <Switch
@@ -646,6 +658,14 @@ export function WhatsAppConfig() {
               required
               value={templateForm.name}
               onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
+            />
+
+            <TextInput
+              label="Nome do Template (Gupshup/Meta HSM)"
+              placeholder="Ex: confirmacao_agendamento"
+              description="Nome exato do template aprovado no painel Gupshup. Quando preenchido, o envio usa HSM (funciona sem o paciente ter iniciado contato)."
+              value={templateForm.hsmTemplateName}
+              onChange={(e) => setTemplateForm(prev => ({ ...prev, hsmTemplateName: e.target.value }))}
             />
 
             <div>
