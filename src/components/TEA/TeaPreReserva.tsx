@@ -263,31 +263,6 @@ const timeToMinutes = (time: string) => {
   return (hour * 60) + minute;
 };
 
-const countManualSelectionGroups = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
-  if (!slots.length) return 0;
-  const byDate = slots.reduce((acc, slot) => {
-    if (!acc[slot.date]) acc[slot.date] = [];
-    acc[slot.date].push(slot.time);
-    return acc;
-  }, {} as Record<string, string[]>);
-
-  return Object.values(byDate).reduce((total, times) => {
-    const sorted = [...times].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
-    let groups = 0;
-    let prevMinutes: number | null = null;
-
-    sorted.forEach((time) => {
-      const current = timeToMinutes(time);
-      if (prevMinutes === null || (current - prevMinutes) > slotStepMinutes) {
-        groups += 1;
-      }
-      prevMinutes = current;
-    });
-
-    return total + groups;
-  }, 0);
-};
-
 const getManualSelectionAnchors = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
   if (!slots.length) return [] as Array<{ date: string; time: string }>;
   const byDate = slots.reduce((acc, slot) => {
@@ -1783,8 +1758,8 @@ export function TeaPreReserva() {
   );
 
   const manualSelectedSessionCount = useMemo(
-    () => countManualSelectionGroups(manualSelectedSlots, manualSlotStepMinutes),
-    [manualSelectedSlots, manualSlotStepMinutes],
+    () => manualSelectedSlots.length,
+    [manualSelectedSlots],
   );
 
   const manualSelectionComplete = manualSelectedSessionCount === manualWeeklyLimit;
@@ -3212,6 +3187,24 @@ export function TeaPreReserva() {
                                 return prev.filter((slotItem) => toSignature(slotItem) !== anchorSignature);
                               }
 
+                              const anchorStartMinutes = timeToMinutes(anchorSlot.time);
+                              const anchorEndMinutes = anchorStartMinutes + selectedDurationMinutes;
+                              const hasOverlap = prev.some((slotItem) => {
+                                if (slotItem.date !== anchorSlot.date) return false;
+                                const existingStartMinutes = timeToMinutes(slotItem.time);
+                                const existingEndMinutes = existingStartMinutes + selectedDurationMinutes;
+                                return anchorStartMinutes < existingEndMinutes && anchorEndMinutes > existingStartMinutes;
+                              });
+
+                              if (hasOverlap) {
+                                showNotification({
+                                  title: 'Conflito de horário',
+                                  message: 'Este horário se sobrepõe a uma sessão já selecionada para esta terapia.',
+                                  color: 'yellow',
+                                });
+                                return prev;
+                              }
+
                               const merged = [...prev, anchorSlot];
 
                               const normalizedMerged = merged.sort((a, b) => {
@@ -3221,7 +3214,7 @@ export function TeaPreReserva() {
                               });
 
                               const maxWeeklySessions = Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1));
-                              const selectedSessions = countManualSelectionGroups(normalizedMerged, manualSlotStepMinutes);
+                              const selectedSessions = normalizedMerged.length;
                               if (selectedSessions > maxWeeklySessions) {
                                 showNotification({
                                   title: 'Limite semanal atingido',
@@ -3620,9 +3613,20 @@ export function TeaPreReserva() {
                   <Stack gap="xs">
                     {pendingGroups.map((group) => {
                       const existingGroupForSamePit = actionableReservationsByGroupKey.get(group.groupKey);
-                      const existingCount = existingGroupForSamePit?.reservations?.length || 0;
                       const completedGroupForSamePit = completedReservationsByGroupKey.get(group.groupKey);
-                      const completedCount = completedGroupForSamePit?.reservations?.length || 0;
+                      const pendingTherapyIdSet = new Set(
+                        (group.therapies || [])
+                          .map((item) => String(item?.pitTherapyId || ''))
+                          .filter(Boolean),
+                      );
+                      const existingReservationsWithoutDuplicates = (existingGroupForSamePit?.reservations || []).filter(
+                        (item) => !pendingTherapyIdSet.has(String(item?.pitTherapyId || '')),
+                      );
+                      const completedReservationsWithoutDuplicates = (completedGroupForSamePit?.reservations || []).filter(
+                        (item) => !pendingTherapyIdSet.has(String(item?.pitTherapyId || '')),
+                      );
+                      const existingCount = existingReservationsWithoutDuplicates.length;
+                      const completedCount = completedReservationsWithoutDuplicates.length;
                       const groupContext = buildGroupContextFromItems(group);
                       const groupTeaProfileId = String(group.therapies[0]?.teaProfileId || group.therapies[0]?.pitId || '');
                       const removedTherapies = group.therapies.filter((item) => Boolean(item?.removedFromPit));
@@ -3730,12 +3734,12 @@ export function TeaPreReserva() {
                               })}
                             </Stack>
 
-                            {existingGroupForSamePit && (
+                            {existingReservationsWithoutDuplicates.length > 0 && (
                               <Stack gap={6}>
                                 <Text size="xs" fw={600} c="dimmed">
                                   Terapias já criadas deste mesmo PIT
                                 </Text>
-                                {existingGroupForSamePit.reservations.map((item) => {
+                                {existingReservationsWithoutDuplicates.map((item) => {
                                   const existingCardKey = `existing-${group.groupKey}-${String(item.preReservationId || item.pitTherapyId || 'unknown')}`;
                                   const isExistingCardCollapsed = Boolean(collapsedTherapyCards[existingCardKey]);
                                   return (
@@ -3782,12 +3786,12 @@ export function TeaPreReserva() {
                               </Stack>
                             )}
 
-                            {completedGroupForSamePit && (
+                            {completedReservationsWithoutDuplicates.length > 0 && (
                               <Stack gap={6}>
                                 <Text size="xs" fw={600} c="dimmed">
                                   Terapias já agendadas deste mesmo PIT
                                 </Text>
-                                {completedGroupForSamePit.reservations.map((item) => {
+                                {completedReservationsWithoutDuplicates.map((item) => {
                                   const completedCardKey = `completed-${group.groupKey}-${String(item.preReservationId || item.pitTherapyId || 'unknown')}`;
                                   const isCompletedCardCollapsed = Boolean(collapsedTherapyCards[completedCardKey]);
                                   return (

@@ -14,6 +14,7 @@ import {
   Table,
   Text,
   TextInput,
+  Modal,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -76,6 +77,11 @@ export function AutorizacaoConvenio() {
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [attachmentByRowKey, setAttachmentByRowKey] = useState<Record<string, string>>({});
   const [, setAttachmentFileByRowKey] = useState<Record<string, File | null>>({});
+  const [uploadPreview, setUploadPreview] = useState<{
+    rowKey: string;
+    file: File;
+    objectUrl: string | null;
+  } | null>(null);
 
   const summary = useMemo(() => {
     return items.reduce((acc, item) => {
@@ -161,9 +167,107 @@ export function AutorizacaoConvenio() {
     setAttachmentByRowKey((prev) => ({ ...prev, [rowKey]: file ? file.name : '' }));
   };
 
+  const closeUploadPreview = () => {
+    setUploadPreview((prev) => {
+      if (prev?.objectUrl) {
+        URL.revokeObjectURL(prev.objectUrl);
+      }
+      return null;
+    });
+  };
+
+  const openUploadPreview = (rowKey: string, file: File | null) => {
+    if (!file) return;
+    const previewable = file.type.startsWith('image/') || file.type === 'application/pdf';
+    const objectUrl = previewable ? URL.createObjectURL(file) : null;
+    setUploadPreview({ rowKey, file, objectUrl });
+  };
+
+  const confirmUploadPreview = () => {
+    if (!uploadPreview) return;
+    handleAttachmentSelect(uploadPreview.rowKey, uploadPreview.file);
+    closeUploadPreview();
+  };
+
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
+
+      <Modal
+        opened={Boolean(uploadPreview)}
+        onClose={closeUploadPreview}
+        title="Confirmar envio de documento"
+        centered
+        size="xl"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Confira o documento selecionado antes de confirmar o envio.
+          </Text>
+
+          {uploadPreview && (
+            <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Stack gap={6}>
+                <Text size="sm" fw={600} lineClamp={1}>{uploadPreview.file.name}</Text>
+                <Text size="xs" c="dimmed">
+                  {(uploadPreview.file.size / 1024).toFixed(1)} KB
+                  {uploadPreview.file.type ? ` • ${uploadPreview.file.type}` : ''}
+                </Text>
+
+                {uploadPreview.objectUrl && uploadPreview.file.type.startsWith('image/') && (
+                  <Box
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 6,
+                      padding: 8,
+                      maxHeight: '60vh',
+                      overflow: 'auto',
+                    }}
+                  >
+                    <img
+                      src={uploadPreview.objectUrl}
+                      alt={uploadPreview.file.name}
+                      style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 4 }}
+                    />
+                  </Box>
+                )}
+
+                {uploadPreview.objectUrl && uploadPreview.file.type === 'application/pdf' && (
+                  <Box
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      height: '60vh',
+                    }}
+                  >
+                    <iframe
+                      src={uploadPreview.objectUrl}
+                      title={uploadPreview.file.name}
+                      style={{ width: '100%', height: '100%', border: 'none' }}
+                    />
+                  </Box>
+                )}
+
+                {!uploadPreview.objectUrl && (
+                  <Text size="sm" c="dimmed">
+                    Pré-visualização não disponível para este tipo de arquivo. Você pode confirmar o envio ou cancelar.
+                  </Text>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={closeUploadPreview}>
+              Cancelar envio
+            </Button>
+            <Button color="indigo" onClick={confirmUploadPreview} leftSection={<Upload size={14} />}>
+              Confirmar envio
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
         <Group justify="space-between" align="center" mb="md" wrap="wrap">
@@ -322,7 +426,7 @@ export function AutorizacaoConvenio() {
                                     accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
                                     onChange={(e) => {
                                       const file = e.currentTarget.files?.[0] || null;
-                                      handleAttachmentSelect(rowKey, file);
+                                      openUploadPreview(rowKey, file);
                                       e.currentTarget.value = '';
                                     }}
                                   />
