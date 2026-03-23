@@ -29,7 +29,7 @@ import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
-import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput } from '../../utils/formatters';
+import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
 import patientService from '../../services/patientService';
 import insuranceService from '../../services/insuranceService';
 import teaProfileService from '../../services/teaProfileService';
@@ -586,14 +586,14 @@ export function CadastroPaciente() {
   const validateFields = (data: PatientForm) => {
     const errors: Record<string, string> = {};
     if (!data.name.trim()) errors.name = 'Nome é obrigatório';
-    if (!/^\d{11}$/.test(String(data.cpf))) errors.cpf = 'CPF deve conter 11 dígitos numéricos';
+    if (!isValidCPF(String(data.cpf))) errors.cpf = 'CPF inválido';
     if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
     // Gênero agora é obrigatório
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
     if (data.hasHealthInsurance && !data.healthInsuranceName.trim()) errors.healthInsuranceName = 'Nome do convênio é obrigatório';
 
-    if (data.email && !/^[\w-.]+@[\w-]+\.[\w-.]+$/.test(String(data.email))) errors.email = 'Email inválido';
+    if (data.email && !isValidEmail(String(data.email))) errors.email = 'Email inválido';
 
     // Celular é obrigatório e deve ter 10 ou 11 dígitos (apenas números)
     if (!data.cellphone) errors.cellphone = 'Celular é obrigatório';
@@ -603,7 +603,7 @@ export function CadastroPaciente() {
     if (data.phone && data.phone.length > 15) errors.phone = 'Telefone muito longo';
     if (data.cellphone && data.cellphone.length > 15) errors.cellphone = 'Celular muito longo';
     if (data.emergencyContactPhone && data.emergencyContactPhone.length > 15) errors.emergencyContactPhone = 'Telefone de emergência muito longo';
-    if (data.guardianCpf && data.guardianCpf.length > 11) errors.guardianCpf = 'CPF do responsável muito longo';
+    if (data.guardianCpf && !isValidCPF(String(data.guardianCpf))) errors.guardianCpf = 'CPF do responsável inválido';
     if (data.guardianPhone && data.guardianPhone.length > 15) errors.guardianPhone = 'Telefone do responsável muito longo';
     if (data.zipCode && data.zipCode.length > 8) errors.zipCode = 'CEP muito longo';
 
@@ -698,7 +698,7 @@ export function CadastroPaciente() {
 
       const payload = {
         name: form.name.trim(),
-        email: form.email?.trim() || undefined,
+        email: normalizeEmail(form.email) || undefined,
         phone: form.phone || undefined,
         cellphone: form.cellphone || undefined,
         birthDate: formatDateForApi(form.birthDate),

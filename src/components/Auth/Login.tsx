@@ -6,6 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { Eye, EyeOff } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import authService from '../../services/authService';
+import { isValidEmail, normalizeEmail } from '../../utils/formatters';
 
 export function Login() {
   const navigate = useNavigate();
@@ -17,7 +18,8 @@ export function Login() {
   const [leftImageSrc, setLeftImageSrc] = useState('/medicos.png');
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !password) {
       notifications.show({
         title: 'Erro',
         message: 'Preencha todos os campos',
@@ -26,9 +28,18 @@ export function Login() {
       return;
     }
 
+    if (!isValidEmail(normalizedEmail)) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Informe um e-mail válido',
+        color: 'red',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      await authService.login({ email, password });
+      await authService.login({ email: normalizedEmail, password });
       notifications.show({
         title: 'Sucesso',
         message: 'Login realizado com sucesso',

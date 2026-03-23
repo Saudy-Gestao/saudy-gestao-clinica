@@ -18,18 +18,23 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import {
+  Calendar,
   CalendarClock,
+  ChevronDown,
   ChevronLeft,
   RefreshCcw,
   History,
   ClipboardList,
   ListChecks,
+  Sparkles,
+  Trash2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
+import teaProfileService from '../../services/teaProfileService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 
 const STATUS_OPTIONS: Array<{ value: TeaPreReservationStatus; label: string }> = [
@@ -93,11 +98,19 @@ const normalizeDateToIso = (value?: string | null) => {
   return dayjs(parsed).format('YYYY-MM-DD');
 };
 
+const buildWeeklySlotSignatures = (slots: Array<{ date: string; time: string }>) => Array.from(new Set(
+  (slots || [])
+    .filter((slot) => slot?.date && slot?.time)
+    .map((slot) => `${dayjs(slot.date).day()}#${String(slot.time).trim()}`),
+));
+
 type GroupTherapyContext = {
   pitTherapyId: string;
   procedureName: string;
   professionalName: string;
   weeklyFrequency?: number;
+  previousWeeklyFrequency?: number;
+  source?: string;
   preferredWeekdays?: string[];
   preferredShift?: string;
   durationMinutes?: number | null;
@@ -153,6 +166,126 @@ type TimelineEventItem = {
   createdAt: string;
 };
 
+type BulkStatusActionOption = {
+  reservationId: string;
+  pitTherapyId: string;
+  procedureName: string;
+  professionalName: string;
+};
+
+type BulkStatusActionState = {
+  groupKey: string;
+  patientName: string;
+  fromStatus: TeaPreReservationStatus;
+  toStatus: TeaPreReservationStatus;
+  successMessage: string;
+  title: string;
+  options: BulkStatusActionOption[];
+};
+
+const isSlotCoveredBySession = (
+  daySlots: ManualGridSlot[],
+  anchorTime: string,
+  targetTime: string,
+  durationMinutes: number,
+): boolean => {
+  const coveredSlots = getCoveredSlotsForSession(daySlots, anchorTime, durationMinutes);
+  return coveredSlots.includes(targetTime);
+};
+
+const getCoveredSlotsForSession = (
+  daySlots: ManualGridSlot[],
+  anchorTime: string,
+  durationMinutes: number,
+): string[] => {
+  const sortedDaySlots = [...(daySlots || [])]
+    .filter((item) => Boolean(item?.time))
+    .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  const startIndex = sortedDaySlots.findIndex((item) => item.time === anchorTime);
+  if (startIndex < 0) return [];
+
+  const positiveDiffs: number[] = [];
+  for (let i = 0; i < sortedDaySlots.length - 1; i += 1) {
+    const diff = timeToMinutes(sortedDaySlots[i + 1].time) - timeToMinutes(sortedDaySlots[i].time);
+    if (diff > 0) positiveDiffs.push(diff);
+  }
+  const baseStep = positiveDiffs.length > 0 ? Math.min(...positiveDiffs) : 30;
+
+  const coveredSlots: string[] = [];
+  let coveredMinutes = 0;
+  for (let i = startIndex; i < sortedDaySlots.length; i += 1) {
+    const candidate = sortedDaySlots[i];
+    coveredSlots.push(candidate.time);
+
+    const nextSlot = sortedDaySlots[i + 1];
+    const candidateDuration = nextSlot
+      ? Math.max(baseStep, timeToMinutes(nextSlot.time) - timeToMinutes(candidate.time))
+      : baseStep;
+    coveredMinutes += candidateDuration;
+
+    if (coveredMinutes >= durationMinutes) {
+      break;
+    }
+  }
+
+  return coveredSlots;
+};
+
+type ManualReservationDecisionState = {
+  groupKey: string;
+  pitTherapyId: string;
+  durationMinutes: number | null;
+  sessionAnchors: Array<{ date: string; time: string }>;
+  recurrenceWeeks: number;
+  hasEditableExistingSeries: boolean;
+};
+
+type TherapyColorToken = {
+  badgeColor: string;
+  borderColor: string;
+  backgroundColor: string;
+  accentColor: string;
+};
+
+const THERAPY_COLOR_TOKENS: TherapyColorToken[] = [
+  {
+    badgeColor: 'cyan',
+    borderColor: 'rgba(34, 211, 238, 0.95)',
+    backgroundColor: 'rgba(34, 211, 238, 0.14)',
+    accentColor: '#67e8f9',
+  },
+  {
+    badgeColor: 'lime',
+    borderColor: 'rgba(132, 204, 22, 0.95)',
+    backgroundColor: 'rgba(132, 204, 22, 0.14)',
+    accentColor: '#bef264',
+  },
+  {
+    badgeColor: 'yellow',
+    borderColor: 'rgba(250, 204, 21, 0.95)',
+    backgroundColor: 'rgba(250, 204, 21, 0.15)',
+    accentColor: '#fde047',
+  },
+  {
+    badgeColor: 'grape',
+    borderColor: 'rgba(192, 132, 252, 0.95)',
+    backgroundColor: 'rgba(192, 132, 252, 0.14)',
+    accentColor: '#d8b4fe',
+  },
+  {
+    badgeColor: 'orange',
+    borderColor: 'rgba(251, 146, 60, 0.95)',
+    backgroundColor: 'rgba(251, 146, 60, 0.14)',
+    accentColor: '#fdba74',
+  },
+  {
+    badgeColor: 'pink',
+    borderColor: 'rgba(244, 114, 182, 0.95)',
+    backgroundColor: 'rgba(244, 114, 182, 0.14)',
+    accentColor: '#f9a8d4',
+  },
+];
+
 const getReservationProcedureName = (reservation: any) => (
   String(
     reservation?.procedure?.name
@@ -177,7 +310,11 @@ type PitProgressInfo = {
   totalTherapies: number;
   convertedCount: number;
   regressedScheduledCount: number;
+  regressionCompletedSessions: number;
+  regressionTargetSessions: number;
   pendingCount: number;
+  reservedPartialCount: number;
+  reservedCompleteCount: number;
   pendingApprovalCount: number;
   pendingApprovalRequestedAt: string | null;
   pendingApprovalDeadlineAt: string | null;
@@ -191,31 +328,6 @@ const timeToMinutes = (time: string) => {
   const minute = Number(minuteRaw);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
   return (hour * 60) + minute;
-};
-
-const countManualSelectionGroups = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
-  if (!slots.length) return 0;
-  const byDate = slots.reduce((acc, slot) => {
-    if (!acc[slot.date]) acc[slot.date] = [];
-    acc[slot.date].push(slot.time);
-    return acc;
-  }, {} as Record<string, string[]>);
-
-  return Object.values(byDate).reduce((total, times) => {
-    const sorted = [...times].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
-    let groups = 0;
-    let prevMinutes: number | null = null;
-
-    sorted.forEach((time) => {
-      const current = timeToMinutes(time);
-      if (prevMinutes === null || (current - prevMinutes) > slotStepMinutes) {
-        groups += 1;
-      }
-      prevMinutes = current;
-    });
-
-    return total + groups;
-  }, 0);
 };
 
 const getManualSelectionAnchors = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
@@ -256,6 +368,16 @@ const PROGRESS_STEP_LABELS = [
   'Agendado parcial',
   'Agendado completo',
 ];
+
+const PIT_STAGE_BADGE: Record<PitProgressStage, { label: string; color: string }> = {
+  PIT_GERADO: { label: 'Pendente de marcação', color: 'gray' },
+  RESERVADO_PARCIAL: { label: 'Reservado parcial', color: 'indigo' },
+  RESERVADO_COMPLETO: { label: 'Reservado completo', color: 'blue' },
+  AGUARDANDO_APROVACAO: { label: 'Aguardando aprovação', color: 'violet' },
+  EM_AUTORIZACAO: { label: 'Em autorização', color: 'yellow' },
+  AGENDADO_PARCIAL: { label: 'Agendado parcial', color: 'teal' },
+  AGENDADO_COMPLETO: { label: 'Agendado completo', color: 'green' },
+};
 
 const STATUS_FLOW_ORDER: TeaPreReservationStatus[] = [
   'PENDING_SCHEDULING',
@@ -365,76 +487,6 @@ export function TeaPreReserva() {
     return previewDates;
   };
 
-  const buildPreferredWeekdayPreviewDates = (
-    startDate: string | undefined,
-    preferredWeekdays: string[] | undefined,
-    count = 5,
-  ) => {
-    const normalizedIndexes = Array.from(
-      new Set(
-        (preferredWeekdays || [])
-          .map((day) => WEEKDAY_TO_DAY_INDEX[String(day || '').toUpperCase()])
-          .filter((index): index is number => Number.isInteger(index)),
-      ),
-    ).sort((a, b) => a - b);
-
-    if (!normalizedIndexes.length) {
-      return buildRecurringPreviewDates(startDate ? [startDate] : [], count);
-    }
-
-    const base = startDate ? dayjs(startDate).startOf('day') : dayjs().startOf('day');
-    const today = dayjs().startOf('day');
-    const cursorStart = base.isBefore(today, 'day') ? today : base;
-    const result: string[] = [];
-    let cursor = cursorStart;
-
-    while (result.length < count && !cursor.isAfter(recurringUntilYearEnd, 'day')) {
-      if (normalizedIndexes.includes(cursor.day())) {
-        result.push(cursor.format('YYYY-MM-DD'));
-      }
-      cursor = cursor.add(1, 'day');
-    }
-
-    return result;
-  };
-
-  const buildWeeklySlotsFromPreferences = (
-    selectedDate: string,
-    preferredWeekdays: string[] | undefined,
-    weeklyFrequency: number,
-  ) => {
-    const limit = Math.max(1, Number(weeklyFrequency) || 1);
-    const indexes = Array.from(
-      new Set(
-        (preferredWeekdays || [])
-          .map((day) => WEEKDAY_TO_DAY_INDEX[String(day || '').toUpperCase()])
-          .filter((index): index is number => Number.isInteger(index)),
-      ),
-    );
-
-    if (!indexes.length) {
-      return Array.from({ length: limit }).map((_, idx) => ({
-        date: dayjs(selectedDate).add(idx, 'week').format('YYYY-MM-DD'),
-        time: '09:00',
-      }));
-    }
-
-    const slots: Array<{ date: string; time: string }> = [];
-    let cursor = dayjs(selectedDate).startOf('day');
-
-    while (slots.length < limit && !cursor.isAfter(recurringUntilYearEnd, 'day')) {
-      if (indexes.includes(cursor.day())) {
-        slots.push({
-          date: cursor.format('YYYY-MM-DD'),
-          time: '09:00',
-        });
-      }
-      cursor = cursor.add(1, 'day');
-    }
-
-    return slots;
-  };
-
   const resolveTherapySlotsForAcceptance = (therapy: GroupTherapyContext, startDate?: string) => {
     // Corrigido: retorna todos os horários marcados para a terapia, ordenados, sem limitar por semana
     const baseSlots = [...(suggestionsByTherapyId[therapy.pitTherapyId] || [])]
@@ -466,7 +518,10 @@ export function TeaPreReserva() {
   const [manualGridByTherapyId, setManualGridByTherapyId] = useState<Record<string, ManualGridResponse>>({});
   const [manualLoadingGrid, setManualLoadingGrid] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
+  const [manualAcceptDecisionOpened, setManualAcceptDecisionOpened] = useState(false);
+  const [manualReservationDecisionState, setManualReservationDecisionState] = useState<ManualReservationDecisionState | null>(null);
   const [manualSelectedSlots, setManualSelectedSlots] = useState<Array<{ date: string; time: string }>>([]);
+  const [manualEditableExistingSlotsByTherapyId, setManualEditableExistingSlotsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [selectedSuggestionByTherapyId, setSelectedSuggestionByTherapyId] = useState<Record<string, boolean>>({});
   const [triedSlotsByTherapyId, setTriedSlotsByTherapyId] = useState<Record<string, string[]>>({});
   const [weeklyValidationByTherapyId, setWeeklyValidationByTherapyId] = useState<Record<string, {
@@ -491,6 +546,8 @@ export function TeaPreReserva() {
   const [selectedChecklistProcedure, setSelectedChecklistProcedure] = useState<string | null>(null);
   const [acceptModalOpened, setAcceptModalOpened] = useState(false);
   const [acceptModalMode, setAcceptModalMode] = useState<'suggestion' | 'conversion'>('suggestion');
+  const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
+  const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; groupKey: string } | null>(null);
   useEffect(() => {
     if (!acceptModalOpened) {
       setAcceptModalStartDate('');
@@ -503,6 +560,16 @@ export function TeaPreReserva() {
   const [acceptTherapies, setAcceptTherapies] = useState<Array<{therapy: GroupTherapyContext; slots: Array<{date:string;time:string}>}>>([]);
   const [acceptDateByTherapy, setAcceptDateByTherapy] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'pendencias' | 'concluidas'>('pendencias');
+  const [collapsedTherapyCards, setCollapsedTherapyCards] = useState<Record<string, boolean>>({});
+  const [bulkStatusActionState, setBulkStatusActionState] = useState<BulkStatusActionState | null>(null);
+  const [bulkStatusSelectedReservationIds, setBulkStatusSelectedReservationIds] = useState<string[]>([]);
+
+  const toggleTherapyCard = (cardKey: string) => {
+    setCollapsedTherapyCards((prev) => ({
+      ...prev,
+      [cardKey]: !prev[cardKey],
+    }));
+  };
 
   const checklistSelectedProcedureReservations = useMemo(() => {
     if (!selectedChecklistProcedure) return [] as any[];
@@ -525,14 +592,15 @@ export function TeaPreReserva() {
     return byProcedure;
   }, [checklistItems, checklistProcedureOptions]);
 
-  const checklistConvertibleReservations = useMemo(() => (
-    checklistGroupReservations.filter((reservation) => {
+  const checklistConvertibleSelectedReservations = useMemo(() => {
+    if (!selectedChecklistProcedure) return [] as any[];
+    return checklistSelectedProcedureReservations.filter((reservation) => {
       const procedure = getReservationProcedureName(reservation);
       return checklistCanConvertByProcedure.get(procedure) === true;
-    })
-  ), [checklistCanConvertByProcedure, checklistGroupReservations]);
+    });
+  }, [checklistCanConvertByProcedure, checklistSelectedProcedureReservations, selectedChecklistProcedure]);
 
-  const checklistCanConvertAnyProcedure = checklistConvertibleReservations.length > 0;
+  const checklistCanConvertSelectedProcedure = checklistConvertibleSelectedReservations.length > 0;
 
 
   const filteredItems = useMemo(() => {
@@ -701,6 +769,14 @@ export function TeaPreReserva() {
     return map;
   }, [completedReservationGroups]);
 
+  const actionableReservationsByGroupKey = useMemo(() => {
+    const map = new Map<string, ReservationGroup>();
+    actionableExistingReservationGroups.forEach((group) => {
+      map.set(group.groupKey, group);
+    });
+    return map;
+  }, [actionableExistingReservationGroups]);
+
   const actionableExistingReservationGroupsWithoutPending = useMemo(
     () => actionableExistingReservationGroups.filter((group) => !pendingGroupKeySet.has(group.groupKey)),
     [actionableExistingReservationGroups, pendingGroupKeySet],
@@ -711,130 +787,12 @@ export function TeaPreReserva() {
     [completedReservationGroups, pendingGroupKeySet],
   );
 
-  const pitProgressByGroupKey = useMemo(() => {
-    const byGroup = new Map<string, {
-      therapyIds: Set<string>;
-      convertedCount: number;
-      regressedScheduledCount: number;
-      pendingCount: number;
-      reservedCount: number;
-      pendingApprovalCount: number;
-      pendingApprovalRequestedAt: string | null;
-      pendingApprovalDeadlineAt: string | null;
-      inAuthorizationCount: number;
-      authorizedCount: number;
-    }>();
+  const renderProgressTrail = (progress: PitProgressInfo, keyPrefix: string) => {
 
-    filteredItems.forEach((item) => {
-      const patientId = String(item?.patient?.id || 'unknown-patient');
-      const pitId = String(item?.pitId || item?.preReservationId || 'unknown-pit');
-      const groupKey = `${patientId}-${pitId}`;
-      const pitTherapyId = String(item?.pitTherapyId || item?.preReservationId || '');
-      const status = String(item?.status || '');
-      const hasPreReservation = Boolean(item?.preReservationId);
-
-      if (!byGroup.has(groupKey)) {
-        byGroup.set(groupKey, {
-          therapyIds: new Set<string>(),
-          convertedCount: 0,
-          regressedScheduledCount: 0,
-          pendingCount: 0,
-          reservedCount: 0,
-          pendingApprovalCount: 0,
-          pendingApprovalRequestedAt: null,
-          pendingApprovalDeadlineAt: null,
-          inAuthorizationCount: 0,
-          authorizedCount: 0,
-        });
-      }
-
-      const current = byGroup.get(groupKey)!;
-      if (pitTherapyId) current.therapyIds.add(pitTherapyId);
-
-      if (status === 'PENDING_SCHEDULING' && String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE') {
-        current.regressedScheduledCount += 1;
-      }
-
-      if (!hasPreReservation || status === 'PENDING_SCHEDULING') {
-        current.pendingCount += 1;
-      } else if (status === 'CONVERTED') {
-        current.convertedCount += 1;
-      } else if (status === 'RESERVED') {
-        current.reservedCount += 1;
-      } else if (status === 'PROPOSED') {
-        current.pendingApprovalCount += 1;
-        const requestedAt = item?.approvalRequestedAt ? dayjs(item.approvalRequestedAt) : null;
-        const deadlineAt = item?.approvalDeadlineAt ? dayjs(item.approvalDeadlineAt) : null;
-
-        if (requestedAt?.isValid()) {
-          if (!current.pendingApprovalRequestedAt || requestedAt.isBefore(dayjs(current.pendingApprovalRequestedAt))) {
-            current.pendingApprovalRequestedAt = requestedAt.toISOString();
-          }
-        }
-
-        if (deadlineAt?.isValid()) {
-          if (!current.pendingApprovalDeadlineAt || deadlineAt.isBefore(dayjs(current.pendingApprovalDeadlineAt))) {
-            current.pendingApprovalDeadlineAt = deadlineAt.toISOString();
-          }
-        }
-      } else if (status === 'PENDING_AUTHORIZATION') {
-        current.inAuthorizationCount += 1;
-      } else if (status === 'AUTHORIZED') {
-        current.authorizedCount += 1;
-      }
-    });
-
-    const resolved = new Map<string, PitProgressInfo>();
-    byGroup.forEach((value, groupKey) => {
-      const totalTherapies = Math.max(1, value.therapyIds.size);
-      let stage: PitProgressStage = 'PIT_GERADO';
-      let stepIndex = 1;
-
-      if (value.convertedCount >= totalTherapies) {
-        stage = 'AGENDADO_COMPLETO';
-        stepIndex = 7;
-      } else if (value.convertedCount > 0 || value.regressedScheduledCount > 0) {
-        stage = 'AGENDADO_PARCIAL';
-        stepIndex = 6;
-      } else if (value.inAuthorizationCount > 0 || value.authorizedCount > 0) {
-        stage = 'EM_AUTORIZACAO';
-        stepIndex = 5;
-      } else if (value.pendingApprovalCount > 0) {
-        stage = 'AGUARDANDO_APROVACAO';
-        stepIndex = 4;
-      } else if (value.reservedCount >= totalTherapies) {
-        stage = 'RESERVADO_COMPLETO';
-        stepIndex = 3;
-      } else if (value.reservedCount > 0) {
-        stage = 'RESERVADO_PARCIAL';
-        stepIndex = 2;
-      }
-
-      resolved.set(groupKey, {
-        stage,
-        stepIndex,
-        totalTherapies,
-        convertedCount: value.convertedCount,
-        regressedScheduledCount: value.regressedScheduledCount,
-        pendingCount: value.pendingCount,
-        pendingApprovalCount: value.pendingApprovalCount,
-        pendingApprovalRequestedAt: value.pendingApprovalRequestedAt,
-        pendingApprovalDeadlineAt: value.pendingApprovalDeadlineAt,
-        inAuthorizationCount: value.inAuthorizationCount,
-        authorizedCount: value.authorizedCount,
-      });
-    });
-
-    return resolved;
-  }, [filteredItems]);
-
-  const renderPitProgress = (groupKey: string) => {
-    const progress = pitProgressByGroupKey.get(groupKey);
-    if (!progress) return null;
-
-    const reservedTotal = progress.totalTherapies - progress.pendingCount;
+    const hasFrequencyRegression = progress.regressedScheduledCount > 0;
+    const reservedTotal = progress.reservedPartialCount + progress.reservedCompleteCount;
     const reservedPartialActive = reservedTotal > 0;
-    const reservedCompleteActive = reservedTotal >= progress.totalTherapies;
+    const reservedCompleteActive = progress.reservedCompleteCount >= progress.totalTherapies;
     const inAuthorizationActive = progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0;
     const pendingApprovalActive = progress.pendingApprovalCount > 0 || inAuthorizationActive;
     const scheduledPartialActive = progress.convertedCount > 0 || progress.regressedScheduledCount > 0;
@@ -847,9 +805,17 @@ export function TeaPreReserva() {
     const pendingRequested = progress.pendingApprovalRequestedAt ? dayjs(progress.pendingApprovalRequestedAt) : null;
     const pendingDeadline = progress.pendingApprovalDeadlineAt ? dayjs(progress.pendingApprovalDeadlineAt) : null;
     const hasLivePendingApproval = progress.pendingApprovalCount > 0;
-    const pendingApprovalStepCompleted = !hasLivePendingApproval && (inAuthorizationActive || stageFilledByStep[pendingApprovalStepIndex]);
+    const hasDownstreamProgress = inAuthorizationActive || scheduledCompleteActive;
+    const shouldCarryPendingApprovalInRegression = hasFrequencyRegression && (
+      progress.inAuthorizationCount > 0
+      || progress.authorizedCount > 0
+      || progress.convertedCount > 0
+    );
     const pendingApprovalElapsedRatio = (() => {
-      if (!hasLivePendingApproval) return pendingApprovalStepCompleted ? 1 : 0;
+      if (hasFrequencyRegression && !hasLivePendingApproval && !shouldCarryPendingApprovalInRegression) return 0;
+      // Once PIT advances beyond approval step, keep this stage visibly filled.
+      if (hasDownstreamProgress) return 1;
+      if (!hasLivePendingApproval) return stageFilledByStep[pendingApprovalStepIndex] ? 1 : 0;
       if (!pendingRequested?.isValid() || !pendingDeadline?.isValid()) return 0.2;
       const totalMs = pendingDeadline.valueOf() - pendingRequested.valueOf();
       if (totalMs <= 0) return 1;
@@ -857,14 +823,43 @@ export function TeaPreReserva() {
       const remainingRatio = Math.max(0, Math.min(1, remainingMs / totalMs));
       return 1 - remainingRatio;
     })();
-    const authorizationDisplayRatio = stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
+    const pendingApprovalStepCompleted = pendingApprovalElapsedRatio >= 1;
+    const authorizationDisplayRatio = (() => {
+      if (hasFrequencyRegression) {
+        if (progress.authorizedCount > 0 || progress.convertedCount >= progress.totalTherapies) return 1;
+        if (progress.regressionTargetSessions > 0) {
+          const ratio = progress.regressionCompletedSessions / progress.regressionTargetSessions;
+          return Math.max(0.5, Math.min(0.95, ratio));
+        }
+        return 0.5;
+      }
+      return stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
+    })();
+
+    const authorizationStepActive = (
+      inAuthorizationActive
+      || stageFilledByStep[4]
+      || (hasFrequencyRegression && progress.regressionTargetSessions > 0 && progress.authorizedCount < progress.totalTherapies)
+    );
+    const shouldCarryReservedStepsInRegression = hasFrequencyRegression && (
+      progress.pendingApprovalCount > 0
+      || progress.inAuthorizationCount > 0
+      || progress.authorizedCount > 0
+      || progress.convertedCount > 0
+    );
 
     const activeByStep: boolean[] = [
       stageFilledByStep[0], // PIT gerado
-      reservedPartialActive || stageFilledByStep[1],
-      reservedCompleteActive || stageFilledByStep[2],
-      pendingApprovalActive || stageFilledByStep[3],
-      inAuthorizationActive || stageFilledByStep[4],
+      hasFrequencyRegression
+        ? (reservedPartialActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[1]))
+        : (reservedPartialActive || stageFilledByStep[1]),
+      hasFrequencyRegression
+        ? (reservedCompleteActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[2]))
+        : (reservedCompleteActive || stageFilledByStep[2]),
+      hasFrequencyRegression
+        ? (progress.pendingApprovalCount > 0 || shouldCarryPendingApprovalInRegression)
+        : (pendingApprovalActive || stageFilledByStep[3]),
+      authorizationStepActive,
       scheduledPartialActive || stageFilledByStep[5],
       scheduledCompleteActive || stageFilledByStep[6],
     ];
@@ -889,7 +884,7 @@ export function TeaPreReserva() {
             const isAuthorizationStep = index === authorizationStepIndex;
             const isPendingApprovalStep = index === pendingApprovalStepIndex;
             return (
-              <Box key={`${groupKey}-${label}`} style={{ minWidth: 0 }}>
+              <Box key={`${keyPrefix}-${label}`} style={{ minWidth: 0 }}>
                 <Box
                   style={{
                     height: 8,
@@ -951,17 +946,175 @@ export function TeaPreReserva() {
     );
   };
 
+  const buildTherapyProgressFromItem = (item: any): PitProgressInfo => {
+    const status = String(item?.status || 'PENDING_SCHEDULING');
+    const isFrequencyAdjustedFlow = String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE';
+    const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
+    const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
+    const regressionCompletedSessions = isFrequencyAdjustedFlow
+      ? Math.max(0, Number(item?.previousWeeklyFrequency || 0))
+      : 0;
+    const regressionTargetSessions = isFrequencyAdjustedFlow
+      ? Math.max(1, Number(item?.currentWeeklyFrequency || item?.preferences?.weeklyFrequency || 1))
+      : 0;
+    const isRegressionPending = (
+      isFrequencyAdjustedFlow
+      && (
+        status === 'PENDING_SCHEDULING'
+        || (status === 'RESERVED' && weeklyReserved === 0)
+      )
+    );
+    const reservedComplete = status === 'RESERVED' && weeklyReserved >= weeklyTarget;
+    const reservedPartial = status === 'RESERVED' && !reservedComplete && !isRegressionPending;
+
+    let stage: PitProgressStage = 'PIT_GERADO';
+    let stepIndex = 1;
+
+    if (status === 'CONVERTED') {
+      stage = 'AGENDADO_COMPLETO';
+      stepIndex = 7;
+    } else if (status === 'PENDING_AUTHORIZATION') {
+      stage = 'EM_AUTORIZACAO';
+      stepIndex = 5;
+    } else if (status === 'AUTHORIZED') {
+      stage = 'AGENDADO_PARCIAL';
+      stepIndex = 6;
+    } else if (status === 'PROPOSED') {
+      stage = 'AGUARDANDO_APROVACAO';
+      stepIndex = 4;
+    } else if (isRegressionPending) {
+      stage = 'AGENDADO_PARCIAL';
+      stepIndex = 6;
+    } else if (reservedComplete) {
+      stage = 'RESERVADO_COMPLETO';
+      stepIndex = 3;
+    } else if (reservedPartial) {
+      stage = 'RESERVADO_PARCIAL';
+      stepIndex = 2;
+    }
+
+    return {
+      stage,
+      stepIndex,
+      totalTherapies: 1,
+      convertedCount: status === 'CONVERTED' ? 1 : 0,
+      regressedScheduledCount: isFrequencyAdjustedFlow ? 1 : 0,
+      regressionCompletedSessions,
+      regressionTargetSessions,
+      pendingCount: status === 'PENDING_SCHEDULING' ? 1 : 0,
+      reservedPartialCount: reservedPartial ? 1 : 0,
+      reservedCompleteCount: reservedComplete ? 1 : 0,
+      pendingApprovalCount: status === 'PROPOSED' ? 1 : 0,
+      pendingApprovalRequestedAt: status === 'PROPOSED'
+        ? String(item?.approvalRequestedAt || item?.updatedAt || item?.createdAt || '') || null
+        : null,
+      pendingApprovalDeadlineAt: status === 'PROPOSED'
+        ? String(item?.approvalDeadlineAt || item?.expiresAt || '') || null
+        : null,
+      inAuthorizationCount: status === 'PENDING_AUTHORIZATION' ? 1 : 0,
+      authorizedCount: status === 'AUTHORIZED' ? 1 : 0,
+    };
+  };
+
+  const buildPitProgressFromItems = (itemsToAggregate: any[]): PitProgressInfo => {
+    if (!Array.isArray(itemsToAggregate) || itemsToAggregate.length === 0) {
+      return {
+        stage: 'PIT_GERADO',
+        stepIndex: 1,
+        totalTherapies: 0,
+        convertedCount: 0,
+        regressedScheduledCount: 0,
+        regressionCompletedSessions: 0,
+        regressionTargetSessions: 0,
+        pendingCount: 0,
+        reservedPartialCount: 0,
+        reservedCompleteCount: 0,
+        pendingApprovalCount: 0,
+        pendingApprovalRequestedAt: null,
+        pendingApprovalDeadlineAt: null,
+        inAuthorizationCount: 0,
+        authorizedCount: 0,
+      };
+    }
+
+    const aggregated = itemsToAggregate.reduce((acc, item) => {
+      const progress = buildTherapyProgressFromItem(item);
+      acc.totalTherapies += 1;
+      acc.convertedCount += progress.convertedCount;
+      acc.regressedScheduledCount += progress.regressedScheduledCount;
+      acc.regressionCompletedSessions += progress.regressionCompletedSessions;
+      acc.regressionTargetSessions += progress.regressionTargetSessions;
+      acc.pendingCount += progress.pendingCount;
+      acc.reservedPartialCount += progress.reservedPartialCount;
+      acc.reservedCompleteCount += progress.reservedCompleteCount;
+      acc.pendingApprovalCount += progress.pendingApprovalCount;
+      acc.inAuthorizationCount += progress.inAuthorizationCount;
+      acc.authorizedCount += progress.authorizedCount;
+
+      if (!acc.pendingApprovalRequestedAt && progress.pendingApprovalRequestedAt) {
+        acc.pendingApprovalRequestedAt = progress.pendingApprovalRequestedAt;
+      }
+      if (!acc.pendingApprovalDeadlineAt && progress.pendingApprovalDeadlineAt) {
+        acc.pendingApprovalDeadlineAt = progress.pendingApprovalDeadlineAt;
+      }
+
+      return acc;
+    }, {
+      stage: 'PIT_GERADO' as PitProgressStage,
+      stepIndex: 1,
+      totalTherapies: 0,
+      convertedCount: 0,
+      regressedScheduledCount: 0,
+      regressionCompletedSessions: 0,
+      regressionTargetSessions: 0,
+      pendingCount: 0,
+      reservedPartialCount: 0,
+      reservedCompleteCount: 0,
+      pendingApprovalCount: 0,
+      pendingApprovalRequestedAt: null as string | null,
+      pendingApprovalDeadlineAt: null as string | null,
+      inAuthorizationCount: 0,
+      authorizedCount: 0,
+    });
+
+    if (aggregated.convertedCount >= aggregated.totalTherapies && aggregated.totalTherapies > 0) {
+      aggregated.stage = 'AGENDADO_COMPLETO';
+      aggregated.stepIndex = 7;
+    } else if (aggregated.convertedCount > 0 || aggregated.regressedScheduledCount > 0 || aggregated.authorizedCount > 0) {
+      aggregated.stage = 'AGENDADO_PARCIAL';
+      aggregated.stepIndex = 6;
+    } else if (aggregated.inAuthorizationCount > 0) {
+      aggregated.stage = 'EM_AUTORIZACAO';
+      aggregated.stepIndex = 5;
+    } else if (aggregated.pendingApprovalCount > 0) {
+      aggregated.stage = 'AGUARDANDO_APROVACAO';
+      aggregated.stepIndex = 4;
+    } else if (aggregated.reservedCompleteCount >= aggregated.totalTherapies && aggregated.totalTherapies > 0) {
+      aggregated.stage = 'RESERVADO_COMPLETO';
+      aggregated.stepIndex = 3;
+    } else if (aggregated.reservedPartialCount > 0) {
+      aggregated.stage = 'RESERVADO_PARCIAL';
+      aggregated.stepIndex = 2;
+    } else {
+      aggregated.stage = 'PIT_GERADO';
+      aggregated.stepIndex = 1;
+    }
+
+    return aggregated;
+  };
+
   const openConversionConfirmationModal = (reservationsToConvert?: any[]) => {
     const scopedReservations = Array.isArray(reservationsToConvert)
       ? reservationsToConvert
       : checklistSelectedProcedureReservations;
-    const scopedReservationIds = Array.from(
-      new Set(
-        scopedReservations
-          .map((item) => String(item?.preReservationId || ''))
-          .filter(Boolean),
-      ),
-    );
+    const anchorByTherapy = new Map<string, string>();
+    scopedReservations.forEach((item) => {
+      const therapyId = String(item?.pitTherapyId || item?.preReservationId || '');
+      const reservationId = String(item?.preReservationId || '');
+      if (!therapyId || !reservationId || anchorByTherapy.has(therapyId)) return;
+      anchorByTherapy.set(therapyId, reservationId);
+    });
+    const scopedReservationIds = Array.from(anchorByTherapy.values());
     const scopedProcedures = Array.from(new Set(scopedReservations.map(getReservationProcedureName)));
     const hasInvalidScopedProcedure = scopedProcedures.some(
       (procedure) => checklistCanConvertByProcedure.get(procedure) !== true,
@@ -979,23 +1132,49 @@ export function TeaPreReserva() {
     const uniqueTherapies = new Map<string, { therapy: GroupTherapyContext; slots: Array<{ date: string; time: string }> }>();
     scopedReservations.forEach((reservation) => {
       const pitTherapyId = String(reservation?.pitTherapyId || reservation?.preReservationId || '');
-      if (!pitTherapyId || uniqueTherapies.has(pitTherapyId)) return;
+      if (!pitTherapyId) return;
+
+      const slotsFromPattern = Array.isArray(reservation?.weeklySlotPattern)
+        ? reservation.weeklySlotPattern
+          .map((slot: any) => {
+            const date = normalizeDateToIso(slot?.date) || normalizeDateToIso(slot?.suggestedDate);
+            const time = String(slot?.time || slot?.suggestedTime || '').trim();
+            if (!date || !time) return null;
+            return { date, time };
+          })
+          .filter(Boolean) as Array<{ date: string; time: string }>
+        : [];
 
       const suggestedDateRaw = reservation?.slotSuggestion?.suggestedDate || reservation?.suggestedDate;
-      const suggestedDate = normalizeDateToIso(suggestedDateRaw) || dayjs().format('YYYY-MM-DD');
-      const suggestedTime = String(reservation?.slotSuggestion?.suggestedTime || reservation?.suggestedTime || '09:00');
+      const fallbackDate = normalizeDateToIso(suggestedDateRaw) || dayjs().format('YYYY-MM-DD');
+      const fallbackTime = String(reservation?.slotSuggestion?.suggestedTime || reservation?.suggestedTime || '09:00');
+      const normalizedSlots = slotsFromPattern.length > 0
+        ? slotsFromPattern
+        : [{ date: fallbackDate, time: fallbackTime }];
 
-      uniqueTherapies.set(pitTherapyId, {
-        therapy: {
-          pitTherapyId,
-          procedureName: reservation?.procedure?.name || reservation?.procedureName || reservation?.therapyType || 'Procedimento não definido',
-          professionalName: reservation?.professional?.name || reservation?.professionalName || 'Profissional não definido',
-          weeklyFrequency: Math.max(1, Number(reservation?.preferences?.weeklyFrequency || 1)),
-          preferredWeekdays: Array.isArray(reservation?.preferences?.weekdays) ? reservation.preferences.weekdays : [],
-          preferredShift: reservation?.preferences?.shift || undefined,
-          durationMinutes: reservation?.procedure?.durationMinutes || null,
-        },
-        slots: [{ date: suggestedDate, time: suggestedTime }],
+      const existing = uniqueTherapies.get(pitTherapyId);
+      if (!existing) {
+        uniqueTherapies.set(pitTherapyId, {
+          therapy: {
+            pitTherapyId,
+            procedureName: reservation?.procedure?.name || reservation?.procedureName || reservation?.therapyType || 'Procedimento não definido',
+            professionalName: reservation?.professional?.name || reservation?.professionalName || 'Profissional não definido',
+            weeklyFrequency: Math.max(1, Number(reservation?.preferences?.weeklyFrequency || 1)),
+            preferredWeekdays: Array.isArray(reservation?.preferences?.weekdays) ? reservation.preferences.weekdays : [],
+            preferredShift: reservation?.preferences?.shift || undefined,
+            durationMinutes: reservation?.procedure?.durationMinutes || null,
+          },
+          slots: normalizedSlots,
+        });
+        return;
+      }
+
+      normalizedSlots.forEach((slot) => {
+        const signature = `${slot.date}#${slot.time}`;
+        const alreadyExists = existing.slots.some((existingSlot) => `${existingSlot.date}#${existingSlot.time}` === signature);
+        if (!alreadyExists) {
+          existing.slots.push(slot);
+        }
       });
     });
 
@@ -1029,24 +1208,44 @@ export function TeaPreReserva() {
   const renderReservationGroupCard = (group: ReservationGroup) => {
     const reservationStatuses = Array.from(new Set(group.reservations.map((item) => String(item?.status || ''))));
     const groupStatus = reservationStatuses.length === 1 ? reservationStatuses[0] : null;
+    const suggestionContext = buildGroupContextFromReservations(group);
+    const existingSlotsByTherapy = buildExistingSlotsByTherapyFromReservations(group.reservations);
+    const teaProfileId = String(group.reservations[0]?.teaProfileId || group.reservations[0]?.pitId || group.pitId || '');
     const isGroupFullyConverted = group.reservations.length > 0
       && group.reservations.every((item) => String(item?.status || '') === 'CONVERTED');
+    const hasPartiallyScheduledReservations = group.reservations.some((item) => String(item?.status || '') === 'AUTHORIZED');
     const hasReservedReservations = group.reservations.some((item) => String(item?.status || '') === 'RESERVED');
     const hasPendingApprovalReservations = group.reservations.some((item) => String(item?.status || '') === 'PROPOSED');
+    const pitProgress = buildPitProgressFromItems(group.reservations);
 
-    async function handleUpdateReservationStatus(reservationId: string, resolvedStatus: TeaPreReservationStatus) {
-      if (!reservationId || !resolvedStatus) return;
+    async function handleUpdatePitStatus(resolvedStatus: TeaPreReservationStatus) {
+      if (!resolvedStatus) return;
 
-      setUpdatingId(reservationId);
+      const anchorByTherapy = new Map<string, string>();
+      group.reservations.forEach((item) => {
+        const reservationId = String(item?.preReservationId || '');
+        const therapyId = String(item?.pitTherapyId || '');
+        if (!reservationId || !therapyId) return;
+        if (!anchorByTherapy.has(therapyId)) {
+          anchorByTherapy.set(therapyId, reservationId);
+        }
+      });
+
+      const reservationIds = Array.from(anchorByTherapy.values());
+      if (reservationIds.length === 0) return;
+
+      setUpdatingId(group.groupKey);
       try {
-        await teaPreReservationService.updateStatus(reservationId, {
-          status: resolvedStatus,
-          applySeries: true,
-        });
+        await Promise.all(
+          reservationIds.map((reservationId) => teaPreReservationService.updateStatus(reservationId, {
+            status: resolvedStatus,
+            applySeries: true,
+          })),
+        );
 
         showNotification({
           title: 'Sucesso',
-          message: 'Status da terapia atualizado para toda a série do procedimento',
+          message: 'Status do PIT atualizado para todas as terapias',
           color: 'green',
         });
 
@@ -1054,7 +1253,7 @@ export function TeaPreReserva() {
       } catch (err: any) {
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status da terapia',
+          message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
           color: 'red',
         });
       } finally {
@@ -1115,10 +1314,7 @@ export function TeaPreReserva() {
         return;
       }
 
-      const eligibleReservations = (group.reservations || []).filter((item) => {
-        const status = String(item?.status || '');
-        return status !== 'CONVERTED' && status !== 'CANCELED';
-      });
+      const eligibleReservations = (group.reservations || []).filter((item) => String(item?.status || '') === 'AUTHORIZED');
       const anchorByTherapy = new Map<string, any>();
       eligibleReservations.forEach((item) => {
         const therapyId = String(item?.pitTherapyId || '');
@@ -1132,19 +1328,19 @@ export function TeaPreReserva() {
       if (eligibleAnchors.length === 0) {
         showNotification({
           title: 'Sem itens elegíveis',
-          message: 'Este PIT não possui pré-reservas elegíveis para conversão.',
+          message: 'Este PIT não possui terapias em Agendado parcial para checklist/agendamento.',
           color: 'yellow',
         });
         return;
       }
 
-      const procedureOptions = Array.from(new Set(eligibleAnchors.map((item) => getReservationProcedureName(item))));
+      const procedureOptions = Array.from(new Set(eligibleReservations.map((item) => getReservationProcedureName(item))));
 
       setChecklistLoading(true);
       setChecklistModalOpened(true);
       setChecklistGroupKey(group.groupKey);
       setChecklistGroupLabel(`${group.patientName} • PIT`);
-      setChecklistGroupReservations(eligibleAnchors);
+      setChecklistGroupReservations(eligibleReservations);
       setChecklistProcedureOptions(procedureOptions);
       setSelectedChecklistProcedure(procedureOptions[0] || null);
       setConversionReservationIds([]);
@@ -1184,19 +1380,25 @@ export function TeaPreReserva() {
       toStatus: TeaPreReservationStatus,
       successMessage: string,
     ) {
-      const anchorByTherapy = new Map<string, string>();
+        const anchorByTherapy = new Map<string, any>();
       group.reservations.forEach((item) => {
         const status = String(item?.status || '');
         const reservationId = String(item?.preReservationId || '');
         const therapyId = String(item?.pitTherapyId || '');
         if (status !== fromStatus || !reservationId || !therapyId) return;
         if (!anchorByTherapy.has(therapyId)) {
-          anchorByTherapy.set(therapyId, reservationId);
+            anchorByTherapy.set(therapyId, item);
         }
       });
 
-      const reservationIds = Array.from(anchorByTherapy.values());
-      if (reservationIds.length === 0) {
+        const options = Array.from(anchorByTherapy.values()).map((item) => ({
+          reservationId: String(item?.preReservationId || ''),
+          pitTherapyId: String(item?.pitTherapyId || item?.preReservationId || ''),
+          procedureName: item?.procedure?.name || item?.procedureName || item?.therapyType || 'Procedimento não definido',
+          professionalName: item?.professional?.name || item?.professionalName || 'Profissional não definido',
+        })).filter((option) => Boolean(option.reservationId));
+
+        if (options.length === 0) {
         showNotification({
           title: 'Sem itens para atualizar',
           message: 'Nenhuma terapia elegível para essa ação neste PIT.',
@@ -1205,30 +1407,24 @@ export function TeaPreReserva() {
         return;
       }
 
-      setUpdatingId(group.groupKey);
-      try {
-        await Promise.all(
-          reservationIds.map((reservationId) => teaPreReservationService.updateStatus(reservationId, {
-            status: toStatus,
-            applySeries: true,
-          })),
-        );
-        showNotification({
-          title: 'Sucesso',
-          message: successMessage,
-          color: 'green',
+
+        const actionLabel = toStatus === 'PROPOSED' ? 'Enviar para aprovação' : 'Aprovar reserva';
+        setBulkStatusActionState({
+          groupKey: group.groupKey,
+          patientName: group.patientName,
+          fromStatus,
+          toStatus,
+          successMessage,
+          title: `${actionLabel} • selecionar terapias`,
+          options,
         });
-        await loadPending();
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
-          color: 'red',
-        });
-      } finally {
-        setUpdatingId(null);
-      }
+        setBulkStatusSelectedReservationIds(options.map((option) => option.reservationId));
     }
+
+    async function handleDeletePit() {
+      await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey);
+    }
+
     return (
       <Paper key={group.groupKey} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
         <Stack gap={8}>
@@ -1247,28 +1443,56 @@ export function TeaPreReserva() {
             PIT: {group.pitId || 'N/D'}
           </Text>
 
-          {renderPitProgress(group.groupKey)}
+          <Box>
+            {renderProgressTrail(pitProgress, `pit-${group.groupKey}`)}
+          </Box>
 
           <Group grow align="flex-end">
-            <Box>
-              <Text size="sm" fw={500} mb={6}>Status do PIT</Text>
-              <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                <Text size="sm" c={groupStatus ? undefined : 'dimmed'}>
-                  {groupStatus ? (STATUS_LABEL[groupStatus] || groupStatus) : 'Status misto entre terapias'}
-                </Text>
-              </Paper>
-            </Box>
+            <Stack gap={4}>
+              <Select
+                size="xs"
+                label="Status do PIT"
+                data={getTherapyStatusOptions(groupStatus || undefined)}
+                value={groupStatus}
+                placeholder="Status misto entre terapias"
+                onChange={(value) => {
+                  if (!value) return;
+                  handleUpdatePitStatus(value as TeaPreReservationStatus);
+                }}
+                disabled={
+                  updatingId === group.groupKey
+                  || !groupStatus
+                  || isAuthorizationManagedStatus(groupStatus)
+                  || groupStatus === 'CONVERTED'
+                  || groupStatus === 'EXPIRED'
+                }
+                style={{ minWidth: 240 }}
+              />
+            </Stack>
+            <Button
+              color="red"
+              variant="light"
+              h={36}
+              leftSection={<Trash2 size={16} />}
+              onClick={handleDeletePit}
+              loading={updatingId === group.groupKey}
+              disabled={!teaProfileId}
+            >
+              Excluir PIT
+            </Button>
             <Button
               variant="default"
+              h={36}
               leftSection={<History size={16} />}
               onClick={() => handleOpenGroupTimeline(group)}
             >
               Histórico do PIT
             </Button>
-            {!isGroupFullyConverted && (
+            {!isGroupFullyConverted && hasPartiallyScheduledReservations && (
               <Button
                 color="green"
                 variant="light"
+                h={36}
                 leftSection={<ListChecks size={16} />}
                 onClick={() => handleOpenGroupConversionChecklist(group)}
                 loading={updatingId === group.groupKey}
@@ -1313,7 +1537,35 @@ export function TeaPreReserva() {
           )}
 
           <Stack gap={6}>
-            {group.reservations.map((item) => (
+            {group.reservations.map((item) => {
+              const itemTherapyId = String(item?.pitTherapyId || item?.preReservationId || '');
+              const reservationCardKey = `reservation-${group.groupKey}-${String(item.preReservationId || itemTherapyId || 'unknown')}`;
+              const isReservationCardCollapsed = Boolean(collapsedTherapyCards[reservationCardKey]);
+              const fallbackTherapy: GroupTherapyContext = {
+                pitTherapyId: itemTherapyId,
+                procedureName: item?.procedure?.name || item?.procedureName || item?.therapyType || 'Procedimento não definido',
+                professionalName: item?.professional?.name || item?.professionalName || 'Profissional não definido',
+                weeklyFrequency: Math.max(1, Number(item?.preferences?.weeklyFrequency || 1)),
+                preferredWeekdays: Array.isArray(item?.preferences?.weekdays) ? item.preferences.weekdays : [],
+                preferredShift: item?.preferences?.shift || undefined,
+                durationMinutes: item?.procedure?.durationMinutes || item?.durationMinutes || null,
+              };
+              const matchedTherapy = suggestionContext.therapies.find((therapy) => therapy.pitTherapyId === itemTherapyId);
+              const therapyContext: SuggestionGroupContext = {
+                ...suggestionContext,
+                therapies: itemTherapyId ? [matchedTherapy || fallbackTherapy] : [],
+              };
+              const itemStatus = String(item?.status || '');
+              const statusToDisplay = groupStatus || itemStatus;
+              const itemWeeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
+              const itemWeeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
+              const isItemReservedComplete = itemStatus === 'RESERVED' && itemWeeklyReserved >= itemWeeklyTarget;
+              const canShowSuggestionButtonsForItem = itemStatus === 'PENDING_SCHEDULING' || (itemStatus === 'RESERVED' && !isItemReservedComplete);
+              const therapyExistingSlotsByTherapy = itemTherapyId && Array.isArray(existingSlotsByTherapy[itemTherapyId])
+                ? { [itemTherapyId]: existingSlotsByTherapy[itemTherapyId] }
+                : {};
+
+              return (
               <Paper key={String(item.preReservationId)} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                 <Group justify="space-between" align="center" wrap="wrap">
                   <Text size="sm" fw={600}>
@@ -1322,8 +1574,8 @@ export function TeaPreReserva() {
                     {item.professional?.name || 'Profissional não definido'}
                   </Text>
                   <Group gap="xs">
-                    <Badge variant="light" color={STATUS_COLOR[item.status] || 'gray'}>
-                      {STATUS_LABEL[item.status] || item.status}
+                    <Badge variant="light" color={STATUS_COLOR[statusToDisplay] || 'gray'}>
+                      {STATUS_LABEL[statusToDisplay] || statusToDisplay}
                     </Badge>
                     {item.isExpiringSoon && item.status !== 'EXPIRED' && item.status !== 'CONVERTED' && item.status !== 'AUTHORIZED' && (
                       <Badge variant="light" color="orange">Vence em breve</Badge>
@@ -1331,31 +1583,48 @@ export function TeaPreReserva() {
                     {(item.isExpired || item.status === 'EXPIRED') && (
                       <Badge variant="light" color="red">Expirada</Badge>
                     )}
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      onClick={() => toggleTherapyCard(reservationCardKey)}
+                      title={isReservationCardCollapsed ? 'Mostrar detalhes' : 'Esconder detalhes'}
+                    >
+                      <ChevronDown
+                        size={16}
+                        style={{
+                          transform: isReservationCardCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                          transition: 'transform 150ms ease',
+                        }}
+                      />
+                    </ActionIcon>
                   </Group>
                 </Group>
-                <Group mt={8} justify="space-between" align="flex-end" wrap="wrap">
-                  <Select
-                    size="xs"
-                    label="Status da terapia (toda a série)"
-                    data={getTherapyStatusOptions(item.status)}
-                    value={item.status}
-                    onChange={(value) => {
-                      if (!value) return;
-                      if (isAuthorizationManagedStatus(item.status)) return;
-                      handleUpdateReservationStatus(String(item.preReservationId), value as TeaPreReservationStatus);
-                    }}
-                    disabled={
-                      !item?.preReservationId
-                      || updatingId === String(item.preReservationId)
-                      || isAuthorizationManagedStatus(item.status)
-                    }
-                    style={{ minWidth: 220 }}
-                  />
-                </Group>
-                {isAuthorizationManagedStatus(item.status) && (
-                  <Text size="xs" mt={4} c="dimmed">
-                    Status de autorização gerenciado no módulo Autorização Convênio.
-                  </Text>
+                {!isReservationCardCollapsed && (
+                  <>
+                {canShowSuggestionButtonsForItem && itemTherapyId && (
+                  <Group mt={8} justify="flex-end" gap="xs" wrap="wrap">
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={<Sparkles size={14} />}
+                      onClick={() => handleLoadGroupSuggestions(therapyContext, {
+                        existingSlotsByTherapy: therapyExistingSlotsByTherapy,
+                        daysAhead: 90,
+                      })}
+                      loading={loadingSuggestionsId === group.groupKey}
+                    >
+                      Sugerir horários automáticos
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<Calendar size={14} />}
+                      onClick={() => openManualProposalModal(therapyContext, { existingSlotsByTherapy: therapyExistingSlotsByTherapy })}
+                      loading={manualLoadingGrid && manualContext?.groupKey === group.groupKey}
+                    >
+                      Criar proposta manual
+                    </Button>
+                  </Group>
                 )}
                 {Number(item?.authorizationAttachmentsCount || 0) > 0 && (
                   <>
@@ -1381,8 +1650,11 @@ export function TeaPreReserva() {
                     Expira em: {dayjs(item.expiresAt).format('DD/MM/YYYY HH:mm')}
                   </Text>
                 )}
+                  </>
+                )}
               </Paper>
-            ))}
+              );
+            })}
           </Stack>
         </Stack>
       </Paper>
@@ -1405,6 +1677,14 @@ export function TeaPreReserva() {
       }));
     });
   }, [suggestionsByTherapyId, suggestionModalContext]);
+
+  const therapyColorById = useMemo(() => {
+    const colorById: Record<string, TherapyColorToken> = {};
+    (suggestionModalContext?.therapies || []).forEach((therapy, index) => {
+      colorById[therapy.pitTherapyId] = THERAPY_COLOR_TOKENS[index % THERAPY_COLOR_TOKENS.length];
+    });
+    return colorById;
+  }, [suggestionModalContext]);
 
 
   const weeklyCalendarSuggestions = useMemo(() => {
@@ -1513,13 +1793,23 @@ export function TeaPreReserva() {
   }, [manualTimeRows]);
 
   const manualWeeklyLimit = useMemo(
-    () => Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1)),
-    [manualSelectedTherapy],
+    () => {
+      if (!manualSelectedTherapyId) return 0;
+      const weeklyFrequency = Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1));
+      const existingSlots = manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || [];
+      const existingWeeklyCount = buildWeeklySlotSignatures(existingSlots).length;
+      const previousWeeklyFrequency = Math.max(0, Number(manualSelectedTherapy?.previousWeeklyFrequency || 0));
+      const baselineReserved = String(manualSelectedTherapy?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+        ? Math.max(existingWeeklyCount, previousWeeklyFrequency)
+        : existingWeeklyCount;
+      return Math.max(0, weeklyFrequency - baselineReserved);
+    },
+    [manualEditableExistingSlotsByTherapyId, manualSelectedTherapy, manualSelectedTherapyId],
   );
 
   const manualSelectedSessionCount = useMemo(
-    () => countManualSelectionGroups(manualSelectedSlots, manualSlotStepMinutes),
-    [manualSelectedSlots, manualSlotStepMinutes],
+    () => manualSelectedSlots.length,
+    [manualSelectedSlots],
   );
 
   const manualSelectionComplete = manualSelectedSessionCount === manualWeeklyLimit;
@@ -1561,6 +1851,93 @@ export function TeaPreReserva() {
           });
         });
       }
+    }
+  };
+
+  const handleDeletePitByTeaProfileId = async (teaProfileId: string, groupKey: string) => {
+    if (!teaProfileId) {
+      showNotification({
+        title: 'PIT inválido',
+        message: 'Não foi possível identificar o perfil TEA para excluir este PIT.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setDeletePitTarget({ teaProfileId, groupKey });
+    setDeletePitConfirmModalOpened(true);
+  };
+
+  const confirmDeletePit = async () => {
+    if (!deletePitTarget?.teaProfileId || !deletePitTarget?.groupKey) {
+      setDeletePitConfirmModalOpened(false);
+      setDeletePitTarget(null);
+      return;
+    }
+
+    const { teaProfileId, groupKey } = deletePitTarget;
+
+    setUpdatingId(groupKey);
+    try {
+      await teaProfileService.deletePit(teaProfileId);
+      showNotification({
+        title: 'Sucesso',
+        message: 'PIT excluído com sucesso.',
+        color: 'green',
+      });
+      setDeletePitConfirmModalOpened(false);
+      setDeletePitTarget(null);
+      await loadPending();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        color: 'red',
+      });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const confirmBulkStatusAction = async () => {
+    if (!bulkStatusActionState) return;
+
+    const selectedReservationIds = Array.from(new Set(bulkStatusSelectedReservationIds.filter(Boolean)));
+    if (selectedReservationIds.length === 0) {
+      showNotification({
+        title: 'Selecione ao menos uma terapia',
+        message: 'Marque uma ou mais terapias para aplicar a alteração de status.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setUpdatingId(bulkStatusActionState.groupKey);
+    try {
+      await Promise.all(
+        selectedReservationIds.map((reservationId) => teaPreReservationService.updateStatus(reservationId, {
+          status: bulkStatusActionState.toStatus,
+          applySeries: true,
+        })),
+      );
+
+      showNotification({
+        title: 'Sucesso',
+        message: bulkStatusActionState.successMessage,
+        color: 'green',
+      });
+
+      setBulkStatusActionState(null);
+      setBulkStatusSelectedReservationIds([]);
+      await loadPending();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
+        color: 'red',
+      });
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -1638,10 +2015,17 @@ export function TeaPreReserva() {
     }
   };
 
-  const openManualProposalModal = async (context: SuggestionGroupContext) => {
+  const openManualProposalModal = async (
+    context: SuggestionGroupContext,
+    options?: { existingSlotsByTherapy?: Record<string, Array<{ date: string; time: string }>> },
+  ) => {
+    const existingSlotsByTherapy = options?.existingSlotsByTherapy || {};
+    const firstTherapyId = context.therapies[0]?.pitTherapyId || null;
+
     setManualContext(context);
     setManualWeekStart(dayjs().startOf('week').add(1, 'day').format('YYYY-MM-DD'));
-    setManualSelectedTherapyId(context.therapies[0]?.pitTherapyId || null);
+    setManualSelectedTherapyId(firstTherapyId);
+    setManualEditableExistingSlotsByTherapyId(existingSlotsByTherapy);
     setManualSelectedSlots([]);
     setManualModalOpened(true);
     await loadManualGridForContext(context, dayjs().startOf('week').add(1, 'day').format('YYYY-MM-DD'));
@@ -1650,6 +2034,14 @@ export function TeaPreReserva() {
   const handleManualConfirmReservation = async () => {
     if (!manualContext || !manualSelectedTherapy) {
       showNotification({ title: 'Atenção', message: 'Selecione uma terapia para continuar.', color: 'yellow' });
+      return;
+    }
+    if (manualWeeklyLimit <= 0) {
+      showNotification({
+        title: 'Nada pendente',
+        message: 'Esta terapia já possui todos os horários semanais necessários.',
+        color: 'yellow',
+      });
       return;
     }
     if (!manualSelectedSlots.length) {
@@ -1663,53 +2055,82 @@ export function TeaPreReserva() {
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
-    const selectedSessions = countManualSelectionGroups(sortedSlots, manualSlotStepMinutes);
-    const weeklyLimit = Math.max(1, Number(manualSelectedTherapy.weeklyFrequency || 1));
-
-    if (selectedSessions < weeklyLimit) {
+    const sessionAnchors = getManualSelectionAnchors(sortedSlots, manualSlotStepMinutes);
+    if (!sessionAnchors.length) {
       showNotification({
-        title: 'Seleção incompleta',
-        message: `Selecione exatamente ${weeklyLimit} marcação(ões) semanal(is) para esta terapia.`,
+        title: 'Atenção',
+        message: 'Não foi possível montar sessões válidas com os horários selecionados.',
+        color: 'yellow',
+      });
+      return;
+    }
+    if (sessionAnchors.length > manualWeeklyLimit) {
+      showNotification({
+        title: 'Limite semanal atingido',
+        message: `Selecione no máximo ${manualWeeklyLimit} horário(s) faltante(s) para esta terapia.`,
         color: 'yellow',
       });
       return;
     }
 
-    if (selectedSessions > weeklyLimit) {
-      showNotification({
-        title: 'Limite semanal excedido',
-        message: `Essa terapia permite até ${weeklyLimit} marcação(ões) por semana no PIT.`,
-        color: 'yellow',
-      });
-      return;
-    }
+    const firstDate = sessionAnchors[0]?.date;
+    const weeks = getWeeksUntilYearEnd(firstDate);
 
+    setManualReservationDecisionState({
+      groupKey: manualContext.groupKey,
+      pitTherapyId: manualSelectedTherapy.pitTherapyId,
+      durationMinutes: manualSelectedTherapy.durationMinutes ?? null,
+      sessionAnchors,
+      recurrenceWeeks: weeks,
+      hasEditableExistingSeries: false,
+    });
+    setManualAcceptDecisionOpened(true);
+  };
+
+  const handleSubmitManualReservation = async (targetStatus: TeaPreReservationStatus) => {
+    if (!manualReservationDecisionState) return;
+
+    setManualAcceptDecisionOpened(false);
     setManualSaving(true);
+    setUpdatingId(manualReservationDecisionState.groupKey);
     try {
-      const sessionAnchors = getManualSelectionAnchors(sortedSlots, manualSlotStepMinutes);
-      const firstDate = sessionAnchors[0]?.date;
-      const weeks = getWeeksUntilYearEnd(firstDate);
-
-      await teaPreReservationService.acceptGroup({
+      const acceptResult: any = await teaPreReservationService.acceptGroup({
         recurring: true,
-        recurrenceWeeks: weeks,
+        recurrenceWeeks: manualReservationDecisionState.recurrenceWeeks,
         recurringUntilDate,
         expiresAt: dayjs().add(2, 'day').toISOString(),
-        items: sessionAnchors.map((slot) => ({
-          pitTherapyId: manualSelectedTherapy.pitTherapyId,
+        status: targetStatus,
+        replaceExistingByTherapy: false,
+        items: manualReservationDecisionState.sessionAnchors.map((slot) => ({
+          pitTherapyId: manualReservationDecisionState.pitTherapyId,
           suggestedDate: slot.date,
           suggestedTime: slot.time,
-          durationMinutes: manualSelectedTherapy.durationMinutes ?? null,
+          durationMinutes: manualReservationDecisionState.durationMinutes,
         })),
       });
 
+      const totalCreated = Number(acceptResult?.totalCreated || 0);
+      const skippedConflicts = Number(acceptResult?.skippedConflicts || 0);
+
+      if (totalCreated <= 0) {
+        showNotification({
+          title: 'Nenhum horário reservado',
+          message: skippedConflicts > 0
+            ? 'Os horários selecionados entraram em conflito e não puderam ser reservados.'
+            : 'Não foi possível reservar os horários selecionados.',
+          color: 'yellow',
+        });
+        return;
+      }
+
       showNotification({
         title: 'Sucesso',
-        message: `Reserva manual confirmada com ${selectedSessions} marcação(ões) semanal(is).`,
+        message: `Reserva manual confirmada com ${totalCreated} sessão(ões) criada(s).`,
         color: 'green',
       });
 
       setManualModalOpened(false);
+      setManualReservationDecisionState(null);
       setManualSelectedSlots([]);
       await loadPending();
     } catch (err: any) {
@@ -1720,6 +2141,7 @@ export function TeaPreReserva() {
       });
     } finally {
       setManualSaving(false);
+      setUpdatingId(null);
     }
   };
 
@@ -1739,17 +2161,84 @@ export function TeaPreReserva() {
         procedureName: item?.procedure?.name || 'Procedimento não definido',
         professionalName: item?.professional?.name || 'Profissional não definido',
         weeklyFrequency: Number(item?.preferences?.weeklyFrequency || 1),
+        previousWeeklyFrequency: Number(item?.previousWeeklyFrequency || 0),
+        source: String(item?.source || ''),
         preferredWeekdays: Array.isArray(item?.preferences?.weekdays) ? item.preferences.weekdays : [],
         preferredShift: item?.preferences?.shift || undefined,
         durationMinutes: item?.procedure?.durationMinutes || null,
       })),
   });
 
+  const buildGroupContextFromReservations = (group: ReservationGroup): SuggestionGroupContext => {
+    const byTherapy = new Map<string, GroupTherapyContext>();
+
+    (group.reservations || []).forEach((item) => {
+      const pitTherapyId = String(item?.pitTherapyId || item?.preReservationId || '');
+      if (!pitTherapyId || byTherapy.has(pitTherapyId)) return;
+
+      byTherapy.set(pitTherapyId, {
+        pitTherapyId,
+        procedureName: item?.procedure?.name || item?.procedureName || item?.therapyType || 'Procedimento não definido',
+        professionalName: item?.professional?.name || item?.professionalName || 'Profissional não definido',
+        weeklyFrequency: Math.max(1, Number(item?.preferences?.weeklyFrequency || 1)),
+        preferredWeekdays: Array.isArray(item?.preferences?.weekdays) ? item.preferences.weekdays : [],
+        preferredShift: item?.preferences?.shift || undefined,
+        durationMinutes: item?.procedure?.durationMinutes || item?.durationMinutes || null,
+      });
+    });
+
+    return {
+      groupKey: group.groupKey,
+      patientName: group.patientName,
+      patientCpf: group.patientCpf,
+      therapies: Array.from(byTherapy.values()),
+    };
+  };
+
+  const buildExistingSlotsByTherapyFromReservations = (reservations: any[]) => {
+    const byTherapy: Record<string, Array<{ date: string; time: string }>> = {};
+
+    (reservations || []).forEach((item) => {
+      const pitTherapyId = String(item?.pitTherapyId || item?.preReservationId || '');
+      if (!pitTherapyId) return;
+
+      const appendSlot = (dateRaw: string, timeRaw: string) => {
+        const suggestedDate = normalizeDateToIso(dateRaw);
+        const suggestedTime = String(timeRaw || '').trim();
+        if (!suggestedDate || !suggestedTime) return;
+
+        if (!byTherapy[pitTherapyId]) byTherapy[pitTherapyId] = [];
+        const signature = `${suggestedDate}#${suggestedTime}`;
+        const alreadyExists = byTherapy[pitTherapyId].some((slot) => `${slot.date}#${slot.time}` === signature);
+        if (!alreadyExists) {
+          byTherapy[pitTherapyId].push({ date: suggestedDate, time: suggestedTime });
+        }
+      };
+
+      const weeklyPatternSlots = Array.isArray(item?.weeklySlotPattern)
+        ? item.weeklySlotPattern
+        : [];
+      weeklyPatternSlots.forEach((patternSlot: any) => {
+        appendSlot(
+          String(patternSlot?.date || patternSlot?.suggestedDate || ''),
+          String(patternSlot?.time || patternSlot?.suggestedTime || ''),
+        );
+      });
+
+      const suggestedDateRaw = item?.slotSuggestion?.suggestedDate || item?.suggestedDate;
+      const suggestedTimeRaw = item?.slotSuggestion?.suggestedTime || item?.suggestedTime;
+      appendSlot(String(suggestedDateRaw || ''), String(suggestedTimeRaw || ''));
+    });
+
+    return byTherapy;
+  };
+
   const handleLoadGroupSuggestions = async (
     context: SuggestionGroupContext,
     options?: {
       excludeSlotsByTherapy?: Record<string, string[]>;
       daysAhead?: number;
+      existingSlotsByTherapy?: Record<string, Array<{ date: string; time: string }>>;
     },
   ) => {
     const excludeSlotsByTherapy = options?.excludeSlotsByTherapy || {};
@@ -1774,9 +2263,11 @@ export function TeaPreReserva() {
     try {
       const pickBestSuggestions = (
         rawList: Array<{ date: string; time: string }>,
-        weeklyFrequency: number,
+        targetCount: number,
         therapy: GroupTherapyContext,
       ): Array<{ date: string; time: string }> => {
+        if (targetCount <= 0) return [];
+
         const unique = rawList.filter((slot, idx, arr) => arr.findIndex((it) => it.date === slot.date && it.time === slot.time) === idx);
 
         const shuffle = <T,>(arr: T[]) => {
@@ -1814,14 +2305,23 @@ export function TeaPreReserva() {
           return false;
         };
 
-        const filtered = unique.filter((slot) => {
-          const weekday = dayjs(slot.date).day();
-          const weekdayOk = preferredWeekdaySet.size === 0 || preferredWeekdaySet.has(weekday);
-          const shiftOk = isShiftMatch(slot.time);
-          return weekdayOk && shiftOk;
-        });
+        const fullPool = [...unique].sort((a, b) => {
+          const weekdayA = dayjs(a.date).day();
+          const weekdayB = dayjs(b.date).day();
+          const weekdayScoreA = preferredWeekdaySet.size === 0 ? 1 : (preferredWeekdaySet.has(weekdayA) ? 1 : 0);
+          const weekdayScoreB = preferredWeekdaySet.size === 0 ? 1 : (preferredWeekdaySet.has(weekdayB) ? 1 : 0);
 
-        const fullPool = filtered.length > 0 ? filtered : unique;
+          if (weekdayScoreB !== weekdayScoreA) return weekdayScoreB - weekdayScoreA;
+
+          const shiftScoreA = shiftTokenSet.size === 0 ? 1 : (isShiftMatch(a.time) ? 1 : 0);
+          const shiftScoreB = shiftTokenSet.size === 0 ? 1 : (isShiftMatch(b.time) ? 1 : 0);
+
+          if (shiftScoreB !== shiftScoreA) return shiftScoreB - shiftScoreA;
+
+          const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+          if (dateDiff !== 0) return dateDiff;
+          return a.time.localeCompare(b.time);
+        });
         const slotsByWeekStart = new Map<string, Array<{ date: string; time: string }>>();
 
         fullPool.forEach((slot) => {
@@ -1846,7 +2346,7 @@ export function TeaPreReserva() {
             uniqueWeekdays,
           };
         });
-        const viableWeeks = weekStats.filter((item) => item.listLength >= weeklyFrequency);
+        const viableWeeks = weekStats.filter((item) => item.listLength >= targetCount);
         const preferredWeek = (viableWeeks.length > 0 ? viableWeeks : weekStats)
           .sort((a, b) => {
             if (b.uniqueWeekdays !== a.uniqueWeekdays) return b.uniqueWeekdays - a.uniqueWeekdays;
@@ -1871,7 +2371,7 @@ export function TeaPreReserva() {
 
         // Passo 1: sorteia por dia da semana (chance equilibrada entre quarta/quinta/sexta)
         for (const weekday of availableWeekdays) {
-          if (selected.length >= weeklyFrequency) break;
+          if (selected.length >= targetCount) break;
           const weekdaySlots = shuffle(slotsByWeekday.get(weekday) || []);
           const candidate = weekdaySlots.find((slot) => !usedDates.has(slot.date));
           if (!candidate) continue;
@@ -1883,10 +2383,10 @@ export function TeaPreReserva() {
         }
 
         // Passo 2: completa com sorteio geral, evitando repetir o mesmo slot
-        if (selected.length < weeklyFrequency) {
+        if (selected.length < targetCount) {
           const shuffledPool = shuffle(pool);
           for (const slot of shuffledPool) {
-            if (selected.length >= weeklyFrequency) break;
+            if (selected.length >= targetCount) break;
             const signature = `${slot.date}#${slot.time}`;
             if (usedSignatures.has(signature)) continue;
             selected.push(slot);
@@ -1894,17 +2394,38 @@ export function TeaPreReserva() {
           }
         }
 
-        return selected.slice(0, weeklyFrequency);
+        return selected.slice(0, targetCount);
       };
 
       const results = await Promise.all(
         context.therapies.map(async (therapy) => {
           const weeklyFrequency = Math.max(1, Number(therapy.weeklyFrequency) || 1);
+          const existingBase = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
+          const existingSignatures = Array.from(new Set(
+            existingBase
+              .filter((slot) => slot?.date && slot?.time)
+              .map((slot) => `${slot.date}#${slot.time}`),
+          ));
+          const existingWeeklySignatures = buildWeeklySlotSignatures(existingBase);
+          const previousWeeklyFrequency = Math.max(0, Number(therapy?.previousWeeklyFrequency || 0));
+          const baselineReserved = String(therapy?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+            ? Math.max(existingWeeklySignatures.length, previousWeeklyFrequency)
+            : existingWeeklySignatures.length;
+          const missingWeeklySlots = Math.max(0, weeklyFrequency - baselineReserved);
+
+          if (missingWeeklySlots <= 0) {
+            return {
+              pitTherapyId: therapy.pitTherapyId,
+              list: [] as Array<{ date: string; time: string }>,
+            };
+          }
+
           const suggestionLimit = Math.max(90, Math.min(240, weeklyFrequency * 40));
           const previousTried = triedSlotsByTherapyId[therapy.pitTherapyId] || [];
           const exclude = Array.from(new Set([
             ...(excludeSlotsByTherapy[therapy.pitTherapyId] || []),
             ...previousTried,
+            ...existingSignatures,
           ]));
           const data: any = await teaPreReservationService.getSuggestions(therapy.pitTherapyId, {
             daysAhead: options?.daysAhead || 90,
@@ -1919,7 +2440,7 @@ export function TeaPreReserva() {
               if (dateDiff !== 0) return dateDiff;
               return String(a.time).localeCompare(String(b.time));
             });
-          const list = pickBestSuggestions(sortedList, weeklyFrequency, therapy);
+          const list = pickBestSuggestions(sortedList, missingWeeklySlots, therapy);
           return {
             pitTherapyId: therapy.pitTherapyId,
             list,
@@ -1929,7 +2450,9 @@ export function TeaPreReserva() {
 
       const nextByTherapyId: Record<string, Array<{ date: string; time: string }>> = {};
       results.forEach((result) => {
-        nextByTherapyId[result.pitTherapyId] = result.list;
+        nextByTherapyId[result.pitTherapyId] = result.list.filter(
+          (slot, idx, arr) => arr.findIndex((it) => it.date === slot.date && it.time === slot.time) === idx,
+        );
       });
 
       const hasAnySuggestion = Object.values(nextByTherapyId).some((slots) => slots.length > 0);
@@ -2260,6 +2783,7 @@ export function TeaPreReserva() {
                           <Stack gap={4}>
                             {dayBlock.entries.map((entry) => {
                               const isTherapySelected = selectedSuggestionByTherapyId[entry.pitTherapyId] !== false;
+                              const colorToken = therapyColorById[entry.pitTherapyId] || THERAPY_COLOR_TOKENS[0];
                               return (
                                 <Paper
                                   key={`${dayBlock.date}-${entry.pitTherapyId}-${entry.time}`}
@@ -2267,12 +2791,24 @@ export function TeaPreReserva() {
                                   withBorder
                                   style={{
                                     borderColor: isTherapySelected
-                                      ? 'var(--mantine-color-teal-5)'
+                                      ? colorToken.borderColor
                                       : 'var(--mantine-color-default-border)',
+                                    backgroundColor: isTherapySelected ? colorToken.backgroundColor : undefined,
                                     opacity: isTherapySelected ? 1 : 0.45,
                                   }}
                                 >
-                                  <Text size="xs" fw={700}>{entry.time}</Text>
+                                  <Group gap={6} wrap="nowrap" align="center">
+                                    <Box
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 999,
+                                        backgroundColor: colorToken.accentColor,
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Text size="xs" fw={700}>{entry.time}</Text>
+                                  </Group>
                                   <Text size="xs" c="dimmed" lineClamp={2}>{entry.procedureName}</Text>
                                 </Paper>
                               );
@@ -2293,6 +2829,7 @@ export function TeaPreReserva() {
                   const isSelected = selectedSuggestionByTherapyId[therapy.pitTherapyId] !== false;
                   const validation = weeklyValidationByTherapyId[therapy.pitTherapyId];
                   const isRegenerating = loadingSuggestionsId === therapy.pitTherapyId;
+                  const colorToken = therapyColorById[therapy.pitTherapyId] || THERAPY_COLOR_TOKENS[0];
 
                   return (
                     <Paper
@@ -2303,8 +2840,9 @@ export function TeaPreReserva() {
                         borderColor: validation && !validation.valid
                           ? 'var(--mantine-color-yellow-5)'
                           : isSelected
-                            ? 'var(--mantine-color-teal-5)'
+                            ? colorToken.borderColor
                             : 'var(--mantine-color-default-border)',
+                        backgroundColor: isSelected ? colorToken.backgroundColor : undefined,
                         opacity: isSelected ? 1 : 0.6,
                       }}
                     >
@@ -2319,10 +2857,21 @@ export function TeaPreReserva() {
                                 [therapy.pitTherapyId]: e.target.checked,
                               }))
                             }
-                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--mantine-color-teal-6)' }}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: colorToken.borderColor }}
                           />
                           <Stack gap={2}>
-                            <Text size="xs" fw={600}>{therapy.procedureName}</Text>
+                            <Group gap={6} wrap="nowrap" align="center">
+                              <Box
+                                style={{
+                                  width: 9,
+                                  height: 9,
+                                  borderRadius: 999,
+                                  backgroundColor: colorToken.accentColor,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <Text size="xs" fw={600}>{therapy.procedureName}</Text>
+                            </Group>
                             <Text size="xs" c="dimmed">
                               {therapy.professionalName}
                               {slots.length > 0 ? ` • ${slots.length} horário(s)` : ' • sem sugestão'}
@@ -2330,6 +2879,9 @@ export function TeaPreReserva() {
                           </Stack>
                         </Group>
                         <Group gap="xs">
+                          <Badge variant="outline" color={colorToken.badgeColor} size="sm">
+                            Cor da terapia
+                          </Badge>
                           {validation && (
                             <Badge variant="light" color={validation.valid ? 'teal' : 'yellow'} size="sm">
                               {validation.valid
@@ -2512,18 +3064,47 @@ export function TeaPreReserva() {
           <Stack gap={6}>
             {acceptTherapies.map((entry) => {
               const allDates = Array.from(new Set(entry.slots.map((s) => s.date))).sort((a,b)=>dayjs(a).valueOf()-dayjs(b).valueOf());
-              const dates = acceptModalMode === 'conversion'
-                ? buildPreferredWeekdayPreviewDates(allDates[0], entry.therapy.preferredWeekdays, 8)
-                : buildRecurringPreviewDates(allDates, 5);
-              const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dates[0] || '';
+              const dates = buildRecurringPreviewDates(allDates, 6);
+              const timeByWeekday = new Map<number, string>();
+              [...entry.slots]
+                .sort((a, b) => {
+                  const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+                  if (dateDiff !== 0) return dateDiff;
+                  return String(a.time).localeCompare(String(b.time));
+                })
+                .forEach((slot) => {
+                  const weekday = dayjs(slot.date).day();
+                  if (!timeByWeekday.has(weekday)) {
+                    timeByWeekday.set(weekday, String(slot.time || '09:00'));
+                  }
+                });
+              const dateOptions = dates.map((d) => {
+                const fallbackTime = entry.slots[0]?.time || '09:00';
+                const labelTime = timeByWeekday.get(dayjs(d).day()) || fallbackTime;
+                return {
+                  value: d,
+                  label: `${formatWeekdayPt(d)} • ${dayjs(d).format('DD/MM/YYYY')} • ${labelTime}`,
+                };
+              });
+              const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dateOptions[0]?.value || '';
               
-              // In conversion mode, calculate directly from weeklyFrequency
-              // In suggestion mode, resolve from generated suggestions
+              // In conversion mode, use the actual marked slots for this therapy.
+              // In suggestion mode, use resolved suggestions from the chosen start date.
               const selectedWeeklySlots = acceptModalMode === 'conversion'
-                ? buildWeeklySlotsFromPreferences(
-                    selectedDate || dayjs().format('YYYY-MM-DD'),
-                    entry.therapy.preferredWeekdays,
-                    entry.therapy.weeklyFrequency || 1,
+                ? Array.from(
+                    new Map(
+                      [...entry.slots]
+                        .filter((slot) => !selectedDate || !dayjs(slot.date).isBefore(dayjs(selectedDate), 'day'))
+                        .sort((a, b) => {
+                          const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+                          if (dateDiff !== 0) return dateDiff;
+                          return String(a.time).localeCompare(String(b.time));
+                        })
+                        .map((slot) => {
+                          const weekday = dayjs(slot.date).day();
+                          return [`${weekday}#${slot.time}`, { date: slot.date, time: slot.time } as { date: string; time: string }];
+                        }),
+                    ).values(),
                   )
                 : resolveTherapySlotsForAcceptance(entry.therapy, selectedDate);
               
@@ -2540,7 +3121,7 @@ export function TeaPreReserva() {
                     <Select
                       size="xs"
                       style={{ minWidth: 260 }}
-                      data={dates.map((d) => ({ value: d, label: `${formatWeekdayPt(d)} • ${dayjs(d).format('DD/MM/YYYY')}` }))}
+                      data={dateOptions}
                       value={selectedDate}
                       onChange={(v) => {
                         if (!v) return;
@@ -2593,7 +3174,11 @@ export function TeaPreReserva() {
 
       <Modal
         opened={manualModalOpened}
-        onClose={() => setManualModalOpened(false)}
+        onClose={() => {
+          setManualModalOpened(false);
+          setManualAcceptDecisionOpened(false);
+          setManualReservationDecisionState(null);
+        }}
         title="Proposta manual em calendário"
         centered
         size="96vw"
@@ -2653,17 +3238,37 @@ export function TeaPreReserva() {
                     </Paper>
                     {manualWeekDays.map((day) => {
                       const slot = day.slots.find((item) => item.time === time);
-                      const isSelected = manualSelectedSlots.some((selected) => selected.date === day.date && selected.time === time);
+                      const selectedDurationMinutes = Math.max(1, Number(manualSelectedTherapy?.durationMinutes || 30));
+                      const isSelected = manualSelectedSlots.some(
+                        (selected) => selected.date === day.date
+                          && isSlotCoveredBySession(day.slots, selected.time, time, selectedDurationMinutes),
+                      );
                       const isOccupied = !!slot?.occupied;
                       const isSelectable = !!slot?.selectable;
+                      const isBlockedBySelectedSession = manualSelectedSlots.some((selected) => {
+                        if (selected.date !== day.date) return false;
+                        const startMinutes = timeToMinutes(selected.time);
+                        const endMinutes = startMinutes + selectedDurationMinutes;
+                        const currentMinutes = timeToMinutes(time);
+                        // Keep only covered slots blocked; free the exact end boundary slot.
+                        return currentMinutes > startMinutes && currentMinutes < endMinutes;
+                      });
+                      const isExistingEditableSlot = !!manualSelectedTherapyId && (
+                        manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
+                      ).some((selected) => selected.date === day.date && selected.time === time);
+                      const canToggleExistingSlot = isExistingEditableSlot;
+                      const effectiveSelectable = (isSelectable || canToggleExistingSlot) && !isBlockedBySelectedSession;
                       const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
                       const canAddNewSelection = !reachedWeeklyLimit || isSelected;
-                      const isFree = !isOccupied && isSelectable && day.enabled;
+                      const isFree = !isOccupied && effectiveSelectable && day.enabled;
                       const isUnavailable = !isOccupied && !isSelectable;
+                      const isBlocked = !isOccupied && isBlockedBySelectedSession;
                       const stateLabel = isSelected
                         ? 'Selecionado'
                         : isOccupied
                           ? 'Ocupado'
+                          : isBlocked
+                            ? 'Bloqueado pela sessão selecionada'
                           : isFree
                             ? 'Livre'
                             : 'Indisponível';
@@ -2674,12 +3279,11 @@ export function TeaPreReserva() {
                           key={`${day.date}-${time}`}
                           size="compact-xs"
                           variant="filled"
-                          disabled={!isSelectable || !manualSelectedTherapyId || !canAddNewSelection}
+                          disabled={!effectiveSelectable || !manualSelectedTherapyId || !canAddNewSelection}
                           title={`${dayLabel} ${time} • ${stateLabel}`}
                           aria-label={`${dayLabel} ${time} • ${stateLabel}`}
                           onClick={() => {
-                            if (!isSelectable) return;
-                            const selectedDurationMinutes = Math.max(1, Number(manualSelectedTherapy?.durationMinutes || 30));
+                            if (!effectiveSelectable) return;
                             const sortedDaySlots = [...day.slots]
                               .filter((item) => !!item.time)
                               .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
@@ -2698,7 +3302,11 @@ export function TeaPreReserva() {
 
                             for (let i = startIndex; i < sortedDaySlots.length; i += 1) {
                               const candidate = sortedDaySlots[i];
-                              if (candidate.occupied || !candidate.selectable) {
+                              const candidateIsExistingEditable = !!manualSelectedTherapyId && (
+                                manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
+                              ).some((selected) => selected.date === day.date && selected.time === candidate.time);
+                              const candidateSelectable = candidate.selectable || candidateIsExistingEditable;
+                              if ((candidate.occupied && !candidateIsExistingEditable) || !candidateSelectable) {
                                 break;
                               }
 
@@ -2726,22 +3334,43 @@ export function TeaPreReserva() {
 
                             setManualSelectedSlots((prev) => {
                               const toSignature = (slotItem: { date: string; time: string }) => `${slotItem.date}#${slotItem.time}`;
+                              const anchorSlot = { date: day.date, time };
+                              const anchorSignature = toSignature(anchorSlot);
                               const prevSignatureSet = new Set(prev.map(toSignature));
-                              const rangeSignatureSet = new Set(rangeSlots.map(toSignature));
-                              const isRangeAlreadySelected = rangeSlots.every((slotItem) => prevSignatureSet.has(toSignature(slotItem)));
 
-                              // Toggle behavior: clicking an already selected range removes it.
-                              if (isRangeAlreadySelected) {
-                                return prev.filter((slotItem) => !rangeSignatureSet.has(toSignature(slotItem)));
+                              const coveredAnchor = prev.find((slotItem) => (
+                                slotItem.date === day.date
+                                && isSlotCoveredBySession(day.slots, slotItem.time, time, selectedDurationMinutes)
+                              ));
+                              if (coveredAnchor) {
+                                const coveredAnchorSignature = toSignature(coveredAnchor);
+                                return prev.filter((slotItem) => toSignature(slotItem) !== coveredAnchorSignature);
                               }
 
-                              const merged = [...prev];
-                              rangeSlots.forEach((slotItem) => {
-                                const signature = toSignature(slotItem);
-                                if (!prevSignatureSet.has(signature)) {
-                                  merged.push(slotItem);
-                                }
+                              // Toggle behavior: clicking an already selected start slot removes it.
+                              if (prevSignatureSet.has(anchorSignature)) {
+                                return prev.filter((slotItem) => toSignature(slotItem) !== anchorSignature);
+                              }
+
+                              const anchorStartMinutes = timeToMinutes(anchorSlot.time);
+                              const anchorEndMinutes = anchorStartMinutes + selectedDurationMinutes;
+                              const hasOverlap = prev.some((slotItem) => {
+                                if (slotItem.date !== anchorSlot.date) return false;
+                                const existingStartMinutes = timeToMinutes(slotItem.time);
+                                const existingEndMinutes = existingStartMinutes + selectedDurationMinutes;
+                                return anchorStartMinutes < existingEndMinutes && anchorEndMinutes > existingStartMinutes;
                               });
+
+                              if (hasOverlap) {
+                                showNotification({
+                                  title: 'Conflito de horário',
+                                  message: 'Este horário se sobrepõe a uma sessão já selecionada para esta terapia.',
+                                  color: 'yellow',
+                                });
+                                return prev;
+                              }
+
+                              const merged = [...prev, anchorSlot];
 
                               const normalizedMerged = merged.sort((a, b) => {
                                 const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
@@ -2750,7 +3379,7 @@ export function TeaPreReserva() {
                               });
 
                               const maxWeeklySessions = Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1));
-                              const selectedSessions = countManualSelectionGroups(normalizedMerged, manualSlotStepMinutes);
+                              const selectedSessions = normalizedMerged.length;
                               if (selectedSessions > maxWeeklySessions) {
                                 showNotification({
                                   title: 'Limite semanal atingido',
@@ -2770,8 +3399,8 @@ export function TeaPreReserva() {
                             minHeight: 28,
                             paddingInline: 4,
                             border: isUnavailable
-                              ? '1px dashed var(--mantine-color-default-border)'
-                              : '1px solid transparent',
+                                ? '1px dashed var(--mantine-color-default-border)'
+                                : '1px solid transparent',
                             backgroundColor: isSelected
                               ? 'var(--mantine-color-green-6)'
                               : isOccupied
@@ -2818,11 +3447,57 @@ export function TeaPreReserva() {
                 color="green"
                 onClick={handleManualConfirmReservation}
                 loading={manualSaving}
-                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || !manualSelectionComplete || manualSaving}
+                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || manualSaving}
               >
                 Confirmar reserva manual
               </Button>
             </Group>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={manualAcceptDecisionOpened}
+        onClose={() => setManualAcceptDecisionOpened(false)}
+        title="Confirmar proposta manual"
+        centered
+        size="md"
+        zIndex={455}
+        withinPortal
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Escolha como deseja seguir após confirmar os horários da proposta manual.
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => setManualAcceptDecisionOpened(false)}
+              disabled={manualSaving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="light"
+              color="indigo"
+              onClick={async () => {
+                await handleSubmitManualReservation('RESERVED');
+              }}
+              loading={manualSaving}
+              disabled={!manualReservationDecisionState || manualSaving}
+            >
+              Apenas reservar
+            </Button>
+            <Button
+              color="violet"
+              onClick={async () => {
+                await handleSubmitManualReservation('PROPOSED');
+              }}
+              loading={manualSaving}
+              disabled={!manualReservationDecisionState || manualSaving}
+            >
+              Reservar e enviar para aprovação
+            </Button>
           </Group>
         </Stack>
       </Modal>
@@ -2852,6 +3527,135 @@ export function TeaPreReserva() {
               </Paper>
             ))
           )}
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={deletePitConfirmModalOpened}
+        onClose={() => {
+          if (updatingId) return;
+          setDeletePitConfirmModalOpened(false);
+          setDeletePitTarget(null);
+        }}
+        title="Excluir PIT"
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Deseja realmente excluir este PIT? As pré-reservas abertas vinculadas a ele serão canceladas.
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setDeletePitConfirmModalOpened(false);
+                setDeletePitTarget(null);
+              }}
+              disabled={!!updatingId}
+            >
+              Voltar
+            </Button>
+            <Button
+              color="red"
+              onClick={confirmDeletePit}
+              loading={!!updatingId && !!deletePitTarget && updatingId === deletePitTarget.groupKey}
+            >
+              Confirmar exclusão
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+      <Modal
+        opened={Boolean(bulkStatusActionState)}
+        onClose={() => {
+          if (updatingId) return;
+          setBulkStatusActionState(null);
+          setBulkStatusSelectedReservationIds([]);
+        }}
+        title={bulkStatusActionState?.title || 'Selecionar terapias'}
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            {bulkStatusActionState
+              ? `Selecione uma ou mais terapias de ${bulkStatusActionState.patientName} para aplicar a ação.`
+              : 'Selecione uma ou mais terapias para continuar.'}
+          </Text>
+
+          {bulkStatusActionState?.options.map((option) => {
+            const isChecked = bulkStatusSelectedReservationIds.includes(option.reservationId);
+            return (
+              <Paper key={option.reservationId} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                <Group justify="space-between" align="center" wrap="wrap">
+                  <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        const nextChecked = e.currentTarget.checked;
+                        setBulkStatusSelectedReservationIds((prev) => {
+                          if (nextChecked) return Array.from(new Set([...prev, option.reservationId]));
+                          return prev.filter((id) => id !== option.reservationId);
+                        });
+                      }}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <Stack gap={2} style={{ minWidth: 0 }}>
+                      <Text size="sm" fw={600} lineClamp={1}>{option.procedureName}</Text>
+                      <Text size="xs" c="dimmed" lineClamp={1}>{option.professionalName}</Text>
+                    </Stack>
+                  </Group>
+                </Group>
+              </Paper>
+            );
+          })}
+
+          <Group justify="space-between" wrap="wrap">
+            <Group gap="xs">
+              <Button
+                size="xs"
+                variant="default"
+                onClick={() => setBulkStatusSelectedReservationIds(bulkStatusActionState?.options.map((option) => option.reservationId) || [])}
+                disabled={!bulkStatusActionState?.options.length || !!updatingId}
+              >
+                Selecionar todas
+              </Button>
+              <Button
+                size="xs"
+                variant="subtle"
+                onClick={() => setBulkStatusSelectedReservationIds([])}
+                disabled={bulkStatusSelectedReservationIds.length === 0 || !!updatingId}
+              >
+                Limpar
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              Selecionadas: {bulkStatusSelectedReservationIds.length}
+            </Text>
+          </Group>
+
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setBulkStatusActionState(null);
+                setBulkStatusSelectedReservationIds([]);
+              }}
+              disabled={!!updatingId}
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="indigo"
+              onClick={confirmBulkStatusAction}
+              loading={!!bulkStatusActionState?.groupKey && updatingId === bulkStatusActionState.groupKey}
+              disabled={bulkStatusSelectedReservationIds.length === 0}
+            >
+              Confirmar ação
+            </Button>
+          </Group>
         </Stack>
       </Modal>
 
@@ -2918,11 +3722,11 @@ export function TeaPreReserva() {
                 </Button>
                 <Button
                   color="green"
-                  disabled={!checklistCanConvertAnyProcedure}
+                  disabled={!checklistCanConvertSelectedProcedure}
                   loading={!!checklistGroupKey && updatingId === checklistGroupKey}
-                  onClick={() => openConversionConfirmationModal(checklistConvertibleReservations)}
+                  onClick={() => openConversionConfirmationModal(checklistConvertibleSelectedReservations)}
                 >
-                  {`Finalizar Agendamento${checklistCanConvertAnyProcedure ? ` (${checklistConvertibleReservations.length})` : ''}`}
+                  {`Finalizar Agendamento${checklistCanConvertSelectedProcedure ? ` (${checklistConvertibleSelectedReservations.length})` : ''}`}
                 </Button>
               </Group>
             </>
@@ -3019,14 +3823,47 @@ export function TeaPreReserva() {
                 return (
                   <Stack gap="xs">
                     {pendingGroups.map((group) => {
+                      const existingGroupForSamePit = actionableReservationsByGroupKey.get(group.groupKey);
                       const completedGroupForSamePit = completedReservationsByGroupKey.get(group.groupKey);
-                      const completedCount = completedGroupForSamePit?.reservations?.length || 0;
+                      const pendingTherapyIdSet = new Set(
+                        (group.therapies || [])
+                          .map((item) => String(item?.pitTherapyId || ''))
+                          .filter(Boolean),
+                      );
+                      const existingReservationsWithoutDuplicates = (existingGroupForSamePit?.reservations || []).filter(
+                        (item) => !pendingTherapyIdSet.has(String(item?.pitTherapyId || '')),
+                      );
+                      const completedReservationsWithoutDuplicates = (completedGroupForSamePit?.reservations || []).filter(
+                        (item) => !pendingTherapyIdSet.has(String(item?.pitTherapyId || '')),
+                      );
+                      const existingCount = existingReservationsWithoutDuplicates.length;
+                      const completedCount = completedReservationsWithoutDuplicates.length;
                       const groupContext = buildGroupContextFromItems(group);
+                      const groupTeaProfileId = String(group.therapies[0]?.teaProfileId || group.therapies[0]?.pitId || '');
                       const removedTherapies = group.therapies.filter((item) => Boolean(item?.removedFromPit));
                       const frequencyChangedTherapies = group.therapies.filter((item) => String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE');
+                      const pitProgress = buildPitProgressFromItems([
+                        ...group.therapies,
+                        ...existingReservationsWithoutDuplicates,
+                        ...completedReservationsWithoutDuplicates,
+                      ]);
+                      const pitStageBadge = PIT_STAGE_BADGE[pitProgress.stage];
                       const hasRemovedTherapyAlert = removedTherapies.length > 0;
                       const hasFrequencyChangeAlert = frequencyChangedTherapies.length > 0;
                       const canScheduleGroup = groupContext.therapies.length > 0;
+                      const existingSlotsByTherapy = buildExistingSlotsByTherapyFromReservations([
+                        ...(group.therapies || []),
+                        ...existingReservationsWithoutDuplicates,
+                        ...completedReservationsWithoutDuplicates,
+                      ]);
+                      const hasSchedulableTherapiesInPending = group.therapies.some((item) => {
+                        const status = String(item?.status || '');
+                        if (status === 'PENDING_SCHEDULING') return true;
+                        if (status !== 'RESERVED') return false;
+                        const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
+                        const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
+                        return weeklyReserved < weeklyTarget;
+                      });
                       const totalSuggested = groupContext.therapies.reduce(
                         (acc, therapy) => acc + (suggestionsByTherapyId[therapy.pitTherapyId]?.length || 0),
                         0,
@@ -3038,33 +3875,56 @@ export function TeaPreReserva() {
                             <Group justify="space-between" align="center" wrap="wrap">
                               <Text fw={600}>{group.patientName}</Text>
                               <Group gap="xs">
+                                <Badge variant="light" color={pitStageBadge.color}>{pitStageBadge.label}</Badge>
                                 {hasFrequencyChangeAlert && (
-                                  <Badge variant="light" color="blue">Agendado parcial</Badge>
+                                  <Badge variant="light" color="blue">Frequência alterada</Badge>
                                 )}
-                                <Badge variant="light" color="gray">Pendente de marcação</Badge>
                               </Group>
                             </Group>
 
                             <Text size="xs" c="dimmed">
                               {group.patientCpf ? `CPF: ${formatCPF(group.patientCpf)} • ` : ''}
-                              Itens do PIT: {group.therapies.length + completedCount}
+                              Itens do PIT: {group.therapies.length + existingCount + completedCount}
                             </Text>
 
-                            {renderPitProgress(group.groupKey)}
+                            <Box>
+                              {renderProgressTrail(pitProgress, `pit-pending-${group.groupKey}`)}
+                            </Box>
 
                             <Stack gap={6}>
-                              {group.therapies.map((therapyItem) => (
+                              {group.therapies.map((therapyItem) => {
+                                const pendingCardKey = `pending-${group.groupKey}-${String(therapyItem.pitTherapyId || 'unknown')}`;
+                                const isPendingCardCollapsed = Boolean(collapsedTherapyCards[pendingCardKey]);
+                                return (
                                 <Paper
                                   key={String(therapyItem.pitTherapyId)}
                                   p="xs"
                                   withBorder
                                   style={{ borderColor: 'var(--mantine-color-default-border)' }}
                                 >
-                                  <Text size="xs" fw={600}>
-                                    {therapyItem.procedure?.name || 'Procedimento não definido'}
-                                    {' • '}
-                                    {therapyItem.professional?.name || 'Profissional não definido'}
-                                  </Text>
+                                  <Group justify="space-between" align="center" wrap="wrap">
+                                    <Text size="xs" fw={600}>
+                                      {therapyItem.procedure?.name || 'Procedimento não definido'}
+                                      {' • '}
+                                      {therapyItem.professional?.name || 'Profissional não definido'}
+                                    </Text>
+                                    <ActionIcon
+                                      variant="subtle"
+                                      color="gray"
+                                      onClick={() => toggleTherapyCard(pendingCardKey)}
+                                      title={isPendingCardCollapsed ? 'Mostrar detalhes' : 'Esconder detalhes'}
+                                    >
+                                      <ChevronDown
+                                        size={16}
+                                        style={{
+                                          transform: isPendingCardCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                                          transition: 'transform 150ms ease',
+                                        }}
+                                      />
+                                    </ActionIcon>
+                                  </Group>
+                                  {!isPendingCardCollapsed && (
+                                    <>
                                   {therapyItem?.removedFromPit && (
                                     <Group gap={6} mb={4}>
                                       <Badge variant="light" color="orange">Terapia removida do PIT</Badge>
@@ -3098,16 +3958,51 @@ export function TeaPreReserva() {
                                       {String(therapyItem.alertMessage)}
                                     </Text>
                                   )}
+                                    </>
+                                  )}
                                 </Paper>
-                              ))}
+                                );
+                              })}
                             </Stack>
 
-                            {completedGroupForSamePit && (
+                            {existingReservationsWithoutDuplicates.length > 0 && (
+                              <Stack gap={6}>
+                                <Text size="xs" fw={600} c="dimmed">
+                                  Terapias já criadas deste mesmo PIT
+                                </Text>
+                                {existingReservationsWithoutDuplicates.map((item) => {
+                                  return (
+                                  <Paper
+                                    key={`existing-${String(item.preReservationId)}`}
+                                    p="xs"
+                                    withBorder
+                                    style={{ borderColor: 'var(--mantine-color-default-border)' }}
+                                  >
+                                    <Group justify="space-between" align="center" wrap="wrap">
+                                      <Text size="xs" fw={600}>
+                                        {item.procedure?.name || 'Procedimento não definido'}
+                                        {' • '}
+                                        {item.professional?.name || 'Profissional não definido'}
+                                      </Text>
+                                      <Group gap="xs">
+                                        <Badge variant="light" color={STATUS_COLOR[item.status] || 'gray'}>
+                                          {STATUS_LABEL[item.status] || item.status}
+                                        </Badge>
+                                      </Group>
+                                    </Group>
+                                  </Paper>
+                                  );
+                                })}
+                              </Stack>
+                            )}
+
+                            {completedReservationsWithoutDuplicates.length > 0 && (
                               <Stack gap={6}>
                                 <Text size="xs" fw={600} c="dimmed">
                                   Terapias já agendadas deste mesmo PIT
                                 </Text>
-                                {completedGroupForSamePit.reservations.map((item) => (
+                                {completedReservationsWithoutDuplicates.map((item) => {
+                                  return (
                                   <Paper
                                     key={`completed-${String(item.preReservationId)}`}
                                     p="xs"
@@ -3120,40 +4015,63 @@ export function TeaPreReserva() {
                                         {' • '}
                                         {item.professional?.name || 'Profissional não definido'}
                                       </Text>
-                                      <Badge variant="light" color={STATUS_COLOR[item.status] || 'green'}>
-                                        {STATUS_LABEL[item.status] || item.status}
-                                      </Badge>
+                                      <Group gap="xs">
+                                        <Badge variant="light" color={STATUS_COLOR[item.status] || 'green'}>
+                                          {STATUS_LABEL[item.status] || item.status}
+                                        </Badge>
+                                      </Group>
                                     </Group>
                                   </Paper>
-                                ))}
+                                  );
+                                })}
                               </Stack>
                             )}
 
                             <Group justify="flex-end">
+                              {hasSchedulableTherapiesInPending && (
+                                <Button
+                                  size="xs"
+                                  variant="light"
+                                  loading={loadingSuggestionsId === group.groupKey}
+                                  onClick={() => handleLoadGroupSuggestions(groupContext, {
+                                    existingSlotsByTherapy,
+                                    daysAhead: 90,
+                                  })}
+                                  disabled={!canScheduleGroup}
+                                >
+                                  Sugerir horários automáticos
+                                </Button>
+                              )}
+                              {hasSchedulableTherapiesInPending && (
+                                <Button
+                                  size="xs"
+                                  bg={DARK_BLUE}
+                                  loading={updatingId === group.groupKey}
+                                  onClick={() => openManualProposalModal(groupContext, {
+                                    existingSlotsByTherapy,
+                                  })}
+                                  disabled={!canScheduleGroup}
+                                >
+                                  Criar proposta manual
+                                </Button>
+                              )}
                               <Button
                                 size="xs"
+                                color="red"
                                 variant="light"
-                                loading={loadingSuggestionsId === group.groupKey}
-                                onClick={() => handleLoadGroupSuggestions(groupContext)}
-                                disabled={!canScheduleGroup}
-                              >
-                                Sugerir horários automáticos
-                              </Button>
-                              <Button
-                                size="xs"
-                                bg={DARK_BLUE}
+                                leftSection={<Trash2 size={14} />}
                                 loading={updatingId === group.groupKey}
-                                onClick={() => openManualProposalModal(groupContext)}
-                                disabled={!canScheduleGroup}
+                                onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey)}
+                                disabled={!groupTeaProfileId}
                               >
-                                Criar proposta manual
+                                Excluir PIT
                               </Button>
                               {hasRemovedTherapyAlert && (
                                 <Button
                                   size="xs"
                                   variant="outline"
                                   color="orange"
-                                  onClick={() => navigate('/tea/desmarcacao-lote')}
+                                  onClick={() => navigate(`/tea/desmarcacao-lote?teaProfileId=${encodeURIComponent(String(group.therapies[0]?.teaProfileId || ''))}`)}
                                 >
                                   Desmarcar terapia removida
                                 </Button>

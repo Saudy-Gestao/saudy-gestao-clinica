@@ -43,7 +43,7 @@ interface ProcedureForm {
   acceptedSubInsurances: Record<string, string[]>;
   durationMinutes?: number | null;
   modalities: string[];
-  doctorId: string | null;
+  doctorIds: string[];
   procedureMaterials: { inventoryItemId: string; quantity: number }[];
 }
 
@@ -67,7 +67,7 @@ const INITIAL_FORM: ProcedureForm = {
   acceptedSubInsurances: {},
   durationMinutes: null,
   modalities: [],
-  doctorId: null,
+  doctorIds: [],
   procedureMaterials: [],
 };
 
@@ -104,7 +104,6 @@ export function CadastroProcedimento() {
   const [activeTab, setActiveTab] = useState('cadastro');
   const [customInsuranceInput, setCustomInsuranceInput] = useState('');
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
-  const [doctorSearchValue, setDoctorSearchValue] = useState('');
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [materialOptions, setMaterialOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [materialDirectory, setMaterialDirectory] = useState<Record<string, { name: string; code?: string; unit?: string }>>({});
@@ -343,16 +342,12 @@ export function CadastroProcedimento() {
 
     setSaving(true);
     try {
-      const doctorName = form.doctorId 
-        ? (doctorLabelById[form.doctorId] || doctorDirectory[form.doctorId]?.name || form.doctorId)
-        : undefined;
-
-      const doctors = form.doctorId
-        ? [{
-            doctorId: form.doctorId,
-            doctorName: doctorName,
-          }]
-        : [];
+      const doctors = form.doctorIds
+        .filter(Boolean)
+        .map((doctorId) => ({
+          doctorId,
+          doctorName: doctorLabelById[doctorId] || doctorDirectory[doctorId]?.name || doctorId,
+        }));
 
       const payload = {
         name: form.name.trim(),
@@ -373,7 +368,6 @@ export function CadastroProcedimento() {
         setForm(INITIAL_FORM);
         setSelectedMaterialId(null);
         setSelectedMaterialQuantity(1);
-        setDoctorSearchValue('');
         setActiveTab('lista');
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
@@ -384,7 +378,6 @@ export function CadastroProcedimento() {
         setForm(INITIAL_FORM);
         setSelectedMaterialId(null);
         setSelectedMaterialQuantity(1);
-        setDoctorSearchValue('');
         setProcedureQuery('');
       }
       const refreshed: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
@@ -425,13 +418,11 @@ export function CadastroProcedimento() {
       setSelectedMaterialId(null);
       setSelectedMaterialQuantity(1);
       setActiveTab('lista');
-      setDoctorSearchValue('');
       return;
     }
     setForm(INITIAL_FORM);
     setSelectedMaterialId(null);
     setSelectedMaterialQuantity(1);
-    setDoctorSearchValue('');
     navigate('/dashboard');
   };
 
@@ -552,9 +543,11 @@ export function CadastroProcedimento() {
     try {
       const data: any = await procedureService.getProcedure(procedureId);
       
-      const doctorId = Array.isArray(data?.doctors) && data.doctors.length > 0
-        ? String(data.doctors[0].doctorId || data.doctors[0].id || '')
-        : null;
+      const doctorIds = Array.isArray(data?.doctors)
+        ? data.doctors
+            .map((doctor: any) => String(doctor?.doctorId || doctor?.id || '').trim())
+            .filter(Boolean)
+        : [];
 
       setForm({
         name: data.name || '',
@@ -566,7 +559,7 @@ export function CadastroProcedimento() {
         acceptedInsurances: Array.isArray(data.acceptedInsurances) ? data.acceptedInsurances : [],
         acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},
         modalities: Array.isArray(data.modalities) ? data.modalities : [],
-        doctorId,
+        doctorIds,
         procedureMaterials: Array.isArray(data?.materials)
           ? data.materials
               .map((item: any) => ({
@@ -576,7 +569,6 @@ export function CadastroProcedimento() {
               .filter((item: { inventoryItemId: string; quantity: number }) => item.inventoryItemId && Number.isFinite(item.quantity) && item.quantity > 0)
           : [],
       });
-      setDoctorSearchValue('');
 
       setEditingProcedureId(procedureId);
       setActiveTab('cadastro');
@@ -690,23 +682,17 @@ export function CadastroProcedimento() {
                 </SimpleGrid>
 
                 <SectionTitle>Medicos vinculados</SectionTitle>
-                <Select
-                  label="Selecione o médico"
-                  placeholder={loadingDoctors ? 'Carregando médicos' : 'Selecione um médico'}
+                <MultiSelect
+                  label="Selecione os médicos"
+                  placeholder={loadingDoctors ? 'Carregando médicos' : 'Selecione um ou mais médicos'}
                   data={doctorOptions}
-                  value={form.doctorId}
-                  onChange={(value) => setForm((prev) => ({ ...prev, doctorId: value }))}
-                  searchValue={doctorSearchValue}
-                  onSearchChange={(value) => {
-                    setDoctorSearchValue(value);
-                    if (value === '') {
-                      setForm((prev) => ({ ...prev, doctorId: null }));
-                    }
-                  }}
+                  value={form.doctorIds}
+                  onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
                   searchable
                   nothingFoundMessage="Nenhum médico"
                   rightSection={loadingDoctors ? <Loader size={16} /> : undefined}
                   clearable
+                  maxDropdownHeight={220}
                 />
 
                 <SectionTitle>Materiais vinculados</SectionTitle>
