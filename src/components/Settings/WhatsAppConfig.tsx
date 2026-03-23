@@ -36,6 +36,7 @@ import {
   IconAlertCircle,
   IconClock,
   IconInfoCircle,
+  IconRefresh,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
 
@@ -43,6 +44,7 @@ interface ConfigFormValues {
   accountSid: string;
   authToken: string;
   fromNumber: string;
+  appId: string;
   isActive: boolean;
 }
 
@@ -65,6 +67,7 @@ interface NotificationFormValues {
 export function WhatsAppConfig() {
   const [activeTab, setActiveTab] = useState('config');
   const [loading, setLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [variables, setVariables] = useState<any[]>([]);
@@ -77,6 +80,7 @@ export function WhatsAppConfig() {
     accountSid: '',
     authToken: '',
     fromNumber: '',
+    appId: '',
     isActive: true,
   });
 
@@ -121,6 +125,7 @@ export function WhatsAppConfig() {
           accountSid: config.accountSid,
           authToken: hasAuthToken ? '' : (config.authToken || ''),
           fromNumber: config.fromNumber,
+          appId: config.appId || '',
           isActive: config.isActive,
         });
       }
@@ -283,6 +288,27 @@ export function WhatsAppConfig() {
     }
   };
 
+  const handleSyncHsm = async () => {
+    setSyncLoading(true);
+    try {
+      const result = await whatsappService.syncHsmStatus();
+      notifications.show({
+        title: 'Sincronizado',
+        message: `${result.synced} template(s) verificados, ${result.updated} atualizado(s).`,
+        color: 'green',
+      });
+      await loadData();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.error || 'Erro ao sincronizar status dos templates',
+        color: 'red',
+      });
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   const openTemplateModal = (template?: any) => {
     if (template) {
       setTemplateForm({
@@ -392,8 +418,15 @@ export function WhatsAppConfig() {
                   onChange={(e) => setConfigForm(prev => ({ ...prev, fromNumber: e.target.value }))}
                 />
 
+                <TextInput
+                  label="App ID (Gupshup)"
+                  placeholder="Ex: c0e21bb7-6e0d-4e2a-a0da-dcf67af1bab5"
+                  description="UUID do seu app no Gupshup — necessário para sincronizar status de templates HSM aprovados"
+                  value={configForm.appId}
+                  onChange={(e) => setConfigForm(prev => ({ ...prev, appId: e.target.value }))}
+                />
+
                 <Switch
-                  label="WhatsApp ativo"
                   description="Quando desativado, nenhuma mensagem será enviada"
                   checked={configForm.isActive}
                   onChange={(e) => setConfigForm(prev => ({ ...prev, isActive: e.target.checked }))}
@@ -435,12 +468,22 @@ export function WhatsAppConfig() {
           <Paper shadow="sm" p="xl">
             <Group justify="space-between" mb="md">
               <Title order={4}>Templates de Mensagens</Title>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                onClick={() => openTemplateModal()}
-              >
-                Novo Template
-              </Button>
+              <Group gap="xs">
+                <Button
+                  variant="light"
+                  leftSection={<IconRefresh size={16} />}
+                  onClick={handleSyncHsm}
+                  loading={syncLoading}
+                >
+                  Sincronizar status HSM
+                </Button>
+                <Button
+                  leftSection={<IconPlus size={16} />}
+                  onClick={() => openTemplateModal()}
+                >
+                  Novo Template
+                </Button>
+              </Group>
             </Group>
 
             <Alert icon={<IconInfoCircle size={16} />} mb="md">
@@ -458,8 +501,8 @@ export function WhatsAppConfig() {
                           {getMessageTypeLabel(template.type)}
                         </Badge>
                         {template.hsmTemplateName && (
-                          <Badge size="sm" variant="filled" color="green">
-                            HSM: {template.hsmTemplateName}
+                          <Badge size="sm" variant="filled" color={template.hsmTemplateApproved ? 'green' : 'red'}>
+                            HSM: {template.hsmTemplateName}{template.hsmTemplateApproved ? ' ✓' : ' ⋅ pendente'}
                           </Badge>
                         )}
                       </Group>

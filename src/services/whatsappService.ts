@@ -6,6 +6,7 @@ export interface WhatsAppConfig {
   accountSid: string;
   authToken?: string;
   fromNumber: string;
+  appId?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -18,6 +19,7 @@ export interface WhatsAppMessageTemplate {
   name: string;
   message: string;
   hsmTemplateName?: string | null;
+  hsmTemplateApproved: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -66,7 +68,7 @@ export default {
     return res.data;
   },
 
-  async saveConfig(data: { accountSid: string; authToken?: string; fromNumber: string; isActive?: boolean }): Promise<WhatsAppConfig> {
+  async saveConfig(data: { accountSid: string; authToken?: string; fromNumber: string; appId?: string; isActive?: boolean }): Promise<WhatsAppConfig> {
     const res = await api.post('/care/whatsapp/config', data);
     return res.data;
   },
@@ -100,6 +102,11 @@ export default {
 
   async deleteTemplate(id: string): Promise<void> {
     await api.delete(`/care/whatsapp/templates/${id}`);
+  },
+
+  async syncHsmStatus(): Promise<{ synced: number; updated: number; gupshupTemplates: Record<string, string> }> {
+    const res = await api.post('/care/whatsapp/templates/sync-hsm', {});
+    return res.data;
   },
 
   // ===== Notification Config =====
