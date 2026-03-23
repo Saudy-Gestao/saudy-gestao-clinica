@@ -29,6 +29,7 @@ import { Header } from '../Header/Header';
 import patientService from '../../services/patientService';
 import teaProfileService from '../../services/teaProfileService';
 import doctorService from '../../services/doctorService';
+import insuranceService from '../../services/insuranceService';
 import { DARK_BLUE } from '../../themes/theme';
 import { onlyDigits, formatCPF, isValidCPF, isValidEmail, normalizeEmail, parseApiDateToLocalDate } from '../../utils/formatters';
 
@@ -92,6 +93,8 @@ interface TherapeuticPlanRow {
   isActive: boolean;
 }
 
+const PARTICULAR_INSURANCE_VALUE = '__PARTICULAR__';
+
 const INITIAL_FORM: TeaForm = {
   patientName: '',
   patientCpf: '',
@@ -99,7 +102,7 @@ const INITIAL_FORM: TeaForm = {
   gender: '',
   cellphone: '',
   email: '',
-  healthInsuranceName: '',
+  healthInsuranceName: PARTICULAR_INSURANCE_VALUE,
   healthInsuranceNumber: '',
   supportLevel: '',
   communicationProfile: '',
@@ -198,6 +201,8 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const [savingPlan, setSavingPlan] = useState(false);
   const [doctorOptions, setDoctorOptions] = useState<{ value: string; label: string }[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
+  const [loadingInsurances, setLoadingInsurances] = useState(false);
 
   const setTeaField = <K extends keyof TeaForm>(field: K, value: TeaForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -215,6 +220,33 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     })),
     [teaItems],
   );
+
+  const insuranceSelectOptions = useMemo(() => {
+    const patientInsuranceOptions = Object.values(patientById)
+      .map((patient: any) => String(patient?.healthInsuranceName || '').trim())
+      .filter(Boolean)
+      .filter((name, index, arr) => arr.indexOf(name) === index)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map((name) => ({ value: name, label: name }));
+
+    const mergedInsuranceOptions = [...insuranceOptions, ...patientInsuranceOptions]
+      .filter((option, index, arr) => arr.findIndex((candidate) => candidate.value === option.value) === index)
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+    const base = [
+      { value: PARTICULAR_INSURANCE_VALUE, label: 'Particular' },
+      ...mergedInsuranceOptions,
+    ];
+    const current = String(form.healthInsuranceName || '').trim();
+    if (
+      current
+      && current !== PARTICULAR_INSURANCE_VALUE
+      && !base.some((option) => option.value === current)
+    ) {
+      base.push({ value: current, label: current });
+    }
+    return base;
+  }, [insuranceOptions, patientById, form.healthInsuranceName]);
 
   const loadPatients = async () => {
     setPatientsLoading(true);
@@ -304,6 +336,51 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   }, []);
 
   useEffect(() => {
+    const loadInsurances = async () => {
+      setLoadingInsurances(true);
+      try {
+        const data: any = await insuranceService.listInsurances({ limit: 300, offset: 0 });
+        const list: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+            ? data.items
+            : Array.isArray(data?.insurances)
+              ? data.insurances
+              : Array.isArray(data?.data?.items)
+                ? data.data.items
+                : Array.isArray(data?.data?.insurances)
+                  ? data.data.insurances
+                  : Array.isArray(data?.data)
+                    ? data.data
+                  : [];
+
+        const mapped = list
+          .map((item: any) => {
+            const name = String(item?.name || item?.nome || '').trim();
+            if (!name) return null;
+            return { value: name, label: name };
+          })
+          .filter((item: { value: string; label: string } | null): item is { value: string; label: string } => Boolean(item))
+          .filter((item, index, arr) => arr.findIndex((candidate) => candidate.value === item.value) === index)
+          .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+        setInsuranceOptions(mapped);
+      } catch (err: any) {
+        setInsuranceOptions([]);
+        showNotification({
+          title: 'Aviso',
+          message: err?.response?.data?.message || err?.message || 'Não foi possível carregar a lista de convênios',
+          color: 'yellow',
+        });
+      } finally {
+        setLoadingInsurances(false);
+      }
+    };
+
+    loadInsurances();
+  }, []);
+
+  useEffect(() => {
     if (!forcedSubmodule) return;
     setActiveSubmodule(forcedSubmodule);
   }, [forcedSubmodule]);
@@ -377,7 +454,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       cellphone: p.cellphone || prev.cellphone,
       email: p.email || prev.email,
       // Keep insurance fields scoped to the selected patient; never reuse prior patient values.
-      healthInsuranceName: String(p.healthInsuranceName || ''),
+      healthInsuranceName: String(p.healthInsuranceName || '').trim() || PARTICULAR_INSURANCE_VALUE,
       healthInsuranceNumber: String(p.healthInsuranceNumber || ''),
     }));
   };
@@ -412,6 +489,11 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
     setSaving(true);
     try {
+      const isParticular = form.healthInsuranceName === PARTICULAR_INSURANCE_VALUE;
+      const normalizedInsuranceName = isParticular
+        ? ''
+        : String(form.healthInsuranceName || '').trim();
+
       const payload = {
         patientId: selectedPatientId || undefined,
         patient: {
@@ -421,8 +503,8 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
           gender: form.gender || undefined,
           cellphone: form.cellphone.trim() || undefined,
           email: normalizeEmail(form.email) || undefined,
-          healthInsuranceName: form.healthInsuranceName.trim() || undefined,
-          healthInsuranceNumber: form.healthInsuranceNumber.trim() || undefined,
+          healthInsuranceName: normalizedInsuranceName || undefined,
+          healthInsuranceNumber: isParticular ? undefined : (form.healthInsuranceNumber.trim() || undefined),
         },
         tea: {
           supportLevel: form.supportLevel || undefined,
@@ -485,7 +567,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       gender: mapGender(patient.gender),
       cellphone: String(patient.cellphone || ''),
       email: String(patient.email || ''),
-      healthInsuranceName: String(patient.healthInsuranceName || ''),
+      healthInsuranceName: String(patient.healthInsuranceName || '').trim() || PARTICULAR_INSURANCE_VALUE,
       healthInsuranceNumber: String(patient.healthInsuranceNumber || ''),
       supportLevel: String(item.supportLevel || ''),
       communicationProfile: String(item.communicationProfile || ''),
@@ -827,17 +909,25 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                 setTeaField('email', value);
               }}
             />
-            <TextInput
+            <Select
               label="Convênio"
+              placeholder={loadingInsurances ? 'Carregando convênios...' : 'Selecione'}
+              clearable={false}
+              data={insuranceSelectOptions}
               value={form.healthInsuranceName}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setTeaField('healthInsuranceName', value);
+              onChange={(value) => {
+                const nextValue = value || PARTICULAR_INSURANCE_VALUE;
+                setTeaField('healthInsuranceName', nextValue);
+                if (nextValue === PARTICULAR_INSURANCE_VALUE) {
+                  setTeaField('healthInsuranceNumber', '');
+                }
               }}
+              disabled={loadingInsurances}
             />
             <TextInput
               label="Nº Convênio"
               value={form.healthInsuranceNumber}
+              disabled={form.healthInsuranceName === PARTICULAR_INSURANCE_VALUE}
               onChange={(e) => {
                 const value = e.currentTarget.value;
                 setTeaField('healthInsuranceNumber', value);

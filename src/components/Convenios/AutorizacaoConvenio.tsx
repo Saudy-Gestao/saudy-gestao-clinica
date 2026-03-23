@@ -34,6 +34,7 @@ type AuthorizationItem = {
   sourceLabel: string;
   patientName: string;
   patientCpf?: string;
+  insuranceType?: 'CONVENIO' | 'PARTICULAR';
   procedureName?: string;
   doctorName?: string;
   roomName?: string | null;
@@ -337,6 +338,7 @@ export function AutorizacaoConvenio() {
                     <Table.Tr>
                       <Table.Th>Origem</Table.Th>
                       <Table.Th>Paciente</Table.Th>
+                      <Table.Th>Tipo de Atendimento</Table.Th>
                       <Table.Th>Procedimento</Table.Th>
                       <Table.Th>Médico</Table.Th>
                       <Table.Th>Sala</Table.Th>
@@ -350,13 +352,15 @@ export function AutorizacaoConvenio() {
                   <Table.Tbody>
                     {items.length === 0 ? (
                       <Table.Tr>
-                        <Table.Td colSpan={10}>
+                        <Table.Td colSpan={11}>
                           <Text size="sm" c="dimmed" ta="center" py="md">Nenhuma autorização encontrada</Text>
                         </Table.Td>
                       </Table.Tr>
                     ) : (
                       items.map((item) => {
                         const rowKey = `${item.sourceType}-${item.id}`;
+                        const resolvedInsuranceType = item.insuranceType
+                          || (item.sourceType === 'TEA' ? 'CONVENIO' : 'PARTICULAR');
                         return (
                           <Table.Tr key={rowKey}>
                             <Table.Td>
@@ -369,6 +373,14 @@ export function AutorizacaoConvenio() {
                                 <Text size="sm" fw={600}>{item.patientName || '-'}</Text>
                                 {item.patientCpf && <Text size="xs" c="dimmed">{item.patientCpf}</Text>}
                               </Stack>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge
+                                variant="light"
+                                color={resolvedInsuranceType === 'CONVENIO' ? 'blue' : 'gray'}
+                              >
+                                {resolvedInsuranceType === 'CONVENIO' ? 'Convênio' : 'Particular'}
+                              </Badge>
                             </Table.Td>
                             <Table.Td><Text size="sm">{item.procedureName || '-'}</Text></Table.Td>
                             <Table.Td><Text size="sm">{item.doctorName || '-'}</Text></Table.Td>
