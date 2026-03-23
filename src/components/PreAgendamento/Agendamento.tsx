@@ -8,7 +8,6 @@ import {
   Button,
   Modal,
   Stack,
-  Textarea,
   Select,
   MultiSelect,
   ActionIcon,
@@ -21,7 +20,7 @@ import {
   Tabs,
   useComputedColorScheme,
 } from '@mantine/core';
-import { DateInput, Calendar as MantineCalendar } from '@mantine/dates';
+import { Calendar as MantineCalendar } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User } from 'lucide-react';
 import dayjs from 'dayjs';
@@ -249,28 +248,6 @@ const buildDoctorSlots = (
   return slots;
 };
 
-const getDoctorUnavailableMessage = (
-  doctor: DoctorScheduleMeta | undefined,
-  period: 'Manhã' | 'Tarde' | 'Noite',
-  date: Date,
-): string => {
-  if (!doctor) {
-    return 'Esse profissional não tem disponibilidade cadastrada.';
-  }
-
-  const normalizedDays = (doctor.workingDays || []).map(normalizeWeekdayLabel);
-  const currentWeekday = getBranchWeekdayLabel(date);
-  if (normalizedDays.length > 0 && !normalizedDays.includes(currentWeekday)) {
-    return `Esse profissional não atende em ${dayjs(date).locale('pt-br').format('dddd')}.`;
-  }
-
-  if (doctor.workingHoursStart && doctor.workingHoursEnd) {
-    return `Esse profissional não tem horários disponíveis no turno ${period.toLowerCase()}.`;
-  }
-
-  return 'Esse profissional não tem disponibilidade cadastrada para este período.';
-};
-
 const formatDateForApi = (value: Date | null): string => {
   if (!value) return '';
   const year = value.getFullYear();
@@ -290,7 +267,7 @@ export function Agendamento() {
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [activeTab, setActiveTab] = useState<string>('marcacao');
-  const [schedulingStep, setSchedulingStep] = useState<number>(0);
+  const [, setSchedulingStep] = useState<number>(0);
   const [activeSchedulePeriod, setActiveSchedulePeriod] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
   const [isEditing, setIsEditing] = useState(false);
@@ -1086,8 +1063,7 @@ export function Agendamento() {
   const getAppointmentsForDate = (date: Date) => agendamentos.filter(
     (item) => item.data === dayjs(date).format('YYYY-MM-DD') && item.status !== 'CANCELADO',
   );
-  const appointmentsForSchedulingDate = getAppointmentsForDate(schedulingDate);
-  const activePeriodSlots = TIME_SLOTS[activeSchedulePeriod];
+  
   const selectedProcedureSummary = Array.isArray(selectedSpecialties) ? selectedSpecialties : [];
   const selectedPatientCpfDigits = onlyDigits(novoAgendamento.pacienteCPF || pendingPatient.cpf);
   const safeSuggestedOptions = Array.isArray(suggestedOptions) ? suggestedOptions : [];
@@ -1115,19 +1091,7 @@ export function Agendamento() {
     ) &&
     (!isManualPatientFlow || pendingPatientReadyForCreation),
   );
-  const canAdvanceToSlots = Boolean(
-    hasPatientContext &&
-    novoAgendamento.convenio &&
-    selectedProcedureSummary.length > 0 &&
-    novoAgendamento.data,
-  );
-  const canAdvanceToReview = Boolean(
-    canAdvanceToSlots &&
-    (
-      (isMultiProcedureFlow && selectedSuggestedSchedules.length === selectedProcedureSummary.length)
-      || (!isMultiProcedureFlow && novoAgendamento.profissional && novoAgendamento.hora)
-    ),
-  );
+  
   const safeSchedulerDoctors = Array.isArray(schedulerDoctors) ? schedulerDoctors : [];
   const doctorSlotsByName = safeSchedulerDoctors.reduce<Record<string, string[]>>((acc, doctorName) => {
     acc[doctorName] = buildDoctorSlots(doctorMetaByName[doctorName], activeSchedulePeriod, schedulingDate);
