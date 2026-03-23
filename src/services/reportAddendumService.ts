@@ -1,7 +1,8 @@
 import api from './api';
 
 export interface ReportAddendumPayload {
-  worklistItemId: string;
+  worklistItemId?: string;
+  reportId?: string;
   content?: string;
   status?: string;
   issuerSignedAt?: string | null;
@@ -11,7 +12,7 @@ export interface ReportAddendumPayload {
 }
 
 export default {
-  async list(params: { worklistItemId: string; status?: string; limit?: number; offset?: number }) {
+  async list(params: { worklistItemId?: string; reportId?: string; status?: string; limit?: number; offset?: number }) {
     const res = await api.get('/care/report-addendums/', { params });
     return res.data;
   },

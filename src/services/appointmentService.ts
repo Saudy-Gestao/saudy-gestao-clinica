@@ -55,4 +55,10 @@ export default {
     const res = await api.delete(url);
     return res.data;
   },
+
+  async createWorklist(id: string) {
+    const url = `/care/appointments/${id}/create-worklist`;
+    const res = await api.post(url);
+    return res.data;
+  },
 };

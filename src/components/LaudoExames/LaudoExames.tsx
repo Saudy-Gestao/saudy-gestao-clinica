@@ -40,6 +40,7 @@ type ExamPriority = 'normal' | 'urgente';
 
 interface ExamItem {
   id: string;
+  reportId?: string;
   dicomStudyUid?: string;
   patientName: string;
   cpf: string;
@@ -329,7 +330,7 @@ const normalizeExamStatus = (status: any): ExamStatus => {
   if (status === 'finalizado') return 'finalizado';
   if (status === 'revisado') return 'revisado';
   if (status === 'laudado') return 'laudado';
-  if (status === 'rascunho') return 'laudado';
+  if (status === 'rascunho') return 'sem_laudo';
   if (status === 'pendente') return 'sem_laudo';
   return 'sem_laudo';
 };
@@ -572,37 +573,42 @@ export function LaudoExames() {
     }
   };
 
-  const mapApiToExam = (it: any): ExamItem => ({
-    id: String(it.id || ''),
-    dicomStudyUid: it.dicomStudyUid || undefined,
-    patientName: it.patientName || '',
-    cpf: it.patientCpf || '',
-    examType: it.examType || '',
-    scheduledAt: it.scheduledAt || '',
-    convenio: it.convenio || '',
-    requestingDoctor: it.requestingDoctor || '-',
-    assignedTo: it.assignedTo || '-',
-    priority: (it.priority === 'urgente' ? 'urgente' : 'normal') as ExamPriority,
-    status: normalizeExamStatus(it.status),
-    reportText: it.reportText || '',
-    issuerSignedAt: it.issuerSignedAt || undefined,
-    reviewerSignedAt: it.reviewerSignedAt || undefined,
-    hasFinalizedAddendum: Boolean(it.hasFinalizedAddendum),
-    dicomUrl: it.dicomUrl || undefined,
-    dicomPath: it.dicomPath || undefined,
-  });
+  const mapApiToExam = (it: any): ExamItem => {
+    const appt = it.appointment;
+    const wl = it.worklistItem;
+    return {
+      id: wl?.id || String(it.id || ''),
+      reportId: String(it.id || '') || undefined,
+      dicomStudyUid: wl?.dicomStudyUid || undefined,
+      patientName: appt?.patientName || it.patientName || '',
+      cpf: appt?.patientCpf || it.cpf || '',
+      examType: appt?.specialty || it.exam || '',
+      scheduledAt: appt ? [appt.date, appt.time].filter(Boolean).join(' ') : (it.scheduledFor || ''),
+      convenio: appt?.convenio || '',
+      requestingDoctor: appt?.doctorName || it.requestingDoctor || '-',
+      assignedTo: it.reportingDoctor || '-',
+      priority: 'normal' as ExamPriority,
+      status: normalizeExamStatus(it.status),
+      reportText: it.description || '',
+      issuerSignedAt: it.issuerSignedAt || undefined,
+      reviewerSignedAt: it.reviewerSignedAt || undefined,
+      hasFinalizedAddendum: Boolean(it.hasFinalizedAddendum),
+      dicomUrl: wl?.dicomUrl || undefined,
+      dicomPath: undefined,
+    };
+  };
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const [worklistData, templateData, phraseData, configData] = await Promise.all([
-          reportWorklistService.list({ limit: 300, offset: 0 }),
+          reportService.list({ limit: 300, offset: 0 }),
           reportTemplateService.list({ limit: 300, offset: 0 }),
           reportPhraseService.list({ limit: 300, offset: 0 }),
           reportConfigService.get(),
         ]);
 
-        const worklist = Array.isArray(worklistData)
+        const reports = Array.isArray(worklistData)
           ? worklistData
           : (Array.isArray(worklistData?.items)
             ? worklistData.items
@@ -624,9 +630,7 @@ export function LaudoExames() {
               ? phraseData.data.items
               : []));
 
-        const mappedWorklist = worklist.map(mapApiToExam).filter((item: ExamItem) => item.id);
-        setExamRows(mappedWorklist.length > 0 ? mappedWorklist : MOCK_EXAMS);
-
+        setExamRows(reports.map(mapApiToExam).filter((item: ExamItem) => item.id));
         const mappedTemplates = templatesList.map((item: any) => ({
           id: String(item.id || ''),
           name: item.name || '',
@@ -907,7 +911,7 @@ export function LaudoExames() {
     setAddendumLoading(true);
     setAddendumModalOpen(true);
     try {
-      const data = await reportAddendumService.list({ worklistItemId: selectedExam.id, status: 'draft', limit: 1, offset: 0 });
+      const data = await reportAddendumService.list({ reportId: selectedExam.reportId || selectedExam.id, status: 'draft', limit: 1, offset: 0 });
       const list = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items) ? data.items : []);
@@ -942,7 +946,7 @@ export function LaudoExames() {
     if (addendumId) return addendumId;
 
     const created = await reportAddendumService.create({
-      worklistItemId: selectedExam.id,
+      reportId: selectedExam.reportId || selectedExam.id,
       content: addendumText,
       status: 'draft',
       issuerSignedAt: addendumIssuerSignedAt,
@@ -1127,8 +1131,8 @@ export function LaudoExames() {
     )));
 
     try {
-      await reportWorklistService.update(selectedExam.id, {
-        reportText,
+      await reportService.update(selectedExam.reportId || selectedExam.id, {
+        description: reportText,
         status: nextStatus,
         issuerSignedAt: nextIssuer,
         reviewerSignedAt: nextReviewer,
@@ -1248,9 +1252,9 @@ export function LaudoExames() {
     )));
 
     try {
-      await reportWorklistService.update(selectedExam.id, {
+      await reportService.update(selectedExam.reportId || selectedExam.id, {
         status: nextStatus,
-        reportText,
+        description: reportText,
       });
       setLastSavedAt(new Date().toLocaleString('pt-BR'));
       showNotification({ title: 'Laudo salvo', message: `Laudo salvo com status ${statusLabel[nextStatus]}.`, color: 'green' });
@@ -1280,14 +1284,10 @@ export function LaudoExames() {
     const nextStatus: ExamStatus = exam.reviewerSignedAt ? 'revisado' : (exam.issuerSignedAt ? 'laudado' : 'sem_laudo');
 
     try {
-      const updated = await reportWorklistService.update(examId, { status: nextStatus });
+      await reportService.update(exam.reportId || examId, { status: nextStatus });
       setExamRows((prev) => prev.map((item) => {
         if (item.id !== examId) return item;
-        return {
-          ...item,
-          ...mapApiToExam({ ...item, ...updated, status: nextStatus }),
-          status: nextStatus,
-        };
+        return { ...item, status: nextStatus };
       }));
       showNotification({ title: 'Laudo desfinalizado', message: 'O laudo voltou para edicao.', color: 'green' });
     } catch (err: any) {
@@ -1375,8 +1375,8 @@ export function LaudoExames() {
         finalizedAt: now,
       });
 
-      await reportWorklistService.update(selectedExam.id, {
-        reportText: nextText,
+      await reportService.update(selectedExam.reportId || selectedExam.id, {
+        description: nextText,
         status: 'finalizado',
       });
 
@@ -1454,9 +1454,9 @@ export function LaudoExames() {
     );
 
     try {
-      await reportWorklistService.update(selectedExam.id, {
+      await reportService.update(selectedExam.reportId || selectedExam.id, {
         status: nextStatus,
-        reportText,
+        description: reportText,
       });
     } catch (err: any) {
       showNotification({

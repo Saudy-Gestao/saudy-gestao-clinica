@@ -8,11 +8,6 @@ import reportWorklistService from '../../services/reportWorklistService';
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const DICOMWEB_URL = import.meta.env.VITE_DICOMWEB_URL || (API_BASE ? `${API_BASE}/dicom-web` : '/dicom-web');
 
-console.log('[OhifViewer] import.meta.env.VITE_API_URL', import.meta.env.VITE_API_URL);
-console.log('[OhifViewer] import.meta.env.VITE_DICOMWEB_URL', import.meta.env.VITE_DICOMWEB_URL);
-console.log('[OhifViewer] API_BASE', API_BASE);
-console.log('[OhifViewer] resolved DICOMWEB_URL', DICOMWEB_URL);
-
 export function OhifViewer() {
   const { key } = useParams<{ key: string }>();
   const [statusMessage, setStatusMessage] = useState('Preparando visualizador...');
