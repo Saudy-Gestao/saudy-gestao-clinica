@@ -20,6 +20,7 @@ import { showNotification } from '@mantine/notifications';
 import {
   Calendar,
   CalendarClock,
+  ChevronDown,
   ChevronLeft,
   RefreshCcw,
   History,
@@ -156,6 +157,52 @@ type TimelineEventItem = {
   payload?: any;
   createdAt: string;
 };
+
+type TherapyColorToken = {
+  badgeColor: string;
+  borderColor: string;
+  backgroundColor: string;
+  accentColor: string;
+};
+
+const THERAPY_COLOR_TOKENS: TherapyColorToken[] = [
+  {
+    badgeColor: 'cyan',
+    borderColor: 'rgba(34, 211, 238, 0.95)',
+    backgroundColor: 'rgba(34, 211, 238, 0.14)',
+    accentColor: '#67e8f9',
+  },
+  {
+    badgeColor: 'lime',
+    borderColor: 'rgba(132, 204, 22, 0.95)',
+    backgroundColor: 'rgba(132, 204, 22, 0.14)',
+    accentColor: '#bef264',
+  },
+  {
+    badgeColor: 'yellow',
+    borderColor: 'rgba(250, 204, 21, 0.95)',
+    backgroundColor: 'rgba(250, 204, 21, 0.15)',
+    accentColor: '#fde047',
+  },
+  {
+    badgeColor: 'grape',
+    borderColor: 'rgba(192, 132, 252, 0.95)',
+    backgroundColor: 'rgba(192, 132, 252, 0.14)',
+    accentColor: '#d8b4fe',
+  },
+  {
+    badgeColor: 'orange',
+    borderColor: 'rgba(251, 146, 60, 0.95)',
+    backgroundColor: 'rgba(251, 146, 60, 0.14)',
+    accentColor: '#fdba74',
+  },
+  {
+    badgeColor: 'pink',
+    borderColor: 'rgba(244, 114, 182, 0.95)',
+    backgroundColor: 'rgba(244, 114, 182, 0.14)',
+    accentColor: '#f9a8d4',
+  },
+];
 
 const getReservationProcedureName = (reservation: any) => (
   String(
@@ -512,6 +559,14 @@ export function TeaPreReserva() {
   const [acceptTherapies, setAcceptTherapies] = useState<Array<{therapy: GroupTherapyContext; slots: Array<{date:string;time:string}>}>>([]);
   const [acceptDateByTherapy, setAcceptDateByTherapy] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'pendencias' | 'concluidas'>('pendencias');
+  const [collapsedTherapyCards, setCollapsedTherapyCards] = useState<Record<string, boolean>>({});
+
+  const toggleTherapyCard = (cardKey: string) => {
+    setCollapsedTherapyCards((prev) => ({
+      ...prev,
+      [cardKey]: !prev[cardKey],
+    }));
+  };
 
   const checklistSelectedProcedureReservations = useMemo(() => {
     if (!selectedChecklistProcedure) return [] as any[];
@@ -710,6 +765,14 @@ export function TeaPreReserva() {
     return map;
   }, [completedReservationGroups]);
 
+  const actionableReservationsByGroupKey = useMemo(() => {
+    const map = new Map<string, ReservationGroup>();
+    actionableExistingReservationGroups.forEach((group) => {
+      map.set(group.groupKey, group);
+    });
+    return map;
+  }, [actionableExistingReservationGroups]);
+
   const actionableExistingReservationGroupsWithoutPending = useMemo(
     () => actionableExistingReservationGroups.filter((group) => !pendingGroupKeySet.has(group.groupKey)),
     [actionableExistingReservationGroups, pendingGroupKeySet],
@@ -866,9 +929,7 @@ export function TeaPreReserva() {
     return resolved;
   }, [filteredItems]);
 
-  const renderPitProgress = (groupKey: string) => {
-    const progress = pitProgressByGroupKey.get(groupKey);
-    if (!progress) return null;
+  const renderProgressTrail = (progress: PitProgressInfo, keyPrefix: string) => {
 
     const reservedTotal = progress.reservedPartialCount + progress.reservedCompleteCount;
     const reservedPartialActive = reservedTotal > 0;
@@ -930,7 +991,7 @@ export function TeaPreReserva() {
             const isAuthorizationStep = index === authorizationStepIndex;
             const isPendingApprovalStep = index === pendingApprovalStepIndex;
             return (
-              <Box key={`${groupKey}-${label}`} style={{ minWidth: 0 }}>
+              <Box key={`${keyPrefix}-${label}`} style={{ minWidth: 0 }}>
                 <Box
                   style={{
                     height: 8,
@@ -990,6 +1051,63 @@ export function TeaPreReserva() {
         </Box>
       </Stack>
     );
+  };
+
+  const buildTherapyProgressFromItem = (item: any): PitProgressInfo => {
+    const status = String(item?.status || 'PENDING_SCHEDULING');
+    const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
+    const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
+    const reservedComplete = status === 'RESERVED' && weeklyReserved >= weeklyTarget;
+    const reservedPartial = status === 'RESERVED' && !reservedComplete;
+    const isRegressionPending = status === 'PENDING_SCHEDULING' && String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE';
+
+    let stage: PitProgressStage = 'PIT_GERADO';
+    let stepIndex = 1;
+
+    if (status === 'CONVERTED') {
+      stage = 'AGENDADO_COMPLETO';
+      stepIndex = 7;
+    } else if (status === 'PENDING_AUTHORIZATION') {
+      stage = 'EM_AUTORIZACAO';
+      stepIndex = 5;
+    } else if (status === 'AUTHORIZED') {
+      stage = 'AGENDADO_PARCIAL';
+      stepIndex = 6;
+    } else if (status === 'PROPOSED') {
+      stage = 'AGUARDANDO_APROVACAO';
+      stepIndex = 4;
+    } else if (reservedComplete) {
+      stage = 'RESERVADO_COMPLETO';
+      stepIndex = 3;
+    } else if (reservedPartial || isRegressionPending) {
+      stage = 'RESERVADO_PARCIAL';
+      stepIndex = 2;
+    }
+
+    return {
+      stage,
+      stepIndex,
+      totalTherapies: 1,
+      convertedCount: status === 'CONVERTED' ? 1 : 0,
+      regressedScheduledCount: isRegressionPending ? 1 : 0,
+      pendingCount: status === 'PENDING_SCHEDULING' ? 1 : 0,
+      reservedPartialCount: reservedPartial || isRegressionPending ? 1 : 0,
+      reservedCompleteCount: reservedComplete ? 1 : 0,
+      pendingApprovalCount: status === 'PROPOSED' ? 1 : 0,
+      pendingApprovalRequestedAt: status === 'PROPOSED'
+        ? String(item?.approvalRequestedAt || item?.updatedAt || item?.createdAt || '') || null
+        : null,
+      pendingApprovalDeadlineAt: status === 'PROPOSED'
+        ? String(item?.approvalDeadlineAt || item?.expiresAt || '') || null
+        : null,
+      inAuthorizationCount: status === 'PENDING_AUTHORIZATION' ? 1 : 0,
+      authorizedCount: status === 'AUTHORIZED' ? 1 : 0,
+    };
+  };
+
+  const renderTherapyProgress = (item: any, keyPrefix: string) => {
+    const progress = buildTherapyProgressFromItem(item);
+    return renderProgressTrail(progress, keyPrefix);
   };
 
   const openConversionConfirmationModal = (reservationsToConvert?: any[]) => {
@@ -1298,8 +1416,6 @@ export function TeaPreReserva() {
             PIT: {group.pitId || 'N/D'}
           </Text>
 
-          {renderPitProgress(group.groupKey)}
-
           <Group grow align="flex-end">
             <Stack gap={4}>
               <Text size="xs" fw={500}>Status do PIT</Text>
@@ -1319,31 +1435,6 @@ export function TeaPreReserva() {
                 </Text>
               </Paper>
             </Stack>
-            {isPartiallyReserved && (
-              <Button
-                variant="default"
-                h={36}
-                leftSection={<Sparkles size={16} />}
-                onClick={() => handleLoadGroupSuggestions(suggestionContext, {
-                  existingSlotsByTherapy,
-                  daysAhead: 90,
-                })}
-                loading={loadingSuggestionsId === group.groupKey}
-              >
-                Sugerir horários automáticos
-              </Button>
-            )}
-            {isPartiallyReserved && (
-              <Button
-                variant="light"
-                h={36}
-                leftSection={<Calendar size={16} />}
-                onClick={() => openManualProposalModal(suggestionContext, { existingSlotsByTherapy })}
-                loading={manualLoadingGrid && manualContext?.groupKey === group.groupKey}
-              >
-                Criar proposta manual
-              </Button>
-            )}
             <Button
               color="red"
               variant="light"
@@ -1412,7 +1503,29 @@ export function TeaPreReserva() {
           )}
 
           <Stack gap={6}>
-            {group.reservations.map((item) => (
+            {group.reservations.map((item) => {
+              const itemTherapyId = String(item?.pitTherapyId || item?.preReservationId || '');
+              const reservationCardKey = `reservation-${group.groupKey}-${String(item.preReservationId || itemTherapyId || 'unknown')}`;
+              const isReservationCardCollapsed = Boolean(collapsedTherapyCards[reservationCardKey]);
+              const fallbackTherapy: GroupTherapyContext = {
+                pitTherapyId: itemTherapyId,
+                procedureName: item?.procedure?.name || item?.procedureName || item?.therapyType || 'Procedimento não definido',
+                professionalName: item?.professional?.name || item?.professionalName || 'Profissional não definido',
+                weeklyFrequency: Math.max(1, Number(item?.preferences?.weeklyFrequency || 1)),
+                preferredWeekdays: Array.isArray(item?.preferences?.weekdays) ? item.preferences.weekdays : [],
+                preferredShift: item?.preferences?.shift || undefined,
+                durationMinutes: item?.procedure?.durationMinutes || item?.durationMinutes || null,
+              };
+              const matchedTherapy = suggestionContext.therapies.find((therapy) => therapy.pitTherapyId === itemTherapyId);
+              const therapyContext: SuggestionGroupContext = {
+                ...suggestionContext,
+                therapies: itemTherapyId ? [matchedTherapy || fallbackTherapy] : [],
+              };
+              const therapyExistingSlotsByTherapy = itemTherapyId && Array.isArray(existingSlotsByTherapy[itemTherapyId])
+                ? { [itemTherapyId]: existingSlotsByTherapy[itemTherapyId] }
+                : {};
+
+              return (
               <Paper key={String(item.preReservationId)} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                 <Group justify="space-between" align="center" wrap="wrap">
                   <Text size="sm" fw={600}>
@@ -1430,8 +1543,52 @@ export function TeaPreReserva() {
                     {(item.isExpired || item.status === 'EXPIRED') && (
                       <Badge variant="light" color="red">Expirada</Badge>
                     )}
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      onClick={() => toggleTherapyCard(reservationCardKey)}
+                      title={isReservationCardCollapsed ? 'Mostrar detalhes' : 'Esconder detalhes'}
+                    >
+                      <ChevronDown
+                        size={16}
+                        style={{
+                          transform: isReservationCardCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                          transition: 'transform 150ms ease',
+                        }}
+                      />
+                    </ActionIcon>
                   </Group>
                 </Group>
+                {!isReservationCardCollapsed && (
+                  <>
+                <Box mt={8}>
+                  {renderTherapyProgress(item, `reservation-${String(item.preReservationId)}`)}
+                </Box>
+                {isPartiallyReserved && itemTherapyId && (
+                  <Group mt={8} justify="flex-end" gap="xs" wrap="wrap">
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={<Sparkles size={14} />}
+                      onClick={() => handleLoadGroupSuggestions(therapyContext, {
+                        existingSlotsByTherapy: therapyExistingSlotsByTherapy,
+                        daysAhead: 90,
+                      })}
+                      loading={loadingSuggestionsId === group.groupKey}
+                    >
+                      Sugerir horários automáticos
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<Calendar size={14} />}
+                      onClick={() => openManualProposalModal(therapyContext, { existingSlotsByTherapy: therapyExistingSlotsByTherapy })}
+                      loading={manualLoadingGrid && manualContext?.groupKey === group.groupKey}
+                    >
+                      Criar proposta manual
+                    </Button>
+                  </Group>
+                )}
                 <Group mt={8} justify="space-between" align="flex-end" wrap="wrap">
                   <Select
                     size="xs"
@@ -1466,8 +1623,11 @@ export function TeaPreReserva() {
                     Expira em: {dayjs(item.expiresAt).format('DD/MM/YYYY HH:mm')}
                   </Text>
                 )}
+                  </>
+                )}
               </Paper>
-            ))}
+              );
+            })}
           </Stack>
         </Stack>
       </Paper>
@@ -1490,6 +1650,14 @@ export function TeaPreReserva() {
       }));
     });
   }, [suggestionsByTherapyId, suggestionModalContext]);
+
+  const therapyColorById = useMemo(() => {
+    const colorById: Record<string, TherapyColorToken> = {};
+    (suggestionModalContext?.therapies || []).forEach((therapy, index) => {
+      colorById[therapy.pitTherapyId] = THERAPY_COLOR_TOKENS[index % THERAPY_COLOR_TOKENS.length];
+    });
+    return colorById;
+  }, [suggestionModalContext]);
 
 
   const weeklyCalendarSuggestions = useMemo(() => {
@@ -2477,6 +2645,7 @@ export function TeaPreReserva() {
                           <Stack gap={4}>
                             {dayBlock.entries.map((entry) => {
                               const isTherapySelected = selectedSuggestionByTherapyId[entry.pitTherapyId] !== false;
+                              const colorToken = therapyColorById[entry.pitTherapyId] || THERAPY_COLOR_TOKENS[0];
                               return (
                                 <Paper
                                   key={`${dayBlock.date}-${entry.pitTherapyId}-${entry.time}`}
@@ -2484,12 +2653,24 @@ export function TeaPreReserva() {
                                   withBorder
                                   style={{
                                     borderColor: isTherapySelected
-                                      ? 'var(--mantine-color-teal-5)'
+                                      ? colorToken.borderColor
                                       : 'var(--mantine-color-default-border)',
+                                    backgroundColor: isTherapySelected ? colorToken.backgroundColor : undefined,
                                     opacity: isTherapySelected ? 1 : 0.45,
                                   }}
                                 >
-                                  <Text size="xs" fw={700}>{entry.time}</Text>
+                                  <Group gap={6} wrap="nowrap" align="center">
+                                    <Box
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 999,
+                                        backgroundColor: colorToken.accentColor,
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Text size="xs" fw={700}>{entry.time}</Text>
+                                  </Group>
                                   <Text size="xs" c="dimmed" lineClamp={2}>{entry.procedureName}</Text>
                                 </Paper>
                               );
@@ -2510,6 +2691,7 @@ export function TeaPreReserva() {
                   const isSelected = selectedSuggestionByTherapyId[therapy.pitTherapyId] !== false;
                   const validation = weeklyValidationByTherapyId[therapy.pitTherapyId];
                   const isRegenerating = loadingSuggestionsId === therapy.pitTherapyId;
+                  const colorToken = therapyColorById[therapy.pitTherapyId] || THERAPY_COLOR_TOKENS[0];
 
                   return (
                     <Paper
@@ -2520,8 +2702,9 @@ export function TeaPreReserva() {
                         borderColor: validation && !validation.valid
                           ? 'var(--mantine-color-yellow-5)'
                           : isSelected
-                            ? 'var(--mantine-color-teal-5)'
+                            ? colorToken.borderColor
                             : 'var(--mantine-color-default-border)',
+                        backgroundColor: isSelected ? colorToken.backgroundColor : undefined,
                         opacity: isSelected ? 1 : 0.6,
                       }}
                     >
@@ -2536,10 +2719,21 @@ export function TeaPreReserva() {
                                 [therapy.pitTherapyId]: e.target.checked,
                               }))
                             }
-                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--mantine-color-teal-6)' }}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: colorToken.borderColor }}
                           />
                           <Stack gap={2}>
-                            <Text size="xs" fw={600}>{therapy.procedureName}</Text>
+                            <Group gap={6} wrap="nowrap" align="center">
+                              <Box
+                                style={{
+                                  width: 9,
+                                  height: 9,
+                                  borderRadius: 999,
+                                  backgroundColor: colorToken.accentColor,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <Text size="xs" fw={600}>{therapy.procedureName}</Text>
+                            </Group>
                             <Text size="xs" c="dimmed">
                               {therapy.professionalName}
                               {slots.length > 0 ? ` • ${slots.length} horário(s)` : ' • sem sugestão'}
@@ -2547,6 +2741,9 @@ export function TeaPreReserva() {
                           </Stack>
                         </Group>
                         <Group gap="xs">
+                          <Badge variant="outline" color={colorToken.badgeColor} size="sm">
+                            Cor da terapia
+                          </Badge>
                           {validation && (
                             <Badge variant="light" color={validation.valid ? 'teal' : 'yellow'} size="sm">
                               {validation.valid
@@ -3276,6 +3473,8 @@ export function TeaPreReserva() {
                 return (
                   <Stack gap="xs">
                     {pendingGroups.map((group) => {
+                      const existingGroupForSamePit = actionableReservationsByGroupKey.get(group.groupKey);
+                      const existingCount = existingGroupForSamePit?.reservations?.length || 0;
                       const completedGroupForSamePit = completedReservationsByGroupKey.get(group.groupKey);
                       const completedCount = completedGroupForSamePit?.reservations?.length || 0;
                       const groupContext = buildGroupContextFromItems(group);
@@ -3305,24 +3504,43 @@ export function TeaPreReserva() {
 
                             <Text size="xs" c="dimmed">
                               {group.patientCpf ? `CPF: ${formatCPF(group.patientCpf)} • ` : ''}
-                              Itens do PIT: {group.therapies.length + completedCount}
+                              Itens do PIT: {group.therapies.length + existingCount + completedCount}
                             </Text>
 
-                            {renderPitProgress(group.groupKey)}
-
                             <Stack gap={6}>
-                              {group.therapies.map((therapyItem) => (
+                              {group.therapies.map((therapyItem) => {
+                                const pendingCardKey = `pending-${group.groupKey}-${String(therapyItem.pitTherapyId || 'unknown')}`;
+                                const isPendingCardCollapsed = Boolean(collapsedTherapyCards[pendingCardKey]);
+                                return (
                                 <Paper
                                   key={String(therapyItem.pitTherapyId)}
                                   p="xs"
                                   withBorder
                                   style={{ borderColor: 'var(--mantine-color-default-border)' }}
                                 >
-                                  <Text size="xs" fw={600}>
-                                    {therapyItem.procedure?.name || 'Procedimento não definido'}
-                                    {' • '}
-                                    {therapyItem.professional?.name || 'Profissional não definido'}
-                                  </Text>
+                                  <Group justify="space-between" align="center" wrap="wrap">
+                                    <Text size="xs" fw={600}>
+                                      {therapyItem.procedure?.name || 'Procedimento não definido'}
+                                      {' • '}
+                                      {therapyItem.professional?.name || 'Profissional não definido'}
+                                    </Text>
+                                    <ActionIcon
+                                      variant="subtle"
+                                      color="gray"
+                                      onClick={() => toggleTherapyCard(pendingCardKey)}
+                                      title={isPendingCardCollapsed ? 'Mostrar detalhes' : 'Esconder detalhes'}
+                                    >
+                                      <ChevronDown
+                                        size={16}
+                                        style={{
+                                          transform: isPendingCardCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                                          transition: 'transform 150ms ease',
+                                        }}
+                                      />
+                                    </ActionIcon>
+                                  </Group>
+                                  {!isPendingCardCollapsed && (
+                                    <>
                                   {therapyItem?.removedFromPit && (
                                     <Group gap={6} mb={4}>
                                       <Badge variant="light" color="orange">Terapia removida do PIT</Badge>
@@ -3346,6 +3564,9 @@ export function TeaPreReserva() {
                                     {' • '}
                                     Turno: {therapyItem.preferences?.shift || 'Não definido'}
                                   </Text>
+                                  <Box mt={8}>
+                                    {renderTherapyProgress(therapyItem, `pending-${String(therapyItem.pitTherapyId)}`)}
+                                  </Box>
                                   {String(therapyItem?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE' && therapyItem?.alertMessage && (
                                     <Text size="xs" c="blue">
                                       {String(therapyItem.alertMessage)}
@@ -3356,16 +3577,74 @@ export function TeaPreReserva() {
                                       {String(therapyItem.alertMessage)}
                                     </Text>
                                   )}
+                                    </>
+                                  )}
                                 </Paper>
-                              ))}
+                                );
+                              })}
                             </Stack>
+
+                            {existingGroupForSamePit && (
+                              <Stack gap={6}>
+                                <Text size="xs" fw={600} c="dimmed">
+                                  Terapias já criadas deste mesmo PIT
+                                </Text>
+                                {existingGroupForSamePit.reservations.map((item) => {
+                                  const existingCardKey = `existing-${group.groupKey}-${String(item.preReservationId || item.pitTherapyId || 'unknown')}`;
+                                  const isExistingCardCollapsed = Boolean(collapsedTherapyCards[existingCardKey]);
+                                  return (
+                                  <Paper
+                                    key={`existing-${String(item.preReservationId)}`}
+                                    p="xs"
+                                    withBorder
+                                    style={{ borderColor: 'var(--mantine-color-default-border)' }}
+                                  >
+                                    <Group justify="space-between" align="center" wrap="wrap">
+                                      <Text size="xs" fw={600}>
+                                        {item.procedure?.name || 'Procedimento não definido'}
+                                        {' • '}
+                                        {item.professional?.name || 'Profissional não definido'}
+                                      </Text>
+                                      <Group gap="xs">
+                                        <Badge variant="light" color={STATUS_COLOR[item.status] || 'gray'}>
+                                          {STATUS_LABEL[item.status] || item.status}
+                                        </Badge>
+                                        <ActionIcon
+                                          variant="subtle"
+                                          color="gray"
+                                          onClick={() => toggleTherapyCard(existingCardKey)}
+                                          title={isExistingCardCollapsed ? 'Mostrar detalhes' : 'Esconder detalhes'}
+                                        >
+                                          <ChevronDown
+                                            size={16}
+                                            style={{
+                                              transform: isExistingCardCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                                              transition: 'transform 150ms ease',
+                                            }}
+                                          />
+                                        </ActionIcon>
+                                      </Group>
+                                    </Group>
+                                    {!isExistingCardCollapsed && (
+                                      <Box mt={8}>
+                                        {renderTherapyProgress(item, `existing-${String(item.preReservationId || item.pitTherapyId || '')}`)}
+                                      </Box>
+                                    )}
+                                  </Paper>
+                                  );
+                                })}
+                              </Stack>
+                            )}
 
                             {completedGroupForSamePit && (
                               <Stack gap={6}>
                                 <Text size="xs" fw={600} c="dimmed">
                                   Terapias já agendadas deste mesmo PIT
                                 </Text>
-                                {completedGroupForSamePit.reservations.map((item) => (
+                                {completedGroupForSamePit.reservations.map((item) => {
+                                  const completedCardKey = `completed-${group.groupKey}-${String(item.preReservationId || item.pitTherapyId || 'unknown')}`;
+                                  const isCompletedCardCollapsed = Boolean(collapsedTherapyCards[completedCardKey]);
+                                  return (
                                   <Paper
                                     key={`completed-${String(item.preReservationId)}`}
                                     p="xs"
@@ -3378,12 +3657,34 @@ export function TeaPreReserva() {
                                         {' • '}
                                         {item.professional?.name || 'Profissional não definido'}
                                       </Text>
-                                      <Badge variant="light" color={STATUS_COLOR[item.status] || 'green'}>
-                                        {STATUS_LABEL[item.status] || item.status}
-                                      </Badge>
+                                      <Group gap="xs">
+                                        <Badge variant="light" color={STATUS_COLOR[item.status] || 'green'}>
+                                          {STATUS_LABEL[item.status] || item.status}
+                                        </Badge>
+                                        <ActionIcon
+                                          variant="subtle"
+                                          color="gray"
+                                          onClick={() => toggleTherapyCard(completedCardKey)}
+                                          title={isCompletedCardCollapsed ? 'Mostrar detalhes' : 'Esconder detalhes'}
+                                        >
+                                          <ChevronDown
+                                            size={16}
+                                            style={{
+                                              transform: isCompletedCardCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                                              transition: 'transform 150ms ease',
+                                            }}
+                                          />
+                                        </ActionIcon>
+                                      </Group>
                                     </Group>
+                                    {!isCompletedCardCollapsed && (
+                                      <Box mt={8}>
+                                        {renderTherapyProgress(item, `completed-${String(item.preReservationId || item.pitTherapyId || '')}`)}
+                                      </Box>
+                                    )}
                                   </Paper>
-                                ))}
+                                  );
+                                })}
                               </Stack>
                             )}
 
