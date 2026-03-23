@@ -175,6 +175,71 @@ type BulkStatusActionState = {
   options: BulkStatusActionOption[];
 };
 
+const isSlotCoveredBySession = (
+  daySlots: ManualGridSlot[],
+  anchorTime: string,
+  targetTime: string,
+  durationMinutes: number,
+): boolean => {
+  const coveredSlots = getCoveredSlotsForSession(daySlots, anchorTime, durationMinutes);
+  return coveredSlots.includes(targetTime);
+};
+
+const getCoveredSlotsForSession = (
+  daySlots: ManualGridSlot[],
+  anchorTime: string,
+  durationMinutes: number,
+): string[] => {
+  const sortedDaySlots = [...(daySlots || [])]
+    .filter((item) => Boolean(item?.time))
+    .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  const startIndex = sortedDaySlots.findIndex((item) => item.time === anchorTime);
+  if (startIndex < 0) return [];
+
+  const positiveDiffs: number[] = [];
+  for (let i = 0; i < sortedDaySlots.length - 1; i += 1) {
+    const diff = timeToMinutes(sortedDaySlots[i + 1].time) - timeToMinutes(sortedDaySlots[i].time);
+    if (diff > 0) positiveDiffs.push(diff);
+  }
+  const baseStep = positiveDiffs.length > 0 ? Math.min(...positiveDiffs) : 30;
+
+  const coveredSlots: string[] = [];
+  let coveredMinutes = 0;
+  for (let i = startIndex; i < sortedDaySlots.length; i += 1) {
+    const candidate = sortedDaySlots[i];
+    coveredSlots.push(candidate.time);
+
+    const nextSlot = sortedDaySlots[i + 1];
+    const candidateDuration = nextSlot
+      ? Math.max(baseStep, timeToMinutes(nextSlot.time) - timeToMinutes(candidate.time))
+      : baseStep;
+    coveredMinutes += candidateDuration;
+
+    if (coveredMinutes >= durationMinutes) {
+      break;
+    }
+  }
+
+  return coveredSlots;
+};
+
+const getSessionEndTime = (anchorTime: string, durationMinutes: number): string => {
+  const endMinutes = timeToMinutes(anchorTime) + Math.max(1, Number(durationMinutes) || 0);
+  const normalized = ((endMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hour = Math.floor(normalized / 60);
+  const minute = normalized % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
+type ManualReservationDecisionState = {
+  groupKey: string;
+  pitTherapyId: string;
+  durationMinutes: number | null;
+  sessionAnchors: Array<{ date: string; time: string }>;
+  recurrenceWeeks: number;
+  hasEditableExistingSeries: boolean;
+};
+
 type TherapyColorToken = {
   badgeColor: string;
   borderColor: string;
@@ -523,6 +588,8 @@ export function TeaPreReserva() {
   const [manualGridByTherapyId, setManualGridByTherapyId] = useState<Record<string, ManualGridResponse>>({});
   const [manualLoadingGrid, setManualLoadingGrid] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
+  const [manualAcceptDecisionOpened, setManualAcceptDecisionOpened] = useState(false);
+  const [manualReservationDecisionState, setManualReservationDecisionState] = useState<ManualReservationDecisionState | null>(null);
   const [manualSelectedSlots, setManualSelectedSlots] = useState<Array<{ date: string; time: string }>>([]);
   const [manualEditableExistingSlotsByTherapyId, setManualEditableExistingSlotsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [selectedSuggestionByTherapyId, setSelectedSuggestionByTherapyId] = useState<Record<string, boolean>>({});
@@ -1998,28 +2065,53 @@ export function TeaPreReserva() {
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
 
-    setManualSaving(true);
-    try {
-      const sessionAnchors = getManualSelectionAnchors(sortedSlots, manualSlotStepMinutes);
-      const firstDate = sessionAnchors[0]?.date;
-      const weeks = getWeeksUntilYearEnd(firstDate);
-      const hasEditableExistingSeries = Boolean(
-        manualSelectedTherapy
-        && (manualEditableExistingSlotsByTherapyId[manualSelectedTherapy.pitTherapyId] || []).length > 0,
-      );
+    const sessionAnchors = getManualSelectionAnchors(sortedSlots, manualSlotStepMinutes);
+    if (!sessionAnchors.length) {
+      showNotification({
+        title: 'Atenção',
+        message: 'Não foi possível montar sessões válidas com os horários selecionados.',
+        color: 'yellow',
+      });
+      return;
+    }
 
+    const firstDate = sessionAnchors[0]?.date;
+    const weeks = getWeeksUntilYearEnd(firstDate);
+    const hasEditableExistingSeries = Boolean(
+      manualSelectedTherapy
+      && (manualEditableExistingSlotsByTherapyId[manualSelectedTherapy.pitTherapyId] || []).length > 0,
+    );
+
+    setManualReservationDecisionState({
+      groupKey: manualContext.groupKey,
+      pitTherapyId: manualSelectedTherapy.pitTherapyId,
+      durationMinutes: manualSelectedTherapy.durationMinutes ?? null,
+      sessionAnchors,
+      recurrenceWeeks: weeks,
+      hasEditableExistingSeries,
+    });
+    setManualAcceptDecisionOpened(true);
+  };
+
+  const handleSubmitManualReservation = async (targetStatus: TeaPreReservationStatus) => {
+    if (!manualReservationDecisionState) return;
+
+    setManualAcceptDecisionOpened(false);
+    setManualSaving(true);
+    setUpdatingId(manualReservationDecisionState.groupKey);
+    try {
       const acceptResult: any = await teaPreReservationService.acceptGroup({
         recurring: true,
-        recurrenceWeeks: weeks,
+        recurrenceWeeks: manualReservationDecisionState.recurrenceWeeks,
         recurringUntilDate,
         expiresAt: dayjs().add(2, 'day').toISOString(),
-        status: 'RESERVED',
-        replaceExistingByTherapy: hasEditableExistingSeries,
-        items: sessionAnchors.map((slot) => ({
-          pitTherapyId: manualSelectedTherapy.pitTherapyId,
+        status: targetStatus,
+        replaceExistingByTherapy: manualReservationDecisionState.hasEditableExistingSeries,
+        items: manualReservationDecisionState.sessionAnchors.map((slot) => ({
+          pitTherapyId: manualReservationDecisionState.pitTherapyId,
           suggestedDate: slot.date,
           suggestedTime: slot.time,
-          durationMinutes: manualSelectedTherapy.durationMinutes ?? null,
+          durationMinutes: manualReservationDecisionState.durationMinutes,
         })),
       });
 
@@ -2044,6 +2136,7 @@ export function TeaPreReserva() {
       });
 
       setManualModalOpened(false);
+      setManualReservationDecisionState(null);
       setManualSelectedSlots([]);
       await loadPending();
     } catch (err: any) {
@@ -2054,6 +2147,7 @@ export function TeaPreReserva() {
       });
     } finally {
       setManualSaving(false);
+      setUpdatingId(null);
     }
   };
 
@@ -3037,7 +3131,11 @@ export function TeaPreReserva() {
 
       <Modal
         opened={manualModalOpened}
-        onClose={() => setManualModalOpened(false)}
+        onClose={() => {
+          setManualModalOpened(false);
+          setManualAcceptDecisionOpened(false);
+          setManualReservationDecisionState(null);
+        }}
         title="Proposta manual em calendário"
         centered
         size="96vw"
@@ -3097,22 +3195,41 @@ export function TeaPreReserva() {
                     </Paper>
                     {manualWeekDays.map((day) => {
                       const slot = day.slots.find((item) => item.time === time);
-                      const isSelected = manualSelectedSlots.some((selected) => selected.date === day.date && selected.time === time);
+                      const selectedDurationMinutes = Math.max(1, Number(manualSelectedTherapy?.durationMinutes || 30));
+                      const isSelected = manualSelectedSlots.some(
+                        (selected) => selected.date === day.date
+                          && isSlotCoveredBySession(day.slots, selected.time, time, selectedDurationMinutes),
+                      );
+                      const isSelectedEndSlot = manualSelectedSlots.some(
+                        (selected) => selected.date === day.date
+                          && getSessionEndTime(selected.time, selectedDurationMinutes) === time,
+                      );
                       const isOccupied = !!slot?.occupied;
                       const isSelectable = !!slot?.selectable;
+                      const isBlockedBySelectedSession = manualSelectedSlots.some((selected) => {
+                        if (selected.date !== day.date) return false;
+                        const startMinutes = timeToMinutes(selected.time);
+                        const endMinutes = startMinutes + selectedDurationMinutes;
+                        const currentMinutes = timeToMinutes(time);
+                        // Keep only the anchor start clickable; block covered slots and end boundary.
+                        return currentMinutes > startMinutes && currentMinutes <= endMinutes;
+                      });
                       const isExistingEditableSlot = !!manualSelectedTherapyId && (
                         manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
                       ).some((selected) => selected.date === day.date && selected.time === time);
                       const canToggleExistingSlot = isExistingEditableSlot;
-                      const effectiveSelectable = isSelectable || canToggleExistingSlot;
+                      const effectiveSelectable = (isSelectable || canToggleExistingSlot) && !isBlockedBySelectedSession;
                       const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
                       const canAddNewSelection = !reachedWeeklyLimit || isSelected;
                       const isFree = !isOccupied && effectiveSelectable && day.enabled;
                       const isUnavailable = !isOccupied && !isSelectable;
+                      const isBlocked = !isOccupied && isBlockedBySelectedSession;
                       const stateLabel = isSelected
-                        ? 'Selecionado'
+                        ? (isSelectedEndSlot ? 'Selecionado (fim da sessão)' : 'Selecionado')
                         : isOccupied
                           ? 'Ocupado'
+                          : isBlocked
+                            ? 'Bloqueado pela sessão selecionada'
                           : isFree
                             ? 'Livre'
                             : 'Indisponível';
@@ -3128,7 +3245,6 @@ export function TeaPreReserva() {
                           aria-label={`${dayLabel} ${time} • ${stateLabel}`}
                           onClick={() => {
                             if (!effectiveSelectable) return;
-                            const selectedDurationMinutes = Math.max(1, Number(manualSelectedTherapy?.durationMinutes || 30));
                             const sortedDaySlots = [...day.slots]
                               .filter((item) => !!item.time)
                               .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
@@ -3183,6 +3299,15 @@ export function TeaPreReserva() {
                               const anchorSignature = toSignature(anchorSlot);
                               const prevSignatureSet = new Set(prev.map(toSignature));
 
+                              const coveredAnchor = prev.find((slotItem) => (
+                                slotItem.date === day.date
+                                && isSlotCoveredBySession(day.slots, slotItem.time, time, selectedDurationMinutes)
+                              ));
+                              if (coveredAnchor) {
+                                const coveredAnchorSignature = toSignature(coveredAnchor);
+                                return prev.filter((slotItem) => toSignature(slotItem) !== coveredAnchorSignature);
+                              }
+
                               // Toggle behavior: clicking an already selected start slot removes it.
                               if (prevSignatureSet.has(anchorSignature)) {
                                 return prev.filter((slotItem) => toSignature(slotItem) !== anchorSignature);
@@ -3234,11 +3359,16 @@ export function TeaPreReserva() {
                             height: 28,
                             minHeight: 28,
                             paddingInline: 4,
-                            border: isUnavailable
-                              ? '1px dashed var(--mantine-color-default-border)'
-                              : '1px solid transparent',
+                            border: isSelectedEndSlot
+                              ? '2px solid var(--mantine-color-lime-3)'
+                              : isUnavailable
+                                ? '1px dashed var(--mantine-color-default-border)'
+                                : '1px solid transparent',
+                            boxShadow: isSelectedEndSlot
+                              ? 'inset 0 0 0 1px rgba(190, 242, 100, 0.55)'
+                              : undefined,
                             backgroundColor: isSelected
-                              ? 'var(--mantine-color-green-6)'
+                              ? (isSelectedEndSlot ? 'var(--mantine-color-green-7)' : 'var(--mantine-color-green-6)')
                               : isOccupied
                                 ? 'var(--mantine-color-gray-7)'
                                 : isFree
@@ -3252,7 +3382,7 @@ export function TeaPreReserva() {
                             opacity: isOccupied ? 0.85 : 1,
                           }}
                         >
-                          {isSelected ? '●' : isFree ? '•' : isOccupied ? '•' : ''}
+                          {isSelectedEndSlot ? 'END' : isSelected ? '●' : isFree ? '•' : isOccupied ? '•' : ''}
                         </Button>
                       );
                     })}
@@ -3288,6 +3418,52 @@ export function TeaPreReserva() {
                 Confirmar reserva manual
               </Button>
             </Group>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={manualAcceptDecisionOpened}
+        onClose={() => setManualAcceptDecisionOpened(false)}
+        title="Confirmar proposta manual"
+        centered
+        size="md"
+        zIndex={455}
+        withinPortal
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Escolha como deseja seguir após confirmar os horários da proposta manual.
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => setManualAcceptDecisionOpened(false)}
+              disabled={manualSaving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="light"
+              color="indigo"
+              onClick={async () => {
+                await handleSubmitManualReservation('RESERVED');
+              }}
+              loading={manualSaving}
+              disabled={!manualReservationDecisionState || manualSaving}
+            >
+              Apenas reservar
+            </Button>
+            <Button
+              color="violet"
+              onClick={async () => {
+                await handleSubmitManualReservation('PROPOSED');
+              }}
+              loading={manualSaving}
+              disabled={!manualReservationDecisionState || manualSaving}
+            >
+              Reservar e enviar para aprovação
+            </Button>
           </Group>
         </Stack>
       </Modal>
