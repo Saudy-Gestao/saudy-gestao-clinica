@@ -814,16 +814,27 @@ export function TeaPreReserva() {
       const hasRegressionOrPendingAuthorization = value.regressedScheduledCount > 0 || value.inAuthorizationCount > 0;
 
       const reservedTotal = value.reservedPartialCount + value.reservedCompleteCount;
+      const hasCompletedPitWithNewTherapy = value.convertedCount > 0 && value.convertedCount < totalTherapies;
+      const hasMixedProgressWithPending = value.pendingCount > 0
+        && (
+          value.convertedCount > 0
+          || reservedTotal > 0
+          || value.pendingApprovalCount > 0
+          || value.authorizedCount > 0
+        );
 
       if (value.convertedCount >= totalTherapies && !hasRegressionOrPendingAuthorization) {
         stage = 'AGENDADO_COMPLETO';
         stepIndex = 7;
-      } else if (value.convertedCount > 0 || value.regressedScheduledCount > 0 || value.inAuthorizationCount > 0) {
-        stage = 'AGENDADO_PARCIAL';
-        stepIndex = 6;
-      } else if (value.inAuthorizationCount > 0 || value.authorizedCount > 0) {
+      } else if (hasCompletedPitWithNewTherapy) {
+        stage = 'RESERVADO_PARCIAL';
+        stepIndex = 2;
+      } else if (value.inAuthorizationCount > 0) {
         stage = 'EM_AUTORIZACAO';
         stepIndex = 5;
+      } else if (hasMixedProgressWithPending || value.convertedCount > 0 || value.regressedScheduledCount > 0 || value.authorizedCount > 0) {
+        stage = 'AGENDADO_PARCIAL';
+        stepIndex = 6;
       } else if (value.pendingApprovalCount > 0) {
         stage = 'AGUARDANDO_APROVACAO';
         stepIndex = 4;
@@ -874,9 +885,11 @@ export function TeaPreReserva() {
     const pendingRequested = progress.pendingApprovalRequestedAt ? dayjs(progress.pendingApprovalRequestedAt) : null;
     const pendingDeadline = progress.pendingApprovalDeadlineAt ? dayjs(progress.pendingApprovalDeadlineAt) : null;
     const hasLivePendingApproval = progress.pendingApprovalCount > 0;
-    const pendingApprovalStepCompleted = !hasLivePendingApproval && (inAuthorizationActive || stageFilledByStep[pendingApprovalStepIndex]);
+    const hasDownstreamProgress = inAuthorizationActive || scheduledPartialActive || scheduledCompleteActive;
     const pendingApprovalElapsedRatio = (() => {
-      if (!hasLivePendingApproval) return pendingApprovalStepCompleted ? 1 : 0;
+      // Once PIT advances beyond approval step, keep this stage visibly filled.
+      if (hasDownstreamProgress) return 1;
+      if (!hasLivePendingApproval) return stageFilledByStep[pendingApprovalStepIndex] ? 1 : 0;
       if (!pendingRequested?.isValid() || !pendingDeadline?.isValid()) return 0.2;
       const totalMs = pendingDeadline.valueOf() - pendingRequested.valueOf();
       if (totalMs <= 0) return 1;
@@ -884,6 +897,7 @@ export function TeaPreReserva() {
       const remainingRatio = Math.max(0, Math.min(1, remainingMs / totalMs));
       return 1 - remainingRatio;
     })();
+    const pendingApprovalStepCompleted = pendingApprovalElapsedRatio >= 1;
     const authorizationDisplayRatio = stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
 
     const activeByStep: boolean[] = [
@@ -3283,7 +3297,7 @@ export function TeaPreReserva() {
                               <Text fw={600}>{group.patientName}</Text>
                               <Group gap="xs">
                                 {hasFrequencyChangeAlert && (
-                                  <Badge variant="light" color="blue">Agendado parcial</Badge>
+                                  <Badge variant="light" color="blue">Reservado parcial</Badge>
                                 )}
                                 <Badge variant="light" color="gray">Pendente de marcação</Badge>
                               </Group>

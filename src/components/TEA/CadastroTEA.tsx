@@ -376,8 +376,9 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       gender: mapGender(p.gender) || prev.gender,
       cellphone: p.cellphone || prev.cellphone,
       email: p.email || prev.email,
-      healthInsuranceName: p.healthInsuranceName || prev.healthInsuranceName,
-      healthInsuranceNumber: p.healthInsuranceNumber || prev.healthInsuranceNumber,
+      // Keep insurance fields scoped to the selected patient; never reuse prior patient values.
+      healthInsuranceName: String(p.healthInsuranceName || ''),
+      healthInsuranceNumber: String(p.healthInsuranceNumber || ''),
     }));
   };
 
