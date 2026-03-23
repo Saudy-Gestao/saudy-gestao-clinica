@@ -1214,6 +1214,7 @@ export function TeaPreReserva() {
     const teaProfileId = String(group.reservations[0]?.teaProfileId || group.reservations[0]?.pitId || group.pitId || '');
     const isGroupFullyConverted = group.reservations.length > 0
       && group.reservations.every((item) => String(item?.status || '') === 'CONVERTED');
+    const hasPartiallyScheduledReservations = group.reservations.some((item) => String(item?.status || '') === 'AUTHORIZED');
     const hasReservedReservations = group.reservations.some((item) => String(item?.status || '') === 'RESERVED');
     const hasPendingApprovalReservations = group.reservations.some((item) => String(item?.status || '') === 'PROPOSED');
 
@@ -1298,10 +1299,7 @@ export function TeaPreReserva() {
         return;
       }
 
-      const eligibleReservations = (group.reservations || []).filter((item) => {
-        const status = String(item?.status || '');
-        return status !== 'CONVERTED' && status !== 'CANCELED';
-      });
+      const eligibleReservations = (group.reservations || []).filter((item) => String(item?.status || '') === 'AUTHORIZED');
       const anchorByTherapy = new Map<string, any>();
       eligibleReservations.forEach((item) => {
         const therapyId = String(item?.pitTherapyId || '');
@@ -1315,7 +1313,7 @@ export function TeaPreReserva() {
       if (eligibleAnchors.length === 0) {
         showNotification({
           title: 'Sem itens elegíveis',
-          message: 'Este PIT não possui pré-reservas elegíveis para conversão.',
+          message: 'Este PIT não possui terapias em Agendado parcial para checklist/agendamento.',
           color: 'yellow',
         });
         return;
@@ -1468,7 +1466,7 @@ export function TeaPreReserva() {
             >
               Histórico do PIT
             </Button>
-            {!isGroupFullyConverted && (
+            {!isGroupFullyConverted && hasPartiallyScheduledReservations && (
               <Button
                 color="green"
                 variant="light"
