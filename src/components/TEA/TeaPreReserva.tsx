@@ -158,6 +158,23 @@ type TimelineEventItem = {
   createdAt: string;
 };
 
+type BulkStatusActionOption = {
+  reservationId: string;
+  pitTherapyId: string;
+  procedureName: string;
+  professionalName: string;
+};
+
+type BulkStatusActionState = {
+  groupKey: string;
+  patientName: string;
+  fromStatus: TeaPreReservationStatus;
+  toStatus: TeaPreReservationStatus;
+  successMessage: string;
+  title: string;
+  options: BulkStatusActionOption[];
+};
+
 type TherapyColorToken = {
   badgeColor: string;
   borderColor: string;
@@ -560,6 +577,8 @@ export function TeaPreReserva() {
   const [acceptDateByTherapy, setAcceptDateByTherapy] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'pendencias' | 'concluidas'>('pendencias');
   const [collapsedTherapyCards, setCollapsedTherapyCards] = useState<Record<string, boolean>>({});
+  const [bulkStatusActionState, setBulkStatusActionState] = useState<BulkStatusActionState | null>(null);
+  const [bulkStatusSelectedReservationIds, setBulkStatusSelectedReservationIds] = useState<string[]>([]);
 
   const toggleTherapyCard = (cardKey: string) => {
     setCollapsedTherapyCards((prev) => ({
@@ -1348,19 +1367,25 @@ export function TeaPreReserva() {
       toStatus: TeaPreReservationStatus,
       successMessage: string,
     ) {
-      const anchorByTherapy = new Map<string, string>();
+        const anchorByTherapy = new Map<string, any>();
       group.reservations.forEach((item) => {
         const status = String(item?.status || '');
         const reservationId = String(item?.preReservationId || '');
         const therapyId = String(item?.pitTherapyId || '');
         if (status !== fromStatus || !reservationId || !therapyId) return;
         if (!anchorByTherapy.has(therapyId)) {
-          anchorByTherapy.set(therapyId, reservationId);
+            anchorByTherapy.set(therapyId, item);
         }
       });
 
-      const reservationIds = Array.from(anchorByTherapy.values());
-      if (reservationIds.length === 0) {
+        const options = Array.from(anchorByTherapy.values()).map((item) => ({
+          reservationId: String(item?.preReservationId || ''),
+          pitTherapyId: String(item?.pitTherapyId || item?.preReservationId || ''),
+          procedureName: item?.procedure?.name || item?.procedureName || item?.therapyType || 'Procedimento não definido',
+          professionalName: item?.professional?.name || item?.professionalName || 'Profissional não definido',
+        })).filter((option) => Boolean(option.reservationId));
+
+        if (options.length === 0) {
         showNotification({
           title: 'Sem itens para atualizar',
           message: 'Nenhuma terapia elegível para essa ação neste PIT.',
@@ -1369,29 +1394,18 @@ export function TeaPreReserva() {
         return;
       }
 
-      setUpdatingId(group.groupKey);
-      try {
-        await Promise.all(
-          reservationIds.map((reservationId) => teaPreReservationService.updateStatus(reservationId, {
-            status: toStatus,
-            applySeries: true,
-          })),
-        );
-        showNotification({
-          title: 'Sucesso',
-          message: successMessage,
-          color: 'green',
+
+        const actionLabel = toStatus === 'PROPOSED' ? 'Enviar para aprovação' : 'Aprovar reserva';
+        setBulkStatusActionState({
+          groupKey: group.groupKey,
+          patientName: group.patientName,
+          fromStatus,
+          toStatus,
+          successMessage,
+          title: `${actionLabel} • selecionar terapias`,
+          options,
         });
-        await loadPending();
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
-          color: 'red',
-        });
-      } finally {
-        setUpdatingId(null);
-      }
+        setBulkStatusSelectedReservationIds(options.map((option) => option.reservationId));
     }
 
     async function handleDeletePit() {
@@ -1855,6 +1869,48 @@ export function TeaPreReserva() {
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        color: 'red',
+      });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const confirmBulkStatusAction = async () => {
+    if (!bulkStatusActionState) return;
+
+    const selectedReservationIds = Array.from(new Set(bulkStatusSelectedReservationIds.filter(Boolean)));
+    if (selectedReservationIds.length === 0) {
+      showNotification({
+        title: 'Selecione ao menos uma terapia',
+        message: 'Marque uma ou mais terapias para aplicar a alteração de status.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setUpdatingId(bulkStatusActionState.groupKey);
+    try {
+      await Promise.all(
+        selectedReservationIds.map((reservationId) => teaPreReservationService.updateStatus(reservationId, {
+          status: bulkStatusActionState.toStatus,
+          applySeries: true,
+        })),
+      );
+
+      showNotification({
+        title: 'Sucesso',
+        message: bulkStatusActionState.successMessage,
+        color: 'green',
+      });
+
+      setBulkStatusActionState(null);
+      setBulkStatusSelectedReservationIds([]);
+      await loadPending();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
         color: 'red',
       });
     } finally {
@@ -3304,6 +3360,98 @@ export function TeaPreReserva() {
               loading={!!updatingId && !!deletePitTarget && updatingId === deletePitTarget.groupKey}
             >
               Confirmar exclusão
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+      <Modal
+        opened={Boolean(bulkStatusActionState)}
+        onClose={() => {
+          if (updatingId) return;
+          setBulkStatusActionState(null);
+          setBulkStatusSelectedReservationIds([]);
+        }}
+        title={bulkStatusActionState?.title || 'Selecionar terapias'}
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            {bulkStatusActionState
+              ? `Selecione uma ou mais terapias de ${bulkStatusActionState.patientName} para aplicar a ação.`
+              : 'Selecione uma ou mais terapias para continuar.'}
+          </Text>
+
+          {bulkStatusActionState?.options.map((option) => {
+            const isChecked = bulkStatusSelectedReservationIds.includes(option.reservationId);
+            return (
+              <Paper key={option.reservationId} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                <Group justify="space-between" align="center" wrap="wrap">
+                  <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        const nextChecked = e.currentTarget.checked;
+                        setBulkStatusSelectedReservationIds((prev) => {
+                          if (nextChecked) return Array.from(new Set([...prev, option.reservationId]));
+                          return prev.filter((id) => id !== option.reservationId);
+                        });
+                      }}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <Stack gap={2} style={{ minWidth: 0 }}>
+                      <Text size="sm" fw={600} lineClamp={1}>{option.procedureName}</Text>
+                      <Text size="xs" c="dimmed" lineClamp={1}>{option.professionalName}</Text>
+                    </Stack>
+                  </Group>
+                </Group>
+              </Paper>
+            );
+          })}
+
+          <Group justify="space-between" wrap="wrap">
+            <Group gap="xs">
+              <Button
+                size="xs"
+                variant="default"
+                onClick={() => setBulkStatusSelectedReservationIds(bulkStatusActionState?.options.map((option) => option.reservationId) || [])}
+                disabled={!bulkStatusActionState?.options.length || !!updatingId}
+              >
+                Selecionar todas
+              </Button>
+              <Button
+                size="xs"
+                variant="subtle"
+                onClick={() => setBulkStatusSelectedReservationIds([])}
+                disabled={bulkStatusSelectedReservationIds.length === 0 || !!updatingId}
+              >
+                Limpar
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              Selecionadas: {bulkStatusSelectedReservationIds.length}
+            </Text>
+          </Group>
+
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setBulkStatusActionState(null);
+                setBulkStatusSelectedReservationIds([]);
+              }}
+              disabled={!!updatingId}
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="indigo"
+              onClick={confirmBulkStatusAction}
+              loading={!!bulkStatusActionState?.groupKey && updatingId === bulkStatusActionState.groupKey}
+              disabled={bulkStatusSelectedReservationIds.length === 0}
+            >
+              Confirmar ação
             </Button>
           </Group>
         </Stack>
