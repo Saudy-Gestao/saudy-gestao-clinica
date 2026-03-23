@@ -245,6 +245,8 @@ type PitProgressInfo = {
   totalTherapies: number;
   convertedCount: number;
   regressedScheduledCount: number;
+  regressionCompletedSessions: number;
+  regressionTargetSessions: number;
   pendingCount: number;
   reservedPartialCount: number;
   reservedCompleteCount: number;
@@ -301,6 +303,16 @@ const PROGRESS_STEP_LABELS = [
   'Agendado parcial',
   'Agendado completo',
 ];
+
+const PIT_STAGE_BADGE: Record<PitProgressStage, { label: string; color: string }> = {
+  PIT_GERADO: { label: 'Pendente de marcação', color: 'gray' },
+  RESERVADO_PARCIAL: { label: 'Reservado parcial', color: 'indigo' },
+  RESERVADO_COMPLETO: { label: 'Reservado completo', color: 'blue' },
+  AGUARDANDO_APROVACAO: { label: 'Aguardando aprovação', color: 'violet' },
+  EM_AUTORIZACAO: { label: 'Em autorização', color: 'yellow' },
+  AGENDADO_PARCIAL: { label: 'Agendado parcial', color: 'teal' },
+  AGENDADO_COMPLETO: { label: 'Agendado completo', color: 'green' },
+};
 
 const STATUS_FLOW_ORDER: TeaPreReservationStatus[] = [
   'PENDING_SCHEDULING',
@@ -779,6 +791,7 @@ export function TeaPreReserva() {
 
   const renderProgressTrail = (progress: PitProgressInfo, keyPrefix: string) => {
 
+    const hasFrequencyRegression = progress.regressedScheduledCount > 0;
     const reservedTotal = progress.reservedPartialCount + progress.reservedCompleteCount;
     const reservedPartialActive = reservedTotal > 0;
     const reservedCompleteActive = progress.reservedCompleteCount >= progress.totalTherapies;
@@ -794,8 +807,14 @@ export function TeaPreReserva() {
     const pendingRequested = progress.pendingApprovalRequestedAt ? dayjs(progress.pendingApprovalRequestedAt) : null;
     const pendingDeadline = progress.pendingApprovalDeadlineAt ? dayjs(progress.pendingApprovalDeadlineAt) : null;
     const hasLivePendingApproval = progress.pendingApprovalCount > 0;
-    const hasDownstreamProgress = inAuthorizationActive || scheduledPartialActive || scheduledCompleteActive;
+    const hasDownstreamProgress = inAuthorizationActive || scheduledCompleteActive;
+    const shouldCarryPendingApprovalInRegression = hasFrequencyRegression && (
+      progress.inAuthorizationCount > 0
+      || progress.authorizedCount > 0
+      || progress.convertedCount > 0
+    );
     const pendingApprovalElapsedRatio = (() => {
+      if (hasFrequencyRegression && !hasLivePendingApproval && !shouldCarryPendingApprovalInRegression) return 0;
       // Once PIT advances beyond approval step, keep this stage visibly filled.
       if (hasDownstreamProgress) return 1;
       if (!hasLivePendingApproval) return stageFilledByStep[pendingApprovalStepIndex] ? 1 : 0;
@@ -807,14 +826,42 @@ export function TeaPreReserva() {
       return 1 - remainingRatio;
     })();
     const pendingApprovalStepCompleted = pendingApprovalElapsedRatio >= 1;
-    const authorizationDisplayRatio = stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
+    const authorizationDisplayRatio = (() => {
+      if (hasFrequencyRegression) {
+        if (progress.authorizedCount > 0 || progress.convertedCount >= progress.totalTherapies) return 1;
+        if (progress.regressionTargetSessions > 0) {
+          const ratio = progress.regressionCompletedSessions / progress.regressionTargetSessions;
+          return Math.max(0.5, Math.min(0.95, ratio));
+        }
+        return 0.5;
+      }
+      return stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
+    })();
+
+    const authorizationStepActive = (
+      inAuthorizationActive
+      || stageFilledByStep[4]
+      || (hasFrequencyRegression && progress.regressionTargetSessions > 0 && progress.authorizedCount < progress.totalTherapies)
+    );
+    const shouldCarryReservedStepsInRegression = hasFrequencyRegression && (
+      progress.pendingApprovalCount > 0
+      || progress.inAuthorizationCount > 0
+      || progress.authorizedCount > 0
+      || progress.convertedCount > 0
+    );
 
     const activeByStep: boolean[] = [
       stageFilledByStep[0], // PIT gerado
-      reservedPartialActive || stageFilledByStep[1],
-      reservedCompleteActive || stageFilledByStep[2],
-      pendingApprovalActive || stageFilledByStep[3],
-      inAuthorizationActive || stageFilledByStep[4],
+      hasFrequencyRegression
+        ? (reservedPartialActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[1]))
+        : (reservedPartialActive || stageFilledByStep[1]),
+      hasFrequencyRegression
+        ? (reservedCompleteActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[2]))
+        : (reservedCompleteActive || stageFilledByStep[2]),
+      hasFrequencyRegression
+        ? (progress.pendingApprovalCount > 0 || shouldCarryPendingApprovalInRegression)
+        : (pendingApprovalActive || stageFilledByStep[3]),
+      authorizationStepActive,
       scheduledPartialActive || stageFilledByStep[5],
       scheduledCompleteActive || stageFilledByStep[6],
     ];
@@ -903,11 +950,24 @@ export function TeaPreReserva() {
 
   const buildTherapyProgressFromItem = (item: any): PitProgressInfo => {
     const status = String(item?.status || 'PENDING_SCHEDULING');
+    const isFrequencyAdjustedFlow = String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE';
     const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
     const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
+    const regressionCompletedSessions = isFrequencyAdjustedFlow
+      ? Math.max(0, Number(item?.previousWeeklyFrequency || 0))
+      : 0;
+    const regressionTargetSessions = isFrequencyAdjustedFlow
+      ? Math.max(1, Number(item?.currentWeeklyFrequency || item?.preferences?.weeklyFrequency || 1))
+      : 0;
+    const isRegressionPending = (
+      isFrequencyAdjustedFlow
+      && (
+        status === 'PENDING_SCHEDULING'
+        || (status === 'RESERVED' && weeklyReserved === 0)
+      )
+    );
     const reservedComplete = status === 'RESERVED' && weeklyReserved >= weeklyTarget;
-    const reservedPartial = status === 'RESERVED' && !reservedComplete;
-    const isRegressionPending = status === 'PENDING_SCHEDULING' && String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE';
+    const reservedPartial = status === 'RESERVED' && !reservedComplete && !isRegressionPending;
 
     let stage: PitProgressStage = 'PIT_GERADO';
     let stepIndex = 1;
@@ -924,10 +984,13 @@ export function TeaPreReserva() {
     } else if (status === 'PROPOSED') {
       stage = 'AGUARDANDO_APROVACAO';
       stepIndex = 4;
+    } else if (isRegressionPending) {
+      stage = 'AGENDADO_PARCIAL';
+      stepIndex = 6;
     } else if (reservedComplete) {
       stage = 'RESERVADO_COMPLETO';
       stepIndex = 3;
-    } else if (reservedPartial || isRegressionPending) {
+    } else if (reservedPartial) {
       stage = 'RESERVADO_PARCIAL';
       stepIndex = 2;
     }
@@ -937,9 +1000,11 @@ export function TeaPreReserva() {
       stepIndex,
       totalTherapies: 1,
       convertedCount: status === 'CONVERTED' ? 1 : 0,
-      regressedScheduledCount: isRegressionPending ? 1 : 0,
+      regressedScheduledCount: isFrequencyAdjustedFlow ? 1 : 0,
+      regressionCompletedSessions,
+      regressionTargetSessions,
       pendingCount: status === 'PENDING_SCHEDULING' ? 1 : 0,
-      reservedPartialCount: reservedPartial || isRegressionPending ? 1 : 0,
+      reservedPartialCount: reservedPartial ? 1 : 0,
       reservedCompleteCount: reservedComplete ? 1 : 0,
       pendingApprovalCount: status === 'PROPOSED' ? 1 : 0,
       pendingApprovalRequestedAt: status === 'PROPOSED'
@@ -961,6 +1026,8 @@ export function TeaPreReserva() {
         totalTherapies: 0,
         convertedCount: 0,
         regressedScheduledCount: 0,
+        regressionCompletedSessions: 0,
+        regressionTargetSessions: 0,
         pendingCount: 0,
         reservedPartialCount: 0,
         reservedCompleteCount: 0,
@@ -977,6 +1044,8 @@ export function TeaPreReserva() {
       acc.totalTherapies += 1;
       acc.convertedCount += progress.convertedCount;
       acc.regressedScheduledCount += progress.regressedScheduledCount;
+      acc.regressionCompletedSessions += progress.regressionCompletedSessions;
+      acc.regressionTargetSessions += progress.regressionTargetSessions;
       acc.pendingCount += progress.pendingCount;
       acc.reservedPartialCount += progress.reservedPartialCount;
       acc.reservedCompleteCount += progress.reservedCompleteCount;
@@ -998,6 +1067,8 @@ export function TeaPreReserva() {
       totalTherapies: 0,
       convertedCount: 0,
       regressedScheduledCount: 0,
+      regressionCompletedSessions: 0,
+      regressionTargetSessions: 0,
       pendingCount: 0,
       reservedPartialCount: 0,
       reservedCompleteCount: 0,
@@ -3566,6 +3637,7 @@ export function TeaPreReserva() {
                         ...existingReservationsWithoutDuplicates,
                         ...completedReservationsWithoutDuplicates,
                       ]);
+                      const pitStageBadge = PIT_STAGE_BADGE[pitProgress.stage];
                       const hasRemovedTherapyAlert = removedTherapies.length > 0;
                       const hasFrequencyChangeAlert = frequencyChangedTherapies.length > 0;
                       const canScheduleGroup = groupContext.therapies.length > 0;
@@ -3588,10 +3660,10 @@ export function TeaPreReserva() {
                             <Group justify="space-between" align="center" wrap="wrap">
                               <Text fw={600}>{group.patientName}</Text>
                               <Group gap="xs">
+                                <Badge variant="light" color={pitStageBadge.color}>{pitStageBadge.label}</Badge>
                                 {hasFrequencyChangeAlert && (
-                                  <Badge variant="light" color="blue">Reservado parcial</Badge>
+                                  <Badge variant="light" color="blue">Frequência alterada</Badge>
                                 )}
-                                <Badge variant="light" color="gray">Pendente de marcação</Badge>
                               </Group>
                             </Group>
 
