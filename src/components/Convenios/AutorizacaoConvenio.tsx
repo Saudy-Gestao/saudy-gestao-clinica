@@ -35,6 +35,7 @@ type AuthorizationItem = {
   patientName: string;
   patientCpf?: string;
   insuranceType?: 'CONVENIO' | 'PARTICULAR';
+  insuranceName?: string;
   procedureName?: string;
   doctorName?: string;
   roomName?: string | null;
@@ -45,8 +46,6 @@ type AuthorizationItem = {
   updatedAt?: string;
   sessionsCount?: number;
 };
-
-type InsuranceType = 'CONVENIO' | 'PARTICULAR';
 
 const STATUS_OPTIONS: Array<{ value: ConvenioAuthorizationStatus; label: string }> = [
   { value: 'PENDING', label: 'Pendente' },
@@ -66,8 +65,10 @@ const sanitizeAuthorizationNotes = (value?: string | null) => (
     .trim()
 );
 
-const resolveInsuranceType = (item: AuthorizationItem): InsuranceType => (
-  item.insuranceType || (item.sourceType === 'TEA' ? 'CONVENIO' : 'PARTICULAR')
+const resolveInsuranceName = (item: AuthorizationItem): string => (
+  String(item.insuranceName || '').trim()
+  || (item.insuranceType === 'CONVENIO' ? 'Convênio' : 'Particular')
+  || 'Particular'
 );
 
 export function AutorizacaoConvenio() {
@@ -81,7 +82,7 @@ export function AutorizacaoConvenio() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
-  const [insuranceTypeFilter, setInsuranceTypeFilter] = useState<InsuranceType[]>([]);
+  const [insuranceTypeFilter, setInsuranceTypeFilter] = useState<string[]>([]);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [attachmentByRowKey, setAttachmentByRowKey] = useState<Record<string, string>>({});
   const [, setAttachmentFileByRowKey] = useState<Record<string, File | null>>({});
@@ -93,8 +94,18 @@ export function AutorizacaoConvenio() {
 
   const filteredItems = useMemo(() => {
     if (insuranceTypeFilter.length === 0) return items;
-    return items.filter((item) => insuranceTypeFilter.includes(resolveInsuranceType(item)));
+    return items.filter((item) => insuranceTypeFilter.includes(resolveInsuranceName(item)));
   }, [items, insuranceTypeFilter]);
+
+  const insuranceTypeOptions = useMemo(() => {
+    const unique = Array.from(new Set(items.map((item) => resolveInsuranceName(item)).filter(Boolean)));
+    const withoutParticular = unique
+      .filter((name) => name.toLowerCase() !== 'particular')
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const hasParticular = unique.some((name) => name.toLowerCase() === 'particular');
+    const ordered = hasParticular ? [...withoutParticular, 'Particular'] : withoutParticular;
+    return ordered.map((name) => ({ value: name, label: name }));
+  }, [items]);
 
   const summary = useMemo(() => {
     return filteredItems.reduce((acc, item) => {
@@ -340,14 +351,11 @@ export function AutorizacaoConvenio() {
                 clearable
               />
               <MultiSelect
-                label="Tipo de Atendimento"
-                placeholder="Filtrar tipo"
-                data={[
-                  { value: 'CONVENIO', label: 'Convênio' },
-                  { value: 'PARTICULAR', label: 'Particular' },
-                ]}
+                label="Convênio"
+                placeholder="Filtrar convênio"
+                data={insuranceTypeOptions}
                 value={insuranceTypeFilter}
-                onChange={(value) => setInsuranceTypeFilter(value as InsuranceType[])}
+                onChange={(value) => setInsuranceTypeFilter(value as string[])}
                 clearable
               />
             </Group>
@@ -361,7 +369,7 @@ export function AutorizacaoConvenio() {
                     <Table.Tr>
                       <Table.Th>Origem</Table.Th>
                       <Table.Th>Paciente</Table.Th>
-                      <Table.Th>Tipo de Atendimento</Table.Th>
+                      <Table.Th>Convênio</Table.Th>
                       <Table.Th>Procedimento</Table.Th>
                       <Table.Th>Médico</Table.Th>
                       <Table.Th>Sala</Table.Th>
@@ -382,7 +390,7 @@ export function AutorizacaoConvenio() {
                     ) : (
                       filteredItems.map((item) => {
                         const rowKey = `${item.sourceType}-${item.id}`;
-                        const resolvedInsuranceType = resolveInsuranceType(item);
+                        const resolvedInsuranceName = resolveInsuranceName(item);
                         return (
                           <Table.Tr key={rowKey}>
                             <Table.Td>
@@ -399,9 +407,9 @@ export function AutorizacaoConvenio() {
                             <Table.Td>
                               <Badge
                                 variant="light"
-                                color={resolvedInsuranceType === 'CONVENIO' ? 'blue' : 'gray'}
+                                color={resolvedInsuranceName.toLowerCase() === 'particular' ? 'gray' : 'blue'}
                               >
-                                {resolvedInsuranceType === 'CONVENIO' ? 'Convênio' : 'Particular'}
+                                {resolvedInsuranceName}
                               </Badge>
                             </Table.Td>
                             <Table.Td><Text size="sm">{item.procedureName || '-'}</Text></Table.Td>

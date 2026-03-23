@@ -41,7 +41,7 @@ type CancellationScope = 'single' | 'all';
 type WeekdayCancellationTarget = {
   weekdayIndex: number;
   weekdayLabel: string;
-  time: string;
+  timesLabel: string;
 };
 
 const WEEKDAY_LABELS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -312,7 +312,7 @@ export function TeaDesmarcacaoLote() {
           <Text size="sm">Deseja excluir os horários desse dia?</Text>
           <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
             <Text size="sm" fw={700}>
-              Deseja excluir os horários da {weekdayCancelTarget?.weekdayLabel || '-'} • {weekdayCancelTarget?.time || '-'}?
+              Deseja excluir os horários da {weekdayCancelTarget?.weekdayLabel || '-'} • {weekdayCancelTarget?.timesLabel || '-'}?
             </Text>
             <Text size="xs" c="dimmed" mt={4}>
               Apenas os horários desse dia da semana serão removidos. Os outros dias permanecem normais.
@@ -386,21 +386,38 @@ export function TeaDesmarcacaoLote() {
             ) : (
               <Stack gap="xs">
                 {therapies.map((therapy) => {
-                  const weeklyPatternSlots = therapy.slots
+                  const weeklyPatternByWeekdayMap = therapy.slots
                     .map((slot) => ({
                       weekdayLabel: getWeekdayLabel(slot.date),
                       weekdayIndex: getWeekdayIndex(slot.date),
                       time: String(slot.time || '').trim(),
                     }))
                     .filter((slot) => slot.weekdayLabel !== 'Dia inválido' && slot.time)
-                    .filter((slot, index, list) => (
-                      list.findIndex((candidate) => (
-                        candidate.weekdayIndex === slot.weekdayIndex && candidate.time === slot.time
-                      )) === index
-                    ))
+                    .reduce((acc, slot) => {
+                      const existing = acc.get(slot.weekdayIndex);
+                      if (!existing) {
+                        acc.set(slot.weekdayIndex, {
+                          weekdayIndex: slot.weekdayIndex,
+                          weekdayLabel: slot.weekdayLabel,
+                          times: [slot.time],
+                        });
+                        return acc;
+                      }
+
+                      if (!existing.times.includes(slot.time)) {
+                        existing.times.push(slot.time);
+                      }
+                      return acc;
+                    }, new Map<number, { weekdayIndex: number; weekdayLabel: string; times: string[] }>());
+
+                  const weeklyPatternByDay = Array.from(weeklyPatternByWeekdayMap.values())
+                    .map((slot) => ({
+                      ...slot,
+                      times: [...slot.times].sort((a, b) => a.localeCompare(b)),
+                    }))
                     .sort((a, b) => {
                       if (a.weekdayIndex !== b.weekdayIndex) return a.weekdayIndex - b.weekdayIndex;
-                      return a.time.localeCompare(b.time);
+                      return (a.times[0] || '').localeCompare(b.times[0] || '');
                     });
                   return (
                     <Paper key={therapy.pitTherapyId} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
@@ -425,11 +442,11 @@ export function TeaDesmarcacaoLote() {
 
                         <Stack gap={3}>
                           <Text size="xs" fw={600}>sessões</Text>
-                          {weeklyPatternSlots.length > 0 ? (
+                          {weeklyPatternByDay.length > 0 ? (
                             <Group gap={6} wrap="wrap">
-                              {weeklyPatternSlots.map((slot) => (
+                              {weeklyPatternByDay.map((slot) => (
                                 <Group
-                                  key={`${slot.weekdayIndex}-${slot.time}`}
+                                  key={`${slot.weekdayIndex}`}
                                   gap={4}
                                   wrap="nowrap"
                                   style={{
@@ -449,7 +466,7 @@ export function TeaDesmarcacaoLote() {
                                     fw={700}
                                     c={colorScheme === 'dark' ? 'var(--mantine-color-blue-1)' : 'var(--mantine-color-dark-7)'}
                                   >
-                                    {slot.weekdayLabel} • {slot.time}
+                                    {slot.weekdayLabel} • {slot.times.join(', ')}
                                   </Text>
                                   <ActionIcon
                                     size="xs"
@@ -459,7 +476,7 @@ export function TeaDesmarcacaoLote() {
                                     onClick={() => openWeekdayCancelModal({
                                       weekdayIndex: slot.weekdayIndex,
                                       weekdayLabel: slot.weekdayLabel,
-                                      time: slot.time,
+                                      timesLabel: slot.times.join(', '),
                                     })}
                                   >
                                     <X size={12} />

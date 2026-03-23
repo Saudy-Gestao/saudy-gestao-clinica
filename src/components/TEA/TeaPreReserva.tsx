@@ -231,14 +231,6 @@ const getCoveredSlotsForSession = (
   return coveredSlots;
 };
 
-const getSessionEndTime = (anchorTime: string, durationMinutes: number): string => {
-  const endMinutes = timeToMinutes(anchorTime) + Math.max(1, Number(durationMinutes) || 0);
-  const normalized = ((endMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
-  const hour = Math.floor(normalized / 60);
-  const minute = normalized % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-};
-
 type ManualReservationDecisionState = {
   groupKey: string;
   pitTherapyId: string;
@@ -600,14 +592,15 @@ export function TeaPreReserva() {
     return byProcedure;
   }, [checklistItems, checklistProcedureOptions]);
 
-  const checklistConvertibleReservations = useMemo(() => (
-    checklistGroupReservations.filter((reservation) => {
+  const checklistConvertibleSelectedReservations = useMemo(() => {
+    if (!selectedChecklistProcedure) return [] as any[];
+    return checklistSelectedProcedureReservations.filter((reservation) => {
       const procedure = getReservationProcedureName(reservation);
       return checklistCanConvertByProcedure.get(procedure) === true;
-    })
-  ), [checklistCanConvertByProcedure, checklistGroupReservations]);
+    });
+  }, [checklistCanConvertByProcedure, checklistSelectedProcedureReservations, selectedChecklistProcedure]);
 
-  const checklistCanConvertAnyProcedure = checklistConvertibleReservations.length > 0;
+  const checklistCanConvertSelectedProcedure = checklistConvertibleSelectedReservations.length > 0;
 
 
   const filteredItems = useMemo(() => {
@@ -3236,10 +3229,6 @@ export function TeaPreReserva() {
                         (selected) => selected.date === day.date
                           && isSlotCoveredBySession(day.slots, selected.time, time, selectedDurationMinutes),
                       );
-                      const isSelectedEndSlot = manualSelectedSlots.some(
-                        (selected) => selected.date === day.date
-                          && getSessionEndTime(selected.time, selectedDurationMinutes) === time,
-                      );
                       const isOccupied = !!slot?.occupied;
                       const isSelectable = !!slot?.selectable;
                       const isBlockedBySelectedSession = manualSelectedSlots.some((selected) => {
@@ -3247,8 +3236,8 @@ export function TeaPreReserva() {
                         const startMinutes = timeToMinutes(selected.time);
                         const endMinutes = startMinutes + selectedDurationMinutes;
                         const currentMinutes = timeToMinutes(time);
-                        // Keep only the anchor start clickable; block covered slots and end boundary.
-                        return currentMinutes > startMinutes && currentMinutes <= endMinutes;
+                        // Keep only covered slots blocked; free the exact end boundary slot.
+                        return currentMinutes > startMinutes && currentMinutes < endMinutes;
                       });
                       const isExistingEditableSlot = !!manualSelectedTherapyId && (
                         manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
@@ -3261,7 +3250,7 @@ export function TeaPreReserva() {
                       const isUnavailable = !isOccupied && !isSelectable;
                       const isBlocked = !isOccupied && isBlockedBySelectedSession;
                       const stateLabel = isSelected
-                        ? (isSelectedEndSlot ? 'Selecionado (fim da sessão)' : 'Selecionado')
+                        ? 'Selecionado'
                         : isOccupied
                           ? 'Ocupado'
                           : isBlocked
@@ -3395,16 +3384,11 @@ export function TeaPreReserva() {
                             height: 28,
                             minHeight: 28,
                             paddingInline: 4,
-                            border: isSelectedEndSlot
-                              ? '2px solid var(--mantine-color-lime-3)'
-                              : isUnavailable
+                            border: isUnavailable
                                 ? '1px dashed var(--mantine-color-default-border)'
                                 : '1px solid transparent',
-                            boxShadow: isSelectedEndSlot
-                              ? 'inset 0 0 0 1px rgba(190, 242, 100, 0.55)'
-                              : undefined,
                             backgroundColor: isSelected
-                              ? (isSelectedEndSlot ? 'var(--mantine-color-green-7)' : 'var(--mantine-color-green-6)')
+                              ? 'var(--mantine-color-green-6)'
                               : isOccupied
                                 ? 'var(--mantine-color-gray-7)'
                                 : isFree
@@ -3418,7 +3402,7 @@ export function TeaPreReserva() {
                             opacity: isOccupied ? 0.85 : 1,
                           }}
                         >
-                          {isSelectedEndSlot ? 'END' : isSelected ? '●' : isFree ? '•' : isOccupied ? '•' : ''}
+                          {isSelected ? '●' : isFree ? '•' : isOccupied ? '•' : ''}
                         </Button>
                       );
                     })}
@@ -3724,11 +3708,11 @@ export function TeaPreReserva() {
                 </Button>
                 <Button
                   color="green"
-                  disabled={!checklistCanConvertAnyProcedure}
+                  disabled={!checklistCanConvertSelectedProcedure}
                   loading={!!checklistGroupKey && updatingId === checklistGroupKey}
-                  onClick={() => openConversionConfirmationModal(checklistConvertibleReservations)}
+                  onClick={() => openConversionConfirmationModal(checklistConvertibleSelectedReservations)}
                 >
-                  {`Finalizar Agendamento${checklistCanConvertAnyProcedure ? ` (${checklistConvertibleReservations.length})` : ''}`}
+                  {`Finalizar Agendamento${checklistCanConvertSelectedProcedure ? ` (${checklistConvertibleSelectedReservations.length})` : ''}`}
                 </Button>
               </Group>
             </>
