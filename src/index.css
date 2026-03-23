@@ -210,6 +210,149 @@ body {
   border-bottom-color: var(--mantine-color-darkBlue-4);
 }
 
+/* Floating wrappers for Mantine controls (Select, MultiSelect, DateInput, Textarea) */
+.floating-mantine-field {
+  position: relative;
+}
+
+.floating-mantine-field .mantine-Input-wrapper {
+  width: 100%;
+}
+
+.floating-mantine-field .mantine-Input-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  border-radius: 0;
+  padding: 10px 0 6px 0;
+  min-height: 34px;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--mantine-color-text);
+}
+
+.floating-mantine-field .mantine-Input-input:focus,
+.floating-mantine-field:focus-within .mantine-Input-input {
+  outline: none;
+  border-bottom: 2px solid var(--mantine-color-darkBlue-6);
+  padding-bottom: 5px;
+}
+
+.floating-mantine-field label {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  color: var(--mantine-color-dimmed);
+  font-size: 0.8rem;
+  transition: transform 160ms ease, font-size 160ms ease, top 160ms ease, color 160ms ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.floating-mantine-field.has-value label,
+.floating-mantine-field:focus-within label {
+  top: -6px;
+  font-size: 0.7rem;
+  color: var(--mantine-color-darkBlue-6);
+}
+
+.floating-mantine-field .mantine-Input-input::placeholder {
+  color: transparent;
+}
+
+.floating-mantine-field--textarea .mantine-Input-input {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 8px;
+  padding: 16px 12px 10px;
+  min-height: 72px;
+}
+
+.floating-mantine-field--textarea .mantine-Input-input:focus,
+.floating-mantine-field--textarea:focus-within .mantine-Input-input {
+  border: 1px solid var(--mantine-color-darkBlue-6);
+  padding: 16px 12px 10px;
+}
+
+.floating-mantine-field--textarea label {
+  left: 12px;
+  top: 12px;
+}
+
+.floating-mantine-field--textarea.has-value label,
+.floating-mantine-field--textarea:focus-within label {
+  top: -16px;
+  left: 12px;
+  background: transparent;
+  padding: 0 2px;
+}
+
+.floating-mantine-field--textarea.has-value .mantine-Input-input,
+.floating-mantine-field--textarea:focus-within .mantine-Input-input {
+  border-top-color: transparent;
+}
+
+/* Floating kit - dark mode contrast fixes */
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field label {
+  color: #9fb2df;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field.has-value label,
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field:focus-within label {
+  color: #cfe0ff;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field .mantine-Input-input {
+  color: #eef3ff;
+  border-bottom-color: #5f78b2;
+  background-color: transparent !important;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field .mantine-Input-input:focus,
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field:focus-within .mantine-Input-input {
+  border-bottom-color: #9ec1ff;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field .mantine-Input-input::placeholder {
+  color: transparent;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field .mantine-Input-section,
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field .mantine-Select-rightSection,
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field .mantine-DateInput-rightSection {
+  color: #b9ccef;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field--textarea .mantine-Input-input {
+  border-color: #5f78b2;
+  background-color: transparent !important;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field--textarea .mantine-Input-input:focus,
+:root[data-mantine-color-scheme='dark'] .floating-mantine-field--textarea:focus-within .mantine-Input-input {
+  border-color: #9ec1ff;
+}
+
+/* FloatingInput original - dark mode contrast */
+:root[data-mantine-color-scheme='dark'] .floating-field input {
+  color: #eef3ff !important;
+  border-bottom-color: #5f78b2;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-field input:focus {
+  border-bottom-color: #9ec1ff;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-field label {
+  color: #9fb2df;
+}
+
+:root[data-mantine-color-scheme='dark'] .floating-field.has-value label,
+:root[data-mantine-color-scheme='dark'] .floating-field.is-focused label,
+:root[data-mantine-color-scheme='dark'] .floating-field input:focus + label,
+:root[data-mantine-color-scheme='dark'] .floating-field input:not(:placeholder-shown) + label {
+  color: #cfe0ff;
+}
+
 /* red asterisk overlay used to simulate a colored '*' inside the placeholder */
 .placeholder-asterisk {
   position: absolute;
@@ -319,4 +462,9 @@ button:disabled {
 .mantine-NumberInput-root[data-unstyled] .mantine-NumberInput-input,
 .mantine-Select-root[data-unstyled] .mantine-Select-input {
   padding: 10px 0 6px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(1.12); }
 }

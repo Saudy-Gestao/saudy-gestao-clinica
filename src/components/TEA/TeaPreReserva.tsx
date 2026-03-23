@@ -1626,6 +1626,20 @@ export function TeaPreReserva() {
                     </Button>
                   </Group>
                 )}
+                {Number(item?.authorizationAttachmentsCount || 0) > 0 && (
+                  <>
+                    <Text size="xs" mt={4} c="blue">
+                      Anexos da autorização: {item.authorizationAttachmentsCount}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {(Array.isArray(item?.authorizationAttachments) ? item.authorizationAttachments : [])
+                        .slice(0, 3)
+                        .map((doc: any) => String(doc?.fileName || '').trim())
+                        .filter(Boolean)
+                        .join(' • ')}
+                    </Text>
+                  </>
+                )}
                 {item.status === 'AUTHORIZED' && item.authorizedAt && (
                   <Text size="xs" mt={4} c="teal">
                     Autorizado em: {dayjs(item.authorizedAt).format('DD/MM/YYYY HH:mm')}
