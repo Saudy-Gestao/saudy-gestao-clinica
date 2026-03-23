@@ -98,11 +98,19 @@ const normalizeDateToIso = (value?: string | null) => {
   return dayjs(parsed).format('YYYY-MM-DD');
 };
 
+const buildWeeklySlotSignatures = (slots: Array<{ date: string; time: string }>) => Array.from(new Set(
+  (slots || [])
+    .filter((slot) => slot?.date && slot?.time)
+    .map((slot) => `${dayjs(slot.date).day()}#${String(slot.time).trim()}`),
+));
+
 type GroupTherapyContext = {
   pitTherapyId: string;
   procedureName: string;
   professionalName: string;
   weeklyFrequency?: number;
+  previousWeeklyFrequency?: number;
+  source?: string;
   preferredWeekdays?: string[];
   preferredShift?: string;
   durationMinutes?: number | null;
@@ -485,76 +493,6 @@ export function TeaPreReserva() {
     }
 
     return previewDates;
-  };
-
-  const buildPreferredWeekdayPreviewDates = (
-    startDate: string | undefined,
-    preferredWeekdays: string[] | undefined,
-    count = 5,
-  ) => {
-    const normalizedIndexes = Array.from(
-      new Set(
-        (preferredWeekdays || [])
-          .map((day) => WEEKDAY_TO_DAY_INDEX[String(day || '').toUpperCase()])
-          .filter((index): index is number => Number.isInteger(index)),
-      ),
-    ).sort((a, b) => a - b);
-
-    if (!normalizedIndexes.length) {
-      return buildRecurringPreviewDates(startDate ? [startDate] : [], count);
-    }
-
-    const base = startDate ? dayjs(startDate).startOf('day') : dayjs().startOf('day');
-    const today = dayjs().startOf('day');
-    const cursorStart = base.isBefore(today, 'day') ? today : base;
-    const result: string[] = [];
-    let cursor = cursorStart;
-
-    while (result.length < count && !cursor.isAfter(recurringUntilYearEnd, 'day')) {
-      if (normalizedIndexes.includes(cursor.day())) {
-        result.push(cursor.format('YYYY-MM-DD'));
-      }
-      cursor = cursor.add(1, 'day');
-    }
-
-    return result;
-  };
-
-  const buildWeeklySlotsFromPreferences = (
-    selectedDate: string,
-    preferredWeekdays: string[] | undefined,
-    weeklyFrequency: number,
-  ) => {
-    const limit = Math.max(1, Number(weeklyFrequency) || 1);
-    const indexes = Array.from(
-      new Set(
-        (preferredWeekdays || [])
-          .map((day) => WEEKDAY_TO_DAY_INDEX[String(day || '').toUpperCase()])
-          .filter((index): index is number => Number.isInteger(index)),
-      ),
-    );
-
-    if (!indexes.length) {
-      return Array.from({ length: limit }).map((_, idx) => ({
-        date: dayjs(selectedDate).add(idx, 'week').format('YYYY-MM-DD'),
-        time: '09:00',
-      }));
-    }
-
-    const slots: Array<{ date: string; time: string }> = [];
-    let cursor = dayjs(selectedDate).startOf('day');
-
-    while (slots.length < limit && !cursor.isAfter(recurringUntilYearEnd, 'day')) {
-      if (indexes.includes(cursor.day())) {
-        slots.push({
-          date: cursor.format('YYYY-MM-DD'),
-          time: '09:00',
-        });
-      }
-      cursor = cursor.add(1, 'day');
-    }
-
-    return slots;
   };
 
   const resolveTherapySlotsForAcceptance = (therapy: GroupTherapyContext, startDate?: string) => {
@@ -1176,13 +1114,14 @@ export function TeaPreReserva() {
     const scopedReservations = Array.isArray(reservationsToConvert)
       ? reservationsToConvert
       : checklistSelectedProcedureReservations;
-    const scopedReservationIds = Array.from(
-      new Set(
-        scopedReservations
-          .map((item) => String(item?.preReservationId || ''))
-          .filter(Boolean),
-      ),
-    );
+    const anchorByTherapy = new Map<string, string>();
+    scopedReservations.forEach((item) => {
+      const therapyId = String(item?.pitTherapyId || item?.preReservationId || '');
+      const reservationId = String(item?.preReservationId || '');
+      if (!therapyId || !reservationId || anchorByTherapy.has(therapyId)) return;
+      anchorByTherapy.set(therapyId, reservationId);
+    });
+    const scopedReservationIds = Array.from(anchorByTherapy.values());
     const scopedProcedures = Array.from(new Set(scopedReservations.map(getReservationProcedureName)));
     const hasInvalidScopedProcedure = scopedProcedures.some(
       (procedure) => checklistCanConvertByProcedure.get(procedure) !== true,
@@ -1200,23 +1139,49 @@ export function TeaPreReserva() {
     const uniqueTherapies = new Map<string, { therapy: GroupTherapyContext; slots: Array<{ date: string; time: string }> }>();
     scopedReservations.forEach((reservation) => {
       const pitTherapyId = String(reservation?.pitTherapyId || reservation?.preReservationId || '');
-      if (!pitTherapyId || uniqueTherapies.has(pitTherapyId)) return;
+      if (!pitTherapyId) return;
+
+      const slotsFromPattern = Array.isArray(reservation?.weeklySlotPattern)
+        ? reservation.weeklySlotPattern
+          .map((slot: any) => {
+            const date = normalizeDateToIso(slot?.date) || normalizeDateToIso(slot?.suggestedDate);
+            const time = String(slot?.time || slot?.suggestedTime || '').trim();
+            if (!date || !time) return null;
+            return { date, time };
+          })
+          .filter(Boolean) as Array<{ date: string; time: string }>
+        : [];
 
       const suggestedDateRaw = reservation?.slotSuggestion?.suggestedDate || reservation?.suggestedDate;
-      const suggestedDate = normalizeDateToIso(suggestedDateRaw) || dayjs().format('YYYY-MM-DD');
-      const suggestedTime = String(reservation?.slotSuggestion?.suggestedTime || reservation?.suggestedTime || '09:00');
+      const fallbackDate = normalizeDateToIso(suggestedDateRaw) || dayjs().format('YYYY-MM-DD');
+      const fallbackTime = String(reservation?.slotSuggestion?.suggestedTime || reservation?.suggestedTime || '09:00');
+      const normalizedSlots = slotsFromPattern.length > 0
+        ? slotsFromPattern
+        : [{ date: fallbackDate, time: fallbackTime }];
 
-      uniqueTherapies.set(pitTherapyId, {
-        therapy: {
-          pitTherapyId,
-          procedureName: reservation?.procedure?.name || reservation?.procedureName || reservation?.therapyType || 'Procedimento não definido',
-          professionalName: reservation?.professional?.name || reservation?.professionalName || 'Profissional não definido',
-          weeklyFrequency: Math.max(1, Number(reservation?.preferences?.weeklyFrequency || 1)),
-          preferredWeekdays: Array.isArray(reservation?.preferences?.weekdays) ? reservation.preferences.weekdays : [],
-          preferredShift: reservation?.preferences?.shift || undefined,
-          durationMinutes: reservation?.procedure?.durationMinutes || null,
-        },
-        slots: [{ date: suggestedDate, time: suggestedTime }],
+      const existing = uniqueTherapies.get(pitTherapyId);
+      if (!existing) {
+        uniqueTherapies.set(pitTherapyId, {
+          therapy: {
+            pitTherapyId,
+            procedureName: reservation?.procedure?.name || reservation?.procedureName || reservation?.therapyType || 'Procedimento não definido',
+            professionalName: reservation?.professional?.name || reservation?.professionalName || 'Profissional não definido',
+            weeklyFrequency: Math.max(1, Number(reservation?.preferences?.weeklyFrequency || 1)),
+            preferredWeekdays: Array.isArray(reservation?.preferences?.weekdays) ? reservation.preferences.weekdays : [],
+            preferredShift: reservation?.preferences?.shift || undefined,
+            durationMinutes: reservation?.procedure?.durationMinutes || null,
+          },
+          slots: normalizedSlots,
+        });
+        return;
+      }
+
+      normalizedSlots.forEach((slot) => {
+        const signature = `${slot.date}#${slot.time}`;
+        const alreadyExists = existing.slots.some((existingSlot) => `${existingSlot.date}#${existingSlot.time}` === signature);
+        if (!alreadyExists) {
+          existing.slots.push(slot);
+        }
       });
     });
 
@@ -1376,13 +1341,13 @@ export function TeaPreReserva() {
         return;
       }
 
-      const procedureOptions = Array.from(new Set(eligibleAnchors.map((item) => getReservationProcedureName(item))));
+      const procedureOptions = Array.from(new Set(eligibleReservations.map((item) => getReservationProcedureName(item))));
 
       setChecklistLoading(true);
       setChecklistModalOpened(true);
       setChecklistGroupKey(group.groupKey);
       setChecklistGroupLabel(`${group.patientName} • PIT`);
-      setChecklistGroupReservations(eligibleAnchors);
+      setChecklistGroupReservations(eligibleReservations);
       setChecklistProcedureOptions(procedureOptions);
       setSelectedChecklistProcedure(procedureOptions[0] || null);
       setConversionReservationIds([]);
@@ -1821,8 +1786,18 @@ export function TeaPreReserva() {
   }, [manualTimeRows]);
 
   const manualWeeklyLimit = useMemo(
-    () => Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1)),
-    [manualSelectedTherapy],
+    () => {
+      if (!manualSelectedTherapyId) return 0;
+      const weeklyFrequency = Math.max(1, Number(manualSelectedTherapy?.weeklyFrequency || 1));
+      const existingSlots = manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || [];
+      const existingWeeklyCount = buildWeeklySlotSignatures(existingSlots).length;
+      const previousWeeklyFrequency = Math.max(0, Number(manualSelectedTherapy?.previousWeeklyFrequency || 0));
+      const baselineReserved = String(manualSelectedTherapy?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+        ? Math.max(existingWeeklyCount, previousWeeklyFrequency)
+        : existingWeeklyCount;
+      return Math.max(0, weeklyFrequency - baselineReserved);
+    },
+    [manualEditableExistingSlotsByTherapyId, manualSelectedTherapy, manualSelectedTherapyId],
   );
 
   const manualSelectedSessionCount = useMemo(
@@ -2044,7 +2019,7 @@ export function TeaPreReserva() {
     setManualWeekStart(dayjs().startOf('week').add(1, 'day').format('YYYY-MM-DD'));
     setManualSelectedTherapyId(firstTherapyId);
     setManualEditableExistingSlotsByTherapyId(existingSlotsByTherapy);
-    setManualSelectedSlots(firstTherapyId ? [...(existingSlotsByTherapy[firstTherapyId] || [])] : []);
+    setManualSelectedSlots([]);
     setManualModalOpened(true);
     await loadManualGridForContext(context, dayjs().startOf('week').add(1, 'day').format('YYYY-MM-DD'));
   };
@@ -2052,6 +2027,14 @@ export function TeaPreReserva() {
   const handleManualConfirmReservation = async () => {
     if (!manualContext || !manualSelectedTherapy) {
       showNotification({ title: 'Atenção', message: 'Selecione uma terapia para continuar.', color: 'yellow' });
+      return;
+    }
+    if (manualWeeklyLimit <= 0) {
+      showNotification({
+        title: 'Nada pendente',
+        message: 'Esta terapia já possui todos os horários semanais necessários.',
+        color: 'yellow',
+      });
       return;
     }
     if (!manualSelectedSlots.length) {
@@ -2074,13 +2057,17 @@ export function TeaPreReserva() {
       });
       return;
     }
+    if (sessionAnchors.length > manualWeeklyLimit) {
+      showNotification({
+        title: 'Limite semanal atingido',
+        message: `Selecione no máximo ${manualWeeklyLimit} horário(s) faltante(s) para esta terapia.`,
+        color: 'yellow',
+      });
+      return;
+    }
 
     const firstDate = sessionAnchors[0]?.date;
     const weeks = getWeeksUntilYearEnd(firstDate);
-    const hasEditableExistingSeries = Boolean(
-      manualSelectedTherapy
-      && (manualEditableExistingSlotsByTherapyId[manualSelectedTherapy.pitTherapyId] || []).length > 0,
-    );
 
     setManualReservationDecisionState({
       groupKey: manualContext.groupKey,
@@ -2088,7 +2075,7 @@ export function TeaPreReserva() {
       durationMinutes: manualSelectedTherapy.durationMinutes ?? null,
       sessionAnchors,
       recurrenceWeeks: weeks,
-      hasEditableExistingSeries,
+      hasEditableExistingSeries: false,
     });
     setManualAcceptDecisionOpened(true);
   };
@@ -2106,7 +2093,7 @@ export function TeaPreReserva() {
         recurringUntilDate,
         expiresAt: dayjs().add(2, 'day').toISOString(),
         status: targetStatus,
-        replaceExistingByTherapy: manualReservationDecisionState.hasEditableExistingSeries,
+        replaceExistingByTherapy: false,
         items: manualReservationDecisionState.sessionAnchors.map((slot) => ({
           pitTherapyId: manualReservationDecisionState.pitTherapyId,
           suggestedDate: slot.date,
@@ -2167,6 +2154,8 @@ export function TeaPreReserva() {
         procedureName: item?.procedure?.name || 'Procedimento não definido',
         professionalName: item?.professional?.name || 'Profissional não definido',
         weeklyFrequency: Number(item?.preferences?.weeklyFrequency || 1),
+        previousWeeklyFrequency: Number(item?.previousWeeklyFrequency || 0),
+        source: String(item?.source || ''),
         preferredWeekdays: Array.isArray(item?.preferences?.weekdays) ? item.preferences.weekdays : [],
         preferredShift: item?.preferences?.shift || undefined,
         durationMinutes: item?.procedure?.durationMinutes || null,
@@ -2206,17 +2195,32 @@ export function TeaPreReserva() {
       const pitTherapyId = String(item?.pitTherapyId || item?.preReservationId || '');
       if (!pitTherapyId) return;
 
-      const suggestedDateRaw = item?.slotSuggestion?.suggestedDate || item?.suggestedDate;
-      const suggestedDate = normalizeDateToIso(suggestedDateRaw);
-      const suggestedTime = String(item?.slotSuggestion?.suggestedTime || item?.suggestedTime || '').trim();
-      if (!suggestedDate || !suggestedTime) return;
+      const appendSlot = (dateRaw: string, timeRaw: string) => {
+        const suggestedDate = normalizeDateToIso(dateRaw);
+        const suggestedTime = String(timeRaw || '').trim();
+        if (!suggestedDate || !suggestedTime) return;
 
-      if (!byTherapy[pitTherapyId]) byTherapy[pitTherapyId] = [];
-      const signature = `${suggestedDate}#${suggestedTime}`;
-      const alreadyExists = byTherapy[pitTherapyId].some((slot) => `${slot.date}#${slot.time}` === signature);
-      if (!alreadyExists) {
-        byTherapy[pitTherapyId].push({ date: suggestedDate, time: suggestedTime });
-      }
+        if (!byTherapy[pitTherapyId]) byTherapy[pitTherapyId] = [];
+        const signature = `${suggestedDate}#${suggestedTime}`;
+        const alreadyExists = byTherapy[pitTherapyId].some((slot) => `${slot.date}#${slot.time}` === signature);
+        if (!alreadyExists) {
+          byTherapy[pitTherapyId].push({ date: suggestedDate, time: suggestedTime });
+        }
+      };
+
+      const weeklyPatternSlots = Array.isArray(item?.weeklySlotPattern)
+        ? item.weeklySlotPattern
+        : [];
+      weeklyPatternSlots.forEach((patternSlot: any) => {
+        appendSlot(
+          String(patternSlot?.date || patternSlot?.suggestedDate || ''),
+          String(patternSlot?.time || patternSlot?.suggestedTime || ''),
+        );
+      });
+
+      const suggestedDateRaw = item?.slotSuggestion?.suggestedDate || item?.suggestedDate;
+      const suggestedTimeRaw = item?.slotSuggestion?.suggestedTime || item?.suggestedTime;
+      appendSlot(String(suggestedDateRaw || ''), String(suggestedTimeRaw || ''));
     });
 
     return byTherapy;
@@ -2395,7 +2399,12 @@ export function TeaPreReserva() {
               .filter((slot) => slot?.date && slot?.time)
               .map((slot) => `${slot.date}#${slot.time}`),
           ));
-          const missingWeeklySlots = Math.max(0, weeklyFrequency - existingSignatures.length);
+          const existingWeeklySignatures = buildWeeklySlotSignatures(existingBase);
+          const previousWeeklyFrequency = Math.max(0, Number(therapy?.previousWeeklyFrequency || 0));
+          const baselineReserved = String(therapy?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+            ? Math.max(existingWeeklySignatures.length, previousWeeklyFrequency)
+            : existingWeeklySignatures.length;
+          const missingWeeklySlots = Math.max(0, weeklyFrequency - baselineReserved);
 
           if (missingWeeklySlots <= 0) {
             return {
@@ -2434,9 +2443,7 @@ export function TeaPreReserva() {
 
       const nextByTherapyId: Record<string, Array<{ date: string; time: string }>> = {};
       results.forEach((result) => {
-        const existingBase = options?.existingSlotsByTherapy?.[result.pitTherapyId] || [];
-        const combined = [...existingBase, ...result.list];
-        nextByTherapyId[result.pitTherapyId] = combined.filter(
+        nextByTherapyId[result.pitTherapyId] = result.list.filter(
           (slot, idx, arr) => arr.findIndex((it) => it.date === slot.date && it.time === slot.time) === idx,
         );
       });
@@ -3050,18 +3057,47 @@ export function TeaPreReserva() {
           <Stack gap={6}>
             {acceptTherapies.map((entry) => {
               const allDates = Array.from(new Set(entry.slots.map((s) => s.date))).sort((a,b)=>dayjs(a).valueOf()-dayjs(b).valueOf());
-              const dates = acceptModalMode === 'conversion'
-                ? buildPreferredWeekdayPreviewDates(allDates[0], entry.therapy.preferredWeekdays, 8)
-                : buildRecurringPreviewDates(allDates, 5);
-              const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dates[0] || '';
+              const dates = buildRecurringPreviewDates(allDates, 6);
+              const timeByWeekday = new Map<number, string>();
+              [...entry.slots]
+                .sort((a, b) => {
+                  const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+                  if (dateDiff !== 0) return dateDiff;
+                  return String(a.time).localeCompare(String(b.time));
+                })
+                .forEach((slot) => {
+                  const weekday = dayjs(slot.date).day();
+                  if (!timeByWeekday.has(weekday)) {
+                    timeByWeekday.set(weekday, String(slot.time || '09:00'));
+                  }
+                });
+              const dateOptions = dates.map((d) => {
+                const fallbackTime = entry.slots[0]?.time || '09:00';
+                const labelTime = timeByWeekday.get(dayjs(d).day()) || fallbackTime;
+                return {
+                  value: d,
+                  label: `${formatWeekdayPt(d)} • ${dayjs(d).format('DD/MM/YYYY')} • ${labelTime}`,
+                };
+              });
+              const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dateOptions[0]?.value || '';
               
-              // In conversion mode, calculate directly from weeklyFrequency
-              // In suggestion mode, resolve from generated suggestions
+              // In conversion mode, use the actual marked slots for this therapy.
+              // In suggestion mode, use resolved suggestions from the chosen start date.
               const selectedWeeklySlots = acceptModalMode === 'conversion'
-                ? buildWeeklySlotsFromPreferences(
-                    selectedDate || dayjs().format('YYYY-MM-DD'),
-                    entry.therapy.preferredWeekdays,
-                    entry.therapy.weeklyFrequency || 1,
+                ? Array.from(
+                    new Map(
+                      [...entry.slots]
+                        .filter((slot) => !selectedDate || !dayjs(slot.date).isBefore(dayjs(selectedDate), 'day'))
+                        .sort((a, b) => {
+                          const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+                          if (dateDiff !== 0) return dateDiff;
+                          return String(a.time).localeCompare(String(b.time));
+                        })
+                        .map((slot) => {
+                          const weekday = dayjs(slot.date).day();
+                          return [`${weekday}#${slot.time}`, { date: slot.date, time: slot.time } as { date: string; time: string }];
+                        }),
+                    ).values(),
                   )
                 : resolveTherapySlotsForAcceptance(entry.therapy, selectedDate);
               
@@ -3078,7 +3114,7 @@ export function TeaPreReserva() {
                     <Select
                       size="xs"
                       style={{ minWidth: 260 }}
-                      data={dates.map((d) => ({ value: d, label: `${formatWeekdayPt(d)} • ${dayjs(d).format('DD/MM/YYYY')}` }))}
+                      data={dateOptions}
                       value={selectedDate}
                       onChange={(v) => {
                         if (!v) return;
@@ -3165,7 +3201,7 @@ export function TeaPreReserva() {
               value={manualSelectedTherapyId}
               onChange={(value) => {
                 setManualSelectedTherapyId(value);
-                setManualSelectedSlots(value ? [...(manualEditableExistingSlotsByTherapyId[value] || [])] : []);
+                setManualSelectedSlots([]);
               }}
             />
           </Group>
@@ -3817,6 +3853,11 @@ export function TeaPreReserva() {
                       const hasRemovedTherapyAlert = removedTherapies.length > 0;
                       const hasFrequencyChangeAlert = frequencyChangedTherapies.length > 0;
                       const canScheduleGroup = groupContext.therapies.length > 0;
+                      const existingSlotsByTherapy = buildExistingSlotsByTherapyFromReservations([
+                        ...(group.therapies || []),
+                        ...existingReservationsWithoutDuplicates,
+                        ...completedReservationsWithoutDuplicates,
+                      ]);
                       const hasSchedulableTherapiesInPending = group.therapies.some((item) => {
                         const status = String(item?.status || '');
                         if (status === 'PENDING_SCHEDULING') return true;
@@ -3994,7 +4035,10 @@ export function TeaPreReserva() {
                                   size="xs"
                                   variant="light"
                                   loading={loadingSuggestionsId === group.groupKey}
-                                  onClick={() => handleLoadGroupSuggestions(groupContext)}
+                                  onClick={() => handleLoadGroupSuggestions(groupContext, {
+                                    existingSlotsByTherapy,
+                                    daysAhead: 90,
+                                  })}
                                   disabled={!canScheduleGroup}
                                 >
                                   Sugerir horários automáticos
@@ -4005,7 +4049,9 @@ export function TeaPreReserva() {
                                   size="xs"
                                   bg={DARK_BLUE}
                                   loading={updatingId === group.groupKey}
-                                  onClick={() => openManualProposalModal(groupContext)}
+                                  onClick={() => openManualProposalModal(groupContext, {
+                                    existingSlotsByTherapy,
+                                  })}
                                   disabled={!canScheduleGroup}
                                 >
                                   Criar proposta manual
