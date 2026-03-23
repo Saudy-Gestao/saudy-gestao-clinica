@@ -26,12 +26,14 @@ import {
   ClipboardList,
   ListChecks,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
+import teaProfileService from '../../services/teaProfileService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 
 const STATUS_OPTIONS: Array<{ value: TeaPreReservationStatus; label: string }> = [
@@ -496,6 +498,8 @@ export function TeaPreReserva() {
   const [selectedChecklistProcedure, setSelectedChecklistProcedure] = useState<string | null>(null);
   const [acceptModalOpened, setAcceptModalOpened] = useState(false);
   const [acceptModalMode, setAcceptModalMode] = useState<'suggestion' | 'conversion'>('suggestion');
+  const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
+  const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; groupKey: string } | null>(null);
   useEffect(() => {
     if (!acceptModalOpened) {
       setAcceptModalStartDate('');
@@ -1056,6 +1060,7 @@ export function TeaPreReserva() {
     const isPartiallyReserved = pitProgress?.stage === 'RESERVADO_PARCIAL';
     const suggestionContext = buildGroupContextFromReservations(group);
     const existingSlotsByTherapy = buildExistingSlotsByTherapyFromReservations(group.reservations);
+    const teaProfileId = String(group.reservations[0]?.teaProfileId || group.reservations[0]?.pitId || group.pitId || '');
     const isGroupFullyConverted = group.reservations.length > 0
       && group.reservations.every((item) => String(item?.status || '') === 'CONVERTED');
     const hasReservedReservations = group.reservations.some((item) => String(item?.status || '') === 'RESERVED');
@@ -1256,6 +1261,11 @@ export function TeaPreReserva() {
         setUpdatingId(null);
       }
     }
+
+    async function handleDeletePit() {
+      await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey);
+    }
+
     return (
       <Paper key={group.groupKey} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
         <Stack gap={8}>
@@ -1320,6 +1330,17 @@ export function TeaPreReserva() {
                 Criar proposta manual
               </Button>
             )}
+            <Button
+              color="red"
+              variant="light"
+              h={36}
+              leftSection={<Trash2 size={16} />}
+              onClick={handleDeletePit}
+              loading={updatingId === group.groupKey}
+              disabled={!teaProfileId}
+            >
+              Excluir PIT
+            </Button>
             <Button
               variant="default"
               h={36}
@@ -1611,6 +1632,51 @@ export function TeaPreReserva() {
           });
         });
       }
+    }
+  };
+
+  const handleDeletePitByTeaProfileId = async (teaProfileId: string, groupKey: string) => {
+    if (!teaProfileId) {
+      showNotification({
+        title: 'PIT inválido',
+        message: 'Não foi possível identificar o perfil TEA para excluir este PIT.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setDeletePitTarget({ teaProfileId, groupKey });
+    setDeletePitConfirmModalOpened(true);
+  };
+
+  const confirmDeletePit = async () => {
+    if (!deletePitTarget?.teaProfileId || !deletePitTarget?.groupKey) {
+      setDeletePitConfirmModalOpened(false);
+      setDeletePitTarget(null);
+      return;
+    }
+
+    const { teaProfileId, groupKey } = deletePitTarget;
+
+    setUpdatingId(groupKey);
+    try {
+      await teaProfileService.deletePit(teaProfileId);
+      showNotification({
+        title: 'Sucesso',
+        message: 'PIT excluído com sucesso.',
+        color: 'green',
+      });
+      setDeletePitConfirmModalOpened(false);
+      setDeletePitTarget(null);
+      await loadPending();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        color: 'red',
+      });
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -2996,6 +3062,43 @@ export function TeaPreReserva() {
       </Modal>
 
       <Modal
+        opened={deletePitConfirmModalOpened}
+        onClose={() => {
+          if (updatingId) return;
+          setDeletePitConfirmModalOpened(false);
+          setDeletePitTarget(null);
+        }}
+        title="Excluir PIT"
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Deseja realmente excluir este PIT? As pré-reservas abertas vinculadas a ele serão canceladas.
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setDeletePitConfirmModalOpened(false);
+                setDeletePitTarget(null);
+              }}
+              disabled={!!updatingId}
+            >
+              Voltar
+            </Button>
+            <Button
+              color="red"
+              onClick={confirmDeletePit}
+              loading={!!updatingId && !!deletePitTarget && updatingId === deletePitTarget.groupKey}
+            >
+              Confirmar exclusão
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
         opened={checklistModalOpened}
         onClose={() => setChecklistModalOpened(false)}
         title={`Checklist pré-conversão • ${checklistGroupLabel || 'PIT'}`}
@@ -3162,6 +3265,7 @@ export function TeaPreReserva() {
                       const completedGroupForSamePit = completedReservationsByGroupKey.get(group.groupKey);
                       const completedCount = completedGroupForSamePit?.reservations?.length || 0;
                       const groupContext = buildGroupContextFromItems(group);
+                      const groupTeaProfileId = String(group.therapies[0]?.teaProfileId || group.therapies[0]?.pitId || '');
                       const removedTherapies = group.therapies.filter((item) => Boolean(item?.removedFromPit));
                       const frequencyChangedTherapies = group.therapies.filter((item) => String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE');
                       const hasRemovedTherapyAlert = removedTherapies.length > 0;
@@ -3288,12 +3392,23 @@ export function TeaPreReserva() {
                               >
                                 Criar proposta manual
                               </Button>
+                              <Button
+                                size="xs"
+                                color="red"
+                                variant="light"
+                                leftSection={<Trash2 size={14} />}
+                                loading={updatingId === group.groupKey}
+                                onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey)}
+                                disabled={!groupTeaProfileId}
+                              >
+                                Excluir PIT
+                              </Button>
                               {hasRemovedTherapyAlert && (
                                 <Button
                                   size="xs"
                                   variant="outline"
                                   color="orange"
-                                  onClick={() => navigate('/tea/desmarcacao-lote')}
+                                  onClick={() => navigate(`/tea/desmarcacao-lote?teaProfileId=${encodeURIComponent(String(group.therapies[0]?.teaProfileId || ''))}`)}
                                 >
                                   Desmarcar terapia removida
                                 </Button>

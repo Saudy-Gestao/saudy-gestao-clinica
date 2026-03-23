@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Group,
@@ -39,6 +39,7 @@ type CancellationScope = 'single' | 'all';
 
 export function TeaDesmarcacaoLote() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
 
@@ -110,6 +111,12 @@ export function TeaDesmarcacaoLote() {
   useEffect(() => {
     loadTeaProfiles();
   }, []);
+
+  useEffect(() => {
+    const queryTeaProfileId = String(searchParams.get('teaProfileId') || '').trim();
+    if (!queryTeaProfileId) return;
+    setSelectedTeaProfileId((prev) => prev || queryTeaProfileId);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!selectedTeaProfileId) {

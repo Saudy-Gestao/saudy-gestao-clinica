@@ -90,7 +90,6 @@ export function TeaPIT() {
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deletingPit, setDeletingPit] = useState(false);
 
   const [title, setTitle] = useState('PIT - Plano Integrado de Terapias');
   const [startDate, setStartDate] = useState<Date | null>(new Date());
@@ -106,7 +105,6 @@ export function TeaPIT() {
   const [removeTherapyModalOpened, setRemoveTherapyModalOpened] = useState(false);
   const [removeTherapyTargetIndex, setRemoveTherapyTargetIndex] = useState<number | null>(null);
   const [removeTherapyAction, setRemoveTherapyAction] = useState<'KEEP_FUTURE_APPOINTMENTS' | 'CANCEL_FUTURE_APPOINTMENTS'>('KEEP_FUTURE_APPOINTMENTS');
-  const [deletePitModalOpened, setDeletePitModalOpened] = useState(false);
 
   const teaProfileOptions = useMemo(
     () => teaProfiles.map((it: any) => ({
@@ -361,30 +359,6 @@ export function TeaPIT() {
     }
   };
 
-  const handleDeletePit = async () => {
-    if (!selectedTeaProfileId) {
-      showNotification({ title: 'Atenção', message: 'Selecione um paciente TEA', color: 'yellow' });
-      return;
-    }
-
-    setDeletingPit(true);
-    try {
-      await teaProfileService.deletePit(selectedTeaProfileId);
-      showNotification({ title: 'Sucesso', message: 'PIT excluído com sucesso', color: 'green' });
-      setDeletePitModalOpened(false);
-      setSelectedTeaProfileId(null);
-      await loadTeaProfiles();
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
-        color: 'red',
-      });
-    } finally {
-      setDeletingPit(false);
-    }
-  };
-
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
@@ -599,40 +573,11 @@ export function TeaPIT() {
             </Stack>
 
             <Group justify="flex-end">
-              <Button
-                variant="outline"
-                color="red"
-                onClick={() => setDeletePitModalOpened(true)}
-                disabled={!selectedTeaProfileId || saving || deletingPit}
-              >
-                Excluir PIT
-              </Button>
-              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving || deletingPit}>Salvar PIT</Button>
+              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>Salvar PIT</Button>
             </Group>
           </Stack>
         </Paper>
       </Box>
-
-      <Modal
-        opened={deletePitModalOpened}
-        onClose={() => setDeletePitModalOpened(false)}
-        title="Excluir PIT"
-        centered
-      >
-        <Stack gap="sm">
-          <Text size="sm" c="dimmed">
-            Esta ação excluirá o PIT ativo do paciente e cancelará pré-reservas abertas vinculadas a ele.
-          </Text>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setDeletePitModalOpened(false)} disabled={deletingPit}>
-              Voltar
-            </Button>
-            <Button color="red" onClick={handleDeletePit} loading={deletingPit}>
-              Confirmar exclusão
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
 
       <Modal
         opened={removeTherapyModalOpened}
