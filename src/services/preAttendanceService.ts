@@ -2,6 +2,7 @@ import api from './api';
 
 export interface PreAttendancePayload {
   patientId?: string;
+  appointmentId?: string;
   fullName: string;
   cpf: string;
   birthDate?: string;

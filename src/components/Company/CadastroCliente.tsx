@@ -16,6 +16,7 @@ import {
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import companyService from '../../services/companyService';
+import { isValidEmail, normalizeEmail } from '../../utils/formatters';
 
 const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
 const BRANCH_QUOTAS_STORAGE_KEY = 'settings:branch-create-quotas';
@@ -82,7 +83,7 @@ export function CadastroCliente() {
         showNotification({ title: 'Erro', message: 'Nome do administrador é obrigatório', color: 'red' });
         return false;
       }
-      if (!adminEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) {
+      if (!isValidEmail(adminEmail)) {
         showNotification({ title: 'Erro', message: 'E-mail inválido', color: 'red' });
         return false;
       }
@@ -130,7 +131,7 @@ export function CadastroCliente() {
       const payload = {
         admin: {
           name: adminName.trim(),
-          email: adminEmail.trim(),
+          email: normalizeEmail(adminEmail),
           password: plainPassword,
         },
         company: {

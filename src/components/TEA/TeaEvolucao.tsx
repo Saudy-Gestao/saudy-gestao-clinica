@@ -196,7 +196,7 @@ export function TeaEvolucao() {
   const loadTeaProfiles = async () => {
     setLoading(true);
     try {
-      const data: any = await teaProfileService.list({ limit: 200, offset: 0, hasActivePit: true });
+      const data: any = await teaProfileService.list({ limit: 200, offset: 0 });
       const list: any[] = Array.isArray(data)
         ? data
         : (Array.isArray(data?.items) ? data.items : []);

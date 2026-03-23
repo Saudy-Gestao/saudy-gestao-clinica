@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers, Mic, MicOff, SpellCheck } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
@@ -129,6 +129,29 @@ const MOCK_EXAMS: ExamItem[] = [
       '<h3>Descrição</h3><p>Parênquima mamário de padrão fibroglândular. Sem nódulos suspeitos.</p><h3>Conclusão</h3><p>BI-RADS 2.</p>',
     issuerSignedAt: '22/02/2026 17:20',
     reviewerSignedAt: '22/02/2026 17:48',
+  },
+  {
+    id: 'EX-004',
+    patientName: 'Carlos Alberto Ferreira',
+    cpf: '444.555.666-77',
+    examType: 'Tomografia de crânio',
+    scheduledAt: '20/03/2026 08:30',
+    convenio: 'Unimed',
+    requestingDoctor: 'Dr. Rafael Mendonça',
+    assignedTo: 'Dra. Priscila Vaz',
+    priority: 'urgente',
+    status: 'revisado',
+    reportText: `<h3>Descrição</h3>
+<p>Exame realizado sem a administração de meio de contraste endovenoso.</p>
+<p>Parênquima encefálico com coeficientes de atenuação preservados. Não são identificadas áreas de hiperdensidade ou hipodensidade parenquimatosa sugestivas de sangramento agudo ou lesão isquêmica estabelecida.</p>
+<p>Sistema ventricular de morfologia e dimensões normais para a faixa etária. Sulcos corticais presentes e simétricos, sem evidência de apagamento.</p>
+<p>Estruturas da linha média centradas. Sela turca sem alterações. Cisternas basais pérvias.</p>
+<p>Órbitas, seios paranasais e mastoides com aspecto habitual. Partes moles do couro cabeludo sem alterações.</p>
+<h3>Conclusão</h3>
+<p>Tomografia computadorizada de crânio sem contraste <strong>sem alterações agudas</strong> ao presente exame. Correlacionar com o quadro clínico.</p>
+<h3>Observações</h3>
+<p>Sugere-se complementação com ressonância magnética caso a suspeita clínica de lesão de partes moles ou processo desmielinizante persista.</p>`,
+    issuerSignedAt: '20/03/2026 09:15',
   },
 ];
 
@@ -366,10 +389,165 @@ export function LaudoExames() {
   const [addendumSaving, setAddendumSaving] = useState(false);
   const [addendumFinalizing, setAddendumFinalizing] = useState(false);
   const [savingLaudo, setSavingLaudo] = useState(false);
+  const [spellCheckModalOpen, setSpellCheckModalOpen] = useState(false);
+  const [spellCheckLoading, setSpellCheckLoading] = useState(false);
   const [finalizePasswordModalOpen, setFinalizePasswordModalOpen] = useState(false);
   const [finalizePassword, setFinalizePassword] = useState('');
   const [finalizeTarget, setFinalizeTarget] = useState<'laudo' | 'adendo' | null>(null);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
+
+  // ===== Ditado por voz =====
+  const [isDictating, setIsDictating] = useState(false);
+  const [dictationSupported] = useState(() => {
+    return typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  });
+  const recognitionRef = useRef<any>(null);
+  const shouldRestartRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consecutiveNetworkFailsRef = useRef(0);
+  const sessionStartedAtRef = useRef<number>(0);
+
+  const createRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      consecutiveNetworkFailsRef.current = 0; // reset ao receber resultado
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        }
+      }
+      if (finalTranscript) {
+        if (editorRef.current) {
+          editorRef.current.insertContent(finalTranscript);
+          setEditorContent(editorRef.current.getContent());
+        } else {
+          setEditorContent((prev) => prev + finalTranscript);
+        }
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return;
+      }
+      if (event.error === 'network') {
+        consecutiveNetworkFailsRef.current += 1;
+        recognitionRef.current = null; // impede onend de reiniciar diretamente
+
+        const elapsed = Date.now() - sessionStartedAtRef.current;
+        const isInstantFail = elapsed < 2000 && consecutiveNetworkFailsRef.current >= 3;
+
+        if (isInstantFail || consecutiveNetworkFailsRef.current > 8) {
+          // Muitas falhas instantâneas = problema real de conexão ou permissão
+          shouldRestartRef.current = false;
+          setIsDictating(false);
+          consecutiveNetworkFailsRef.current = 0;
+          showNotification({
+            title: 'Serviço de voz indisponível',
+            message: 'Não foi possível usar o reconhecimento de voz. Certifique-se de que o microfone está permitido e a internet está funcionando.',
+            color: 'orange',
+            autoClose: 7000,
+          });
+          return;
+        }
+
+        // Falha transitória (sessão expirou no Chrome, etc.) — reconecta silenciosamente
+        if (shouldRestartRef.current) {
+          const delay = Math.min(500 * consecutiveNetworkFailsRef.current, 3000);
+          sessionStartedAtRef.current = Date.now();
+          restartTimerRef.current = setTimeout(() => {
+            if (shouldRestartRef.current) {
+              const r = createRecognition();
+              recognitionRef.current = r;
+              try { r.start(); } catch { /* ignore */ }
+            }
+          }, delay);
+        }
+        return;
+      }
+      // outros erros desconhecidos
+      shouldRestartRef.current = false;
+      recognitionRef.current = null;
+      setIsDictating(false);
+      showNotification({ title: 'Erro no ditado', message: `Erro: ${event.error}`, color: 'red' });
+    };
+
+    recognition.onend = () => {
+      if (shouldRestartRef.current && recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch { /* ignore */ }
+      }
+    };
+
+    return recognition;
+  };
+
+  const startDictation = () => {
+    if (!dictationSupported) {
+      showNotification({ title: 'Não suportado', message: 'Seu navegador não suporta ditado por voz. Use Chrome ou Edge.', color: 'orange' });
+      return;
+    }
+    consecutiveNetworkFailsRef.current = 0;
+    sessionStartedAtRef.current = Date.now();
+    shouldRestartRef.current = true;
+    const recognition = createRecognition();
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsDictating(true);
+    showNotification({ title: 'Ditado iniciado', message: 'Fale agora. O texto será inserido no editor em tempo real.', color: 'green' });
+  };
+
+  const stopDictation = () => {
+    shouldRestartRef.current = false;
+    consecutiveNetworkFailsRef.current = 0;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsDictating(false);
+    showNotification({ title: 'Ditado encerrado', message: 'Gravação parada.', color: 'gray' });
+  };
+
+  const toggleDictation = () => {
+    if (isDictating) stopDictation();
+    else startDictation();
+  };
+
+  const handleSpellCheck = async () => {
+    const html = editorRef.current ? editorRef.current.getContent() : editorContent;
+    if (!html || html.replace(/<[^>]*>/g, '').trim().length === 0) {
+      showNotification({ title: 'Editor vazio', message: 'Digite algo antes de corrigir.', color: 'orange' });
+      return;
+    }
+    setSpellCheckLoading(true);
+    try {
+      const { correctedHtml } = await reportService.spellCheck(html);
+      if (editorRef.current) {
+        editorRef.current.setContent(correctedHtml);
+        setEditorContent(editorRef.current.getContent());
+      } else {
+        setEditorContent(correctedHtml);
+      }
+      showNotification({ title: 'Correção aplicada', message: 'O texto foi corrigido com sucesso.', color: 'green' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao corrigir o texto.';
+      showNotification({ title: 'Erro na correção', message: msg, color: 'red' });
+    } finally {
+      setSpellCheckLoading(false);
+      setSpellCheckModalOpen(false);
+    }
+  };
+  // ===========================
 
   const requestSignature = (role: 'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer') => {
     setSignRolePending(role);
@@ -453,19 +631,22 @@ export function LaudoExames() {
               : []));
 
         setExamRows(reports.map(mapApiToExam).filter((item: ExamItem) => item.id));
-        setTemplates(templatesList.map((item: any) => ({
+        const mappedTemplates = templatesList.map((item: any) => ({
           id: String(item.id || ''),
           name: item.name || '',
           examType: item.examType || '',
           group: item.group || 'Outros',
           content: item.content || TEMPLATE_TEXT,
-        })).filter((item: ReportTemplate) => item.id));
-        setPhrases(phrasesList.map((item: any) => ({
+        })).filter((item: ReportTemplate) => item.id);
+        setTemplates(mappedTemplates.length > 0 ? mappedTemplates : MOCK_REPORT_TEMPLATES);
+
+        const mappedPhrases = phrasesList.map((item: any) => ({
           id: String(item.id || ''),
           examType: item.examType || '',
           label: item.label || '',
           text: item.text || '',
-        })).filter((item: ReportPhrase) => item.id));
+        })).filter((item: ReportPhrase) => item.id);
+        setPhrases(mappedPhrases.length > 0 ? mappedPhrases : MOCK_REPORT_PHRASES);
         setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
       } catch (err: any) {
         setExamRows(MOCK_EXAMS);
@@ -780,6 +961,18 @@ export function LaudoExames() {
   };
 
   const closeModal = () => {
+    // parar ditado se estiver ativo
+    shouldRestartRef.current = false;
+    consecutiveNetworkFailsRef.current = 0;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsDictating(false);
     setModalOpen(false);
     setTemplatePickerModalOpen(false);
     setPdfPreviewModalOpen(false);
@@ -1720,6 +1913,31 @@ export function LaudoExames() {
                         zIndex: 10,
                       }}
                     >
+                      <Tooltip label={isDictating ? 'Parar ditado' : 'Ditar laudo por voz'} position="bottom" withArrow>
+                        <ActionIcon
+                          variant={isDictating ? 'filled' : 'default'}
+                          color={isDictating ? 'red' : undefined}
+                          size="md"
+                          radius="md"
+                          style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)', animation: isDictating ? 'pulse 1.2s infinite' : undefined }}
+                          onClick={toggleDictation}
+                          disabled={selectedExam?.status === 'finalizado'}
+                        >
+                          {isDictating ? <MicOff size={16} /> : <Mic size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Correção ortográfica" position="bottom" withArrow>
+                        <ActionIcon
+                          variant="default"
+                          size="md"
+                          radius="md"
+                          style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                          onClick={() => setSpellCheckModalOpen(true)}
+                          disabled={selectedExam?.status === 'finalizado'}
+                        >
+                          <SpellCheck size={16} />
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label={toolsExpanded ? "Ocultar ferramentas" : "Mostrar ferramentas"} position="bottom" withArrow>
                         <ActionIcon
                           variant="default"
@@ -2307,6 +2525,39 @@ export function LaudoExames() {
               </Button>
               <Button bg={DARK_BLUE} c="white" onClick={confirmFinalizeWithPassword} loading={finalizeLoading} leftSection={<ShieldCheck size={16} />}>
                 Confirmar finalizacao
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        {/* Modal Correção Ortográfica */}
+        <Modal
+          opened={spellCheckModalOpen}
+          onClose={() => setSpellCheckModalOpen(false)}
+          title="Correção Ortográfica"
+          centered
+          size="sm"
+        >
+          <Stack mt={"xs"} gap="md">
+            <Text size="sm">
+              Deseja realizar a correção ortográfica e gramatical no texto do laudo?
+            </Text>
+            <Text size="xs" c="dimmed">
+              O texto será analisado por IA e erros de escrita serão corrigidos automaticamente.
+              A formatação e termos médicos serão preservados.
+            </Text>
+            <Group justify="flex-end" gap="sm">
+              <Button variant="default" onClick={() => setSpellCheckModalOpen(false)} disabled={spellCheckLoading}>
+                Não
+              </Button>
+              <Button
+                bg={DARK_BLUE}
+                c="white"
+                leftSection={<SpellCheck size={16} />}
+                onClick={handleSpellCheck}
+                loading={spellCheckLoading}
+              >
+                Sim, corrigir
               </Button>
             </Group>
           </Stack>

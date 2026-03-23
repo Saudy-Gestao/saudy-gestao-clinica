@@ -45,4 +45,9 @@ export default {
     const res = await api.delete(url);
     return res.data;
   },
+
+  async spellCheck(html: string): Promise<{ correctedHtml: string }> {
+    const res = await api.post('/care/spell-check', { html });
+    return res.data;
+  },
 };

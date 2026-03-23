@@ -14,15 +14,17 @@ import {
   Table,
   Text,
   TextInput,
+  Modal,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, RefreshCcw, ShieldCheck, Upload, X } from 'lucide-react';
+import { ChevronLeft, RefreshCcw, ShieldCheck, Upload } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import convenioAuthorizationService, {
+  type ConvenioAuthorizationAttachment,
   type ConvenioAuthorizationSourceType,
   type ConvenioAuthorizationStatus,
 } from '../../services/convenioAuthorizationService';
@@ -33,6 +35,8 @@ type AuthorizationItem = {
   sourceLabel: string;
   patientName: string;
   patientCpf?: string;
+  insuranceType?: 'CONVENIO' | 'PARTICULAR';
+  insuranceName?: string;
   procedureName?: string;
   doctorName?: string;
   roomName?: string | null;
@@ -42,6 +46,8 @@ type AuthorizationItem = {
   notes?: string | null;
   updatedAt?: string;
   sessionsCount?: number;
+  attachmentsCount?: number;
+  attachments?: ConvenioAuthorizationAttachment[];
 };
 
 const STATUS_OPTIONS: Array<{ value: ConvenioAuthorizationStatus; label: string }> = [
@@ -56,10 +62,10 @@ const STATUS_COLOR: Record<ConvenioAuthorizationStatus, string> = {
   DENIED: 'red',
 };
 
-const sanitizeAuthorizationNotes = (value?: string | null) => (
-  String(value || '')
-    .replace(/\[AUTH_DENIED\]\s*/g, '')
-    .trim()
+const resolveInsuranceName = (item: AuthorizationItem): string => (
+  String(item.insuranceName || '').trim()
+  || (item.insuranceType === 'CONVENIO' ? 'Convênio' : 'Particular')
+  || 'Particular'
 );
 
 export function AutorizacaoConvenio() {
@@ -73,18 +79,38 @@ export function AutorizacaoConvenio() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
+  const [insuranceTypeFilter, setInsuranceTypeFilter] = useState<string[]>([]);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-  const [attachmentByRowKey, setAttachmentByRowKey] = useState<Record<string, string>>({});
-  const [, setAttachmentFileByRowKey] = useState<Record<string, File | null>>({});
+  const [uploadPreview, setUploadPreview] = useState<{
+    item: AuthorizationItem;
+    file: File;
+    objectUrl: string | null;
+  } | null>(null);
+
+  const filteredItems = useMemo(() => {
+    if (insuranceTypeFilter.length === 0) return items;
+    return items.filter((item) => insuranceTypeFilter.includes(resolveInsuranceName(item)));
+  }, [items, insuranceTypeFilter]);
+
+  const insuranceTypeOptions = useMemo(() => {
+    const unique = Array.from(new Set(items.map((item) => resolveInsuranceName(item)).filter(Boolean)));
+    const withoutParticular = unique
+      .filter((name) => name.toLowerCase() !== 'particular')
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const hasParticular = unique.some((name) => name.toLowerCase() === 'particular');
+    const ordered = hasParticular ? [...withoutParticular, 'Particular'] : withoutParticular;
+    return ordered.map((name) => ({ value: name, label: name }));
+  }, [items]);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
 
   const summary = useMemo(() => {
-    return items.reduce((acc, item) => {
+    return filteredItems.reduce((acc, item) => {
       if (item.status === 'PENDING') acc.pending += 1;
       if (item.status === 'AUTHORIZED') acc.authorized += 1;
       if (item.status === 'DENIED') acc.denied += 1;
       return acc;
     }, { pending: 0, authorized: 0, denied: 0 });
-  }, [items]);
+  }, [filteredItems]);
 
   const loadItems = async () => {
     setLoading(true);
@@ -114,30 +140,16 @@ export function AutorizacaoConvenio() {
     loadItems();
   }, [search, JSON.stringify(sourceFilter), JSON.stringify(statusFilter)]);
 
-  useEffect(() => {
-    setAttachmentByRowKey((prev) => {
-      const next = { ...prev };
-      items.forEach((item) => {
-        const rowKey = `${item.sourceType}-${item.id}`;
-        if (next[rowKey] === undefined) {
-          next[rowKey] = sanitizeAuthorizationNotes(item.notes);
-        }
-      });
-      return next;
-    });
-  }, [items]);
-
   const handleUpdateStatus = async (
     item: AuthorizationItem,
     status: ConvenioAuthorizationStatus,
   ) => {
     const rowKey = `${item.sourceType}-${item.id}`;
-    const attachment = String(attachmentByRowKey[rowKey] || '').trim();
     setUpdatingKey(rowKey);
     try {
       await convenioAuthorizationService.updateStatus(item.sourceType, item.id, {
         status,
-        notes: attachment || undefined,
+        notes: item.notes || undefined,
       });
       showNotification({
         title: 'Status atualizado',
@@ -156,14 +168,160 @@ export function AutorizacaoConvenio() {
     }
   };
 
-  const handleAttachmentSelect = (rowKey: string, file: File | null) => {
-    setAttachmentFileByRowKey((prev) => ({ ...prev, [rowKey]: file }));
-    setAttachmentByRowKey((prev) => ({ ...prev, [rowKey]: file ? file.name : '' }));
+  const fileToBase64 = async (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleAttachmentSelect = async (item: AuthorizationItem, file: File | null) => {
+    if (!file) return;
+    const rowKey = `${item.sourceType}-${item.id}`;
+    setUpdatingKey(rowKey);
+    try {
+      const fileBase64 = await fileToBase64(file);
+      await convenioAuthorizationService.uploadAttachment(item.sourceType, item.id, {
+        fileName: file.name,
+        fileBase64,
+        mimeType: file.type || undefined,
+      });
+      showNotification({
+        title: 'Anexo enviado',
+        message: `${file.name} anexado com sucesso.`,
+        color: 'green',
+      });
+      await loadItems();
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao anexar',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Falha ao anexar documento',
+        color: 'red',
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  };
+
+  const handleOpenAttachment = async (attachmentId: string) => {
+    setOpeningAttachmentId(attachmentId);
+    try {
+      const blob = await convenioAuthorizationService.viewAttachment(attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao abrir anexo',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        color: 'red',
+      });
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  };
+
+  const closeUploadPreview = () => {
+    setUploadPreview((prev) => {
+      if (prev?.objectUrl) {
+        URL.revokeObjectURL(prev.objectUrl);
+      }
+      return null;
+    });
+  };
+
+  const openUploadPreview = (item: AuthorizationItem, file: File | null) => {
+    if (!file) return;
+    const previewable = file.type.startsWith('image/') || file.type === 'application/pdf';
+    const objectUrl = previewable ? URL.createObjectURL(file) : null;
+    setUploadPreview({ item, file, objectUrl });
+  };
+
+  const confirmUploadPreview = () => {
+    if (!uploadPreview) return;
+    handleAttachmentSelect(uploadPreview.item, uploadPreview.file);
+    closeUploadPreview();
   };
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
+
+      <Modal
+        opened={Boolean(uploadPreview)}
+        onClose={closeUploadPreview}
+        title="Confirmar envio de documento"
+        centered
+        size="xl"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            Confira o documento selecionado antes de confirmar o envio.
+          </Text>
+
+          {uploadPreview && (
+            <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Stack gap={6}>
+                <Text size="sm" fw={600} lineClamp={1}>{uploadPreview.file.name}</Text>
+                <Text size="xs" c="dimmed">
+                  {(uploadPreview.file.size / 1024).toFixed(1)} KB
+                  {uploadPreview.file.type ? ` • ${uploadPreview.file.type}` : ''}
+                </Text>
+
+                {uploadPreview.objectUrl && uploadPreview.file.type.startsWith('image/') && (
+                  <Box
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 6,
+                      padding: 8,
+                      maxHeight: '60vh',
+                      overflow: 'auto',
+                    }}
+                  >
+                    <img
+                      src={uploadPreview.objectUrl}
+                      alt={uploadPreview.file.name}
+                      style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 4 }}
+                    />
+                  </Box>
+                )}
+
+                {uploadPreview.objectUrl && uploadPreview.file.type === 'application/pdf' && (
+                  <Box
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      height: '60vh',
+                    }}
+                  >
+                    <iframe
+                      src={uploadPreview.objectUrl}
+                      title={uploadPreview.file.name}
+                      style={{ width: '100%', height: '100%', border: 'none' }}
+                    />
+                  </Box>
+                )}
+
+                {!uploadPreview.objectUrl && (
+                  <Text size="sm" c="dimmed">
+                    Pré-visualização não disponível para este tipo de arquivo. Você pode confirmar o envio ou cancelar.
+                  </Text>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={closeUploadPreview}>
+              Cancelar envio
+            </Button>
+            <Button color="indigo" onClick={confirmUploadPreview} leftSection={<Upload size={14} />}>
+              Confirmar envio
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
         <Group justify="space-between" align="center" mb="md" wrap="wrap">
@@ -222,6 +380,14 @@ export function AutorizacaoConvenio() {
                 onChange={(value) => setStatusFilter(value as ConvenioAuthorizationStatus[])}
                 clearable
               />
+              <MultiSelect
+                label="Convênio"
+                placeholder="Filtrar convênio"
+                data={insuranceTypeOptions}
+                value={insuranceTypeFilter}
+                onChange={(value) => setInsuranceTypeFilter(value as string[])}
+                clearable
+              />
             </Group>
 
             {loading ? (
@@ -233,6 +399,7 @@ export function AutorizacaoConvenio() {
                     <Table.Tr>
                       <Table.Th>Origem</Table.Th>
                       <Table.Th>Paciente</Table.Th>
+                      <Table.Th>Convênio</Table.Th>
                       <Table.Th>Procedimento</Table.Th>
                       <Table.Th>Médico</Table.Th>
                       <Table.Th>Sala</Table.Th>
@@ -244,15 +411,16 @@ export function AutorizacaoConvenio() {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {items.length === 0 ? (
+                    {filteredItems.length === 0 ? (
                       <Table.Tr>
-                        <Table.Td colSpan={10}>
+                        <Table.Td colSpan={11}>
                           <Text size="sm" c="dimmed" ta="center" py="md">Nenhuma autorização encontrada</Text>
                         </Table.Td>
                       </Table.Tr>
                     ) : (
-                      items.map((item) => {
+                      filteredItems.map((item) => {
                         const rowKey = `${item.sourceType}-${item.id}`;
+                        const resolvedInsuranceName = resolveInsuranceName(item);
                         return (
                           <Table.Tr key={rowKey}>
                             <Table.Td>
@@ -265,6 +433,14 @@ export function AutorizacaoConvenio() {
                                 <Text size="sm" fw={600}>{item.patientName || '-'}</Text>
                                 {item.patientCpf && <Text size="xs" c="dimmed">{item.patientCpf}</Text>}
                               </Stack>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge
+                                variant="light"
+                                color={resolvedInsuranceName.toLowerCase() === 'particular' ? 'gray' : 'blue'}
+                              >
+                                {resolvedInsuranceName}
+                              </Badge>
                             </Table.Td>
                             <Table.Td><Text size="sm">{item.procedureName || '-'}</Text></Table.Td>
                             <Table.Td><Text size="sm">{item.doctorName || '-'}</Text></Table.Td>
@@ -322,26 +498,29 @@ export function AutorizacaoConvenio() {
                                     accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
                                     onChange={(e) => {
                                       const file = e.currentTarget.files?.[0] || null;
-                                      handleAttachmentSelect(rowKey, file);
+                                      openUploadPreview(item, file);
                                       e.currentTarget.value = '';
                                     }}
                                   />
                                 </Button>
-                                {attachmentByRowKey[rowKey] && (
-                                  <Group gap={4} wrap="nowrap">
-                                    <Text size="xs" c="dimmed" lineClamp={1}>{attachmentByRowKey[rowKey]}</Text>
+                                {(item.attachmentsCount || 0) > 0 && (
+                                  <Text size="xs" c="dimmed">{item.attachmentsCount} anexo(s)</Text>
+                                )}
+                                {(item.attachments || []).slice(0, 3).map((doc) => (
+                                  <Group key={doc.id} gap={4} wrap="nowrap">
+                                    <Text size="xs" c="dimmed" lineClamp={1}>{doc.fileName}</Text>
                                     <ActionIcon
                                       size="xs"
                                       variant="subtle"
-                                      color="gray"
-                                      onClick={() => handleAttachmentSelect(rowKey, null)}
-                                      disabled={updatingKey === rowKey}
-                                      title="Remover anexo"
+                                      color="blue"
+                                      onClick={() => handleOpenAttachment(doc.id)}
+                                      loading={openingAttachmentId === doc.id}
+                                      title="Visualizar anexo"
                                     >
-                                      <X size={12} />
+                                      <Upload size={12} />
                                     </ActionIcon>
                                   </Group>
-                                )}
+                                ))}
                               </Stack>
                             </Table.Td>
                           </Table.Tr>

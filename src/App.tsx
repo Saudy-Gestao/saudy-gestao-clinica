@@ -16,6 +16,8 @@ import { AdmRegister } from './components/Auth/AdmRegister';
 import { AdminHub } from './components/Admin/AdminHub';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
+import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
+import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
@@ -35,6 +37,7 @@ import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
+import { WhatsAppPage } from './components/Settings/WhatsAppPage';
 import { TeaEvolucao } from './components/TEA/TeaEvolucao';
 import { TeaPIT } from './components/TEA/TeaPIT';
 import { TeaRelatorios } from './components/TEA/TeaRelatorios';
@@ -112,6 +115,7 @@ function App() {
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route path="/check-in" element={<PublicCheckIn />} />
           <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
+          <Route path="/pre-agendamento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
@@ -128,13 +132,13 @@ function App() {
             path="/agendamento" 
             element={<ProtectedRoute><Agendamento /></ProtectedRoute>} 
           />
+          <Route
+            path="/pre-agendamento"
+            element={<ProtectedRoute><PreAgendamento /></ProtectedRoute>}
+          />
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
-          />
-          <Route
-            path="/laudo"
-            element={<Navigate to="/laudo-exames" replace />}
           />
           <Route
             path="/laudo-exames"
@@ -195,6 +199,10 @@ function App() {
           <Route
             path="/cadastro-sala"
             element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
+          />
+          <Route
+            path="/whatsapp"
+            element={<ProtectedRoute><WhatsAppPage /></ProtectedRoute>}
           />
           <Route
             path="/tea"
