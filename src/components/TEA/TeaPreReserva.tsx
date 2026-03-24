@@ -149,6 +149,46 @@ type ManualGridResponse = {
   week?: { startDate: string; endDate: string };
 };
 
+const normalizeManualGridResponse = (grid?: ManualGridResponse): ManualGridResponse => {
+  const days = Array.isArray(grid?.days)
+    ? grid.days.map((day) => {
+      const slotsByTime = new Map<string, ManualGridSlot>();
+      (day?.slots || []).forEach((slot) => {
+        const time = String(slot?.time || '').trim();
+        if (!time) return;
+        const existing = slotsByTime.get(time);
+        if (!existing) {
+          slotsByTime.set(time, {
+            time,
+            occupied: Boolean(slot?.occupied),
+            selectable: Boolean(slot?.selectable),
+          });
+          return;
+        }
+
+        slotsByTime.set(time, {
+          time,
+          occupied: existing.occupied || Boolean(slot?.occupied),
+          selectable: existing.selectable || Boolean(slot?.selectable),
+        });
+      });
+
+      return {
+        ...day,
+        date: String(day?.date || ''),
+        weekday: String(day?.weekday || ''),
+        enabled: Boolean(day?.enabled),
+        slots: Array.from(slotsByTime.values()).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)),
+      };
+    })
+    : [];
+
+  return {
+    ...grid,
+    days,
+  };
+};
+
 type ConversionChecklistItem = {
   key: string;
   label: string;
@@ -548,7 +588,7 @@ export function TeaPreReserva() {
   const [acceptModalOpened, setAcceptModalOpened] = useState(false);
   const [acceptModalMode, setAcceptModalMode] = useState<'suggestion' | 'conversion'>('suggestion');
   const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
-  const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; groupKey: string } | null>(null);
+  const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; pitId?: string; groupKey: string } | null>(null);
   useEffect(() => {
     if (!acceptModalOpened) {
       setAcceptModalStartDate('');
@@ -1456,7 +1496,7 @@ export function TeaPreReserva() {
     }
 
     async function handleDeletePit() {
-      await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey);
+      await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey, group.pitId);
     }
 
     return (
@@ -1888,7 +1928,7 @@ export function TeaPreReserva() {
     }
   };
 
-  const handleDeletePitByTeaProfileId = async (teaProfileId: string, groupKey: string) => {
+  const handleDeletePitByTeaProfileId = async (teaProfileId: string, groupKey: string, pitId?: string) => {
     if (!teaProfileId) {
       showNotification({
         title: 'PIT inválido',
@@ -1898,7 +1938,7 @@ export function TeaPreReserva() {
       return;
     }
 
-    setDeletePitTarget({ teaProfileId, groupKey });
+    setDeletePitTarget({ teaProfileId, pitId, groupKey });
     setDeletePitConfirmModalOpened(true);
   };
 
@@ -1909,11 +1949,11 @@ export function TeaPreReserva() {
       return;
     }
 
-    const { teaProfileId, groupKey } = deletePitTarget;
+    const { teaProfileId, pitId, groupKey } = deletePitTarget;
 
     setUpdatingId(groupKey);
     try {
-      await teaProfileService.deletePit(teaProfileId);
+      await teaProfileService.deletePit(teaProfileId, pitId);
       showNotification({
         title: 'Sucesso',
         message: 'PIT excluído com sucesso.',
@@ -1925,7 +1965,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
         color: 'red',
       });
     } finally {
@@ -1999,35 +2039,7 @@ export function TeaPreReserva() {
           const data = await teaPreReservationService.getManualGrid(therapy.pitTherapyId, { weekStart });
           return {
             pitTherapyId: therapy.pitTherapyId,
-            data: data as ManualGridResponse,
-          };
-        }),
-      );
-
-      const nextByTherapyId: Record<string, ManualGridResponse> = {};
-      responses.forEach((response) => {
-        nextByTherapyId[response.pitTherapyId] = response.data;
-      });
-
-      setManualGridByTherapyId(nextByTherapyId);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao carregar grade manual',
-        color: 'red',
-      });
-    } finally {
-      setManualLoadingGrid(false);
-    }
-
-    setManualLoadingGrid(true);
-    try {
-      const responses = await Promise.all(
-        context.therapies.map(async (therapy) => {
-          const data = await teaPreReservationService.getManualGrid(therapy.pitTherapyId, { weekStart });
-          return {
-            pitTherapyId: therapy.pitTherapyId,
-            data: data as ManualGridResponse,
+            data: normalizeManualGridResponse(data as ManualGridResponse),
           };
         }),
       );
@@ -4145,7 +4157,7 @@ export function TeaPreReserva() {
                                 variant="light"
                                 leftSection={<Trash2 size={14} />}
                                 loading={updatingId === group.groupKey}
-                                onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey)}
+                                onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey, String(group.therapies[0]?.pitId || ''))}
                                 disabled={!groupTeaProfileId}
                               >
                                 Excluir PIT
