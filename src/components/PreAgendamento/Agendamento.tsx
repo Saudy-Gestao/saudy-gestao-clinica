@@ -1243,6 +1243,12 @@ export function Agendamento() {
   const selectedPatientInsuranceStatus = selectedPatientInsuranceHasRegisteredPlan
     ? 'Ativo'
     : PARTICULAR_STATUS_LABEL;
+  const hasAnySelectedSchedule = Boolean(
+    novoAgendamento.hora
+    || manualProcedureSelections.length
+    || selectedSuggestedOptionId
+    || suggestedOptions.length,
+  );
   const hasManualScheduleSelection = Boolean(novoAgendamento.profissional && novoAgendamento.hora);
   const manualRangesForGrid = manualProcedureSelections
     .filter((item) => dayjs(item.date).isSame(schedulingDate, 'day'))
@@ -1706,6 +1712,20 @@ export function Agendamento() {
       ...prev,
       data: firstItem.date,
       profissional: preserveSelectedProfessional ? (prev.profissional || firstItem.doctorName) : '',
+      hora: '',
+    }));
+  };
+  const handleClearSelectedSchedules = () => {
+    setManualProcedureSelections([]);
+    setSuggestedOptions([]);
+    setSelectedSuggestedOptionId(null);
+    setSuggestionOptionsModalOpen(false);
+    setAnchorProcedureModalOpen(false);
+    setProfessionalSlotModalOpen(false);
+    setPendingAnchorSlot(null);
+    setPendingProfessionalSlot(null);
+    setNovoAgendamento((prev) => ({
+      ...prev,
       hora: '',
     }));
   };
@@ -2345,6 +2365,17 @@ export function Agendamento() {
                       </UnstyledButton>
                     ))}
                   </SimpleGrid>
+
+                  <Group justify="flex-end" mt="md">
+                    <Button
+                      variant="light"
+                      color="red"
+                      onClick={handleClearSelectedSchedules}
+                      disabled={!hasAnySelectedSchedule}
+                    >
+                      Limpar horários
+                    </Button>
+                  </Group>
 
                   <Modal
                     opened={professionalSlotModalOpen}
