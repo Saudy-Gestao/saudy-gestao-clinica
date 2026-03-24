@@ -9,12 +9,10 @@ import {
   Modal,
   Stack,
   Select,
-  MultiSelect,
   ActionIcon,
   Popover,
   SimpleGrid,
   UnstyledButton,
-  ScrollArea,
   Paper,
   Badge,
   Tabs,
@@ -42,6 +40,7 @@ import { formatCPF } from '../../utils/formatters';
 
 interface Agendamento {
   id: string;
+  rescheduledFromAppointmentId?: string;
   patientId?: string;
   pacienteNome: string;
   pacienteCPF: string;
@@ -146,6 +145,7 @@ const PERIOD_RANGES: Record<'Manhã' | 'Tarde' | 'Noite', [number, number]> = {
 const normalizeAppointmentStatus = (status?: string | null): string => {
   const normalized = String(status || '').trim().toUpperCase();
   if (normalized === 'REALIZADO' || normalized === 'COMPLETED' || normalized === 'FINALIZADO' || normalized === 'ATENDIDO') return 'REALIZADO';
+  if (normalized === 'NAO_COMPARECEU' || normalized === 'NÃO_COMPARECEU' || normalized === 'NO_SHOW' || normalized === 'NO-SHOW' || normalized === 'AUSENTE' || normalized === 'FALTOU') return 'NAO_COMPARECEU';
   if (normalized === 'CONFIRMADO') return 'CONFIRMADO';
   if (normalized === 'CANCELED') return 'CANCELADO';
   if (normalized === 'AGENDADO') return 'AGENDADO';
@@ -306,18 +306,17 @@ export function Agendamento() {
   const [suggestedOptions, setSuggestedOptions] = useState<SuggestedScheduleOption[]>([]);
   const [selectedSuggestedOptionId, setSelectedSuggestedOptionId] = useState<string | null>(null);
   const [generatingSuggestion, setGeneratingSuggestion] = useState(false);
+  const [rescheduleSourceId, setRescheduleSourceId] = useState<string | null>(null);
 
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState<string | null>(null);
   const [convenio, setConvenio] = useState<string | null>(null);
   const [dataHoraFiltro, setDataHoraFiltro] = useState<Date | null>(new Date());
-  const [turno, setTurno] = useState<string[]>([]);
+  const [statusFiltro, setStatusFiltro] = useState<string | null>(null);
 
-  // State for custom date picker
+  // State for date filter picker
   const [pickerOpened, setPickerOpened] = useState(false);
-  const [tempDate, setTempDate] = useState<Date>(new Date());
-  const [tempTime, setTempTime] = useState<string | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState('Manhã');
+  const [tempDateFilter, setTempDateFilter] = useState<Date | null>(new Date());
   const [viewedDate, setViewedDate] = useState<Date>(new Date());
 
   dayjs.locale('pt-br');
@@ -337,12 +336,14 @@ export function Agendamento() {
     setViewedDate(keepDate || new Date());
     setSuggestedOptions([]);
     setSelectedSuggestedOptionId(null);
+    setRescheduleSourceId(null);
   };
 
 
 
   const mapApiToAgendamento = (it: any): Agendamento => ({
     id: String(it.id),
+    rescheduledFromAppointmentId: it.rescheduledFromAppointmentId || it.rescheduled_from_appointment_id || undefined,
     patientId: it.patientId || it.patient_id || it.patient?.id || undefined,
     pacienteNome: it.patientName || it.patient_name || it.patient?.name || it.pacienteNome || '',
     pacienteCPF: it.patientCpf || it.patient_cpf || it.patient?.cpf || it.pacienteCPF || '',
@@ -575,13 +576,6 @@ export function Agendamento() {
     loadProcedures();
   }, []);
 
-  const getFilteredTimeSlots = (period: string) => {
-    if (period === 'Todos') {
-      return [...TIME_SLOTS['Manhã'], ...TIME_SLOTS['Tarde'], ...TIME_SLOTS['Noite']];
-    }
-    return TIME_SLOTS[period as keyof typeof TIME_SLOTS] || [];
-  };
-
   const filteredAgendamentos = agendamentos.filter((agendamento) => {
     const normalizedSearch = searchValue.trim().toLowerCase();
     const matchesSearch = !normalizedSearch
@@ -601,10 +595,9 @@ export function Agendamento() {
     const matchesDate = !dataHoraFiltro
       || dayjs(agendamento.data).isSame(dayjs(dataHoraFiltro), 'day');
 
-    const matchesTurno = turno.length === 0
-      || turno.includes(resolveTurnoFromTime(agendamento.hora) || '');
+    const matchesStatus = !statusFiltro || agendamento.status === statusFiltro;
 
-    return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesTurno;
+    return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesStatus;
   });
 
   const handleEditAgendamento = (agendamento: Agendamento) => {
@@ -630,6 +623,42 @@ export function Agendamento() {
     setPendingPatient(INITIAL_PENDING_PATIENT);
     setIsEditing(true);
     setEditingAgendamentoId(agendamento.id);
+    setRescheduleSourceId(null);
+    setActiveTab('marcacao');
+    setSchedulingStep(0);
+    if (appointmentDate) {
+      setDataHoraFiltro(appointmentDate);
+      setViewedDate(appointmentDate);
+    }
+    setTimeout(() => {
+      schedulerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
+
+  const handleRescheduleAppointment = (agendamento: Agendamento) => {
+    const appointmentDate = agendamento.data ? new Date(`${agendamento.data}T00:00:00`) : null;
+    setNovoAgendamento({
+      pacienteId: agendamento.patientId || '',
+      pacienteNome: agendamento.pacienteNome || '',
+      pacienteCPF: agendamento.pacienteCPF || '',
+      especialidade: agendamento.especialidade,
+      convenio: agendamento.convenio,
+      data: appointmentDate,
+      hora: agendamento.hora,
+      profissional: agendamento.medicoNome,
+      tipoConsulta: agendamento.tipoConsulta,
+      informacoes: agendamento.observacoes,
+    });
+    const specialties = agendamento.especialidade
+      ? agendamento.especialidade.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    setSelectedSpecialties(specialties);
+    setSelectedPatientId(agendamento.patientId || null);
+    setIsManualPatientFlow(false);
+    setPendingPatient(INITIAL_PENDING_PATIENT);
+    setIsEditing(false);
+    setEditingAgendamentoId(null);
+    setRescheduleSourceId(agendamento.id);
     setActiveTab('marcacao');
     setSchedulingStep(0);
     if (appointmentDate) {
@@ -877,6 +906,7 @@ export function Agendamento() {
               observations: novoAgendamento.informacoes || undefined,
               status: 'AGENDADO',
               totem: Math.floor(Math.random() * 100) + 1,
+              rescheduledFromAppointmentId: rescheduleSourceId || undefined,
             });
           }
         } else {
@@ -893,6 +923,7 @@ export function Agendamento() {
             observations: novoAgendamento.informacoes || undefined,
             status: 'AGENDADO',
             totem: Math.floor(Math.random() * 100) + 1,
+            rescheduledFromAppointmentId: rescheduleSourceId || undefined,
           });
         }
         await loadAgendamentos();
@@ -951,25 +982,46 @@ export function Agendamento() {
       </Box>
 
       {/* Right aligned status */}
-      <Box style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Box style={{ minWidth: 140 }}>
-          <Select
-              data={[
-              { value: 'AGENDADO', label: 'Agendado' },
-              { value: 'CONFIRMADO', label: 'Confirmado' },
-              { value: 'REALIZADO', label: 'Realizado' },
-              { value: 'CANCELADO', label: 'Cancelado' },
-            ]}
+      <Box
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 12,
+          minWidth: isMobile ? 180 : 320,
+          paddingRight: isMobile ? 12 : 20,
+        }}
+      >
+        <Box style={{ minWidth: isMobile ? 170 : 190 }}>
+	          <Select
+	              data={[
+	              { value: 'AGENDADO', label: 'Agendado' },
+	              { value: 'CONFIRMADO', label: 'Confirmado' },
+	              { value: 'NAO_COMPARECEU', label: 'Não compareceu' },
+	              { value: 'REALIZADO', label: 'Realizado' },
+	              { value: 'CANCELADO', label: 'Cancelado' },
+	            ]}
             value={agendamento.status}
-            onChange={(value) => handleStatusChange(agendamento.id, value || 'AGENDADO')}
+	            onChange={(value) => handleStatusChange(agendamento.id, value || 'AGENDADO')}
+	            size="xs"
+	            radius="md"
+		            w={isMobile ? 170 : 190}
+	          />
+	        </Box>
+        {(agendamento.status === 'NAO_COMPARECEU' || agendamento.status === 'CANCELADO') && (
+          <Button
             size="xs"
-            radius="md"
-            w={120}
-          />
-        </Box>
-      </Box>
-    </Box>
-  ));
+            variant="light"
+            miw={110}
+            px="md"
+            onClick={() => handleRescheduleAppointment(agendamento)}
+          >
+            Reagendar
+          </Button>
+        )}
+	      </Box>
+	    </Box>
+	  ));
 
   const uniqueDates = Array.from(new Set(filteredAgendamentos.map(a => a.data))).sort();
   const agendamentosByDate = uniqueDates.reduce<Record<string, Agendamento[]>>((acc, date) => {
@@ -1969,19 +2021,18 @@ export function Agendamento() {
               position="bottom-start"
               withArrow
               shadow="md"
-              width={700}
+              width={320}
               trapFocus
             >
               <Popover.Target>
                 <TextInput
-                  label="Data e Hora"
-                  placeholder="Selecione data e hora"
-                  value={dataHoraFiltro ? dayjs(dataHoraFiltro).format('DD/MM/YYYY | HH:mm:ss') : dayjs().format('DD/MM/YYYY | HH:mm:ss')}
+                  label="Data"
+                  placeholder="Selecione a data"
+                  value={dataHoraFiltro ? dayjs(dataHoraFiltro).format('DD/MM/YYYY') : ''}
                   onClick={() => {
                     const initialDate = dataHoraFiltro || new Date();
-                    setTempDate(initialDate);
+                    setTempDateFilter(initialDate);
                     setViewedDate(initialDate);
-                    setTempTime(dataHoraFiltro ? dayjs(dataHoraFiltro).format('HH:mm') : null);
                     setPickerOpened(true);
                   }}
                   leftSection={<Calendar size={16} />}
@@ -1989,139 +2040,84 @@ export function Agendamento() {
                   variant="unstyled"
                 />
               </Popover.Target>
-              <Popover.Dropdown p={0}>
-                <Box display="flex" style={{ height: 350 }}>
-                  <Box p="md" style={{ borderRight: '1px solid #eee', width: 320 }}>
-                    <MantineCalendar
-                      date={viewedDate}
-                      onDateChange={(date) => setViewedDate(new Date(date))}
-                      locale="pt-br"
-                      size="md"
-                      styles={{
-                        day: { borderRadius: '50%' }
+              <Popover.Dropdown p="md">
+                <Stack gap="md">
+                  <MantineCalendar
+                    date={viewedDate}
+                    onDateChange={(date) => setViewedDate(new Date(date))}
+                    locale="pt-br"
+                    size="md"
+                    styles={{
+                      day: { borderRadius: '50%' },
+                    }}
+                    getDayProps={(date) => ({
+                      onClick: () => {
+                        const d = new Date(date);
+                        setTempDateFilter(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0));
+                      },
+                      selected: tempDateFilter ? dayjs(date).isSame(tempDateFilter, 'day') : false,
+                    })}
+                  />
+
+                  <Group justify="space-between" gap="xs">
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      color="gray"
+                      onClick={() => {
+                        const today = new Date();
+                        setTempDateFilter(today);
+                        setViewedDate(today);
                       }}
-                      getDayProps={(date) => ({
-                        onClick: () => {
-                          // Garante que 'date' é um objeto Date
-                          const d = new Date(date);
-                          setTempDate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0));
-                        },
-                        selected: tempDate && dayjs(date).isSame(tempDate, 'day'),
-                      })}
-                    />
-                  </Box>
-                  <Box p="md" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Text fw={500} mb="sm">Selecione o horário</Text>
-                    
-                    <Group mb="md" gap="xs">
-                      {['Todos', 'Manhã', 'Tarde', 'Noite'].map(period => (
-                        <Button
-                          key={period}
-                          size="xs"
-                          variant={selectedPeriod === period ? 'filled' : 'outline'}
-                          color={selectedPeriod === period ? 'darkBlue' : 'gray'}
-                          onClick={() => setSelectedPeriod(period)}
-                          bg={selectedPeriod === period ? DARK_BLUE : undefined}
-                          style={{ 
-                            borderColor: selectedPeriod === period ? DARK_BLUE : 'var(--mantine-color-default-border)',
-                            color: selectedPeriod === period ? 'white' : 'var(--mantine-color-text)'
-                          }}
-                        >
-                          {period}
-                        </Button>
-                      ))}
+                    >
+                      Hoje
+                    </Button>
+                    <Group gap="xs">
+                      <Button
+                        variant="subtle"
+                        size="xs"
+                        color="gray"
+                        onClick={() => {
+                          setTempDateFilter(null);
+                          setDataHoraFiltro(null);
+                          setPickerOpened(false);
+                        }}
+                      >
+                        Limpar
+                      </Button>
+                      <Button variant="default" size="xs" onClick={() => setPickerOpened(false)}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="xs"
+                        bg={DARK_BLUE}
+                        onClick={() => {
+                          setDataHoraFiltro(tempDateFilter);
+                          setPickerOpened(false);
+                        }}
+                      >
+                        Aplicar
+                      </Button>
                     </Group>
-
-                    <ScrollArea style={{ flex: 1 }} type="auto">
-                      <SimpleGrid cols={4} spacing="xs">
-                        {getFilteredTimeSlots(selectedPeriod).map(time => (
-                          <UnstyledButton
-                            key={time}
-                            onClick={() => setTempTime(time)}
-                            style={{
-                              backgroundColor: tempTime === time ? 'rgba(28, 126, 214, 0.18)' : 'transparent',
-                              border: `1px solid ${tempTime === time ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-default-border)'}`,
-                              borderRadius: 4,
-                              padding: '4px 0',
-                              textAlign: 'center',
-                              fontSize: '0.875rem',
-                              color: tempTime === time ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-text)',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {time}
-                          </UnstyledButton>
-                        ))}
-                      </SimpleGrid>
-                    </ScrollArea>
-
-                    <Group mt="md" justify="space-between">
-                      <Group gap="xs">
-                        <Group gap={4}>
-                          <Box w={12} h={12} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 2 }} />
-                          <Text size="xs" c="dimmed">Disponível</Text>
-                        </Group>
-                        <Group gap={4}>
-                          <Box w={12} h={12} bg="var(--mantine-color-default)" style={{ borderRadius: 2 }} />
-                          <Text size="xs" c="dimmed">Indisponível</Text>
-                        </Group>
-                      </Group>
-                      
-                      <Group gap="xs">
-                        <Button variant="outline" size="xs" color="gray" onClick={() => {
-                          setTempDate(new Date());
-                          setViewedDate(new Date());
-                          setTempTime(null);
-                          setDataHoraFiltro(new Date());
-                        }}>
-                          Redefinir
-                        </Button>
-                        <Button variant="default" size="xs" onClick={() => setPickerOpened(false)}>Cancelar</Button>
-                        <Button 
-                          size="xs" 
-                          bg={DARK_BLUE} 
-                          onClick={() => {
-                            if (!tempTime) {
-                              alert('Selecione um horário para salvar.');
-                              return;
-                            }
-                            if (tempDate && tempTime) {
-                              const [hours, minutes] = tempTime.split(':');
-                              // Cria uma nova data local sem ajuste de fuso
-                              const newDate = new Date(
-                                tempDate.getFullYear(),
-                                tempDate.getMonth(),
-                                tempDate.getDate(),
-                                parseInt(hours),
-                                parseInt(minutes),
-                                0,
-                                0
-                              );
-                              setDataHoraFiltro(newDate);
-                              setPickerOpened(false);
-                            }
-                          }}
-                        >
-                          Salvar
-                        </Button>
-                      </Group>
-                    </Group>
-                  </Box>
-                </Box>
+                  </Group>
+                </Stack>
               </Popover.Dropdown>
             </Popover>
 
-            <MultiSelect
-              label="Turno"
+            <Select
+              label="Status"
               placeholder="Selecione"
               data={[
-                { value: 'Manhã', label: 'Manhã' },
-                { value: 'Tarde', label: 'Tarde' },
-                { value: 'Noite', label: 'Noite' },
+                { value: 'AGENDADO', label: 'Agendado' },
+                { value: 'CONFIRMADO', label: 'Confirmado' },
+                { value: 'NAO_COMPARECEU', label: 'Não compareceu' },
+                { value: 'REALIZADO', label: 'Realizado' },
+                { value: 'CANCELADO', label: 'Cancelado' },
               ]}
-              value={turno}
-              onChange={setTurno}
+              value={statusFiltro}
+              onChange={setStatusFiltro}
               clearable
+              style={{ minWidth: 180 }}
             />
 
             {/* Search Bar */}

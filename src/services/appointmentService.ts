@@ -16,6 +16,7 @@ export interface AppointmentPayload {
   authorizationNotes?: string;
   observations?: string;
   totem?: number;
+  rescheduledFromAppointmentId?: string;
 }
 
 export default {

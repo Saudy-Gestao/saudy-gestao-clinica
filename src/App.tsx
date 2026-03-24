@@ -35,6 +35,7 @@ import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
 import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
+import { CadastroEquipamento } from './components/Equipamentos/CadastroEquipamento';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
 import { WhatsAppPage } from './components/Settings/WhatsAppPage';
@@ -204,6 +205,10 @@ function App() {
           <Route
             path="/cadastro-sala"
             element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-equipamento"
+            element={<ProtectedRoute><CadastroEquipamento /></ProtectedRoute>}
           />
           <Route
             path="/whatsapp"
