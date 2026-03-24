@@ -1,5 +1,5 @@
 import { Box, Group, Stack, Text, ActionIcon } from '@mantine/core';
-import { ArrowLeft, ListOrdered } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { PatientQueue } from './PatientQueue';

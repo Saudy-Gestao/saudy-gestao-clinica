@@ -130,7 +130,7 @@ export function PreAtendimento() {
   const [insurancesLoading, setInsurancesLoading] = useState(false);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
-  const [checklistStep, setChecklistStep] = useState(0);
+  const [, setChecklistStep] = useState(0);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistPatient, setChecklistPatient] = useState<Patient | null>(null);
   const [checklistPreAttendanceId, setChecklistPreAttendanceId] = useState<string | null>(null);
@@ -247,29 +247,6 @@ export function PreAtendimento() {
       agendaConferida: false,
       observacoes: '',
     });
-  };
-
-  const canAdvanceChecklist = () => {
-    if (checklistStep === 0) {
-      return checklistData.dadosConferidos && checklistData.contatoConferido;
-    }
-    if (checklistStep === 1) {
-      if (isPrivateCare(checklistPatient) || checklistData.atendimentoParticular) return true;
-      return checklistData.autorizacaoConferida && checklistData.guiaNumero.trim().length > 0;
-    }
-    if (checklistStep === 2) {
-      if (isPrivateCare(checklistPatient) || checklistData.atendimentoParticular) {
-        return checklistData.pagamentoRealizado && checklistData.valorPagamento > 0 && checklistData.formaPagamento.trim().length > 0;
-      }
-      return true;
-    }
-    if (checklistStep === 3) {
-      return checklistData.agendaConferida;
-    }
-    if (checklistStep === 4) {
-      return facialValidationVerified;
-    }
-    return false;
   };
 
   const canCompleteChecklist = () => {
