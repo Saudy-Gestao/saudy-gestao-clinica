@@ -24,29 +24,19 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconBrandWhatsapp,
-  IconSettings,
   IconMessage,
   IconBell,
   IconHistory,
   IconTrash,
-  IconDeviceFloppy,
   IconPlus,
   IconEye,
   IconAlertCircle,
   IconClock,
   IconInfoCircle,
   IconRefresh,
+  IconDeviceFloppy,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
-
-interface ConfigFormValues {
-  accountSid: string;
-  authToken: string;
-  fromNumber: string;
-  appId: string;
-  isActive: boolean;
-}
 
 interface TemplateFormValues {
   type: string;
@@ -64,26 +54,21 @@ interface NotificationFormValues {
   reminderHoursBefore: number;
 }
 
-export function WhatsAppConfig() {
-  const [activeTab, setActiveTab] = useState('config');
+interface WhatsAppConfigProps {
+  embedded?: boolean;
+}
+
+export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
+  const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [variables, setVariables] = useState<any[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [testModalOpen, setTestModalOpen] = useState(false);
-  const [hasExistingConfig, setHasExistingConfig] = useState(false);
+  const [showAlert, setShowAlert] = useState(true);
 
   // Forms using simple state instead of @mantine/form
-  const [configForm, setConfigForm] = useState<ConfigFormValues>({
-    accountSid: '',
-    authToken: '',
-    fromNumber: '',
-    appId: '',
-    isActive: true,
-  });
-
   const [templateForm, setTemplateForm] = useState<TemplateFormValues>({
     type: 'APPOINTMENT_CREATED',
     name: '',
@@ -100,11 +85,6 @@ export function WhatsAppConfig() {
     reminderHoursBefore: 2,
   });
 
-  const [testForm, setTestForm] = useState({
-    phone: '',
-    message: 'Teste de envio WhatsApp',
-  });
-
   useEffect(() => {
     loadData();
     loadVariables();
@@ -112,23 +92,10 @@ export function WhatsAppConfig() {
 
   const loadData = async () => {
     try {
-      const [config, templatesData, notificationConfig] = await Promise.all([
-        whatsappService.getConfig(),
+      const [templatesData, notificationConfig] = await Promise.all([
         whatsappService.listTemplates(),
         whatsappService.getNotificationConfig(),
       ]);
-
-      if (config) {
-        const hasAuthToken = config.authToken && config.authToken.startsWith('***');
-        setHasExistingConfig(!!config.id);
-        setConfigForm({
-          accountSid: config.accountSid,
-          authToken: hasAuthToken ? '' : (config.authToken || ''),
-          fromNumber: config.fromNumber,
-          appId: config.appId || '',
-          isActive: config.isActive,
-        });
-      }
 
       setTemplates(templatesData);
 
@@ -169,28 +136,6 @@ export function WhatsAppConfig() {
         message: 'Erro ao carregar logs',
         color: 'red',
       });
-    }
-  };
-
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await whatsappService.saveConfig(configForm);
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Configuração salva com sucesso',
-        color: 'green',
-      });
-      await loadData();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao salvar configuração',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -265,29 +210,6 @@ export function WhatsAppConfig() {
     }
   };
 
-  const handleTestMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await whatsappService.testMessage(testForm);
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Mensagem de teste enviada',
-        color: 'green',
-      });
-      setTestModalOpen(false);
-      setTestForm({ phone: '', message: 'Teste de envio WhatsApp' });
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erro',
-        message: error.response?.data?.details || 'Erro ao enviar mensagem',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSyncHsm = async () => {
     setSyncLoading(true);
     try {
@@ -358,21 +280,24 @@ export function WhatsAppConfig() {
   };
 
   return (
-    <Box p="md">
-      <Group mb="lg">
-        <IconBrandWhatsapp size={32} color="#25D366" />
-        <Title order={2}>Configuração WhatsApp</Title>
-      </Group>
+    <Box p={embedded ? 0 : "md"}>
+      {showAlert && (
+        <Alert 
+          icon={<IconAlertCircle size={16} />} 
+          mb="md" 
+          color="yellow"
+          withCloseButton
+          onClose={() => setShowAlert(false)}
+        >
+          <Text size="sm">
+            <strong>Importante:</strong> Você precisa configurar sua conta na Gupshup e obter aprovação
+            do WhatsApp Business API antes de usar este recurso.
+          </Text>
+        </Alert>
+      )}
 
-      <Alert icon={<IconInfoCircle size={16} />} mb="md" color="blue">
-        Integração com Gupshup para envio de mensagens WhatsApp automatizadas aos pacientes.
-      </Alert>
-
-      <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'config')}>
+      <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'templates')}>
         <Tabs.List>
-          <Tabs.Tab value="config" leftSection={<IconSettings size={16} />}>
-            Configuração Geral
-          </Tabs.Tab>
           <Tabs.Tab value="templates" leftSection={<IconMessage size={16} />}>
             Templates de Mensagens
           </Tabs.Tab>
@@ -383,85 +308,6 @@ export function WhatsAppConfig() {
             Histórico
           </Tabs.Tab>
         </Tabs.List>
-
-        {/* Configuração Geral */}
-        <Tabs.Panel value="config" pt="md">
-          <Paper shadow="sm" p="xl">
-            <form onSubmit={handleSaveConfig}>
-              <Stack gap="md">
-                <Title order={4}>Credenciais Gupshup</Title>
-                
-                <TextInput
-                  label="API Key"
-                  placeholder="Ex: abc123xyz..."
-                  required
-                  value={configForm.accountSid}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, accountSid: e.target.value }))}
-                />
-
-                <TextInput
-                  label="App Name"
-                  placeholder={hasExistingConfig ? "Deixe vazio para manter o atual" : "Digite o nome do seu app no Gupshup"}
-                  description={hasExistingConfig ? "App Name atual configurado. Preencha apenas se quiser alterar." : undefined}
-                  required={!hasExistingConfig}
-                  type="password"
-                  value={configForm.authToken}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, authToken: e.target.value }))}
-                />
-
-                <TextInput
-                  label="Número de Origem (WhatsApp)"
-                  placeholder="Ex: 5511999999999"
-                  description="Número WhatsApp Business no formato: 5511999999999 (somente números, sem +)"
-                  required
-                  value={configForm.fromNumber}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, fromNumber: e.target.value }))}
-                />
-
-                <TextInput
-                  label="App ID (Gupshup)"
-                  placeholder="Ex: c0e21bb7-6e0d-4e2a-a0da-dcf67af1bab5"
-                  description="UUID do seu app no Gupshup — necessário para sincronizar status de templates HSM aprovados"
-                  value={configForm.appId}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, appId: e.target.value }))}
-                />
-
-                <Switch
-                  description="Quando desativado, nenhuma mensagem será enviada"
-                  checked={configForm.isActive}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, isActive: e.target.checked }))}
-                />
-
-                <Divider my="md" />
-
-                <Group>
-                  <Button
-                    type="submit"
-                    leftSection={<IconDeviceFloppy size={16} />}
-                    loading={loading}
-                  >
-                    Salvar Configuração
-                  </Button>
-                  
-                  <Button
-                    variant="light"
-                    leftSection={<IconBrandWhatsapp size={16} />}
-                    onClick={() => setTestModalOpen(true)}
-                  >
-                    Enviar Teste
-                  </Button>
-                </Group>
-
-                <Alert icon={<IconAlertCircle size={16} />} color="yellow">
-                  <Text size="sm">
-                    <strong>Importante:</strong> Você precisa configurar sua conta na Gupshup e obter aprovação
-                    do WhatsApp Business API antes de usar este recurso.
-                  </Text>
-                </Alert>
-              </Stack>
-            </form>
-          </Paper>
-        </Tabs.Panel>
 
         {/* Templates */}
         <Tabs.Panel value="templates" pt="md">
@@ -749,43 +595,6 @@ export function WhatsAppConfig() {
               </Button>
               <Button type="submit" loading={loading}>
                 Salvar
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
-
-      {/* Modal Teste */}
-      <Modal
-        opened={testModalOpen}
-        onClose={() => setTestModalOpen(false)}
-        title="Enviar Mensagem de Teste"
-      >
-        <form onSubmit={handleTestMessage}>
-          <Stack gap="md">
-            <TextInput
-              label="Telefone"
-              placeholder="(11) 98765-4321"
-              required
-              value={testForm.phone}
-              onChange={(e) => setTestForm(prev => ({ ...prev, phone: e.target.value }))}
-            />
-
-            <Textarea
-              label="Mensagem"
-              placeholder="Digite a mensagem de teste"
-              required
-              minRows={4}
-              value={testForm.message}
-              onChange={(e) => setTestForm(prev => ({ ...prev, message: e.target.value }))}
-            />
-
-            <Group justify="flex-end">
-              <Button variant="light" type="button" onClick={() => setTestModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" loading={loading}>
-                Enviar
               </Button>
             </Group>
           </Stack>

@@ -35,6 +35,7 @@ import {
   UserPlus,
   ChevronLeft,
   Settings,
+  MessageCircle,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -50,6 +51,7 @@ import accessService from '../../services/accessService';
 import { moduleService, type Module } from '../../services/moduleService';
 import { FloatingInput } from '../common/FloatingInput';
 import { isRoomSector } from '../../utils/sectorClassification';
+import { WhatsAppCredentials } from './WhatsAppCredentials';
 
 // Validations
 import {
@@ -1784,6 +1786,7 @@ export function SettingsPage() {
                                             </Group>
                                         </Paper>
 
+                                        {/* WhatsApp Configuration */}
                                         <Paper
                                             p="lg"
                                             radius="md"
@@ -1832,11 +1835,17 @@ export function SettingsPage() {
                                                     </Button>
                                                 </Group>
                                             </Stack>
+                                            <Group mb="md" gap="xs">
+                                                <MessageCircle size={20} />
+                                                <Text fw={600} size="md">
+                                                    Configuração WhatsApp
+                                                </Text>
+                                            </Group>
+                                            <WhatsAppCredentials />
                                         </Paper>
 
                                         <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
-                                            💡 Dica: Mais configurações serão adicionadas em breve para personalizar 
-                                            o comportamento do sistema por filial.
+                                            💡 Dica: As configurações acima são específicas da filial selecionada.
                                         </Text>
                                     </Stack>
                                 )}
