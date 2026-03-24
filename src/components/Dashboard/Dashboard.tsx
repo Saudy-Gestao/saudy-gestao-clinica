@@ -133,7 +133,7 @@ export function Dashboard() {
         </Group>
 
         <StatsCards />
-        <PatientQueue />
+        <PatientQueue limit={3} />
         <WorkflowSections />
       </Box>
 

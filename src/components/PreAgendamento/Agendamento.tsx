@@ -1490,7 +1490,7 @@ export function Agendamento() {
             p={isMobile ? 'md' : 'lg'}
             radius="md"
             withBorder
-            bg="var(--mantine-color-default)"
+            bg={isDarkMode ? 'var(--mantine-color-body)' : 'var(--mantine-color-default)'}
             style={{ borderColor: 'var(--mantine-color-default-border)' }}
             mb={isMobile ? 20 : 28}
           >
@@ -1700,7 +1700,14 @@ export function Agendamento() {
               </Group>
 
               {safeSchedulerDoctors.length === 0 ? (
-                <Paper p="xl" radius="lg" bg="rgba(255,255,255,0.02)">
+                <Paper
+                  p="xl"
+                  radius="lg"
+                  bg={isDarkMode ? 'transparent' : 'rgba(255,255,255,0.02)'}
+                  style={{
+                    border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : undefined,
+                  }}
+                >
                   <Text ta="center" c="dimmed">
                     Nenhum médico compatível com os procedimentos escolhidos está disponível para esta visualização.
                   </Text>
@@ -1708,7 +1715,14 @@ export function Agendamento() {
               ) : (
                 <Stack gap="md">
                   {isMultiProcedureFlow && (
-                    <Paper p="md" radius="lg" bg="rgba(0, 31, 84, 0.18)">
+                    <Paper
+                      p="md"
+                      radius="lg"
+                      bg={isDarkMode ? 'transparent' : 'rgba(0, 31, 84, 0.18)'}
+                      style={{
+                        border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : undefined,
+                      }}
+                    >
                       <Group justify="space-between" align="center" wrap="wrap">
                         <Box>
                           <Text fw={700}>Sugestão inteligente para múltiplos procedimentos</Text>
@@ -1730,7 +1744,11 @@ export function Agendamento() {
                                 key={option.id}
                                 p="sm"
                                 radius="md"
-                                bg={isSelected ? 'rgba(18, 184, 134, 0.08)' : 'rgba(255,255,255,0.02)'}
+                                bg={
+                                  isSelected
+                                    ? (isDarkMode ? 'rgba(18, 184, 134, 0.10)' : 'rgba(18, 184, 134, 0.08)')
+                                    : (isDarkMode ? 'transparent' : 'rgba(255,255,255,0.02)')
+                                }
                                 style={{ border: `1px solid ${isSelected ? 'var(--mantine-color-teal-5)' : 'var(--mantine-color-default-border)'}` }}
                               >
                                 <Group justify="space-between" align="center" wrap="wrap" mb="sm">
@@ -1752,7 +1770,15 @@ export function Agendamento() {
 
                                 <Stack gap="xs">
                                   {option.items.map((item) => (
-                                    <Paper key={`${option.id}-${item.procedure}-${item.doctorName}-${item.time}`} p="sm" radius="md" bg="rgba(255,255,255,0.02)">
+                                    <Paper
+                                      key={`${option.id}-${item.procedure}-${item.doctorName}-${item.time}`}
+                                      p="sm"
+                                      radius="md"
+                                      bg={isDarkMode ? 'transparent' : 'rgba(255,255,255,0.02)'}
+                                      style={{
+                                        border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.14)' : undefined,
+                                      }}
+                                    >
                                       <Group justify="space-between" wrap="wrap">
                                         <Box>
                                           <Text fw={700}>{item.procedure}</Text>
@@ -1776,7 +1802,12 @@ export function Agendamento() {
                   )}
 
                   {!schedulingDateHasAvailability && (
-                    <Paper p="md" radius="lg" bg="rgba(250, 176, 5, 0.08)" style={{ border: '1px solid rgba(250, 176, 5, 0.28)' }}>
+                    <Paper
+                      p="md"
+                      radius="lg"
+                      bg={isDarkMode ? 'rgba(250, 176, 5, 0.06)' : 'rgba(250, 176, 5, 0.08)'}
+                      style={{ border: '1px solid rgba(250, 176, 5, 0.28)' }}
+                    >
                       <Group justify="space-between" align="center" wrap="wrap">
                         <Box>
                           <Text fw={700}>Nenhuma disponibilidade nesse dia</Text>
@@ -1864,7 +1895,14 @@ export function Agendamento() {
               </SimpleGrid>
 
               {isManualPatientFlow && (
-                <Paper p="md" radius="lg" bg="rgba(0, 31, 84, 0.18)">
+                <Paper
+                  p="md"
+                  radius="lg"
+                  bg={isDarkMode ? 'transparent' : 'rgba(0, 31, 84, 0.18)'}
+                  style={{
+                    border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : undefined,
+                  }}
+                >
                   <Text fw={700} mb="sm">Finalizar cadastro do paciente</Text>
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
                     <FloatingDateInput

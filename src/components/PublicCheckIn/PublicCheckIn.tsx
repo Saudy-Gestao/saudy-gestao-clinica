@@ -58,6 +58,18 @@ export function PublicCheckIn() {
   };
 
   useEffect(() => {
+    if (!checkInResult) return;
+
+    const timer = window.setTimeout(() => {
+      resetFlow();
+    }, 10000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [checkInResult]);
+
+  useEffect(() => {
     if (!branchId) {
       setBranchInfo(null);
       setBranchLookupError('URL do totem sem filial configurada.');

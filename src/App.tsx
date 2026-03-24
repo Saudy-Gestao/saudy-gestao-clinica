@@ -46,6 +46,7 @@ import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
 import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
+import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -119,6 +120,10 @@ function App() {
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+          />
+          <Route
+            path="/fila-atendimento"
+            element={<ProtectedRoute><PatientQueuePage /></ProtectedRoute>}
           />
           <Route 
             path="/settings" 
