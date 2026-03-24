@@ -233,7 +233,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     }
   };
 
-  const handleSyncHsm = async () => {    setSyncLoading(true);
+  const handleSyncHsm = async () => {
+    setSyncLoading(true);
     try {
       const result = await whatsappService.syncHsmStatus();
       notifications.show({
@@ -299,6 +300,19 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     };
     const config = statusConfig[status] || { color: 'gray', label: status };
     return <Badge color={config.color}>{config.label}</Badge>;
+  };
+
+  const getHsmStatusLabel = (status?: string | null) => {
+    const normalized = String(status || '').trim().toUpperCase();
+    const statusConfig: Record<string, { color: string; label: string }> = {
+      APPROVED: { color: 'green', label: 'Aprovado' },
+      REJECTED: { color: 'red', label: 'Recusado' },
+      FAILED: { color: 'red', label: 'Falhou' },
+      PENDING: { color: 'yellow', label: 'Pendente' },
+      SUBMITTED: { color: 'blue', label: 'Enviado' },
+      IN_REVIEW: { color: 'blue', label: 'Em análise' },
+    };
+    return statusConfig[normalized] || { color: 'gray', label: normalized || 'Sem status' };
   };
 
   return (
@@ -369,9 +383,16 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                           {getMessageTypeLabel(template.type)}
                         </Badge>
                         {template.hsmTemplateName && (
-                          <Badge size="sm" variant="filled" color={template.hsmTemplateApproved ? 'green' : 'red'}>
-                            HSM: {template.hsmTemplateName}{template.hsmTemplateApproved ? ' ✓' : ' ⋅ pendente'}
-                          </Badge>
+                          <>
+                            <Badge size="sm" variant="filled" color={getHsmStatusLabel(template.hsmTemplateStatus).color}>
+                              HSM: {template.hsmTemplateName} · {getHsmStatusLabel(template.hsmTemplateStatus).label}
+                            </Badge>
+                            {template.hsmTemplateId && (
+                              <Badge size="sm" variant="outline" color="gray">
+                                ID: {template.hsmTemplateId}
+                              </Badge>
+                            )}
+                          </>
                         )}
                       </Group>
                     </div>
