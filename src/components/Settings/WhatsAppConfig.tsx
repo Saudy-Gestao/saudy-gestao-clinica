@@ -62,6 +62,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<{ id: string; name: string } | null>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [variables, setVariables] = useState<any[]>([]);
@@ -165,12 +166,33 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     e.preventDefault();
     setLoading(true);
     try {
-      await whatsappService.saveTemplate(templateForm);
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Template salvo com sucesso',
-        color: 'green',
-      });
+      const saved = await whatsappService.saveTemplate(templateForm);
+
+      // Auto-enviar para Gupshup se o nome HSM estiver preenchido
+      if (templateForm.hsmTemplateName) {
+        try {
+          await whatsappService.pushTemplateToGupshup(saved.id);
+          notifications.show({
+            title: 'Template salvo e enviado para o Gupshup',
+            message: 'Aguarde a aprovação da Meta para usar HSM.',
+            color: 'green',
+          });
+        } catch (pushError: any) {
+          notifications.show({
+            title: 'Template salvo, mas erro ao enviar para Gupshup',
+            message: pushError.response?.data?.error || 'Verifique as credenciais e o App ID do Gupshup.',
+            color: 'yellow',
+            autoClose: 8000,
+          });
+        }
+      } else {
+        notifications.show({
+          title: 'Sucesso',
+          message: 'Template salvo com sucesso',
+          color: 'green',
+        });
+      }
+
       setShowTemplateModal(false);
       setTemplateForm({
         type: 'APPOINTMENT_CREATED',
@@ -183,23 +205,24 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao salvar template',
+        message: error.response?.data?.error || error.response?.data?.message || 'Erro ao salvar template',
         color: 'red',
       });
     } finally {
       setLoading(false);
     }
   };
-  const handleDeleteTemplate = async (id: string) => {
-    if (!window.confirm('Deseja realmente excluir este template?')) return;
-    
+
+  const handleDeleteTemplate = async () => {
+    if (!deleteConfirmTemplate) return;
     try {
-      await whatsappService.deleteTemplate(id);
+      await whatsappService.deleteTemplate(deleteConfirmTemplate.id);
       notifications.show({
-        title: 'Sucesso',
-        message: 'Template excluído',
+        title: 'Excluído',
+        message: `Template "${deleteConfirmTemplate.name}" removido.`,
         color: 'green',
       });
+      setDeleteConfirmTemplate(null);
       loadData();
     } catch (error: any) {
       notifications.show({
@@ -210,8 +233,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     }
   };
 
-  const handleSyncHsm = async () => {
-    setSyncLoading(true);
+  const handleSyncHsm = async () => {    setSyncLoading(true);
     try {
       const result = await whatsappService.syncHsmStatus();
       notifications.show({
@@ -374,7 +396,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                       <ActionIcon
                         variant="light"
                         color="red"
-                        onClick={() => handleDeleteTemplate(template.id)}
+                        onClick={() => setDeleteConfirmTemplate({ id: template.id, name: template.name })}
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
@@ -599,6 +621,30 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      {/* Modal Confirmação de Exclusão */}
+      <Modal
+        opened={!!deleteConfirmTemplate}
+        onClose={() => setDeleteConfirmTemplate(null)}
+        title="Excluir template"
+        size="sm"
+        centered
+      >
+        <Stack gap="md">
+          <Text>
+            Tem certeza que deseja excluir o template{' '}
+            <strong>"{deleteConfirmTemplate?.name}"</strong>? Esta ação não pode ser desfeita.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteConfirmTemplate(null)}>
+              Cancelar
+            </Button>
+            <Button color="red" leftSection={<IconTrash size={16} />} onClick={handleDeleteTemplate}>
+              Excluir
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Box>
   );

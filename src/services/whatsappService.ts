@@ -109,6 +109,11 @@ export default {
     return res.data;
   },
 
+  async pushTemplateToGupshup(id: string): Promise<{ success: boolean; gupshupResponse: any }> {
+    const res = await api.post(`/care/whatsapp/templates/${id}/push-to-gupshup`, {});
+    return res.data;
+  },
+
   // ===== Notification Config =====
   
   async getNotificationConfig(): Promise<WhatsAppNotificationConfig | null> {
