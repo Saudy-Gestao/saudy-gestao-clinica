@@ -831,19 +831,19 @@ export function Agendamento() {
       showNotification({ title: 'Erro', message: 'Procedimento é obrigatório', color: 'red' });
       return;
     }
-    if (!isMultiProcedureFlow && !novoAgendamento.profissional) {
+    if (!novoAgendamento.profissional && !hasSelectedSuggestedSchedules) {
       showNotification({ title: 'Erro', message: 'Profissional é obrigatório', color: 'red' });
       return;
     }
-    if (!isMultiProcedureFlow && !novoAgendamento.hora) {
+    if (!novoAgendamento.hora && !hasSelectedSuggestedSchedules) {
       showNotification({ title: 'Erro', message: 'Horário é obrigatório', color: 'red' });
       return;
     }
-    if (isMultiProcedureFlow && selectedSuggestedSchedules.length !== selectedSpecialties.length) {
+    if (false) { // Mantido desativado: múltiplos procedimentos agora podem usar seleção manual.
       showNotification({ title: 'Erro', message: 'Gere a sugestão de horários próximos antes de confirmar.', color: 'red' });
       return;
     }
-    if (isEditing && isMultiProcedureFlow) {
+    if (isEditing && isMultiProcedureFlow && hasSelectedSuggestedSchedules) {
       showNotification({ title: 'Edição em lote', message: 'A edição com múltiplos procedimentos ainda não está disponível.', color: 'yellow' });
       return;
     }
@@ -891,7 +891,7 @@ export function Agendamento() {
       }
     } else {
       try {
-        if (isMultiProcedureFlow) {
+        if (isMultiProcedureFlow && hasSelectedSuggestedSchedules) {
           for (const suggestion of selectedSuggestedSchedules) {
             await appointmentService.create({
               patientId: resolvedPatient.patientId || undefined,
@@ -1115,12 +1115,14 @@ export function Agendamento() {
   const getAppointmentsForDate = (date: Date) => agendamentos.filter(
     (item) => item.data === dayjs(date).format('YYYY-MM-DD') && item.status !== 'CANCELADO',
   );
-  
   const selectedProcedureSummary = Array.isArray(selectedSpecialties) ? selectedSpecialties : [];
+  
   const selectedPatientCpfDigits = onlyDigits(novoAgendamento.pacienteCPF || pendingPatient.cpf);
   const safeSuggestedOptions = Array.isArray(suggestedOptions) ? suggestedOptions : [];
   const selectedSuggestedOption = safeSuggestedOptions.find((option) => option.id === selectedSuggestedOptionId) || null;
   const selectedSuggestedSchedules = selectedSuggestedOption?.items || [];
+  const hasSelectedSuggestedSchedules = isMultiProcedureFlow && selectedSuggestedSchedules.length === selectedProcedureSummary.length;
+  const hasManualScheduleSelection = Boolean(novoAgendamento.profissional && novoAgendamento.hora);
   const hasPatientContext = Boolean(
     selectedPatientId || (
       String(novoAgendamento.pacienteNome || pendingPatient.name).trim()
@@ -1138,8 +1140,8 @@ export function Agendamento() {
     selectedProcedureSummary.length > 0 &&
     novoAgendamento.data &&
     (
-      (isMultiProcedureFlow && selectedSuggestedSchedules.length === selectedProcedureSummary.length)
-      || (!isMultiProcedureFlow && novoAgendamento.profissional && novoAgendamento.hora)
+      (isMultiProcedureFlow && (hasSelectedSuggestedSchedules || hasManualScheduleSelection))
+      || (!isMultiProcedureFlow && hasManualScheduleSelection)
     ) &&
     (!isManualPatientFlow || pendingPatientReadyForCreation),
   );
@@ -1211,6 +1213,10 @@ export function Agendamento() {
   };
   const slotSupportsProcedureDuration = (doctorName: string, slot: string, date: Date = schedulingDate) =>
     slotSupportsDuration(doctorName, slot, selectedProcedureDuration, date, editingAgendamentoId);
+  const selectedSlotStartMinute = parseTimeToMinutes(novoAgendamento.hora);
+  const selectedSlotEndMinute = selectedSlotStartMinute !== null
+    ? selectedSlotStartMinute + selectedProcedureDuration
+    : null;
   const flattenedScheduleSlots = safeSchedulerDoctors
     .flatMap((doctor) => {
       const doctorSlots = doctorSlotsByName[doctor] || [];
@@ -1218,6 +1224,14 @@ export function Agendamento() {
         const slotStartMinute = parseTimeToMinutes(slot) || 0;
         const currentAppointment = findOverlappingAppointment(doctor, slotStartMinute, slotStartMinute + 15);
         const isSelected = novoAgendamento.profissional === doctor && novoAgendamento.hora === slot;
+        const isCoveredBySelectedRange = Boolean(
+          !isSelected
+          && novoAgendamento.profissional === doctor
+          && selectedSlotStartMinute !== null
+          && selectedSlotEndMinute !== null
+          && slotStartMinute >= selectedSlotStartMinute
+          && slotStartMinute < selectedSlotEndMinute,
+        );
         const isOccupied = Boolean(currentAppointment);
         const durationFits = slotSupportsProcedureDuration(doctor, slot);
         const isTooShort = !isOccupied && !durationFits;
@@ -1226,6 +1240,7 @@ export function Agendamento() {
           doctor,
           slot,
           isSelected,
+          isCoveredBySelectedRange,
           isOccupied,
           isTooShort,
           minute: slotStartMinute,
@@ -1842,27 +1857,29 @@ export function Agendamento() {
                     {flattenedScheduleSlots.map((slotItem) => (
                       <UnstyledButton
                         key={slotItem.key}
-                        onClick={() => {
-                          if (isMultiProcedureFlow) return;
-                          setNovoAgendamento((prev) => ({
-                            ...prev,
-                            profissional: slotItem.doctor,
-                            hora: slotItem.slot,
-                            data: schedulingDate,
-                          }));
-                        }}
+                          onClick={() => {
+                            if (slotItem.isCoveredBySelectedRange) return;
+                            setSelectedSuggestedOptionId(null);
+                            setNovoAgendamento((prev) => ({
+                              ...prev,
+                              profissional: slotItem.doctor,
+                              hora: slotItem.slot,
+                              data: schedulingDate,
+                            }));
+                          }}
                         style={{
                           padding: '10px 12px',
                           borderRadius: 8,
                           border: `1px solid ${
-                            slotItem.isSelected
+                            slotItem.isSelected || slotItem.isCoveredBySelectedRange
                               ? (isDarkMode ? 'rgba(66, 180, 255, 0.75)' : 'rgba(16, 99, 212, 0.48)')
                               : (isDarkMode ? 'rgba(66, 180, 255, 0.18)' : 'rgba(15, 23, 42, 0.12)')
                           }`,
-                          background: slotItem.isSelected
+                          background: slotItem.isSelected || slotItem.isCoveredBySelectedRange
                             ? (isDarkMode ? 'rgba(0, 70, 170, 0.45)' : 'rgba(219, 234, 254, 0.95)')
                             : (isDarkMode ? 'rgba(0, 70, 170, 0.30)' : '#ffffff'),
-                          cursor: isMultiProcedureFlow ? 'not-allowed' : 'pointer',
+                          cursor: slotItem.isCoveredBySelectedRange ? 'not-allowed' : 'pointer',
+                          opacity: slotItem.isCoveredBySelectedRange ? 0.82 : 1,
                           boxShadow: isDarkMode ? 'none' : '0 1px 2px rgba(15, 23, 42, 0.04)',
                         }}
                       >
@@ -1872,12 +1889,20 @@ export function Agendamento() {
                             <Text fw={700} size="xl" lh={1}>{slotItem.slot}</Text>
                           </Group>
                                           {slotItem.isSelected ? (
+                                             <Badge
+                                               color="teal"
+                                               variant="light"
+                                              radius="xl"
+                                             >
+                                               SELECIONADO
+                                             </Badge>
+                                          ) : slotItem.isCoveredBySelectedRange ? (
                                             <Badge
-                                              color="teal"
+                                              color="blue"
                                               variant="light"
                                               radius="xl"
                                             >
-                                              SELECIONADO
+                                              BLOQUEADO
                                             </Badge>
                                           ) : null}
                         </Group>
