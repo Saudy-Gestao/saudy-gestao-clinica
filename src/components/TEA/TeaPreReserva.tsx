@@ -590,6 +590,25 @@ export function TeaPreReserva() {
   const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
   const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; pitId?: string; groupKey: string } | null>(null);
   useEffect(() => {
+    if (!manualSelectedTherapyId) {
+      setManualSelectedSlots([]);
+      return;
+    }
+
+    const grid = manualGridByTherapyId[manualSelectedTherapyId];
+    if (!grid?.days?.length) return;
+
+    setManualSelectedSlots((prev) => prev.filter((selected) => {
+      const isExistingEditableSlot = (manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || [])
+        .some((slot) => slot.date === selected.date && slot.time === selected.time);
+      if (isExistingEditableSlot) return true;
+
+      const day = grid.days.find((item) => item.date === selected.date);
+      const slot = day?.slots?.find((item) => item.time === selected.time);
+      return Boolean(slot && !slot.occupied && slot.selectable);
+    }));
+  }, [manualEditableExistingSlotsByTherapyId, manualGridByTherapyId, manualSelectedTherapyId]);
+  useEffect(() => {
     if (!acceptModalOpened) {
       setAcceptModalStartDate('');
       setAcceptTherapies([]);
@@ -3350,7 +3369,7 @@ export function TeaPreReserva() {
                         manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
                       ).some((selected) => selected.date === day.date && selected.time === time);
                       const canToggleExistingSlot = isExistingEditableSlot;
-                      const effectiveSelectable = (isSelectable || canToggleExistingSlot) && !isBlockedBySelectedSession;
+                      const effectiveSelectable = ((!isOccupied && isSelectable) || canToggleExistingSlot) && !isBlockedBySelectedSession;
                       const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
                       const canAddNewSelection = !reachedWeeklyLimit || isSelected;
                       const isFree = !isOccupied && effectiveSelectable && day.enabled;
@@ -3372,10 +3391,18 @@ export function TeaPreReserva() {
                           key={`${day.date}-${time}`}
                           size="compact-xs"
                           variant="filled"
-                          disabled={!effectiveSelectable || !manualSelectedTherapyId || !canAddNewSelection}
+                          disabled={isOccupied || !effectiveSelectable || !manualSelectedTherapyId || !canAddNewSelection}
                           title={`${dayLabel} ${time} • ${stateLabel}`}
                           aria-label={`${dayLabel} ${time} • ${stateLabel}`}
                           onClick={() => {
+                            if (isOccupied && !canToggleExistingSlot) {
+                              showNotification({
+                                title: 'Horário ocupado',
+                                message: 'Esse horário já está reservado para outra consulta e não pode ser marcado.',
+                                color: 'yellow',
+                              });
+                              return;
+                            }
                             if (!effectiveSelectable) return;
                             const sortedDaySlots = [...day.slots]
                               .filter((item) => !!item.time)
