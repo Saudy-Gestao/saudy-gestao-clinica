@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+﻿import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Box, Button, Group, Loader, Text, Flex, Tooltip, ActionIcon } from '@mantine/core';
-import { ArrowLeft, FileText, ScanLine, Layers } from 'lucide-react';
+import { ArrowLeft, FileText, ScanLine } from 'lucide-react';
 import { DicomViewer } from './DicomViewer';
 import reportWorklistService from '../../services/reportWorklistService';
 
 export function DicomViewerPage() {
   const { key } = useParams<{ key: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [series, setSeries] = useState<ArrayBuffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,19 +56,14 @@ export function DicomViewerPage() {
 
         <Group>
           <Button
-            variant="outline"
-            color="gray"
-            leftSection={<Layers size={16} />}
-            onClick={() => navigate(`/ohif/${encodeURIComponent(key || '')}`)}
-            radius="md"
-          >
-            Abrir OHIF
-          </Button>
-          <Button
             variant="filled"
             color="blue"
             leftSection={<FileText size={16} />}
-            onClick={() => navigate(`/laudo-exames?itemId=${encodeURIComponent(key || '')}`)}
+            onClick={() =>
+              navigate(
+                `/laudo-exames?itemId=${encodeURIComponent(key || '')}&returnTo=${encodeURIComponent(location.pathname)}`,
+              )
+            }
             radius="md"
           >
             Abrir Laudo
@@ -99,3 +95,5 @@ export function DicomViewerPage() {
     </Box>
   );
 }
+
+
