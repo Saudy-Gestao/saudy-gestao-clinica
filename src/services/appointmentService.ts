@@ -8,6 +8,8 @@ export interface AppointmentPayload {
   specialty?: string;
   durationMinutes?: number;
   convenio?: string;
+  insurance?: string;
+  healthInsuranceName?: string;
   date?: string;
   time?: string;
   type?: string;
