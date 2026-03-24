@@ -5,6 +5,7 @@ export interface BranchSettings {
   branchId: string;
   requireFacialForReportDelivery: boolean;
   requireFacialForPatientRegistration: boolean;
+  noShowToleranceMinutes: number;
 }
 
 const branchSettingsService = {

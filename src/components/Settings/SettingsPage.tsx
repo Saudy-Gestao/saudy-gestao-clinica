@@ -18,6 +18,7 @@ import {
   Badge,
   useMantineColorScheme,
   Switch,
+  NumberInput,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -1028,6 +1029,34 @@ export function SettingsPage() {
     }
   };
 
+  const handleSaveNoShowTolerance = async (value: number | string) => {
+    if (!selectedBranchForSettings) return;
+    const normalized = typeof value === 'number' ? value : Number(value);
+    const nextValue = Math.max(0, Math.floor(Number.isFinite(normalized) ? normalized : 0));
+
+    setSavingBranchSettings(true);
+    try {
+      const updated = await branchSettingsService.updateBranchSettings(
+        selectedBranchForSettings,
+        { noShowToleranceMinutes: nextValue }
+      );
+      setBranchSettings(updated);
+      notifications.show({
+        title: 'Sucesso',
+        message: 'Tempo de tolerância atualizado',
+        color: 'green'
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.error || 'Erro ao atualizar tolerância',
+        color: 'red'
+      });
+    } finally {
+      setSavingBranchSettings(false);
+    }
+  };
+
   // Effect to load branch settings when branch is selected
   useEffect(() => {
     if (selectedBranchForSettings) {
@@ -1753,6 +1782,56 @@ export function SettingsPage() {
                                                     }}
                                                 />
                                             </Group>
+                                        </Paper>
+
+                                        <Paper
+                                            p="lg"
+                                            radius="md"
+                                            withBorder
+                                            style={{
+                                                borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                                background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                            }}
+                                        >
+                                            <Stack gap="md">
+                                                <Box>
+                                                    <Text fw={600} size="sm" mb={4}>
+                                                        Tolerância Para Não Comparecimento
+                                                    </Text>
+                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                        Define quantos minutos após o horário marcado o sistema deve aguardar
+                                                        antes de mudar automaticamente o agendamento para "Não compareceu".
+                                                    </Text>
+                                                </Box>
+                                                <Group align="end">
+                                                    <NumberInput
+                                                        label="Tempo de tolerância (minutos)"
+                                                        min={0}
+                                                        max={240}
+                                                        step={5}
+                                                        value={branchSettings?.noShowToleranceMinutes ?? 30}
+                                                        onChange={(value) => {
+                                                            const nextValue = typeof value === 'number' ? value : Number(value);
+                                                            setBranchSettings((prev) => prev ? ({
+                                                                ...prev,
+                                                                noShowToleranceMinutes: Number.isFinite(nextValue) ? nextValue : 0,
+                                                            }) : prev);
+                                                        }}
+                                                        styles={{
+                                                            label: { marginBottom: 8, fontWeight: 500 },
+                                                        }}
+                                                        style={{ maxWidth: 260 }}
+                                                    />
+                                                    <Button
+                                                        bg={DARK_BLUE}
+                                                        c="white"
+                                                        onClick={() => handleSaveNoShowTolerance(branchSettings?.noShowToleranceMinutes ?? 30)}
+                                                        loading={savingBranchSettings}
+                                                    >
+                                                        Salvar tolerância
+                                                    </Button>
+                                                </Group>
+                                            </Stack>
                                         </Paper>
 
                                         <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
