@@ -509,6 +509,7 @@ export function TeaPreReserva() {
   const [suggestionModalOpened, setSuggestionModalOpened] = useState(false);
   // weekOffset removed: we display the single relevant week without navigation
   const [suggestionModalContext, setSuggestionModalContext] = useState<SuggestionGroupContext | null>(null);
+  const [suggestionExistingSlotsByTherapyId, setSuggestionExistingSlotsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [rejectDecisionOpened, setRejectDecisionOpened] = useState(false);
   const [acceptSuggestionDecisionOpened, setAcceptSuggestionDecisionOpened] = useState(false);
   const [manualModalOpened, setManualModalOpened] = useState(false);
@@ -790,9 +791,29 @@ export function TeaPreReserva() {
   const renderProgressTrail = (progress: PitProgressInfo, keyPrefix: string) => {
 
     const hasFrequencyRegression = progress.regressedScheduledCount > 0;
-    const reservedTotal = progress.reservedPartialCount + progress.reservedCompleteCount;
-    const reservedPartialActive = reservedTotal > 0;
-    const reservedCompleteActive = progress.reservedCompleteCount >= progress.totalTherapies;
+    const reservedReachedCount = (
+      progress.reservedPartialCount
+      + progress.reservedCompleteCount
+      + progress.pendingApprovalCount
+      + progress.inAuthorizationCount
+      + progress.authorizedCount
+      + progress.convertedCount
+    );
+    const reservedCompleteReachedCount = (
+      progress.reservedCompleteCount
+      + progress.pendingApprovalCount
+      + progress.inAuthorizationCount
+      + progress.authorizedCount
+      + progress.convertedCount
+    );
+    const reservedPartialActive = reservedReachedCount > 0;
+    const reservedCompleteActive = reservedCompleteReachedCount >= progress.totalTherapies;
+    const hasPendingTherapyRegression = progress.pendingCount > 0 && reservedReachedCount > 0;
+    const hasReservedTherapyRegression = (
+      (progress.reservedPartialCount > 0 || progress.reservedCompleteCount > 0)
+      && (progress.pendingApprovalCount > 0 || progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0)
+    );
+    const hasProgressRegression = hasFrequencyRegression || hasPendingTherapyRegression || hasReservedTherapyRegression;
     const inAuthorizationActive = progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0;
     const pendingApprovalActive = progress.pendingApprovalCount > 0 || inAuthorizationActive;
     const scheduledPartialActive = progress.convertedCount > 0 || progress.regressedScheduledCount > 0;
@@ -806,15 +827,11 @@ export function TeaPreReserva() {
     const pendingDeadline = progress.pendingApprovalDeadlineAt ? dayjs(progress.pendingApprovalDeadlineAt) : null;
     const hasLivePendingApproval = progress.pendingApprovalCount > 0;
     const hasDownstreamProgress = inAuthorizationActive || scheduledCompleteActive;
-    const shouldCarryPendingApprovalInRegression = hasFrequencyRegression && (
-      progress.inAuthorizationCount > 0
-      || progress.authorizedCount > 0
-      || progress.convertedCount > 0
-    );
     const pendingApprovalElapsedRatio = (() => {
-      if (hasFrequencyRegression && !hasLivePendingApproval && !shouldCarryPendingApprovalInRegression) return 0;
+      if ((hasPendingTherapyRegression || hasReservedTherapyRegression) && !hasLivePendingApproval) return 0;
       // Once PIT advances beyond approval step, keep this stage visibly filled.
       if (hasDownstreamProgress) return 1;
+      if (hasFrequencyRegression && !hasLivePendingApproval) return 0;
       if (!hasLivePendingApproval) return stageFilledByStep[pendingApprovalStepIndex] ? 1 : 0;
       if (!pendingRequested?.isValid() || !pendingDeadline?.isValid()) return 0.2;
       const totalMs = pendingDeadline.valueOf() - pendingRequested.valueOf();
@@ -833,31 +850,42 @@ export function TeaPreReserva() {
         }
         return 0.5;
       }
-      return stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
+      if (hasPendingTherapyRegression || hasReservedTherapyRegression) {
+        if (progress.totalTherapies <= 0) return 0;
+        return Math.max(0, Math.min(1, authorizationDone / progress.totalTherapies));
+      }
+      return authorizationRatio;
     })();
 
     const authorizationStepActive = (
       inAuthorizationActive
       || stageFilledByStep[4]
       || (hasFrequencyRegression && progress.regressionTargetSessions > 0 && progress.authorizedCount < progress.totalTherapies)
+      || hasPendingTherapyRegression
+      || hasReservedTherapyRegression
     );
-    const shouldCarryReservedStepsInRegression = hasFrequencyRegression && (
+    const shouldCarryReservedStepsInRegression = hasProgressRegression && (
       progress.pendingApprovalCount > 0
       || progress.inAuthorizationCount > 0
-      || progress.authorizedCount > 0
-      || progress.convertedCount > 0
     );
 
     const activeByStep: boolean[] = [
       stageFilledByStep[0], // PIT gerado
-      hasFrequencyRegression
+      hasProgressRegression
         ? (reservedPartialActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[1]))
         : (reservedPartialActive || stageFilledByStep[1]),
-      hasFrequencyRegression
+      hasProgressRegression
         ? (reservedCompleteActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[2]))
         : (reservedCompleteActive || stageFilledByStep[2]),
-      hasFrequencyRegression
-        ? (progress.pendingApprovalCount > 0 || shouldCarryPendingApprovalInRegression)
+      hasProgressRegression
+        ? (
+          progress.pendingApprovalCount > 0
+          || progress.inAuthorizationCount > 0
+          || (
+            !hasReservedTherapyRegression
+            && (progress.authorizedCount > 0 || progress.convertedCount > 0)
+          )
+        )
         : (pendingApprovalActive || stageFilledByStep[3]),
       authorizationStepActive,
       scheduledPartialActive || stageFilledByStep[5],
@@ -951,12 +979,16 @@ export function TeaPreReserva() {
     const isFrequencyAdjustedFlow = String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE';
     const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
     const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
-    const regressionCompletedSessions = isFrequencyAdjustedFlow
+    const previousWeeklyFrequency = isFrequencyAdjustedFlow
       ? Math.max(0, Number(item?.previousWeeklyFrequency || 0))
       : 0;
+    const regressionCompletedSessions = previousWeeklyFrequency;
     const regressionTargetSessions = isFrequencyAdjustedFlow
       ? Math.max(1, Number(item?.currentWeeklyFrequency || item?.preferences?.weeklyFrequency || 1))
       : 0;
+    const carriedReservedSessions = isFrequencyAdjustedFlow
+      ? Math.max(weeklyReserved, previousWeeklyFrequency)
+      : weeklyReserved;
     const isRegressionPending = (
       isFrequencyAdjustedFlow
       && (
@@ -964,8 +996,13 @@ export function TeaPreReserva() {
         || (status === 'RESERVED' && weeklyReserved === 0)
       )
     );
-    const reservedComplete = status === 'RESERVED' && weeklyReserved >= weeklyTarget;
-    const reservedPartial = status === 'RESERVED' && !reservedComplete && !isRegressionPending;
+    const isReservationPreparedStatus = status === 'RESERVED' || status === 'PROPOSED';
+    const reservedComplete = status === 'PROPOSED'
+      || (isReservationPreparedStatus && carriedReservedSessions >= weeklyTarget);
+    const reservedPartial = (
+      (isReservationPreparedStatus && !reservedComplete)
+      || (isFrequencyAdjustedFlow && status === 'PENDING_SCHEDULING' && carriedReservedSessions > 0)
+    );
 
     let stage: PitProgressStage = 'PIT_GERADO';
     let stepIndex = 1;
@@ -979,16 +1016,13 @@ export function TeaPreReserva() {
     } else if (status === 'AUTHORIZED') {
       stage = 'AGENDADO_PARCIAL';
       stepIndex = 6;
-    } else if (status === 'PROPOSED') {
-      stage = 'AGUARDANDO_APROVACAO';
-      stepIndex = 4;
-    } else if (isRegressionPending) {
-      stage = 'AGENDADO_PARCIAL';
-      stepIndex = 6;
     } else if (reservedComplete) {
       stage = 'RESERVADO_COMPLETO';
       stepIndex = 3;
     } else if (reservedPartial) {
+      stage = 'RESERVADO_PARCIAL';
+      stepIndex = 2;
+    } else if (isRegressionPending) {
       stage = 'RESERVADO_PARCIAL';
       stepIndex = 2;
     }
@@ -1004,11 +1038,11 @@ export function TeaPreReserva() {
       pendingCount: status === 'PENDING_SCHEDULING' ? 1 : 0,
       reservedPartialCount: reservedPartial ? 1 : 0,
       reservedCompleteCount: reservedComplete ? 1 : 0,
-      pendingApprovalCount: status === 'PROPOSED' ? 1 : 0,
-      pendingApprovalRequestedAt: status === 'PROPOSED'
+      pendingApprovalCount: status === 'PENDING_AUTHORIZATION' ? 1 : 0,
+      pendingApprovalRequestedAt: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION'
         ? String(item?.approvalRequestedAt || item?.updatedAt || item?.createdAt || '') || null
         : null,
-      pendingApprovalDeadlineAt: status === 'PROPOSED'
+      pendingApprovalDeadlineAt: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION'
         ? String(item?.approvalDeadlineAt || item?.expiresAt || '') || null
         : null,
       inAuthorizationCount: status === 'PENDING_AUTHORIZATION' ? 1 : 0,
@@ -1080,7 +1114,7 @@ export function TeaPreReserva() {
     if (aggregated.convertedCount >= aggregated.totalTherapies && aggregated.totalTherapies > 0) {
       aggregated.stage = 'AGENDADO_COMPLETO';
       aggregated.stepIndex = 7;
-    } else if (aggregated.convertedCount > 0 || aggregated.regressedScheduledCount > 0 || aggregated.authorizedCount > 0) {
+    } else if (aggregated.convertedCount > 0 || aggregated.authorizedCount > 0) {
       aggregated.stage = 'AGENDADO_PARCIAL';
       aggregated.stepIndex = 6;
     } else if (aggregated.inAuthorizationCount > 0) {
@@ -2466,6 +2500,13 @@ export function TeaPreReserva() {
       }
 
       setSuggestionsByTherapyId((prev) => ({ ...prev, ...nextByTherapyId }));
+      setSuggestionExistingSlotsByTherapyId((prev) => {
+        const next = { ...prev };
+        context.therapies.forEach((therapy) => {
+          next[therapy.pitTherapyId] = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
+        });
+        return next;
+      });
       setTriedSlotsByTherapyId((prev) => {
         const next = { ...prev };
         Object.entries(nextByTherapyId).forEach(([therapyId, slots]) => {
@@ -2494,6 +2535,13 @@ export function TeaPreReserva() {
       const next = { ...prev };
       context.therapies.forEach((therapy) => {
         next[therapy.pitTherapyId] = [];
+      });
+      return next;
+    });
+    setSuggestionExistingSlotsByTherapyId((prev) => {
+      const next = { ...prev };
+      context.therapies.forEach((therapy) => {
+        delete next[therapy.pitTherapyId];
       });
       return next;
     });
@@ -2562,9 +2610,42 @@ export function TeaPreReserva() {
     try {
       const validations = await Promise.all(
         therapiesWithSlots.map(async (entry) => {
+          const weeklyFrequency = Math.max(1, Number(entry.therapy.weeklyFrequency || 1));
+          const existingSlots = suggestionExistingSlotsByTherapyId[entry.therapy.pitTherapyId] || [];
+          const existingWeeklyCount = buildWeeklySlotSignatures(existingSlots).length;
+          const combinedWeeklyCount = buildWeeklySlotSignatures([
+            ...existingSlots,
+            ...entry.slotsToApply,
+          ]).length;
+          const previousWeeklyFrequency = Math.max(0, Number(entry.therapy.previousWeeklyFrequency || 0));
+          const baselineReserved = String(entry.therapy.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+            ? Math.max(existingWeeklyCount, previousWeeklyFrequency)
+            : existingWeeklyCount;
+          const resolvedWeeklyCount = String(entry.therapy.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+            ? Math.max(combinedWeeklyCount, baselineReserved)
+            : combinedWeeklyCount;
+          if (String(entry.therapy.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE') {
+            return {
+              pitTherapyId: entry.therapy.pitTherapyId,
+              valid: resolvedWeeklyCount >= weeklyFrequency,
+              missingWeeks: resolvedWeeklyCount >= weeklyFrequency ? 0 : 1,
+              exceedsWeeks: resolvedWeeklyCount > weeklyFrequency ? 1 : 0,
+              missingSlots: Math.max(0, weeklyFrequency - resolvedWeeklyCount),
+              exceedsSlots: Math.max(0, resolvedWeeklyCount - weeklyFrequency),
+            };
+          }
+
+          const validationSuggestions = Array.from(new Map(
+            [
+              ...existingSlots,
+              ...entry.slotsToApply,
+            ]
+              .filter((slot) => slot?.date && slot?.time)
+              .map((slot) => [`${slot.date}#${slot.time}`, slot] as const),
+          ).values());
           const data: any = await teaPreReservationService.validateWeekly({
             pitTherapyId: entry.therapy.pitTherapyId,
-            suggestions: entry.slotsToApply,
+            suggestions: validationSuggestions,
           });
 
           const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
@@ -3842,6 +3923,10 @@ export function TeaPreReserva() {
                       const groupTeaProfileId = String(group.therapies[0]?.teaProfileId || group.therapies[0]?.pitId || '');
                       const removedTherapies = group.therapies.filter((item) => Boolean(item?.removedFromPit));
                       const frequencyChangedTherapies = group.therapies.filter((item) => String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE');
+                      const allReservationsForSamePit = [
+                        ...(existingGroupForSamePit?.reservations || []),
+                        ...(completedGroupForSamePit?.reservations || []),
+                      ];
                       const pitProgress = buildPitProgressFromItems([
                         ...group.therapies,
                         ...existingReservationsWithoutDuplicates,
@@ -3853,8 +3938,7 @@ export function TeaPreReserva() {
                       const canScheduleGroup = groupContext.therapies.length > 0;
                       const existingSlotsByTherapy = buildExistingSlotsByTherapyFromReservations([
                         ...(group.therapies || []),
-                        ...existingReservationsWithoutDuplicates,
-                        ...completedReservationsWithoutDuplicates,
+                        ...allReservationsForSamePit,
                       ]);
                       const hasSchedulableTherapiesInPending = group.therapies.some((item) => {
                         const status = String(item?.status || '');
