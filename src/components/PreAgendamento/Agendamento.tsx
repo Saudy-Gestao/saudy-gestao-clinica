@@ -108,12 +108,32 @@ interface SuggestedScheduleOption {
   items: SuggestedProcedureSchedule[];
 }
 
+interface ProcedureAnchorSelection {
+  procedure: string;
+  doctorName: string;
+  date: Date;
+  time: string;
+  durationMinutes: number;
+}
+
+interface PendingAnchorSlotSelection {
+  doctorName: string;
+  date: Date;
+  time: string;
+}
+
+interface PendingProfessionalSlotSelection {
+  date: Date;
+  time: string;
+  procedure: string;
+}
+
 const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   pacienteId: '',
   pacienteNome: '',
   pacienteCPF: '',
   especialidade: '',
-  convenio: '',
+  convenio: 'Particular',
   data: null,
   hora: '',
   profissional: '',
@@ -128,6 +148,30 @@ const INITIAL_PENDING_PATIENT: PendingPatientRegistration = {
   gender: '',
   cellphone: '',
   email: '',
+};
+
+const PARTICULAR_INSURANCE_LABEL = 'Particular';
+const PARTICULAR_STATUS_LABEL = 'Particular';
+const NOT_APPLICABLE_LABEL = 'Não se aplica';
+
+const resolvePatientInsuranceName = (patient: any): string => {
+  const insuranceName = String(
+    patient?.healthInsuranceName
+    ?? patient?.insuranceName
+    ?? patient?.convenio
+    ?? '',
+  ).trim();
+  return insuranceName || PARTICULAR_INSURANCE_LABEL;
+};
+
+const patientHasRegisteredInsurance = (patient: any): boolean => {
+  const insuranceName = String(
+    patient?.healthInsuranceName
+    ?? patient?.insuranceName
+    ?? patient?.convenio
+    ?? '',
+  ).trim();
+  return Boolean(insuranceName) && normalizeComparableText(insuranceName) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL);
 };
 
 const TIME_SLOTS = {
@@ -307,6 +351,12 @@ export function Agendamento() {
   const [selectedSuggestedOptionId, setSelectedSuggestedOptionId] = useState<string | null>(null);
   const [generatingSuggestion, setGeneratingSuggestion] = useState(false);
   const [rescheduleSourceId, setRescheduleSourceId] = useState<string | null>(null);
+  const [manualProcedureSelections, setManualProcedureSelections] = useState<ProcedureAnchorSelection[]>([]);
+  const [anchorProcedureModalOpen, setAnchorProcedureModalOpen] = useState(false);
+  const [pendingAnchorSlot, setPendingAnchorSlot] = useState<PendingAnchorSlotSelection | null>(null);
+  const [professionalSlotModalOpen, setProfessionalSlotModalOpen] = useState(false);
+  const [pendingProfessionalSlot, setPendingProfessionalSlot] = useState<PendingProfessionalSlotSelection | null>(null);
+  const [suggestionOptionsModalOpen, setSuggestionOptionsModalOpen] = useState(false);
 
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState<string | null>(null);
@@ -324,6 +374,7 @@ export function Agendamento() {
   const resetSchedulingForm = (keepDate: Date | null = dataHoraFiltro || new Date()) => {
     setNovoAgendamento({
       ...INITIAL_NOVO_AGENDAMENTO,
+      convenio: PARTICULAR_INSURANCE_LABEL,
       data: keepDate,
     });
     setSelectedPatientId(null);
@@ -337,7 +388,27 @@ export function Agendamento() {
     setSuggestedOptions([]);
     setSelectedSuggestedOptionId(null);
     setRescheduleSourceId(null);
+    setManualProcedureSelections([]);
+    setAnchorProcedureModalOpen(false);
+    setPendingAnchorSlot(null);
+    setProfessionalSlotModalOpen(false);
+    setPendingProfessionalSlot(null);
   };
+
+  useEffect(() => {
+    setManualProcedureSelections((prev) => {
+      const filtered = prev.filter((item) => selectedSpecialties.includes(item.procedure));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+
+    if (selectedSpecialties.length === 0) {
+      setPendingAnchorSlot(null);
+      setAnchorProcedureModalOpen(false);
+      setSuggestedOptions([]);
+      setSelectedSuggestedOptionId(null);
+      setNovoAgendamento((prev) => ({ ...prev, profissional: '', hora: '' }));
+    }
+  }, [selectedSpecialties]);
 
 
 
@@ -456,7 +527,12 @@ export function Agendamento() {
           })
           .filter(Boolean) as { value: string; label: string }[];
 
-        setInsuranceOptions(options);
+        const mergedOptions = [
+          { value: PARTICULAR_INSURANCE_LABEL, label: PARTICULAR_INSURANCE_LABEL },
+          ...options.filter((item, index, arr) => arr.findIndex((current) => current.value === item.value) === index),
+        ];
+
+        setInsuranceOptions(mergedOptions);
       } catch (err: any) {
         showNotification({
           title: 'Erro',
@@ -678,6 +754,7 @@ export function Agendamento() {
         pacienteId: '',
         pacienteNome: '',
         pacienteCPF: '',
+        convenio: PARTICULAR_INSURANCE_LABEL,
       }));
       return;
     }
@@ -693,7 +770,7 @@ export function Agendamento() {
       pacienteId: String(p.id ?? p.patientId ?? value),
       pacienteNome: p.name || p.fullName || p.patientName || prev.pacienteNome || '',
       pacienteCPF: p.cpf || prev.pacienteCPF || '',
-      convenio: p.healthInsuranceName || prev.convenio || '',
+      convenio: resolvePatientInsuranceName(p),
     }));
   };
 
@@ -705,6 +782,7 @@ export function Agendamento() {
       pacienteId: '',
       pacienteNome: pendingPatient.name || '',
       pacienteCPF: pendingPatient.cpf || '',
+      convenio: prev.convenio || PARTICULAR_INSURANCE_LABEL,
     }));
   };
 
@@ -772,8 +850,11 @@ export function Agendamento() {
         gender: pendingPatient.gender,
         cellphone: onlyDigits(pendingPatient.cellphone),
         email: pendingPatient.email || undefined,
-        hasHealthInsurance: Boolean(novoAgendamento.convenio),
-        healthInsuranceName: novoAgendamento.convenio || undefined,
+        hasHealthInsurance: normalizeComparableText(novoAgendamento.convenio) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL),
+        healthInsuranceName:
+          normalizeComparableText(novoAgendamento.convenio) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL)
+            ? (novoAgendamento.convenio || undefined)
+            : undefined,
       });
 
       const createdId = String(created?.id || created?.patientId || '');
@@ -850,6 +931,7 @@ export function Agendamento() {
 
     const resolvedPatient = await ensurePatientForScheduling();
     if (!resolvedPatient) return;
+    const resolvedInsuranceName = novoAgendamento.convenio || PARTICULAR_INSURANCE_LABEL;
 
     setSavingAgendamento(true);
     if (isEditing && editingAgendamentoId !== null) {
@@ -862,7 +944,9 @@ export function Agendamento() {
           doctorName: novoAgendamento.profissional || undefined,
           specialty: selectedSpecialties.join(', '),
           durationMinutes: selectedProcedureDuration,
-          convenio: novoAgendamento.convenio || undefined,
+          convenio: resolvedInsuranceName,
+          insurance: resolvedInsuranceName,
+          healthInsuranceName: resolvedInsuranceName,
           date: formatDateForApi(novoAgendamento.data),
           time: novoAgendamento.hora,
           observations: novoAgendamento.informacoes || undefined,
@@ -900,7 +984,9 @@ export function Agendamento() {
               doctorName: suggestion.doctorName,
               specialty: suggestion.procedure,
               durationMinutes: suggestion.durationMinutes,
-              convenio: novoAgendamento.convenio || undefined,
+              convenio: resolvedInsuranceName,
+              insurance: resolvedInsuranceName,
+              healthInsuranceName: resolvedInsuranceName,
               date: formatDateForApi(suggestion.date),
               time: suggestion.time,
               observations: novoAgendamento.informacoes || undefined,
@@ -917,7 +1003,9 @@ export function Agendamento() {
             doctorName: novoAgendamento.profissional || undefined,
             specialty: selectedSpecialties.join(', '),
             durationMinutes: selectedProcedureDuration,
-            convenio: novoAgendamento.convenio || undefined,
+            convenio: resolvedInsuranceName,
+            insurance: resolvedInsuranceName,
+            healthInsuranceName: resolvedInsuranceName,
             date: formatDateForApi(novoAgendamento.data),
             time: novoAgendamento.hora,
             observations: novoAgendamento.informacoes || undefined,
@@ -1075,14 +1163,22 @@ export function Agendamento() {
   }, [location.state, navigate]);
 
   const schedulingDate = viewedDate || novoAgendamento.data || dataHoraFiltro || new Date();
-  const selectedProcedureDuration = Math.max(
+  const isMultiProcedureFlow = selectedSpecialties.length > 1;
+  const anchorSelection = manualProcedureSelections[0] || null;
+  const totalSelectedProcedureDuration = Math.max(
     15,
     selectedSpecialties.reduce((total, selected) => {
       const duration = Number(procedureMetaByName[selected]?.durationMinutes);
       return total + (Number.isFinite(duration) && duration > 0 ? duration : 30);
     }, 0) || 30,
   );
-  const isMultiProcedureFlow = selectedSpecialties.length > 1;
+  const anchorProcedureDuration = anchorSelection?.durationMinutes || null;
+  const selectedProcedureDuration = Math.max(
+    15,
+    isMultiProcedureFlow
+      ? (anchorProcedureDuration || 30)
+      : totalSelectedProcedureDuration,
+  );
   const filteredDoctorOptions = doctorOptions.filter((option) => {
     if (selectedSpecialties.length === 0) return true;
     const meta = doctorMetaByName[option.value];
@@ -1110,6 +1206,12 @@ export function Agendamento() {
   });
   const schedulerDoctors = (() => {
     if (novoAgendamento.profissional) return [novoAgendamento.profissional];
+    if (isMultiProcedureFlow && manualProcedureSelections.length > 0) {
+      return Array.from(new Set([
+        ...manualProcedureSelections.map((item) => item.doctorName),
+        ...filteredDoctorOptions.map((item) => item.value),
+      ]));
+    }
     return filteredDoctorOptions.map((item) => item.value);
   })();
   const getAppointmentsForDate = (date: Date) => agendamentos.filter(
@@ -1122,7 +1224,58 @@ export function Agendamento() {
   const selectedSuggestedOption = safeSuggestedOptions.find((option) => option.id === selectedSuggestedOptionId) || null;
   const selectedSuggestedSchedules = selectedSuggestedOption?.items || [];
   const hasSelectedSuggestedSchedules = isMultiProcedureFlow && selectedSuggestedSchedules.length === selectedProcedureSummary.length;
+  const selectedSuggestedOptionLabel = selectedSuggestedOption
+    ? `Opção ${safeSuggestedOptions.findIndex((option) => option.id === selectedSuggestedOption.id) + 1}`
+    : null;
+  const selectedPatientRecord = patientById[selectedPatientId || ''] || null;
+  const selectedPatientInsuranceName = selectedPatientRecord
+    ? resolvePatientInsuranceName(selectedPatientRecord)
+    : (novoAgendamento.convenio || PARTICULAR_INSURANCE_LABEL);
+  const selectedPatientInsuranceHasRegisteredPlan = selectedPatientRecord
+    ? patientHasRegisteredInsurance(selectedPatientRecord)
+    : normalizeComparableText(selectedPatientInsuranceName) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL);
+  const selectedPatientInsuranceNumber = selectedPatientInsuranceHasRegisteredPlan
+    ? String(selectedPatientRecord?.healthInsuranceNumber || selectedPatientRecord?.insuranceCardNumber || '')
+    : NOT_APPLICABLE_LABEL;
+  const selectedPatientInsuranceValidity = selectedPatientInsuranceHasRegisteredPlan
+    ? (selectedPatientRecord?.healthInsuranceValidity ? dayjs(selectedPatientRecord.healthInsuranceValidity).format('MM/YY') : '')
+    : NOT_APPLICABLE_LABEL;
+  const selectedPatientInsuranceStatus = selectedPatientInsuranceHasRegisteredPlan
+    ? 'Ativo'
+    : PARTICULAR_STATUS_LABEL;
   const hasManualScheduleSelection = Boolean(novoAgendamento.profissional && novoAgendamento.hora);
+  const manualRangesForGrid = manualProcedureSelections
+    .filter((item) => dayjs(item.date).isSame(schedulingDate, 'day'))
+    .map((item, index) => ({
+      doctorName: item.doctorName,
+      startMinute: parseTimeToMinutes(item.time) || 0,
+      endMinute: (parseTimeToMinutes(item.time) || 0) + item.durationMinutes,
+      time: item.time,
+      procedure: item.procedure,
+      isPrimary: index === 0,
+    }));
+  const suggestedRangesForGrid = hasSelectedSuggestedSchedules
+    ? selectedSuggestedSchedules
+        .filter((item) => dayjs(item.date).isSame(schedulingDate, 'day'))
+        .map((item) => {
+          const startMinute = parseTimeToMinutes(item.time);
+          if (startMinute === null) return null;
+          return {
+            doctorName: item.doctorName,
+            startMinute,
+            endMinute: startMinute + item.durationMinutes,
+            time: item.time,
+            procedure: item.procedure,
+          };
+        })
+        .filter(Boolean) as Array<{
+          doctorName: string;
+          startMinute: number;
+          endMinute: number;
+          time: string;
+          procedure: string;
+        }>
+    : [];
   const hasPatientContext = Boolean(
     selectedPatientId || (
       String(novoAgendamento.pacienteNome || pendingPatient.name).trim()
@@ -1140,7 +1293,7 @@ export function Agendamento() {
     selectedProcedureSummary.length > 0 &&
     novoAgendamento.data &&
     (
-      (isMultiProcedureFlow && (hasSelectedSuggestedSchedules || hasManualScheduleSelection))
+      (isMultiProcedureFlow && hasSelectedSuggestedSchedules)
       || (!isMultiProcedureFlow && hasManualScheduleSelection)
     ) &&
     (!isManualPatientFlow || pendingPatientReadyForCreation),
@@ -1223,7 +1376,19 @@ export function Agendamento() {
       return doctorSlots.map((slot) => {
         const slotStartMinute = parseTimeToMinutes(slot) || 0;
         const currentAppointment = findOverlappingAppointment(doctor, slotStartMinute, slotStartMinute + 15);
-        const isSelected = novoAgendamento.profissional === doctor && novoAgendamento.hora === slot;
+        const isSelected = !isMultiProcedureFlow && novoAgendamento.profissional === doctor && novoAgendamento.hora === slot;
+        const matchingManualRange = manualRangesForGrid.find((item) =>
+          item.doctorName === doctor
+          && slotStartMinute >= item.startMinute
+          && slotStartMinute < item.endMinute,
+        ) || null;
+        const isAnchorStart = Boolean(matchingManualRange && matchingManualRange.time === slot);
+        const matchingSuggestedRange = suggestedRangesForGrid.find((item) =>
+          item.doctorName === doctor
+          && slotStartMinute >= item.startMinute
+          && slotStartMinute < item.endMinute,
+        ) || null;
+        const isSuggestedStart = Boolean(matchingSuggestedRange && matchingSuggestedRange.time === slot);
         const isCoveredBySelectedRange = Boolean(
           !isSelected
           && novoAgendamento.profissional === doctor
@@ -1240,6 +1405,13 @@ export function Agendamento() {
           doctor,
           slot,
           isSelected,
+          isAnchorStart,
+          anchorProcedure: matchingManualRange?.procedure || '',
+          isPrimaryAnchor: Boolean(matchingManualRange?.isPrimary),
+          isCoveredByAnchorRange: Boolean(matchingManualRange && matchingManualRange.time !== slot),
+          isSuggestedStart,
+          suggestedProcedure: matchingSuggestedRange?.procedure || '',
+          isCoveredBySuggestedRange: Boolean(matchingSuggestedRange && matchingSuggestedRange.time !== slot),
           isCoveredBySelectedRange,
           isOccupied,
           isTooShort,
@@ -1249,6 +1421,29 @@ export function Agendamento() {
     })
     .filter((item) => !item.isOccupied && !item.isTooShort)
     .sort((a, b) => (a.minute - b.minute) || a.doctor.localeCompare(b.doctor));
+  const scheduleSlotsByTime = flattenedScheduleSlots.reduce<Record<string, typeof flattenedScheduleSlots>>((acc, item) => {
+    if (!acc[item.slot]) acc[item.slot] = [];
+    acc[item.slot].push(item);
+    return acc;
+  }, {});
+  const displayScheduleSlots = novoAgendamento.profissional
+    ? flattenedScheduleSlots.map((item) => ({
+        ...item,
+        availableDoctorsForSlot: [item.doctor],
+        availableCount: 1,
+      }))
+    : Object.values(scheduleSlotsByTime)
+        .map((items) => {
+          const first = items[0];
+          return {
+            ...first,
+            key: `time-${first.slot}`,
+            doctor: '',
+            availableDoctorsForSlot: items.map((item) => item.doctor),
+            availableCount: items.length,
+          };
+        })
+        .sort((a, b) => (a.minute - b.minute));
   const dateHasAvailability = (date: Date) => {
     return schedulerDoctors.some((doctor) => {
       const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
@@ -1295,6 +1490,33 @@ export function Agendamento() {
   const findSuggestedSchedules = (): SuggestedScheduleOption[] => {
     const procedureNames = [...selectedSpecialties];
     if (procedureNames.length <= 1) return [];
+    if (!anchorSelection) return [];
+
+    const anchorDate = anchorSelection.date;
+    const anchorMinute = parseTimeToMinutes(anchorSelection.time);
+    const anchorEndMinute = anchorMinute !== null ? anchorMinute + anchorSelection.durationMinutes : null;
+    const remainingProcedureNames = [...procedureNames];
+    const anchorIndex = remainingProcedureNames.findIndex((item) => item === anchorSelection.procedure);
+    if (anchorIndex >= 0) {
+      remainingProcedureNames.splice(anchorIndex, 1);
+    }
+    if (remainingProcedureNames.length === 0) {
+      return [
+        {
+          id: `${dayjs(anchorDate).format('YYYYMMDD')}-anchor-only`,
+          totalWaitMinutes: 0,
+          items: [
+            {
+              procedure: anchorSelection.procedure,
+              doctorName: anchorSelection.doctorName,
+              date: anchorSelection.date,
+              time: anchorSelection.time,
+              durationMinutes: anchorSelection.durationMinutes,
+            },
+          ],
+        },
+      ];
+    }
 
     type Candidate = SuggestedProcedureSchedule & { start: number; end: number };
     type Assigned = Candidate[];
@@ -1306,17 +1528,26 @@ export function Agendamento() {
         return sameDoctorConflict || samePatientConflict;
       });
 
-    const scoreAssigned = (assigned: Assigned) => {
+    const scoreAssigned = (assigned: Assigned, date: Date) => {
       const ordered = [...assigned].sort((a, b) => a.start - b.start);
-      return ordered.reduce((score, item, index) => {
+      const waitScore = ordered.reduce((score, item, index) => {
         if (index === 0) return score;
         const previous = ordered[index - 1];
         return score + Math.max(0, item.start - previous.end);
       }, 0);
+
+      if (anchorEndMinute === null) return waitScore;
+
+      const sameDayPenalty = dayjs(date).isSame(anchorDate, 'day') ? 0 : 10000;
+      const proximityScore = ordered.reduce((score, item) => (
+        score + Math.abs(item.start - anchorEndMinute)
+      ), 0);
+
+      return waitScore + sameDayPenalty + proximityScore;
     };
 
     const searchForDate = (date: Date): SuggestedScheduleOption[] => {
-      const candidatesByProcedure = procedureNames.reduce<Record<string, Candidate[]>>((acc, procedureName) => {
+      const candidatesByProcedure = remainingProcedureNames.reduce<Record<string, Candidate[]>>((acc, procedureName) => {
         const durationMinutes = getProcedureDuration(procedureName);
         const doctors = getCompatibleDoctorsForProcedure(procedureName);
         const candidates = doctors.flatMap((doctorName) =>
@@ -1342,7 +1573,7 @@ export function Agendamento() {
 
       if (Object.values(candidatesByProcedure).some((items) => items.length === 0)) return [];
 
-      const procedureOrder = [...procedureNames].sort(
+      const procedureOrder = [...remainingProcedureNames].sort(
         (a, b) => (candidatesByProcedure[a]?.length || 0) - (candidatesByProcedure[b]?.length || 0),
       );
 
@@ -1350,15 +1581,18 @@ export function Agendamento() {
 
       const dfs = (index: number, assigned: Assigned) => {
         if (index >= procedureOrder.length) {
-          const currentScore = scoreAssigned(assigned);
+          const currentScore = scoreAssigned(assigned, date);
           foundOptions.push({ assigned: [...assigned], score: currentScore });
           return;
         }
 
         const procedureName = procedureOrder[index];
-        const candidates = candidatesByProcedure[procedureName] || [];
+        const candidates = [...(candidatesByProcedure[procedureName] || [])].sort((a, b) => {
+          if (anchorEndMinute === null) return a.start - b.start;
+          return Math.abs(a.start - anchorEndMinute) - Math.abs(b.start - anchorEndMinute);
+        });
         const orderedAssigned = [...assigned].sort((a, b) => a.start - b.start);
-        const lastEnd = orderedAssigned.length > 0 ? orderedAssigned[orderedAssigned.length - 1].end : null;
+        const lastEnd = orderedAssigned.length > 0 ? orderedAssigned[orderedAssigned.length - 1].end : anchorEndMinute;
 
         for (const candidate of candidates) {
           if (lastEnd !== null && candidate.start < lastEnd) continue;
@@ -1371,7 +1605,17 @@ export function Agendamento() {
         }
       };
 
-      dfs(0, []);
+      const anchorAssigned: Assigned = anchorEndMinute === null ? [] : [{
+        procedure: anchorSelection.procedure,
+        doctorName: anchorSelection.doctorName,
+        date: anchorSelection.date,
+        time: anchorSelection.time,
+        durationMinutes: anchorSelection.durationMinutes,
+        start: anchorMinute || 0,
+        end: anchorEndMinute,
+      }];
+
+      dfs(0, anchorAssigned);
       if (!foundOptions.length) return [];
 
       return foundOptions
@@ -1386,7 +1630,7 @@ export function Agendamento() {
           return {
             id: `${dayjs(date).format('YYYYMMDD')}-${index}`,
             totalWaitMinutes: option.score,
-            items: procedureNames.map((procedureName) => ({
+            items: [anchorSelection.procedure, ...remainingProcedureNames].map((procedureName) => ({
               procedure: procedureName,
               doctorName: byProcedure[procedureName].doctorName,
               date: byProcedure[procedureName].date,
@@ -1397,8 +1641,16 @@ export function Agendamento() {
         });
     };
 
-    for (let offset = 0; offset <= 14; offset += 1) {
-      const candidateDate = addDays(schedulingDate, offset);
+    const searchDates: Date[] = [anchorDate];
+    for (let offset = 1; offset <= 14; offset += 1) {
+      searchDates.push(addDays(anchorDate, offset));
+    }
+
+    const uniqueSearchDates = searchDates.filter((date, index, arr) =>
+      arr.findIndex((candidate) => dayjs(candidate).isSame(date, 'day')) === index,
+    );
+
+    for (const candidateDate of uniqueSearchDates) {
       const found = searchForDate(candidateDate);
       if (found.length > 0) return found;
     }
@@ -1407,6 +1659,14 @@ export function Agendamento() {
   };
   const handleGenerateSuggestedSchedules = async () => {
     if (selectedSpecialties.length <= 1) return;
+    if (!anchorSelection) {
+      showNotification({
+        title: 'Selecione a âncora',
+        message: 'Escolha um horário na grade e informe qual procedimento será feito nele antes de sugerir os próximos horários.',
+        color: 'yellow',
+      });
+      return;
+    }
     setGeneratingSuggestion(true);
     try {
       const result = findSuggestedSchedules();
@@ -1422,15 +1682,10 @@ export function Agendamento() {
       }
 
       setSuggestedOptions(result);
-      setSelectedSuggestedOptionId(result[0].id);
       const first = result[0].items[0];
-      setViewedDate(first.date);
-      setNovoAgendamento((prev) => ({
-        ...prev,
-        data: first.date,
-        profissional: '',
-        hora: '',
-      }));
+      handleApplySuggestedOption(result[0], Boolean(novoAgendamento.profissional));
+      setSuggestionOptionsModalOpen(true);
+      setActiveSchedulePeriod(resolveTurnoFromTime(first.time) || 'Manhã');
       showNotification({
         title: 'Sugestão pronta',
         message: `${result.length} opção(ões) geradas com foco no menor tempo de espera total.`,
@@ -1439,6 +1694,104 @@ export function Agendamento() {
     } finally {
       setGeneratingSuggestion(false);
     }
+  };
+  const handleApplySuggestedOption = (option: SuggestedScheduleOption, preserveSelectedProfessional = Boolean(novoAgendamento.profissional)) => {
+    setSelectedSuggestedOptionId(option.id);
+    const firstItem = option.items[0];
+    if (!firstItem) return;
+
+    setViewedDate(firstItem.date);
+    setActiveSchedulePeriod(resolveTurnoFromTime(firstItem.time) || 'Manhã');
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      data: firstItem.date,
+      profissional: preserveSelectedProfessional ? (prev.profissional || firstItem.doctorName) : '',
+      hora: '',
+    }));
+  };
+  const handleFinalizeProcedureSelection = (procedureName: string, doctorName: string, time: string, date: Date) => {
+    const durationMinutes = getProcedureDuration(procedureName);
+    const nextSelection = {
+      procedure: procedureName,
+      doctorName,
+      date,
+      time,
+      durationMinutes,
+    };
+    setManualProcedureSelections((prev) => {
+      const withoutProcedure = prev.filter((item) => item.procedure !== procedureName);
+      return [...withoutProcedure, nextSelection].sort(
+        (a, b) => (parseTimeToMinutes(a.time) || 0) - (parseTimeToMinutes(b.time) || 0),
+      );
+    });
+    setSelectedSuggestedOptionId(null);
+    setSuggestedOptions([]);
+    setViewedDate(date);
+    setActiveSchedulePeriod(resolveTurnoFromTime(time) || 'Manhã');
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      profissional: doctorName,
+      hora: time,
+      data: date,
+    }));
+  };
+
+  const handleSelectAnchorSlot = (doctorName: string, time: string, date: Date) => {
+    if (!isMultiProcedureFlow) {
+      setSelectedSuggestedOptionId(null);
+      setNovoAgendamento((prev) => ({
+        ...prev,
+        profissional: doctorName,
+        hora: time,
+        data: date,
+      }));
+      return;
+    }
+
+    setPendingAnchorSlot({ doctorName, time, date });
+    setAnchorProcedureModalOpen(true);
+  };
+
+  const handleSelectGridSlot = (slot: { doctor?: string; slot: string; availableDoctorsForSlot?: string[] }, date: Date) => {
+    if (!isMultiProcedureFlow) {
+      if (novoAgendamento.profissional) {
+        handleSelectAnchorSlot(slot.doctor || novoAgendamento.profissional, slot.slot, date);
+        return;
+      }
+
+      setPendingProfessionalSlot({ date, time: slot.slot, procedure: '' });
+      setProfessionalSlotModalOpen(true);
+      return;
+    }
+
+    setPendingAnchorSlot({ doctorName: slot.doctor || novoAgendamento.profissional || '', time: slot.slot, date });
+    setAnchorProcedureModalOpen(true);
+  };
+
+  const handleConfirmAnchorProcedure = (procedureName: string) => {
+    if (!pendingAnchorSlot) return;
+
+    if (!pendingAnchorSlot.doctorName) {
+      setAnchorProcedureModalOpen(false);
+      setPendingProfessionalSlot({
+        date: pendingAnchorSlot.date,
+        time: pendingAnchorSlot.time,
+        procedure: procedureName,
+      });
+      setProfessionalSlotModalOpen(true);
+      setPendingAnchorSlot(null);
+      return;
+    }
+
+    handleFinalizeProcedureSelection(
+      procedureName,
+      pendingAnchorSlot.doctorName,
+      pendingAnchorSlot.time,
+      pendingAnchorSlot.date,
+    );
+    setAnchorProcedureModalOpen(false);
+    setPendingAnchorSlot(null);
+    setActiveSchedulePeriod(resolveTurnoFromTime(pendingAnchorSlot.time) || 'Manhã');
   };
   const goToSchedulingDate = (date: Date) => {
     setViewedDate(date);
@@ -1596,7 +1949,7 @@ export function Agendamento() {
                   placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio'}
                   data={insuranceOptions}
                   value={novoAgendamento.convenio}
-                  onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenio: value || '' })}
+                  onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenio: value || PARTICULAR_INSURANCE_LABEL })}
                   searchable
                   clearable
                   disabled={insurancesLoading}
@@ -1604,17 +1957,17 @@ export function Agendamento() {
                 />
                 <FloatingInput
                   label="Número da carteirinha"
-                  value={String(patientById[selectedPatientId || '']?.healthInsuranceNumber || patientById[selectedPatientId || '']?.insuranceCardNumber || '')}
+                  value={selectedPatientInsuranceNumber}
                   readOnly
                 />
                 <FloatingInput
                   label="Data de validade"
-                  value={patientById[selectedPatientId || '']?.healthInsuranceValidity ? dayjs(patientById[selectedPatientId || '']?.healthInsuranceValidity).format('MM/YY') : ''}
+                  value={selectedPatientInsuranceValidity}
                   readOnly
                 />
                 <FloatingInput
                   label="Status"
-                  value={novoAgendamento.convenio ? 'Ativo' : ''}
+                  value={selectedPatientInsuranceStatus}
                   readOnly
                 />
               </SimpleGrid>
@@ -1767,7 +2120,36 @@ export function Agendamento() {
                       </Group>
 
                       {suggestedOptions.length > 0 && (
-                        <Stack gap="sm" mt="md">
+                        <>
+                          <Paper
+                            mt="md"
+                            p="sm"
+                            radius="md"
+                            bg={isDarkMode ? 'rgba(18, 184, 134, 0.08)' : 'rgba(18, 184, 134, 0.06)'}
+                            style={{ border: '1px solid rgba(18, 184, 134, 0.28)' }}
+                          >
+                            <Group justify="space-between" align="center" wrap="wrap">
+                              <Box>
+                                <Text fw={700}>Sugestões prontas</Text>
+                                <Text size="sm" c="dimmed">
+                                  {selectedSuggestedOptionLabel
+                                    ? `${selectedSuggestedOptionLabel} selecionada com espera total de ${selectedSuggestedOption?.totalWaitMinutes || 0} min.`
+                                    : `${safeSuggestedOptions.length} opção(ões) disponíveis.`}
+                                </Text>
+                              </Box>
+                              <Button variant="light" color="teal" onClick={() => setSuggestionOptionsModalOpen(true)}>
+                                Ver opções
+                              </Button>
+                            </Group>
+                          </Paper>
+                          <Modal
+                            opened={suggestionOptionsModalOpen}
+                            onClose={() => setSuggestionOptionsModalOpen(false)}
+                            title="Sugestões de horários próximos"
+                            centered
+                            size="xl"
+                          >
+                            <Stack gap="sm">
                           {safeSuggestedOptions.map((option, optionIndex) => {
                             const isSelected = selectedSuggestedOptionId === option.id;
                             return (
@@ -1793,7 +2175,10 @@ export function Agendamento() {
                                     size="xs"
                                     variant={isSelected ? 'filled' : 'light'}
                                     color={isSelected ? 'teal' : 'blue'}
-                                    onClick={() => setSelectedSuggestedOptionId(option.id)}
+                                    onClick={() => {
+                                      handleApplySuggestedOption(option, Boolean(novoAgendamento.profissional));
+                                      setSuggestionOptionsModalOpen(false);
+                                    }}
                                   >
                                     {isSelected ? 'Opção selecionada' : 'Escolher opção'}
                                   </Button>
@@ -1827,7 +2212,9 @@ export function Agendamento() {
                               </Paper>
                             );
                           })}
-                        </Stack>
+                            </Stack>
+                          </Modal>
+                        </>
                       )}
                     </Paper>
                   )}
@@ -1854,32 +2241,30 @@ export function Agendamento() {
                   )}
 
                   <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
-                    {flattenedScheduleSlots.map((slotItem) => (
+                    {displayScheduleSlots.map((slotItem) => (
                       <UnstyledButton
                         key={slotItem.key}
                           onClick={() => {
-                            if (slotItem.isCoveredBySelectedRange) return;
-                            setSelectedSuggestedOptionId(null);
-                            setNovoAgendamento((prev) => ({
-                              ...prev,
-                              profissional: slotItem.doctor,
-                              hora: slotItem.slot,
-                              data: schedulingDate,
-                            }));
+                            if (slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange) return;
+                            handleSelectGridSlot(slotItem, schedulingDate);
                           }}
                         style={{
                           padding: '10px 12px',
                           borderRadius: 8,
                           border: `1px solid ${
-                            slotItem.isSelected || slotItem.isCoveredBySelectedRange
+                            slotItem.isSelected || slotItem.isCoveredBySelectedRange || slotItem.isAnchorStart || slotItem.isCoveredByAnchorRange || slotItem.isSuggestedStart || slotItem.isCoveredBySuggestedRange
                               ? (isDarkMode ? 'rgba(66, 180, 255, 0.75)' : 'rgba(16, 99, 212, 0.48)')
                               : (isDarkMode ? 'rgba(66, 180, 255, 0.18)' : 'rgba(15, 23, 42, 0.12)')
                           }`,
                           background: slotItem.isSelected || slotItem.isCoveredBySelectedRange
                             ? (isDarkMode ? 'rgba(0, 70, 170, 0.45)' : 'rgba(219, 234, 254, 0.95)')
+                            : slotItem.isAnchorStart || slotItem.isCoveredByAnchorRange
+                              ? (isDarkMode ? 'rgba(249, 115, 22, 0.18)' : 'rgba(255, 237, 213, 0.95)')
+                            : slotItem.isSuggestedStart || slotItem.isCoveredBySuggestedRange
+                              ? (isDarkMode ? 'rgba(18, 184, 134, 0.18)' : 'rgba(209, 250, 229, 0.9)')
                             : (isDarkMode ? 'rgba(0, 70, 170, 0.30)' : '#ffffff'),
-                          cursor: slotItem.isCoveredBySelectedRange ? 'not-allowed' : 'pointer',
-                          opacity: slotItem.isCoveredBySelectedRange ? 0.82 : 1,
+                          cursor: slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange ? 'not-allowed' : 'pointer',
+                          opacity: slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange ? 0.82 : 1,
                           boxShadow: isDarkMode ? 'none' : '0 1px 2px rgba(15, 23, 42, 0.04)',
                         }}
                       >
@@ -1896,6 +2281,38 @@ export function Agendamento() {
                                              >
                                                SELECIONADO
                                              </Badge>
+                                          ) : slotItem.isAnchorStart ? (
+                                            <Badge
+                                              color="orange"
+                                              variant="light"
+                                              radius="xl"
+                                            >
+                                              SELECIONADO
+                                            </Badge>
+                                          ) : slotItem.isCoveredByAnchorRange ? (
+                                            <Badge
+                                              color="orange"
+                                              variant="light"
+                                              radius="xl"
+                                            >
+                                              EM EXECUÇÃO
+                                            </Badge>
+                                          ) : slotItem.isSuggestedStart ? (
+                                            <Badge
+                                              color="green"
+                                              variant="light"
+                                              radius="xl"
+                                            >
+                                              SUGERIDO
+                                            </Badge>
+                                          ) : slotItem.isCoveredBySuggestedRange ? (
+                                            <Badge
+                                              color="green"
+                                              variant="light"
+                                              radius="xl"
+                                            >
+                                              RESERVADO
+                                            </Badge>
                                           ) : slotItem.isCoveredBySelectedRange ? (
                                             <Badge
                                               color="blue"
@@ -1909,12 +2326,102 @@ export function Agendamento() {
                         <Group gap={6} wrap="nowrap">
                           <User size={14} />
                           <Text size="sm" c={isDarkMode ? 'rgba(255,255,255,0.78)' : 'rgba(15, 23, 42, 0.72)'} truncate>
-                            {slotItem.doctor}
+                            {novoAgendamento.profissional
+                              ? slotItem.doctor
+                              : `${slotItem.availableCount} profissional(is) disponível(is)`}
                           </Text>
                         </Group>
+                        {(slotItem.anchorProcedure || slotItem.suggestedProcedure) && (
+                          <Text
+                            mt={6}
+                            size="xs"
+                            fw={600}
+                            c={slotItem.anchorProcedure ? 'orange.7' : 'green.7'}
+                            truncate
+                          >
+                            {slotItem.anchorProcedure || slotItem.suggestedProcedure}
+                          </Text>
+                        )}
                       </UnstyledButton>
                     ))}
                   </SimpleGrid>
+
+                  <Modal
+                    opened={professionalSlotModalOpen}
+                    onClose={() => {
+                      setProfessionalSlotModalOpen(false);
+                      setPendingProfessionalSlot(null);
+                    }}
+                    title="Selecionar profissional"
+                    centered
+                    size="md"
+                  >
+                    <Stack gap="sm">
+                      <Text size="sm" c="dimmed">
+                        Profissionais com disponibilidade às {pendingProfessionalSlot?.time || '--:--'}.
+                      </Text>
+                      {(pendingProfessionalSlot ? (scheduleSlotsByTime[pendingProfessionalSlot.time] || []) : []).map((slotItem) => (
+                        <Button
+                          key={`${slotItem.doctor}-${slotItem.slot}`}
+                          variant="light"
+                          color="blue"
+                          justify="space-between"
+                          onClick={() => {
+                            setProfessionalSlotModalOpen(false);
+                            if (pendingProfessionalSlot?.procedure) {
+                              handleFinalizeProcedureSelection(
+                                pendingProfessionalSlot.procedure,
+                                slotItem.doctor,
+                                slotItem.slot,
+                                pendingProfessionalSlot.date,
+                              );
+                            } else {
+                              handleSelectAnchorSlot(slotItem.doctor, slotItem.slot, pendingProfessionalSlot?.date || schedulingDate);
+                            }
+                            setPendingProfessionalSlot(null);
+                          }}
+                        >
+                          {slotItem.doctor}
+                        </Button>
+                      ))}
+                    </Stack>
+                  </Modal>
+
+                  <Modal
+                    opened={anchorProcedureModalOpen}
+                    onClose={() => {
+                      setAnchorProcedureModalOpen(false);
+                      setPendingAnchorSlot(null);
+                    }}
+                    title="Vincular horário ao procedimento"
+                    centered
+                    size="md"
+                  >
+                    <Stack gap="sm">
+                      <Text size="sm" c="dimmed">
+                        Escolha qual procedimento será realizado às {pendingAnchorSlot?.time || '--:--'} com {pendingAnchorSlot?.doctorName || 'o profissional selecionado'}.
+                      </Text>
+                      {selectedSpecialties.map((procedureName) => {
+                        const isCurrentAnchor = manualProcedureSelections.some((item) =>
+                          item.procedure === procedureName
+                          && item.doctorName === pendingAnchorSlot?.doctorName
+                          && item.time === pendingAnchorSlot?.time
+                          && dayjs(item.date).isSame(pendingAnchorSlot?.date, 'day'),
+                        );
+                        return (
+                          <Button
+                            key={`${pendingAnchorSlot?.doctorName || 'doctor'}-${pendingAnchorSlot?.time || 'time'}-${procedureName}`}
+                            variant={isCurrentAnchor ? 'filled' : 'light'}
+                            color={isCurrentAnchor ? 'orange' : 'blue'}
+                            justify="space-between"
+                            onClick={() => handleConfirmAnchorProcedure(procedureName)}
+                          >
+                            {procedureName}
+                          </Button>
+                        );
+                      })}
+                    </Stack>
+                  </Modal>
                 </Stack>
               )}
 
@@ -2389,3 +2896,4 @@ export function Agendamento() {
     </Box>
   );
 }
+
