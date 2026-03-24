@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -36,6 +37,8 @@ import patientService from '../../services/patientService';
 import doctorService from '../../services/doctorService';
 import insuranceService from '../../services/insuranceService';
 import procedureService from '../../services/procedureService';
+import appointmentAttachmentService from '../../services/appointmentAttachmentService';
+import type { AppointmentAttachment } from '../../services/appointmentAttachmentService';
 import { formatCPF } from '../../utils/formatters';
 
 interface Agendamento {
@@ -307,6 +310,15 @@ export function Agendamento() {
   const [selectedSuggestedOptionId, setSelectedSuggestedOptionId] = useState<string | null>(null);
   const [generatingSuggestion, setGeneratingSuggestion] = useState(false);
   const [rescheduleSourceId, setRescheduleSourceId] = useState<string | null>(null);
+  const [reviewAttachments, setReviewAttachments] = useState<File[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<AppointmentAttachment[]>([]);
+  const [loadingExistingAttachments, setLoadingExistingAttachments] = useState(false);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailAppointment, setDetailAppointment] = useState<Agendamento | null>(null);
+  const [detailAttachments, setDetailAttachments] = useState<AppointmentAttachment[]>([]);
+  const [detailAttachmentsLoading, setDetailAttachmentsLoading] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState<string | null>(null);
@@ -337,6 +349,8 @@ export function Agendamento() {
     setSuggestedOptions([]);
     setSelectedSuggestedOptionId(null);
     setRescheduleSourceId(null);
+    setReviewAttachments([]);
+    setExistingAttachments([]);
   };
 
 
@@ -383,6 +397,97 @@ export function Agendamento() {
         color: 'red',
       });
     }
+  };
+
+  const fileToBase64 = async (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const loadExistingAttachments = async (appointmentId?: string | null) => {
+    if (!appointmentId) {
+      setExistingAttachments([]);
+      return;
+    }
+
+    try {
+      setLoadingExistingAttachments(true);
+      const response = await appointmentAttachmentService.listAttachments(appointmentId);
+      setExistingAttachments(response?.items || []);
+    } catch {
+      setExistingAttachments([]);
+    } finally {
+      setLoadingExistingAttachments(false);
+    }
+  };
+
+  const handleReviewAttachmentInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (!selectedFiles.length) return;
+
+    setReviewAttachments((prev) => {
+      const next = [...prev];
+      for (const file of selectedFiles) {
+        const exists = next.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
+        if (!exists) next.push(file);
+      }
+      return next;
+    });
+
+    event.target.value = '';
+  };
+
+  const handleRemoveReviewAttachment = (file: File) => {
+    setReviewAttachments((prev) => prev.filter((item) => !(item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)));
+  };
+
+  const handleOpenExistingAttachment = async (attachmentId: string) => {
+    try {
+      setOpeningAttachmentId(attachmentId);
+      const blob = await appointmentAttachmentService.viewAttachment(attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao abrir anexo',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Nao foi possivel abrir o anexo.',
+        color: 'red',
+      });
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  };
+
+  const loadDetailAttachments = async (appointmentId?: string | null) => {
+    if (!appointmentId) {
+      setDetailAttachments([]);
+      return;
+    }
+
+    try {
+      setDetailAttachmentsLoading(true);
+      const response = await appointmentAttachmentService.listAttachments(appointmentId);
+      setDetailAttachments(response?.items || []);
+    } catch {
+      setDetailAttachments([]);
+    } finally {
+      setDetailAttachmentsLoading(false);
+    }
+  };
+
+  const handleOpenAppointmentDetail = async (appointment: Agendamento) => {
+    setDetailAppointment(appointment);
+    setDetailOpen(true);
+    await loadDetailAttachments(appointment.id);
+  };
+
+  const handleEditFromDetail = () => {
+    if (!detailAppointment) return;
+    setDetailOpen(false);
+    handleEditAgendamento(detailAppointment);
   };
 
   useEffect(() => {
@@ -624,6 +729,8 @@ export function Agendamento() {
     setIsEditing(true);
     setEditingAgendamentoId(agendamento.id);
     setRescheduleSourceId(null);
+    setReviewAttachments([]);
+    loadExistingAttachments(agendamento.id);
     setActiveTab('marcacao');
     setSchedulingStep(0);
     if (appointmentDate) {
@@ -659,6 +766,8 @@ export function Agendamento() {
     setIsEditing(false);
     setEditingAgendamentoId(null);
     setRescheduleSourceId(agendamento.id);
+    setReviewAttachments([]);
+    setExistingAttachments([]);
     setActiveTab('marcacao');
     setSchedulingStep(0);
     if (appointmentDate) {
@@ -874,10 +983,22 @@ export function Agendamento() {
           status: current?.status || undefined,
           totem: current?.totem,
         });
+        if (reviewAttachments.length > 0) {
+          for (const file of reviewAttachments) {
+            const fileBase64 = await fileToBase64(file);
+            await appointmentAttachmentService.uploadAttachment(editingAgendamentoId, {
+              fileName: file.name,
+              fileBase64,
+              mimeType: file.type || undefined,
+            });
+          }
+        }
         await loadAgendamentos();
         showNotification({
           title: 'Agendamento atualizado',
-          message: 'Dados do agendamento atualizados com sucesso.',
+          message: reviewAttachments.length > 0
+            ? 'Dados do agendamento e anexos atualizados com sucesso.'
+            : 'Dados do agendamento atualizados com sucesso.',
           color: 'green',
         });
       } catch (err: any) {
@@ -891,9 +1012,10 @@ export function Agendamento() {
       }
     } else {
       try {
+        const createdAppointmentIds: string[] = [];
         if (isMultiProcedureFlow) {
           for (const suggestion of selectedSuggestedSchedules) {
-            await appointmentService.create({
+            const created = await appointmentService.create({
               patientId: resolvedPatient.patientId || undefined,
               patientName: resolvedPatient.patientName || undefined,
               patientCpf: resolvedPatient.patientCpf || undefined,
@@ -908,9 +1030,10 @@ export function Agendamento() {
               totem: Math.floor(Math.random() * 100) + 1,
               rescheduledFromAppointmentId: rescheduleSourceId || undefined,
             });
+            if (created?.id) createdAppointmentIds.push(String(created.id));
           }
         } else {
-          await appointmentService.create({
+          const created = await appointmentService.create({
             patientId: resolvedPatient.patientId || undefined,
             patientName: resolvedPatient.patientName || undefined,
             patientCpf: resolvedPatient.patientCpf || undefined,
@@ -925,13 +1048,27 @@ export function Agendamento() {
             totem: Math.floor(Math.random() * 100) + 1,
             rescheduledFromAppointmentId: rescheduleSourceId || undefined,
           });
+          if (created?.id) createdAppointmentIds.push(String(created.id));
+        }
+
+        if (reviewAttachments.length > 0 && createdAppointmentIds.length > 0) {
+          for (const appointmentId of createdAppointmentIds) {
+            for (const file of reviewAttachments) {
+              const fileBase64 = await fileToBase64(file);
+              await appointmentAttachmentService.uploadAttachment(appointmentId, {
+                fileName: file.name,
+                fileBase64,
+                mimeType: file.type || undefined,
+              });
+            }
+          }
         }
         await loadAgendamentos();
         showNotification({
           title: 'Agendamento criado',
           message: isMultiProcedureFlow
-            ? `${selectedSuggestedSchedules.length} agendamentos criados em sequência com sucesso.`
-            : 'Agendamento realizado com sucesso.',
+            ? `${selectedSuggestedSchedules.length} agendamentos criados${reviewAttachments.length > 0 ? ' com anexos' : ''} com sucesso.`
+            : `Agendamento realizado${reviewAttachments.length > 0 ? ' com anexos' : ''} com sucesso.`,
           color: 'green',
         });
       } catch (err: any) {
@@ -974,7 +1111,7 @@ export function Agendamento() {
       </Box>
 
       {/* Vertical separator and main content */}
-      <Box onClick={() => handleEditAgendamento(agendamento)} style={{ borderLeft: !isMobile ? '1px solid var(--mantine-color-default-border)' : 'none', paddingLeft: !isMobile ? 16 : 0, flex: 1, cursor: 'pointer' }}>
+      <Box onClick={() => handleOpenAppointmentDetail(agendamento)} style={{ borderLeft: !isMobile ? '1px solid var(--mantine-color-default-border)' : 'none', paddingLeft: !isMobile ? 16 : 0, flex: 1, cursor: 'pointer' }}>
         <Text fw={600} size="sm">{agendamento.pacienteNome}</Text>
         <Text size="xs" c="dimmed" mt={6}>
           {getResumoLinha(agendamento)}
@@ -1019,6 +1156,9 @@ export function Agendamento() {
             Reagendar
           </Button>
         )}
+        <Button size="xs" variant="subtle" onClick={() => handleEditAgendamento(agendamento)}>
+          Editar
+        </Button>
 	      </Box>
 	    </Box>
 	  ));
@@ -1910,6 +2050,86 @@ export function Agendamento() {
               <FloatingInput label="Profissional respons." value={novoAgendamento.profissional || selectedSuggestedSchedules[0]?.doctorName || ''} readOnly />
               </SimpleGrid>
 
+              <Paper
+                p="md"
+                radius="lg"
+                bg={isDarkMode ? 'transparent' : 'rgba(0, 31, 84, 0.12)'}
+                style={{
+                  border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : undefined,
+                }}
+              >
+                <Stack gap="sm">
+                  <Group justify="space-between" align="center">
+                    <Box>
+                      <Text fw={700}>Documentos do agendamento</Text>
+                      <Text size="sm" c="dimmed">
+                        Anexe pedido medico, guia, identidade ou outros documentos relevantes.
+                      </Text>
+                    </Box>
+                    <Button variant="light" onClick={() => attachmentInputRef.current?.click()}>
+                      Anexar documentos
+                    </Button>
+                  </Group>
+
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleReviewAttachmentInput}
+                  />
+
+                  {reviewAttachments.length > 0 && (
+                    <Stack gap={6}>
+                      <Text size="sm" fw={600}>Arquivos para enviar</Text>
+                      {reviewAttachments.map((file) => (
+                        <Group key={`${file.name}-${file.lastModified}-${file.size}`} justify="space-between" wrap="nowrap">
+                          <Box>
+                            <Text size="sm" fw={500}>{file.name}</Text>
+                            <Text size="xs" c="dimmed">
+                              {(file.size / 1024).toFixed(1)} KB{file.type ? ` • ${file.type}` : ''}
+                            </Text>
+                          </Box>
+                          <Button variant="subtle" color="red" size="xs" onClick={() => handleRemoveReviewAttachment(file)}>
+                            Remover
+                          </Button>
+                        </Group>
+                      ))}
+                    </Stack>
+                  )}
+
+                  {isEditing && (
+                    <Stack gap={6}>
+                      <Text size="sm" fw={600}>Anexos ja enviados</Text>
+                      {loadingExistingAttachments ? (
+                        <Text size="sm" c="dimmed">Carregando anexos...</Text>
+                      ) : existingAttachments.length > 0 ? (
+                        existingAttachments.map((attachment) => (
+                          <Group key={attachment.id} justify="space-between" wrap="nowrap">
+                            <Box>
+                              <Text size="sm" fw={500}>{attachment.fileName}</Text>
+                              <Text size="xs" c="dimmed">
+                                {attachment.uploadedAt ? dayjs(attachment.uploadedAt).format('DD/MM/YYYY HH:mm') : 'Anexo enviado'}
+                              </Text>
+                            </Box>
+                            <Button
+                              variant="subtle"
+                              size="xs"
+                              loading={openingAttachmentId === attachment.id}
+                              onClick={() => handleOpenExistingAttachment(attachment.id)}
+                            >
+                              Abrir
+                            </Button>
+                          </Group>
+                        ))
+                      ) : (
+                        <Text size="sm" c="dimmed">Nenhum anexo enviado ainda.</Text>
+                      )}
+                    </Stack>
+                  )}
+                </Stack>
+              </Paper>
+
               {isManualPatientFlow && (
                 <Paper
                   p="md"
@@ -2198,9 +2418,14 @@ export function Agendamento() {
                       {!isExpanded ? (
                         <Group mt={8} justify="apart">
                           <Text size="sm">{a.especialidade || '—'}</Text>
-                          <Button size="xs" variant="outline" onClick={() => setExpandedIds(prev => prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id])}>
-                            Ver mais
-                          </Button>
+                          <Group gap="xs">
+                            <Button size="xs" variant="outline" onClick={() => setExpandedIds(prev => prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id])}>
+                              Ver mais
+                            </Button>
+                            <Button size="xs" variant="subtle" onClick={() => handleOpenAppointmentDetail(a)}>
+                              Detalhes
+                            </Button>
+                          </Group>
                         </Group>
                       ) : (
                         <Box mt={8}>
@@ -2339,8 +2564,8 @@ export function Agendamento() {
                             <Text size="xs" c="dimmed">{getResumoLinha(a)}</Text>
                           </Box>
                           <Box style={{ marginLeft: 12 }}>
-                            <Button size="xs" onClick={() => { handleEditAgendamento(a); setCalendarModalOpen(false); }}>
-                              Editar
+                            <Button size="xs" onClick={() => { handleOpenAppointmentDetail(a); setCalendarModalOpen(false); }}>
+                              Detalhes
                             </Button>
                           </Box>
                         </Group>
@@ -2361,6 +2586,130 @@ export function Agendamento() {
           </Tabs.Panel>
         </Tabs>
       </Box>
+
+      <Modal
+        opened={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title="Detalhes do agendamento"
+        centered
+        size={isMobile ? '100%' : 'xl'}
+        fullScreen={isMobile}
+        styles={{
+          body: {
+            paddingTop: 8,
+          },
+        }}
+      >
+        {detailAppointment ? (
+          <Stack gap="md">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+              {[
+                { label: 'Paciente', value: detailAppointment.pacienteNome || 'Nao informado' },
+                { label: 'CPF', value: detailAppointment.pacienteCPF ? formatCPF(detailAppointment.pacienteCPF) : 'Nao informado' },
+                { label: 'Procedimento', value: detailAppointment.especialidade || 'Nao informado' },
+                { label: 'Convenio', value: detailAppointment.convenio || 'Nao informado' },
+                { label: 'Data', value: detailAppointment.data ? dayjs(detailAppointment.data).format('DD/MM/YYYY') : 'Nao informada' },
+                { label: 'Horario', value: detailAppointment.hora || 'Nao informado' },
+                { label: 'Profissional', value: detailAppointment.medicoNome || 'Nao informado' },
+                { label: 'Status', value: detailAppointment.status || 'Nao informado' },
+              ].map((item) => (
+                <Paper
+                  key={item.label}
+                  p="md"
+                  radius="md"
+                  bg={isDarkMode ? 'rgba(120, 158, 230, 0.08)' : 'rgba(0, 31, 84, 0.06)'}
+                  style={{
+                    border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : '1px solid rgba(0, 31, 84, 0.10)',
+                  }}
+                >
+                  <Stack gap={4}>
+                    <Text size="xs" tt="uppercase" fw={700} c="dimmed">
+                      {item.label}
+                    </Text>
+                    <Text fw={600}>
+                      {item.value}
+                    </Text>
+                  </Stack>
+                </Paper>
+              ))}
+            </SimpleGrid>
+
+            <Paper
+              p="md"
+              radius="md"
+              bg={isDarkMode ? 'rgba(120, 158, 230, 0.08)' : 'rgba(0, 31, 84, 0.06)'}
+              style={{
+                border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : '1px solid rgba(0, 31, 84, 0.10)',
+              }}
+            >
+              <Stack gap={6}>
+                <Text size="xs" tt="uppercase" fw={700} c="dimmed">
+                  Observacoes
+                </Text>
+                <Text>
+                  {detailAppointment.observacoes || 'Sem observacoes registradas.'}
+                </Text>
+              </Stack>
+            </Paper>
+
+            <Paper
+              p="md"
+              radius="md"
+              bg={isDarkMode ? 'rgba(120, 158, 230, 0.08)' : 'rgba(0, 31, 84, 0.06)'}
+              style={{
+                border: isDarkMode ? '1px solid rgba(120, 158, 230, 0.18)' : '1px solid rgba(0, 31, 84, 0.10)',
+              }}
+            >
+              <Stack gap="sm">
+                <Text fw={700}>Anexos</Text>
+                {detailAttachmentsLoading ? (
+                  <Text size="sm" c="dimmed">Carregando anexos...</Text>
+                ) : detailAttachments.length > 0 ? (
+                  detailAttachments.map((attachment) => (
+                    <Paper
+                      key={attachment.id}
+                      p="sm"
+                      radius="md"
+                      bg={isDarkMode ? 'rgba(255,255,255,0.02)' : 'white'}
+                      style={{
+                        border: '1px solid rgba(120, 158, 230, 0.18)',
+                      }}
+                    >
+                      <Group justify="space-between" align="center" wrap={isMobile ? 'wrap' : 'nowrap'}>
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Text size="sm" fw={500}>{attachment.fileName}</Text>
+                        <Text size="xs" c="dimmed">
+                          {attachment.uploadedAt ? dayjs(attachment.uploadedAt).format('DD/MM/YYYY HH:mm') : 'Anexo enviado'}
+                        </Text>
+                        </Box>
+                        <Button
+                          variant="light"
+                          size="xs"
+                          loading={openingAttachmentId === attachment.id}
+                          onClick={() => handleOpenExistingAttachment(attachment.id)}
+                        >
+                          Abrir
+                        </Button>
+                      </Group>
+                    </Paper>
+                  ))
+                ) : (
+                  <Text size="sm" c="dimmed">Nenhum anexo enviado para este agendamento.</Text>
+                )}
+              </Stack>
+            </Paper>
+
+            <Group justify="space-between" wrap="wrap">
+              <Button variant="default" onClick={() => setDetailOpen(false)}>
+                Fechar
+              </Button>
+              <Button bg={DARK_BLUE} onClick={handleEditFromDetail}>
+                Editar agendamento
+              </Button>
+            </Group>
+          </Stack>
+        ) : null}
+      </Modal>
     </Box>
   );
 }

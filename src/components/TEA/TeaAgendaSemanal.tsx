@@ -206,7 +206,9 @@ export function TeaAgendaSemanal() {
       doctors.forEach((doctor: any) => {
         const doctorId = String(doctor?.id || doctor?.doctorId || '').trim();
         const doctorName = String(doctor?.name || doctor?.nome || doctor?.fullName || '').trim();
-        const roomId = String(doctor?.roomId || '').trim();
+        const roomId = Array.isArray(doctor?.roomIds) && doctor.roomIds.length > 0
+          ? String(doctor.roomIds[0] || '').trim()
+          : String(doctor?.roomId || '').trim();
         const roomName = roomById.get(roomId) || '';
 
         if (doctorId && roomName) roomByDoctorId.set(doctorId, roomName);
