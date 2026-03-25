@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './getApiBaseUrl';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: getApiBaseUrl(),
 });
 
 // Interceptor para adicionar token de autenticação

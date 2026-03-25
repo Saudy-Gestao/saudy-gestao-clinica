@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './getApiBaseUrl';
 
 const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: getApiBaseUrl(),
 });
 
 export interface PublicCheckInPayload {

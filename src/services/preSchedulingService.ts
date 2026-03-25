@@ -1,8 +1,9 @@
 import axios from 'axios';
 import api from './api';
+import { getApiBaseUrl } from './getApiBaseUrl';
 
 const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: getApiBaseUrl(),
 });
 
 export type PreSchedulingStatus =
