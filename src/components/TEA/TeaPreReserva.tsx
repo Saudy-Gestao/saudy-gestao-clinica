@@ -22,6 +22,7 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronLeft,
+  Upload,
   RefreshCcw,
   History,
   ClipboardList,
@@ -35,6 +36,7 @@ import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import teaProfileService from '../../services/teaProfileService';
+import convenioAuthorizationService from '../../services/convenioAuthorizationService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 
 const STATUS_OPTIONS: Array<{ value: TeaPreReservationStatus; label: string }> = [
@@ -223,6 +225,12 @@ type BulkStatusActionState = {
   options: BulkStatusActionOption[];
 };
 
+type AuthorizationAttachmentItem = {
+  id: string;
+  fileName: string;
+  uploadedAt?: string;
+};
+
 const getTimelineEventLabel = (event: any) => {
   const nextStatus = String(event?.payload?.nextStatus || event?.payload?.requestedStatus || '');
   if (event?.eventType === 'STATUS_CHANGED') {
@@ -236,6 +244,24 @@ const getTimelineEventLabel = (event: any) => {
   }
 
   return event?.eventLabel || event?.eventType || 'Evento';
+};
+
+const getAuthorizationAttachmentsFromItems = (items: any[]) => {
+  const attachmentMap = new Map<string, AuthorizationAttachmentItem>();
+  (items || []).forEach((item) => {
+    const docs = Array.isArray(item?.authorizationAttachments) ? item.authorizationAttachments : [];
+    docs.forEach((doc: any) => {
+      const id = String(doc?.id || '');
+      if (!id || attachmentMap.has(id)) return;
+      attachmentMap.set(id, {
+        id,
+        fileName: String(doc?.fileName || 'Anexo'),
+        uploadedAt: doc?.uploadedAt ? String(doc.uploadedAt) : undefined,
+      });
+    });
+  });
+
+  return Array.from(attachmentMap.values()).sort((a, b) => dayjs(b.uploadedAt).valueOf() - dayjs(a.uploadedAt).valueOf());
 };
 
 const isSlotCoveredBySession = (
@@ -657,6 +683,10 @@ export function TeaPreReserva() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEventItem[]>([]);
   const [timelineReservationLabel, setTimelineReservationLabel] = useState('');
+  const [authorizationAttachmentsModalOpened, setAuthorizationAttachmentsModalOpened] = useState(false);
+  const [authorizationAttachmentsLabel, setAuthorizationAttachmentsLabel] = useState('');
+  const [authorizationAttachmentsItems, setAuthorizationAttachmentsItems] = useState<AuthorizationAttachmentItem[]>([]);
+  const [openingAuthorizationAttachmentId, setOpeningAuthorizationAttachmentId] = useState<string | null>(null);
   const [checklistModalOpened, setChecklistModalOpened] = useState(false);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistItems, setChecklistItems] = useState<ConversionChecklistItem[]>([]);
@@ -1381,6 +1411,40 @@ export function TeaPreReserva() {
     setAcceptModalOpened(true);
   };
 
+  const handleOpenAuthorizationAttachment = async (attachmentId: string) => {
+    setOpeningAuthorizationAttachmentId(attachmentId);
+    try {
+      const blob = await convenioAuthorizationService.viewAttachment(attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao abrir anexo',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        color: 'red',
+      });
+    } finally {
+      setOpeningAuthorizationAttachmentId(null);
+    }
+  };
+
+  const handleOpenPitAuthorizationAttachments = (label: string, items: any[]) => {
+    const attachments = getAuthorizationAttachmentsFromItems(items);
+    if (attachments.length === 0) {
+      showNotification({
+        title: 'Sem anexos',
+        message: 'Este PIT ainda não possui anexos enviados na autorização de convênio.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setAuthorizationAttachmentsItems(attachments);
+    setAuthorizationAttachmentsLabel(label);
+    setAuthorizationAttachmentsModalOpened(true);
+  };
+
   // Move handleOpenGroupTimeline above its first usage
   // (No duplicate handleOpenGroupTimeline here, keep only the first definition above)
 
@@ -1396,6 +1460,7 @@ export function TeaPreReserva() {
     const hasReservedReservations = group.reservations.some((item) => String(item?.status || '') === 'RESERVED');
     const hasPendingApprovalReservations = group.reservations.some((item) => String(item?.status || '') === 'PROPOSED');
     const pitProgress = buildPitProgressFromItems(group.reservations);
+    const groupAuthorizationAttachments = getAuthorizationAttachmentsFromItems(group.reservations);
 
     async function handleUpdatePitStatus(resolvedStatus: TeaPreReservationStatus) {
       if (!resolvedStatus) return;
@@ -1480,6 +1545,9 @@ export function TeaPreReserva() {
       } finally {
       setTimelineLoading(false);
       }
+    }
+    function handleOpenGroupAuthorizationAttachments() {
+      handleOpenPitAuthorizationAttachments(`${group.patientName} • PIT`, group.reservations);
     }
     async function handleOpenGroupConversionChecklist(group: ReservationGroup) {
       const alreadyConverted = group.reservations.length > 0
@@ -1662,6 +1730,15 @@ export function TeaPreReserva() {
               onClick={() => handleOpenGroupTimeline(group)}
             >
               Histórico do PIT
+            </Button>
+            <Button
+              variant="default"
+              h={36}
+              leftSection={<Upload size={16} />}
+              onClick={handleOpenGroupAuthorizationAttachments}
+              disabled={groupAuthorizationAttachments.length === 0}
+            >
+              Anexos do convenio
             </Button>
             {!isGroupFullyConverted && hasPartiallyScheduledReservations && (
               <Button
@@ -3771,6 +3848,42 @@ export function TeaPreReserva() {
       </Modal>
 
       <Modal
+        opened={authorizationAttachmentsModalOpened}
+        onClose={() => setAuthorizationAttachmentsModalOpened(false)}
+        title={`Anexos do convênio • ${authorizationAttachmentsLabel || 'PIT'}`}
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          {authorizationAttachmentsItems.length === 0 ? (
+            <Text size="sm" c="dimmed">Nenhum anexo enviado para este PIT.</Text>
+          ) : (
+            authorizationAttachmentsItems.map((attachment) => (
+              <Paper key={attachment.id} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                <Group justify="space-between" align="center" wrap="wrap">
+                  <Stack gap={2}>
+                    <Text size="sm" fw={600}>{attachment.fileName}</Text>
+                    <Text size="xs" c="dimmed">
+                      {attachment.uploadedAt ? dayjs(attachment.uploadedAt).format('DD/MM/YYYY HH:mm') : 'Data não informada'}
+                    </Text>
+                  </Stack>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    leftSection={<Upload size={14} />}
+                    onClick={() => handleOpenAuthorizationAttachment(attachment.id)}
+                    loading={openingAuthorizationAttachmentId === attachment.id}
+                  >
+                    Visualizar
+                  </Button>
+                </Group>
+              </Paper>
+            ))
+          )}
+        </Stack>
+      </Modal>
+
+      <Modal
         opened={deletePitConfirmModalOpened}
         onClose={() => {
           if (updatingId) return;
@@ -4086,6 +4199,11 @@ export function TeaPreReserva() {
                         ...(existingGroupForSamePit?.reservations || []),
                         ...(completedGroupForSamePit?.reservations || []),
                       ];
+                      const pitAuthorizationAttachments = getAuthorizationAttachmentsFromItems([
+                        ...(group.therapies || []),
+                        ...existingReservationsWithoutDuplicates,
+                        ...completedReservationsWithoutDuplicates,
+                      ]);
                       const pitProgress = buildPitProgressFromItems([
                         ...group.therapies,
                         ...existingReservationsWithoutDuplicates,
@@ -4298,6 +4416,19 @@ export function TeaPreReserva() {
                                   Criar proposta manual
                                 </Button>
                               )}
+                              <Button
+                                size="xs"
+                                variant="default"
+                                leftSection={<Upload size={14} />}
+                                onClick={() => handleOpenPitAuthorizationAttachments(`${group.patientName} • PIT`, [
+                                  ...(group.therapies || []),
+                                  ...existingReservationsWithoutDuplicates,
+                                  ...completedReservationsWithoutDuplicates,
+                                ])}
+                                disabled={pitAuthorizationAttachments.length === 0}
+                              >
+                                Ver anexos
+                              </Button>
                               <Button
                                 size="xs"
                                 color="red"
