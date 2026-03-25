@@ -370,6 +370,20 @@ const timeToMinutes = (time: string) => {
   return (hour * 60) + minute;
 };
 
+const doSlotsOverlap = (
+  first: { date: string; time: string; durationMinutes?: number | null },
+  second: { date: string; time: string; durationMinutes?: number | null },
+) => {
+  if (first.date !== second.date) return false;
+  const firstStart = timeToMinutes(first.time);
+  const secondStart = timeToMinutes(second.time);
+  const firstDuration = Math.max(1, Number(first.durationMinutes || 30));
+  const secondDuration = Math.max(1, Number(second.durationMinutes || 30));
+  const firstEnd = firstStart + firstDuration;
+  const secondEnd = secondStart + secondDuration;
+  return firstStart < secondEnd && secondStart < firstEnd;
+};
+
 const getManualSelectionAnchors = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
   if (!slots.length) return [] as Array<{ date: string; time: string }>;
   const byDate = slots.reduce((acc, slot) => {
@@ -2462,8 +2476,10 @@ export function TeaPreReserva() {
         return selected.slice(0, targetCount);
       };
 
-      const results = await Promise.all(
-        context.therapies.map(async (therapy) => {
+      const reservedDoctorSlots = new Map<string, Array<{ date: string; time: string; durationMinutes: number }>>();
+      const results: Array<{ pitTherapyId: string; list: Array<{ date: string; time: string }> }> = [];
+
+      for (const therapy of context.therapies) {
           const weeklyFrequency = Math.max(1, Number(therapy.weeklyFrequency) || 1);
           const existingBase = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
           const existingSignatures = Array.from(new Set(
@@ -2492,6 +2508,8 @@ export function TeaPreReserva() {
             ...previousTried,
             ...existingSignatures,
           ]));
+          const doctorReservationKey = String(therapy.professionalName || '').trim().toLowerCase();
+          const doctorReservedSlots = reservedDoctorSlots.get(doctorReservationKey) || [];
           const data: any = await teaPreReservationService.getSuggestions(therapy.pitTherapyId, {
             daysAhead: options?.daysAhead || 90,
             limit: suggestionLimit,
@@ -2505,13 +2523,38 @@ export function TeaPreReserva() {
               if (dateDiff !== 0) return dateDiff;
               return String(a.time).localeCompare(String(b.time));
             });
-          const list = pickBestSuggestions(sortedList, missingWeeklySlots, therapy);
-          return {
+          const list = pickBestSuggestions(sortedList, missingWeeklySlots, therapy)
+            .filter((slot) => !doctorReservedSlots.some((reservedSlot) => (
+              doSlotsOverlap(
+                {
+                  date: slot.date,
+                  time: slot.time,
+                  durationMinutes: therapy.durationMinutes || 30,
+                },
+                reservedSlot,
+              )
+            )));
+
+          if (doctorReservationKey) {
+            const currentReserved = reservedDoctorSlots.get(doctorReservationKey) || [];
+            reservedDoctorSlots.set(
+              doctorReservationKey,
+              [
+                ...currentReserved,
+                ...list.map((slot) => ({
+                  date: slot.date,
+                  time: slot.time,
+                  durationMinutes: Math.max(1, Number(therapy.durationMinutes || 30)),
+                })),
+              ],
+            );
+          }
+
+          results.push({
             pitTherapyId: therapy.pitTherapyId,
             list,
-          };
-        }),
-      );
+          });
+        }
 
       const nextByTherapyId: Record<string, Array<{ date: string; time: string }>> = {};
       results.forEach((result) => {
