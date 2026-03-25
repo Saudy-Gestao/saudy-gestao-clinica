@@ -1,0 +1,21 @@
+.toolbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(95, 123, 255, 0.35) transparent;
+}
+
+.toolbar::-webkit-scrollbar {
+  height: 3px;
+}
+
+.toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.toolbar::-webkit-scrollbar-thumb {
+  background: rgba(95, 123, 255, 0.35);
+  border-radius: 99px;
+}
+
+.toolbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(95, 123, 255, 0.65);
+}

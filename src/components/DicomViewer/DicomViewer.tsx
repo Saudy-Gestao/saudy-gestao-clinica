@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
 import { ActionIcon, Box, Button, Group, Loader, Paper, Text, Tooltip } from '@mantine/core';
+import styles from './DicomViewer.module.css';
 import {
   ZoomIn,
   Move,
@@ -39,14 +39,13 @@ cornerstoneTools.init();
 cornerstoneWADOImageLoader.configure({
   useWebWorkers: false,
   beforeSend: (xhr: XMLHttpRequest) => {
-    // Use same-origin cookies if needed (backend auth token)
-    xhr.withCredentials = true;
+    const token = localStorage.getItem('token');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
   },
 });
 
-const SIDEBAR_WIDTH = 176;
-const THUMB_ITEM_HEIGHT = 92;
-const THUMB_OVERSCAN = 8;
 const CINE_BASE_FPS = 8;
 
 const WINDOW_PRESETS = [
@@ -59,6 +58,8 @@ const WINDOW_PRESETS = [
 
 interface DicomViewerProps {
   style?: React.CSSProperties;
+  /** Pre-built WADO imageIds (e.g. `wadouri:/dicom/file/{id}`). Takes priority over buffer props. */
+  initialImageIds?: string[];
   /** optional series of buffers to load when viewer mounts */
   initialSeries?: ArrayBuffer[];
   /** optional single file buffer */
@@ -77,44 +78,38 @@ type ActiveTool =
   | 'arrow'
   | 'magnify';
 
-export function DicomViewer({ style, initialSeries, initialData }: DicomViewerProps) {
+export function DicomViewer({ style, initialImageIds, initialSeries, initialData }: DicomViewerProps) {
   const elementRef = useRef<HTMLDivElement | null>(null);
-  const thumbnailRailRef = useRef<HTMLDivElement | null>(null);
-  const thumbnailItemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageCount, setImageCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [stackImageIds, setStackImageIds] = useState<string[]>([]);
-  const [thumbnailDataUrls, setThumbnailDataUrls] = useState<string[]>([]);
-  const [thumbnailInstanceLabels, setThumbnailInstanceLabels] = useState<string[]>([]);
-  const [thumbWindow, setThumbWindow] = useState({ start: 0, end: 0 });
   const [activeTool, setActiveTool] = useState<ActiveTool>('wwwc');
   const [isInverted, setIsInverted] = useState(false);
   const [windowPresetIndex, setWindowPresetIndex] = useState(0);
   const [cinePlaying, setCinePlaying] = useState(false);
   const [cineSpeed, setCineSpeed] = useState(1);
-
-  const thumbnailDataUrlsRef = useRef<string[]>([]);
-  const thumbnailInstanceLabelsRef = useRef<string[]>([]);
+  // Keep an up-to-date ref of isInverted so the loading effect doesn't need it as a dep
+  const isInvertedRef = useRef(isInverted);
+  useEffect(() => {
+    isInvertedRef.current = isInverted;
+  });
 
   const seriesBuffers = useMemo(() => {
+    // Only used when initialImageIds is not provided
+    if (initialImageIds && initialImageIds.length > 0) return [] as ArrayBuffer[];
     if (initialSeries && initialSeries.length > 0) return initialSeries;
     if (initialData) return [initialData];
     return [] as ArrayBuffer[];
-  }, [initialSeries, initialData]);
+  }, [initialImageIds, initialSeries, initialData]);
 
   const viewerId = useMemo(() => Math.random().toString(36).slice(2), []);
   const cleanupBlobUrls = useRef<string[]>([]);
-
-  useEffect(() => {
-    thumbnailDataUrlsRef.current = thumbnailDataUrls;
-  }, [thumbnailDataUrls]);
-
-  useEffect(() => {
-    thumbnailInstanceLabelsRef.current = thumbnailInstanceLabels;
-  }, [thumbnailInstanceLabels]);
+  // Prefetch tracking: key increments each time a new series is loaded so any
+  // in-flight prefetch from the previous series knows it should abort.
+  const prefetchKeyRef = useRef(0);
+  const [prefetchProgress, setPrefetchProgress] = useState<{ loaded: number; total: number } | null>(null);
 
   const applyViewportState = useCallback((element: HTMLDivElement, invert: boolean) => {
     const viewport = cornerstone.getViewport(element);
@@ -180,26 +175,6 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
     cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
   }, []);
 
-  const computeThumbWindow = useCallback((scrollTop: number, viewportHeight: number, total: number) => {
-    if (total <= 0) return { start: 0, end: 0 };
-
-    const visibleStart = Math.max(0, Math.floor(scrollTop / THUMB_ITEM_HEIGHT));
-    const visibleCount = Math.max(1, Math.ceil(viewportHeight / THUMB_ITEM_HEIGHT));
-
-    const start = Math.max(0, visibleStart - THUMB_OVERSCAN);
-    const end = Math.min(total - 1, visibleStart + visibleCount + THUMB_OVERSCAN);
-
-    return { start, end };
-  }, []);
-
-  const handleThumbnailRailScroll = useCallback(() => {
-    const rail = thumbnailRailRef.current;
-    if (!rail || !stackImageIds.length) return;
-
-    const next = computeThumbWindow(rail.scrollTop, rail.clientHeight, stackImageIds.length);
-    setThumbWindow((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
-  }, [computeThumbWindow, stackImageIds.length]);
-
   useEffect(() => {
     const element = elementRef.current;
     if (!element) return;
@@ -227,13 +202,29 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
   }, [setTool]);
 
   useEffect(() => {
-    if (!seriesBuffers.length) {
-      setError('Nenhum DICOM disponível.');
+    // Resolve imageIds from either prop source
+    let imageIds: string[];
+
+    if (initialImageIds && initialImageIds.length > 0) {
+      // Direct WADO imageIds provided – no pre-download needed
+      cleanupBlobUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      cleanupBlobUrls.current = [];
+      imageIds = initialImageIds;
+    } else if (seriesBuffers.length > 0) {
+      // Fallback: create blob URLs from in-memory buffers
+      cleanupBlobUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      cleanupBlobUrls.current = [];
+      imageIds = seriesBuffers.map((buf) => {
+        const blob = new Blob([buf], { type: 'application/dicom' });
+        const url = URL.createObjectURL(blob);
+        cleanupBlobUrls.current.push(url);
+        return `wadouri:${url}`;
+      });
+    } else {
+      setError(null);
       setLoading(false);
-      setStackImageIds([]);
-      setThumbnailDataUrls([]);
-      setThumbnailInstanceLabels([]);
-      setThumbWindow({ start: 0, end: 0 });
+      setImageCount(0);
+      setCurrentIndex(0);
       return;
     }
 
@@ -242,45 +233,49 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
 
     setLoading(true);
     setError(null);
+    setCinePlaying(false);
+    setPrefetchProgress(null);
+    const prefetchKey = ++prefetchKeyRef.current;
 
-    // Cleanup previous blob URLs
-    cleanupBlobUrls.current.forEach((url) => URL.revokeObjectURL(url));
-    cleanupBlobUrls.current = [];
+    const stack = { currentImageIdIndex: 0, imageIds };
 
-    const imageIds = seriesBuffers.map((buf) => {
-      const blob = new Blob([buf], { type: 'application/dicom' });
-      const url = URL.createObjectURL(blob);
-      cleanupBlobUrls.current.push(url);
-      return `wadouri:${url}`;
-    });
-
-    const stack = {
-      currentImageIdIndex: 0,
-      imageIds,
-    };
-
-    setStackImageIds(imageIds);
-    thumbnailItemRefs.current = Array(imageIds.length).fill(null);
-
-    const emptyThumbs = Array(imageIds.length).fill('');
-    const emptyLabels = Array(imageIds.length).fill('');
-    setThumbnailDataUrls(emptyThumbs);
-    setThumbnailInstanceLabels(emptyLabels);
-    thumbnailDataUrlsRef.current = emptyThumbs;
-    thumbnailInstanceLabelsRef.current = emptyLabels;
-
-    setThumbWindow({ start: 0, end: Math.min(imageIds.length - 1, 28) });
-
+    // Clear stale stack state from a previous series before registering new one
+    try { cornerstoneTools.clearToolState(element, 'stack'); } catch { /* no-op */ }
     cornerstoneTools.addStackStateManager(element, ['stack']);
     cornerstoneTools.addToolState(element, 'stack', stack);
 
     cornerstone.loadImage(imageIds[0])
-      .then((image: any) => {
+      .then(async (image: any) => {
         cornerstone.displayImage(element, image);
-        applyViewportState(element, isInverted);
+        applyViewportState(element, isInvertedRef.current);
         setImageCount(imageIds.length);
         setCurrentIndex(0);
         setLoading(false);
+
+        // Pre-cache all remaining images in the background so scrolling is instant.
+        // Uses batches of 4 concurrent requests to avoid saturating the browser.
+        if (imageIds.length > 1 && prefetchKeyRef.current === prefetchKey) {
+          const remaining = imageIds.slice(1);
+          setPrefetchProgress({ loaded: 0, total: remaining.length });
+          let loaded = 0;
+          const BATCH = 4;
+          for (let i = 0; i < remaining.length; i += BATCH) {
+            if (prefetchKeyRef.current !== prefetchKey) break;
+            const batch = remaining.slice(i, i + BATCH);
+            await Promise.all(
+              batch.map(async (id) => {
+                try { await cornerstone.loadAndCacheImage(id); } catch { /* ignore individual failures */ }
+                loaded++;
+                if (prefetchKeyRef.current === prefetchKey) {
+                  setPrefetchProgress({ loaded, total: remaining.length });
+                }
+              }),
+            );
+          }
+          if (prefetchKeyRef.current === prefetchKey) {
+            setPrefetchProgress(null);
+          }
+        }
       })
       .catch((err: any) => {
         setError(err?.message || 'Erro ao carregar DICOM.');
@@ -293,137 +288,23 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
       if (stackStateItem) {
         setCurrentIndex(stackStateItem.currentImageIdIndex);
       }
-      applyViewportState(element, isInverted);
+      applyViewportState(element, isInvertedRef.current);
     };
 
     element.addEventListener('cornerstoneimagerendered', onNewImage);
 
     return () => {
+      // Invalidate the current prefetch key so any in-flight batch loop aborts.
+      prefetchKeyRef.current++;
+      setPrefetchProgress(null);
       element.removeEventListener('cornerstoneimagerendered', onNewImage);
       cleanupBlobUrls.current.forEach((url) => URL.revokeObjectURL(url));
       cleanupBlobUrls.current = [];
       setCinePlaying(false);
     };
-  }, [applyViewportState, isInverted, seriesBuffers]);
-
-  useEffect(() => {
-    if (!stackImageIds.length) {
-      setThumbnailDataUrls([]);
-      setThumbnailInstanceLabels([]);
-      return;
-    }
-
-    let cancelled = false;
-    const previewElement = document.createElement('div');
-    previewElement.style.position = 'fixed';
-    previewElement.style.left = '-9999px';
-    previewElement.style.top = '-9999px';
-    previewElement.style.width = '128px';
-    previewElement.style.height = '128px';
-    document.body.appendChild(previewElement);
-    cornerstone.enable(previewElement);
-
-    const generateThumbnails = async () => {
-      for (let i = thumbWindow.start; i <= thumbWindow.end; i += 1) {
-        if (cancelled) break;
-
-        const hasThumb = Boolean(thumbnailDataUrlsRef.current[i]);
-        const hasLabel = Boolean(thumbnailInstanceLabelsRef.current[i]);
-        if (hasThumb && hasLabel) continue;
-
-        try {
-          const image = await cornerstone.loadAndCacheImage(stackImageIds[i]);
-          if (cancelled) break;
-
-          const instanceNumber = image?.data?.string?.('x00200013');
-          const nextLabel = instanceNumber ? `Inst ${instanceNumber}` : `Inst ${i + 1}`;
-
-          if (!hasLabel) {
-            setThumbnailInstanceLabels((prev) => {
-              if (prev[i]) return prev;
-              const next = [...prev];
-              next[i] = nextLabel;
-              thumbnailInstanceLabelsRef.current = next;
-              return next;
-            });
-          }
-
-          if (!hasThumb) {
-            cornerstone.displayImage(previewElement, image);
-            await new Promise((resolve) => {
-              requestAnimationFrame(() => resolve(null));
-            });
-
-            const canvas = previewElement.querySelector('canvas') as HTMLCanvasElement | null;
-            if (canvas) {
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
-              setThumbnailDataUrls((prev) => {
-                if (prev[i]) return prev;
-                const next = [...prev];
-                next[i] = dataUrl;
-                thumbnailDataUrlsRef.current = next;
-                return next;
-              });
-            }
-          }
-        } catch {
-          setThumbnailInstanceLabels((prev) => {
-            if (prev[i]) return prev;
-            const next = [...prev];
-            next[i] = `Inst ${i + 1}`;
-            thumbnailInstanceLabelsRef.current = next;
-            return next;
-          });
-        }
-      }
-    };
-
-    generateThumbnails();
-
-    return () => {
-      cancelled = true;
-      try {
-        cornerstone.disable(previewElement);
-      } catch {
-        // no-op
-      }
-      previewElement.remove();
-    };
-  }, [stackImageIds, thumbWindow.start, thumbWindow.end]);
-
-  useEffect(() => {
-    if (!stackImageIds.length) return;
-
-    const rail = thumbnailRailRef.current;
-    const activeItem = thumbnailItemRefs.current[currentIndex];
-    if (!rail || !activeItem) return;
-
-    const railTop = rail.scrollTop;
-    const railBottom = railTop + rail.clientHeight;
-    const itemTop = activeItem.offsetTop;
-    const itemBottom = itemTop + activeItem.offsetHeight;
-
-    if (itemTop < railTop || itemBottom > railBottom) {
-      activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-
-    setThumbWindow((prev) => {
-      const keepStart = Math.max(0, currentIndex - THUMB_OVERSCAN);
-      const keepEnd = Math.min(stackImageIds.length - 1, currentIndex + THUMB_OVERSCAN + 6);
-      return {
-        start: Math.min(prev.start, keepStart),
-        end: Math.max(prev.end, keepEnd),
-      };
-    });
-  }, [currentIndex, stackImageIds.length]);
-
-  useEffect(() => {
-    const rail = thumbnailRailRef.current;
-    if (!rail || !stackImageIds.length) return;
-
-    const next = computeThumbWindow(rail.scrollTop, rail.clientHeight, stackImageIds.length);
-    setThumbWindow(next);
-  }, [computeThumbWindow, stackImageIds.length]);
+    // NOTE: isInverted intentionally omitted – tracked via isInvertedRef to avoid
+    // reloading the entire stack on every invert toggle.
+  }, [applyViewportState, initialImageIds, seriesBuffers]);
 
   const displayImageAtIndex = useCallback(async (index: number) => {
     const element = elementRef.current;
@@ -595,154 +476,18 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
           padding: hasImages ? 12 : 0,
           boxSizing: 'border-box',
           display: 'grid',
-          gridTemplateColumns: hasImages ? `${SIDEBAR_WIDTH}px 1fr` : '1fr',
+          gridTemplateColumns: '1fr',
           gridTemplateRows: hasImages ? 'auto 1fr' : '1fr',
           gap: hasImages ? 12 : 0,
         }}
       >
         {hasImages && (
           <Paper
+            className={styles.toolbar}
             radius="md"
             p={6}
             style={{
               gridColumn: 1,
-              gridRow: '1 / span 2',
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'rgba(10, 14, 24, 0.92)',
-              border: '1px solid rgba(95, 123, 255, 0.35)',
-              backdropFilter: 'blur(6px)',
-            }}
-          >
-            <Box
-              ref={thumbnailRailRef}
-              onScroll={handleThumbnailRailScroll}
-              style={{ minHeight: 0, overflowY: 'auto', flex: 1 }}
-            >
-              <Group gap={6}>
-                {stackImageIds.map((_, index) => {
-                  const active = index === currentIndex;
-                  const thumbSrc = thumbnailDataUrls[index];
-                  const instanceLabel = thumbnailInstanceLabels[index] || `Inst ${index + 1}`;
-
-                  return (
-                    <Box
-                      key={`thumb-${index}`}
-                      ref={(el) => {
-                        thumbnailItemRefs.current[index] = el;
-                      }}
-                      onClick={() => displayImageAtIndex(index)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(evt: KeyboardEvent<HTMLDivElement>) => {
-                        if (evt.key === 'Enter' || evt.key === ' ') {
-                          evt.preventDefault();
-                          displayImageAtIndex(index);
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        minHeight: 132,
-                        cursor: 'pointer',
-                        borderRadius: 10,
-                        border: active ? '2px solid #339af0' : '1px solid rgba(95, 123, 255, 0.25)',
-                        background: active ? 'rgba(51, 154, 240, 0.18)' : 'rgba(16, 22, 34, 0.9)',
-                        padding: 6,
-                      }}
-                    >
-                      <Box
-                        style={{
-                          width: '100%',
-                          height: 92,
-                          borderRadius: 6,
-                          overflow: 'hidden',
-                          background: '#020203',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {thumbSrc ? (
-                          <img
-                            src={thumbSrc}
-                            alt={`Corte ${index + 1}`}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          />
-                        ) : (
-                          <Loader size="xs" color="gray" />
-                        )}
-                      </Box>
-                      <Text size="sm" fw={700} c={active ? 'blue.2' : 'gray.2'} ta="center" mt={5}>
-                        {index + 1}
-                      </Text>
-                      <Text size="xs" c={active ? 'blue.1' : 'gray.5'} ta="center" lh={1.1}>
-                        {instanceLabel}
-                      </Text>
-                    </Box>
-                  );
-                })}
-              </Group>
-            </Box>
-
-            <Paper
-              radius="md"
-              p={6}
-              style={{
-                marginTop: 6,
-                background: 'rgba(8, 12, 20, 0.95)',
-                border: '1px solid rgba(95, 123, 255, 0.35)',
-              }}
-            >
-              <Box
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '30px 1fr 30px',
-                  alignItems: 'center',
-                  columnGap: 6,
-                }}
-              >
-                <ActionIcon size="sm" radius="md" variant="light" color="gray" onClick={scrollPrevious} disabled={currentIndex === 0}>
-                  <ChevronLeft size={14} />
-                </ActionIcon>
-
-                <Text size="sm" c="white" fw={600} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                  {currentIndex + 1} / {imageCount}
-                </Text>
-
-                <ActionIcon size="sm" radius="md" variant="light" color="gray" onClick={scrollNext} disabled={currentIndex + 1 >= imageCount}>
-                  <ChevronRight size={14} />
-                </ActionIcon>
-              </Box>
-
-              <Group gap={6} mt={6} wrap="nowrap" justify="space-between">
-                <Button
-                  size="xs"
-                  variant={cinePlaying ? 'filled' : 'light'}
-                  color={cinePlaying ? 'blue' : 'gray'}
-                  leftSection={cinePlaying ? <Pause size={14} /> : <Play size={14} />}
-                  onClick={() => setCinePlaying((p) => !p)}
-                  style={{ flex: 1 }}
-                >
-                  Cine
-                </Button>
-
-                <Tooltip label={`Velocidade cine: x${cineSpeed}`}>
-                  <Button size="xs" variant="light" color="gray" onClick={cycleCineSpeed} style={{ minWidth: 44, paddingInline: 8 }}>
-                    x{cineSpeed}
-                  </Button>
-                </Tooltip>
-              </Group>
-            </Paper>
-          </Paper>
-        )}
-
-        {hasImages && (
-          <Paper
-            radius="md"
-            p={6}
-            style={{
-              gridColumn: 2,
               gridRow: 1,
               overflowX: 'auto',
               background: 'rgba(10, 14, 24, 0.92)',
@@ -751,6 +496,50 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
             }}
           >
             <Group gap={6} wrap="nowrap" style={{ minWidth: 'max-content' }}>
+              {/* Cine */}
+              <Tooltip label={cinePlaying ? 'Pausar Cine' : 'Iniciar Cine'}>
+                <Button
+                  size="xs"
+                  variant={cinePlaying ? 'filled' : 'light'}
+                  color={cinePlaying ? 'blue' : 'gray'}
+                  leftSection={cinePlaying ? <Pause size={14} /> : <Play size={14} />}
+                  onClick={() => setCinePlaying((p) => !p)}
+                >
+                  Cine
+                </Button>
+              </Tooltip>
+
+              <Tooltip label={`Velocidade cine: x${cineSpeed}`}>
+                <Button size="xs" variant="light" color="gray" onClick={cycleCineSpeed} style={{ minWidth: 44, paddingInline: 8 }}>
+                  x{cineSpeed}
+                </Button>
+              </Tooltip>
+
+              {/* Contador de imagens */}
+              <ActionIcon size="sm" radius="md" variant="light" color="gray" onClick={scrollPrevious} disabled={currentIndex === 0}>
+                <ChevronLeft size={14} />
+              </ActionIcon>
+              <Text size="sm" c="white" fw={600} style={{ whiteSpace: 'nowrap', minWidth: 52, textAlign: 'center' }}>
+                {currentIndex + 1} / {imageCount}
+              </Text>
+              <ActionIcon size="sm" radius="md" variant="light" color="gray" onClick={scrollNext} disabled={currentIndex + 1 >= imageCount}>
+                <ChevronRight size={14} />
+              </ActionIcon>
+
+              {/* Pre-cache progress: shown while background loading is in progress */}
+              {prefetchProgress && (
+                <Tooltip label={`Pré-carregando imagens: ${prefetchProgress.loaded + 1}/${prefetchProgress.total}`}>
+                  <Group gap={5} wrap="nowrap" style={{ cursor: 'default' }}>
+                    <Loader size={11} color="blue" />
+                    <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                      {prefetchProgress.loaded}/{prefetchProgress.total}
+                    </Text>
+                  </Group>
+                </Tooltip>
+              )}
+
+              <Box style={{ width: 1, height: 20, background: 'rgba(95,123,255,0.3)', margin: '0 4px' }} />
+
               <Tooltip label="Janela / Nível (W/L)">
                 <Button size="xs" variant={activeTool === 'wwwc' ? 'filled' : 'light'} color={activeTool === 'wwwc' ? 'blue' : 'gray'} onClick={() => setTool('wwwc')}>
                   WL
@@ -858,7 +647,7 @@ export function DicomViewer({ style, initialSeries, initialData }: DicomViewerPr
 
         <Box
           style={{
-            gridColumn: hasImages ? 2 : 1,
+            gridColumn: 1,
             gridRow: hasImages ? 2 : 1,
             position: 'relative',
             minHeight: 0,
