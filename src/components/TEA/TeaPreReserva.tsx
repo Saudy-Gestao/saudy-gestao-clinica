@@ -384,6 +384,58 @@ const doSlotsOverlap = (
   return firstStart < secondEnd && secondStart < firstEnd;
 };
 
+const getPendingApprovalVisualState = (
+  elapsedRatio: number,
+  hasLivePendingApproval: boolean,
+  completed: boolean,
+) => {
+  if (completed) {
+    return {
+      fill: 'var(--mantine-color-teal-6)',
+      glow: 'rgba(20, 184, 166, 0.28)',
+      text: 'teal',
+    } as const;
+  }
+
+  if (!hasLivePendingApproval) {
+    return {
+      fill: 'var(--mantine-color-violet-6)',
+      glow: 'rgba(124, 58, 237, 0.18)',
+      text: 'violet',
+    } as const;
+  }
+
+  if (elapsedRatio >= 0.9) {
+    return {
+      fill: 'linear-gradient(90deg, var(--mantine-color-orange-6) 0%, var(--mantine-color-red-6) 100%)',
+      glow: 'rgba(220, 38, 38, 0.36)',
+      text: 'red',
+    } as const;
+  }
+
+  if (elapsedRatio >= 0.75) {
+    return {
+      fill: 'linear-gradient(90deg, var(--mantine-color-yellow-6) 0%, var(--mantine-color-orange-6) 100%)',
+      glow: 'rgba(249, 115, 22, 0.3)',
+      text: 'orange',
+    } as const;
+  }
+
+  if (elapsedRatio >= 0.5) {
+    return {
+      fill: 'linear-gradient(90deg, var(--mantine-color-violet-6) 0%, var(--mantine-color-yellow-6) 100%)',
+      glow: 'rgba(245, 158, 11, 0.24)',
+      text: 'yellow',
+    } as const;
+  }
+
+  return {
+    fill: 'var(--mantine-color-violet-6)',
+    glow: 'rgba(124, 58, 237, 0.18)',
+    text: 'violet',
+  } as const;
+};
+
 const getManualSelectionAnchors = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
   if (!slots.length) return [] as Array<{ date: string; time: string }>;
   const byDate = slots.reduce((acc, slot) => {
@@ -914,6 +966,11 @@ export function TeaPreReserva() {
       return 1 - remainingRatio;
     })();
     const pendingApprovalStepCompleted = pendingApprovalElapsedRatio >= 1;
+    const pendingApprovalVisual = getPendingApprovalVisualState(
+      pendingApprovalElapsedRatio,
+      hasLivePendingApproval,
+      pendingApprovalStepCompleted,
+    );
     const authorizationDisplayRatio = (() => {
       if (hasFrequencyRegression) {
         if (progress.authorizedCount > 0 || progress.convertedCount >= progress.totalTherapies) return 1;
@@ -995,21 +1052,24 @@ export function TeaPreReserva() {
                       : (active ? 'var(--mantine-color-teal-6)' : 'var(--mantine-color-default)'),
                     border: '1px solid var(--mantine-color-default-border)',
                     overflow: 'hidden',
+                    boxShadow: isPendingApprovalStep && hasLivePendingApproval
+                      ? `0 0 0 1px ${pendingApprovalVisual.glow} inset, 0 0 12px ${pendingApprovalVisual.glow}`
+                      : undefined,
                   }}
                 >
                   {isPendingApprovalStep && (
                     <Box
                       style={{
-                        width: `${Math.round(Math.max(0, Math.min(1, pendingApprovalElapsedRatio)) * 100)}%`,
+                        width: `${Math.round(
+                          (
+                            hasLivePendingApproval
+                              ? Math.max(0.2, Math.min(1, pendingApprovalElapsedRatio))
+                              : Math.max(0, Math.min(1, pendingApprovalElapsedRatio))
+                          ) * 100,
+                        )}%`,
                         height: '100%',
-                        backgroundColor: pendingApprovalStepCompleted
-                          ? 'var(--mantine-color-teal-6)'
-                          : hasLivePendingApproval && pendingApprovalElapsedRatio >= 0.9
-                            ? 'var(--mantine-color-red-6)'
-                            : hasLivePendingApproval && pendingApprovalElapsedRatio >= 0.7
-                              ? 'var(--mantine-color-yellow-6)'
-                              : 'var(--mantine-color-violet-6)',
-                        transition: 'width 180ms ease',
+                        background: pendingApprovalVisual.fill,
+                        transition: 'width 180ms ease, background 180ms ease',
                       }}
                     />
                   )}
@@ -1025,7 +1085,11 @@ export function TeaPreReserva() {
                   )}
                 </Box>
                 <Group justify="space-between" gap={4} mt={4} wrap="nowrap">
-                  <Text size="10px" c={active ? 'teal' : 'dimmed'} lineClamp={1}>
+                  <Text
+                    size="10px"
+                    c={isPendingApprovalStep && hasLivePendingApproval ? pendingApprovalVisual.text : (active ? 'teal' : 'dimmed')}
+                    lineClamp={1}
+                  >
                     {label}
                   </Text>
                   {isPendingApprovalStep && pendingRequested?.isValid() && (
@@ -1083,6 +1147,9 @@ export function TeaPreReserva() {
     if (status === 'CONVERTED') {
       stage = 'AGENDADO_COMPLETO';
       stepIndex = 7;
+    } else if (status === 'PROPOSED') {
+      stage = 'AGUARDANDO_APROVACAO';
+      stepIndex = 4;
     } else if (status === 'PENDING_AUTHORIZATION') {
       stage = 'EM_AUTORIZACAO';
       stepIndex = 5;
@@ -1111,7 +1178,7 @@ export function TeaPreReserva() {
       pendingCount: status === 'PENDING_SCHEDULING' ? 1 : 0,
       reservedPartialCount: reservedPartial ? 1 : 0,
       reservedCompleteCount: reservedComplete ? 1 : 0,
-      pendingApprovalCount: status === 'PENDING_AUTHORIZATION' ? 1 : 0,
+      pendingApprovalCount: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION' ? 1 : 0,
       pendingApprovalRequestedAt: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION'
         ? String(item?.approvalRequestedAt || item?.updatedAt || item?.createdAt || '') || null
         : null,
@@ -1752,7 +1819,7 @@ export function TeaPreReserva() {
                     Autorizado em: {dayjs(item.authorizedAt).format('DD/MM/YYYY HH:mm')}
                   </Text>
                 )}
-                {item.status !== 'AUTHORIZED' && item.status !== 'CONVERTED' && item.expiresAt && (
+                {item.status === 'PROPOSED' && item.expiresAt && (
                   <Text size="xs" mt={4} c={item.isExpired ? 'red' : item.isExpiringSoon ? 'orange' : 'dimmed'}>
                     Expira em: {dayjs(item.expiresAt).format('DD/MM/YYYY HH:mm')}
                   </Text>
