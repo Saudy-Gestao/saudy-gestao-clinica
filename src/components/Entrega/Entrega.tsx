@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, Popover, ActionIcon, Select, Textarea, Paper, Loader, Menu, Switch } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -8,10 +9,12 @@ import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import deliveryService from '../../services/deliveryService';
-import patientService from '../../services/patientService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import { FacialCapture } from '../common/FacialCapture';
 import { formatDateInput, isValidCPF } from '../../utils/formatters';
+import { useDeliveriesQuery } from '../../hooks/useDeliveriesQuery';
+import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface DeliveryRow {
   id: string;
@@ -26,9 +29,9 @@ interface DeliveryRow {
 
 export function Entrega() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<DeliveryRow[]>([]);
-  const [rowsLoading, setRowsLoading] = useState(false);
   const [savingDelivery, setSavingDelivery] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -37,9 +40,16 @@ export function Entrega() {
   const [deliverToName, setDeliverToName] = useState('');
   const [deliverToCpf, setDeliverToCpf] = useState('');
   const [delivering, setDelivering] = useState(false);
-  const [patientsLoading, setPatientsLoading] = useState(false);
-  const [patientOptions, setPatientOptions] = useState<{ value: string; label: string }[]>([]);
-  const [patientById, setPatientById] = useState<Record<string, any>>({});
+  const {
+    data: deliveries = [],
+    isLoading: rowsLoading,
+    error: deliveriesError,
+  } = useDeliveriesQuery();
+  const {
+    data: patients = [],
+    isLoading: patientsLoading,
+    error: patientsError,
+  } = usePatientsAdminQuery();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -68,96 +78,49 @@ export function Entrega() {
   const [dateInput, setDateInput] = useState('');
 
   useEffect(() => {
-    const load = async () => {
-      setRowsLoading(true);
-      try {
-        const data: any = await deliveryService.getDeliveries();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const mapped: DeliveryRow[] = list.map((it: any, idx: number) => {
-          const id = String(it.id ?? it.deliveryId ?? idx + 1);
-          const availableAt = it.availableAt || it.available_at;
-          const deliveredAt = it.deliveredAt || it.delivered_at;
-          return {
-            id,
-            nomeCompleto: it.patientName || it.patient_name || '- ',
-            dataHora: availableAt ? new Date(availableAt).toLocaleString('pt-BR') : '-',
-            responsavel: it.responsible || '-',
-            status: it.status ? String(it.status).toUpperCase() : 'AVAILABLE',
-            tipo: it.documentType || it.document_type || '-',
-            entreguePara: it.deliveredTo || it.delivered_to || '-',
-            dataHoraEntrega: deliveredAt ? new Date(deliveredAt).toLocaleString('pt-BR') : '-',
-          };
-        });
-
-        setRows(mapped);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar entregas',
-          color: 'red',
-        });
-      } finally {
-        setRowsLoading(false);
-      }
-    };
-
-    load();
-  }, []);
+    const mapped: DeliveryRow[] = deliveries.map((it: any, idx: number) => {
+      const id = String(it.id ?? it.deliveryId ?? idx + 1);
+      const availableAt = it.availableAt || it.available_at;
+      const deliveredAt = it.deliveredAt || it.delivered_at;
+      return {
+        id,
+        nomeCompleto: it.patientName || it.patient_name || '- ',
+        dataHora: availableAt ? new Date(availableAt).toLocaleString('pt-BR') : '-',
+        responsavel: it.responsible || '-',
+        status: it.status ? String(it.status).toUpperCase() : 'AVAILABLE',
+        tipo: it.documentType || it.document_type || '-',
+        entreguePara: it.deliveredTo || it.delivered_to || '-',
+        dataHoraEntrega: deliveredAt ? new Date(deliveredAt).toLocaleString('pt-BR') : '-',
+      };
+    });
+    setRows(mapped);
+  }, [deliveries]);
 
   useEffect(() => {
-    const loadPatients = async () => {
-      setPatientsLoading(true);
-      try {
-        const data: any = await patientService.listPatients();
-        const listRaw = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.patients)
-            ? data.patients
-            : (Array.isArray(data?.data?.patients)
-              ? data.data.patients
-              : (Array.isArray(data?.data)
-                ? data.data
-                : (Array.isArray(data?.items) ? data.items : []))));
+    const err: any = deliveriesError || patientsError;
+    if (!err) return;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar dados da entrega',
+      color: 'red',
+    });
+  }, [deliveriesError, patientsError]);
 
-        const list: any[] = Array.isArray(listRaw) ? listRaw : [];
+  const patientOptions = useMemo(() => patients.map((p: any) => {
+    const id = String(p.id ?? p.patientId ?? '');
+    const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+    const label = name || 'Paciente';
+    return { value: id || label, label };
+  }), [patients]);
 
-        const options = list.map((p: any) => {
-          const id = String(p.id ?? p.patientId ?? '');
-          const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
-          const label = name || 'Paciente';
-          return { value: id || label, label };
-        });
-
-        const byId: Record<string, any> = {};
-        list.forEach((p: any) => {
-          const id = String(p.id ?? p.patientId ?? '');
-          if (id) byId[id] = p;
-        });
-
-        setPatientById(byId);
-        setPatientOptions(options);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
-          color: 'red',
-        });
-      } finally {
-        setPatientsLoading(false);
-      }
-    };
-
-    loadPatients();
-  }, []);
+  const patientById = useMemo<Record<string, any>>(() => {
+    const byId: Record<string, any> = {};
+    patients.forEach((p: any) => {
+      const id = String(p.id ?? p.patientId ?? '');
+      if (id) byId[id] = p;
+    });
+    return byId;
+  }, [patients]);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -321,6 +284,7 @@ export function Entrega() {
       showNotification({ title: 'Entrega realizada', message: 'Registro atualizado', color: 'green' });
       setDeliverModalOpen(false);
       setDeliverTarget(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deliveries });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -398,6 +362,7 @@ export function Entrega() {
       setModalOpen(false);
       setForm({ paciente: '', tipoDocumento: '', dataDisponivel: null, descricao: '' });
       setDateInput('');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deliveries });
     } catch (err: any) {
       // map server field errors to front fields (patientName -> paciente, documentType -> tipoDocumento)
       const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;

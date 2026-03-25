@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -40,6 +41,8 @@ import ResultModal from '../common/ResultModal';
 import { FacialCapture } from '../common/FacialCapture';
 import { FacialInstructionsModal } from '../common/FacialInstructionsModal';
 import { findExistingCpf } from '../../utils/cpfRegistry';
+import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -174,6 +177,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function CadastroPaciente() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -279,6 +283,7 @@ export function CadastroPaciente() {
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
   const [facialImage, setFacialImage] = useState<string | null>(null);
   const [requireFacialForPatientRegistration, setRequireFacialForPatientRegistration] = useState(true);
+  const patientsQuery = usePatientsAdminQuery();
   const lastValidatedCpfRef = useRef<string>('');
 
   const clearFieldError = (field: string) => {
@@ -517,42 +522,41 @@ export function CadastroPaciente() {
   };
 
   useEffect(() => {
-    const loadPatients = async () => {
-      setPatientsLoading(true);
-      try {
-        const data: unknown = await patientService.listPatients();
-        const list = getApiList(data);
-
-        const mapped: PatientListItem[] = list.map((item: ApiRecord, index: number) => {
-          const name = String(item.name ?? item.nome ?? item.fullName ?? 'Paciente');
-          const phone = String(item.cellphone ?? item.phone ?? '');
-          const insuranceName = String(item.healthInsuranceName ?? item.insuranceName ?? item.convenio ?? '');
-          return {
-            id: String(item.id ?? item.patientId ?? item._id ?? item.uuid ?? index),
-            name,
-            cpf: String(item.cpf ?? ''),
-            phone,
-            insuranceName,
-            raw: item,
-          };
-        });
-
-        setPatients(mapped);
-      } catch (e: unknown) {
-        const err = e as ApiError;
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
-          color: 'red',
-        });
-      } finally {
-        setPatientsLoading(false);
-      }
-    };
-
     loadTeaProfiles();
-    loadPatients();
   }, []);
+
+  useEffect(() => {
+    setPatientsLoading(patientsQuery.isFetching);
+  }, [patientsQuery.isFetching]);
+
+  useEffect(() => {
+    if (patientsQuery.error) {
+      const err = patientsQuery.error as ApiError;
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+        color: 'red',
+      });
+    }
+  }, [patientsQuery.error]);
+
+  useEffect(() => {
+    const list = getApiList(patientsQuery.data);
+    const mapped: PatientListItem[] = list.map((item: ApiRecord, index: number) => {
+      const name = String(item.name ?? item.nome ?? item.fullName ?? 'Paciente');
+      const phone = String(item.cellphone ?? item.phone ?? '');
+      const insuranceName = String(item.healthInsuranceName ?? item.insuranceName ?? item.convenio ?? '');
+      return {
+        id: String(item.id ?? item.patientId ?? item._id ?? item.uuid ?? index),
+        name,
+        cpf: String(item.cpf ?? ''),
+        phone,
+        insuranceName,
+        raw: item,
+      };
+    });
+    setPatients(mapped);
+  }, [patientsQuery.data]);
 
   useEffect(() => {
     const loadInsurances = async () => {
@@ -862,28 +866,7 @@ export function CadastroPaciente() {
         setFacialImage(null);
         setShowSuccessModal(true);
       }
-      try {
-        const refreshed: unknown = await patientService.listPatients();
-        const list = getApiList(refreshed);
-
-        const mapped: PatientListItem[] = list.map((item: ApiRecord, index: number) => {
-          const name = String(item.name ?? item.nome ?? item.fullName ?? 'Paciente');
-          const phone = String(item.cellphone ?? item.phone ?? '');
-          const insuranceName = String(item.healthInsuranceName ?? item.insuranceName ?? item.convenio ?? '');
-          return {
-            id: String(item.id ?? item.patientId ?? item._id ?? item.uuid ?? index),
-            name,
-            cpf: String(item.cpf ?? ''),
-            phone,
-            insuranceName,
-            raw: item,
-          };
-        });
-
-        setPatients(mapped);
-      } catch {
-        // Silent refresh failure after save.
-      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.patientsAdmin });
     } catch (e: unknown) {
       const err = e as ApiError;
       // handle field-level errors returned by server
@@ -915,7 +898,7 @@ export function CadastroPaciente() {
   const handleDeletePatient = async (item: PatientListItem) => {
     try {
       await patientService.deletePatient(item.id);
-      setPatients((prev) => prev.filter((p) => p.id !== item.id));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.patientsAdmin });
       showNotification({ title: 'Paciente excluído', message: 'Registro removido com sucesso.', color: 'green' });
       setDeleteConfirmOpen(false);
       setDeleteTarget(null);
@@ -930,17 +913,7 @@ export function CadastroPaciente() {
     try {
       const currentIsActive = Boolean(item.raw?.isActive ?? true);
       await patientService.updatePatient(item.id, { isActive: !currentIsActive });
-
-      setPatients((prev) =>
-        prev.map((p) =>
-          p.id === item.id
-            ? {
-                ...p,
-                raw: { ...p.raw, isActive: !currentIsActive },
-              }
-            : p,
-        ),
-      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.patientsAdmin });
 
       showNotification({
         title: 'Status atualizado',

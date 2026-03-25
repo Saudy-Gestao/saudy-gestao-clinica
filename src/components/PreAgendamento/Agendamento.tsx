@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -34,12 +35,15 @@ import { FloatingDateInput } from '../common/FloatingDateInput';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import appointmentService from '../../services/appointmentService';
 import patientService from '../../services/patientService';
-import doctorService from '../../services/doctorService';
-import insuranceService from '../../services/insuranceService';
-import procedureService from '../../services/procedureService';
 import appointmentAttachmentService from '../../services/appointmentAttachmentService';
 import type { AppointmentAttachment } from '../../services/appointmentAttachmentService';
 import { formatCPF } from '../../utils/formatters';
+import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
+import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
+import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
+import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface Agendamento {
   id: string;
@@ -313,6 +317,7 @@ const addDays = (date: Date, amount: number): Date => dayjs(date).add(amount, 'd
 
 export function Agendamento() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const handledPrefillRef = useRef(false);
   const schedulerRef = useRef<HTMLDivElement | null>(null);
@@ -374,6 +379,11 @@ export function Agendamento() {
   const [detailAttachments, setDetailAttachments] = useState<AppointmentAttachment[]>([]);
   const [detailAttachmentsLoading, setDetailAttachmentsLoading] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const appointmentsQuery = useAppointmentsQuery();
+  const patientsQuery = usePatientsAdminQuery();
+  const insurancesQuery = useInsurancesAdminQuery();
+  const doctorsQuery = useDoctorsAdminQuery();
+  const proceduresCatalogQuery = useProceduresAdminQuery();
 
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState<string | null>(null);
@@ -470,23 +480,7 @@ export function Agendamento() {
   };
 
   const loadAgendamentos = async () => {
-    try {
-      const data: any = await appointmentService.list({ limit: 2000, offset: 0 });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : []));
-      setAgendamentos(sortAgendamentosByDateTime(list.map(mapApiToAgendamento)));
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos',
-        color: 'red',
-      });
-    }
+    await queryClient.invalidateQueries({ queryKey: queryKeys.appointments });
   };
 
   const fileToBase64 = async (file: File) => new Promise<string>((resolve, reject) => {
@@ -581,201 +575,205 @@ export function Agendamento() {
   };
 
   useEffect(() => {
-    loadAgendamentos();
-  }, []);
+    if (appointmentsQuery.error) {
+      const err: any = appointmentsQuery.error;
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos',
+        color: 'red',
+      });
+    }
+  }, [appointmentsQuery.error]);
 
   useEffect(() => {
-    const loadPatients = async () => {
-      setPatientsLoading(true);
-      try {
-        const data: any = await patientService.listPatients();
-        const listRaw = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.patients)
-            ? data.patients
-            : (Array.isArray(data?.data?.patients)
-              ? data.data.patients
-              : (Array.isArray(data?.data)
-                ? data.data
-                : (Array.isArray(data?.items) ? data.items : []))));
-
-        const list: any[] = Array.isArray(listRaw) ? listRaw : [];
-        const options = list.map((p: any) => {
-          const id = String(p.id ?? p.patientId ?? '');
-          const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
-          const label = name ? `${name}${p.cpf ? ` • ${formatCPF(p.cpf)}` : ''}` : 'Paciente';
-          return { value: id || label, label };
-        });
-
-        const byId: Record<string, any> = {};
-        list.forEach((p: any) => {
-          const id = String(p.id ?? p.patientId ?? '');
-          if (id) byId[id] = p;
-        });
-
-        setPatientById(byId);
-        setPatientOptions(options);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
-          color: 'red',
-        });
-      } finally {
-        setPatientsLoading(false);
-      }
-    };
-
-    loadPatients();
-  }, []);
+    const list = Array.isArray(appointmentsQuery.data) ? appointmentsQuery.data : [];
+    setAgendamentos(sortAgendamentosByDateTime(list.map(mapApiToAgendamento)));
+  }, [appointmentsQuery.data]);
 
   useEffect(() => {
-    const loadInsurances = async () => {
-      setInsurancesLoading(true);
-      try {
-        const data: any = await insuranceService.listInsurances({ isActive: true });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+    setPatientsLoading(patientsQuery.isFetching);
+  }, [patientsQuery.isFetching]);
 
-        const options = list
-          .map((it: any) => {
-            const name = (it.name || it.nome || '').toString().trim();
-            return name ? { value: name, label: name } : null;
-          })
-          .filter(Boolean) as { value: string; label: string }[];
+  useEffect(() => {
+    setInsurancesLoading(insurancesQuery.isFetching);
+  }, [insurancesQuery.isFetching]);
 
-        const mergedOptions = [
-          { value: PARTICULAR_INSURANCE_LABEL, label: PARTICULAR_INSURANCE_LABEL },
-          ...options.filter((item, index, arr) => arr.findIndex((current) => current.value === item.value) === index),
-        ];
+  useEffect(() => {
+    setDoctorsLoading(doctorsQuery.isFetching);
+  }, [doctorsQuery.isFetching]);
 
-        setInsuranceOptions(mergedOptions);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
-          color: 'red',
-        });
-      } finally {
-        setInsurancesLoading(false);
-      }
-    };
+  useEffect(() => {
+    setProceduresLoading(proceduresCatalogQuery.isFetching);
+  }, [proceduresCatalogQuery.isFetching]);
 
-    const loadDoctors = async () => {
-      setDoctorsLoading(true);
-      try {
-        const data: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+  useEffect(() => {
+    if (!patientsQuery.error) return;
+    const err: any = patientsQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      color: 'red',
+    });
+  }, [patientsQuery.error]);
 
-        const options = list
-          .map((doctor: any) => {
-            const name = doctor.name || doctor.nome || doctor.fullName || '';
-            return name ? { value: name, label: name } : null;
-          })
-          .filter(Boolean) as { value: string; label: string }[];
+  useEffect(() => {
+    if (!insurancesQuery.error) return;
+    const err: any = insurancesQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      color: 'red',
+    });
+  }, [insurancesQuery.error]);
 
-        const metaByName = list.reduce<Record<string, DoctorScheduleMeta>>((acc, doctor: any) => {
-          const name = (doctor.name || doctor.nome || doctor.fullName || '').toString().trim();
-          if (!name) return acc;
-          acc[name] = {
-            id: String(doctor.id ?? doctor.doctorId ?? '').trim() || undefined,
-            name,
-            workingDays: Array.isArray(doctor.workingDays) ? doctor.workingDays : [],
-            workingHoursStart: doctor.workingHoursStart || undefined,
-            workingHoursEnd: doctor.workingHoursEnd || undefined,
-            specialties: [
-              ...(doctor.specialty ? [String(doctor.specialty)] : []),
-              ...(Array.isArray(doctor.specialties) ? doctor.specialties.map((item: any) => String(item)) : []),
-            ].filter(Boolean),
-          };
-          return acc;
-        }, {});
+  useEffect(() => {
+    if (!doctorsQuery.error) return;
+    const err: any = doctorsQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+      color: 'red',
+    });
+  }, [doctorsQuery.error]);
 
-        setDoctorOptions(options);
-        setDoctorMetaByName(metaByName);
+  useEffect(() => {
+    if (!proceduresCatalogQuery.error) return;
+    const err: any = proceduresCatalogQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+      color: 'red',
+    });
+  }, [proceduresCatalogQuery.error]);
 
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
-          color: 'red',
-        });
-      } finally {
-        setDoctorsLoading(false);
-      }
-    };
+  useEffect(() => {
+    const data: any = patientsQuery.data;
+    const listRaw = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.patients)
+        ? data.patients
+        : (Array.isArray(data?.data?.patients)
+          ? data.data.patients
+          : (Array.isArray(data?.data)
+            ? data.data
+            : (Array.isArray(data?.items) ? data.items : []))));
 
-    const loadProcedures = async () => {
-      setProceduresLoading(true);
-      try {
-        const data: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+    const list: any[] = Array.isArray(listRaw) ? listRaw : [];
+    const options = list.map((p: any) => {
+      const id = String(p.id ?? p.patientId ?? '');
+      const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+      const label = name ? `${name}${p.cpf ? ` • ${formatCPF(p.cpf)}` : ''}` : 'Paciente';
+      return { value: id || label, label };
+    });
 
-        const options = list
-          .map((item: any) => {
-            const name = (item.name || item.nome || '').toString().trim();
-            return name ? { value: name, label: name } : null;
-          })
-          .filter(Boolean) as { value: string; label: string }[];
+    const byId: Record<string, any> = {};
+    list.forEach((p: any) => {
+      const id = String(p.id ?? p.patientId ?? '');
+      if (id) byId[id] = p;
+    });
 
-        const metaByName = list.reduce<Record<string, ProcedureMeta>>((acc, item: any) => {
-          const name = (item.name || item.nome || '').toString().trim();
-          if (!name) return acc;
-          const linkedDoctors = Array.isArray(item.doctors) ? item.doctors : [];
-          acc[name] = {
-            name,
-            appointmentType: normalizeProcedureAppointmentType(item.appointmentType),
-            durationMinutes: Number.isFinite(Number(item.durationMinutes)) ? Number(item.durationMinutes) : null,
-            doctorIds: linkedDoctors
-              .map((doctor: any) => String(doctor?.doctorId || doctor?.id || '').trim())
-              .filter(Boolean),
-            doctorNames: linkedDoctors
-              .map((doctor: any) => String(doctor?.doctorName || doctor?.name || '').trim())
-              .filter(Boolean),
-          };
-          return acc;
-        }, {});
+    setPatientById(byId);
+    setPatientOptions(options);
+  }, [patientsQuery.data]);
 
-        setProcedureOptions(options);
-        setProcedureMetaByName(metaByName);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
-          color: 'red',
-        });
-      } finally {
-        setProceduresLoading(false);
-      }
-    };
+  useEffect(() => {
+    const data: any = insurancesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
 
-    loadInsurances();
-    loadDoctors();
-    loadProcedures();
-  }, []);
+    const options = list
+      .filter((it: any) => it?.isActive !== false)
+      .map((it: any) => {
+        const name = (it.name || it.nome || '').toString().trim();
+        return name ? { value: name, label: name } : null;
+      })
+      .filter(Boolean) as { value: string; label: string }[];
+
+    const mergedOptions = [
+      { value: PARTICULAR_INSURANCE_LABEL, label: PARTICULAR_INSURANCE_LABEL },
+      ...options.filter((item, index, arr) => arr.findIndex((current) => current.value === item.value) === index),
+    ];
+
+    setInsuranceOptions(mergedOptions);
+  }, [insurancesQuery.data]);
+
+  useEffect(() => {
+    const data: any = doctorsQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
+
+    const options = list
+      .map((doctor: any) => {
+        const name = doctor.name || doctor.nome || doctor.fullName || '';
+        return name ? { value: name, label: name } : null;
+      })
+      .filter(Boolean) as { value: string; label: string }[];
+
+    const metaByName = list.reduce<Record<string, DoctorScheduleMeta>>((acc, doctor: any) => {
+      const name = (doctor.name || doctor.nome || doctor.fullName || '').toString().trim();
+      if (!name) return acc;
+      acc[name] = {
+        id: String(doctor.id ?? doctor.doctorId ?? '').trim() || undefined,
+        name,
+        workingDays: Array.isArray(doctor.workingDays) ? doctor.workingDays : [],
+        workingHoursStart: doctor.workingHoursStart || undefined,
+        workingHoursEnd: doctor.workingHoursEnd || undefined,
+        specialties: [
+          ...(doctor.specialty ? [String(doctor.specialty)] : []),
+          ...(Array.isArray(doctor.specialties) ? doctor.specialties.map((item: any) => String(item)) : []),
+        ].filter(Boolean),
+      };
+      return acc;
+    }, {});
+
+    setDoctorOptions(options);
+    setDoctorMetaByName(metaByName);
+  }, [doctorsQuery.data]);
+
+  useEffect(() => {
+    const list: any[] = Array.isArray(proceduresCatalogQuery.data) ? proceduresCatalogQuery.data : [];
+    const options = list
+      .map((item: any) => {
+        const name = (item.name || item.nome || '').toString().trim();
+        return name ? { value: name, label: name } : null;
+      })
+      .filter(Boolean) as { value: string; label: string }[];
+
+    const metaByName = list.reduce<Record<string, ProcedureMeta>>((acc, item: any) => {
+      const name = (item.name || item.nome || '').toString().trim();
+      if (!name) return acc;
+      const linkedDoctors = Array.isArray(item.doctors) ? item.doctors : [];
+      acc[name] = {
+        name,
+        appointmentType: normalizeProcedureAppointmentType(item.appointmentType),
+        durationMinutes: Number.isFinite(Number(item.durationMinutes)) ? Number(item.durationMinutes) : null,
+        doctorIds: linkedDoctors
+          .map((doctor: any) => String(doctor?.doctorId || doctor?.id || '').trim())
+          .filter(Boolean),
+        doctorNames: linkedDoctors
+          .map((doctor: any) => String(doctor?.doctorName || doctor?.name || '').trim())
+          .filter(Boolean),
+      };
+      return acc;
+    }, {});
+
+    setProcedureOptions(options);
+    setProcedureMetaByName(metaByName);
+  }, [proceduresCatalogQuery.data]);
 
   const filteredAgendamentos = agendamentos.filter((agendamento) => {
     const normalizedSearch = searchValue.trim().toLowerCase();

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Paper,
   Tabs,
@@ -37,6 +38,8 @@ import {
   IconDeviceFloppy,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
+import { useWhatsAppPageDataQuery } from '../../hooks/useWhatsAppPageDataQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface TemplateFormValues {
   type: string;
@@ -59,15 +62,17 @@ interface WhatsAppConfigProps {
 }
 
 export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<{ id: string; name: string } | null>(null);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [variables, setVariables] = useState<any[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showAlert, setShowAlert] = useState(true);
+  const { data, error, isFetching } = useWhatsAppPageDataQuery();
+  const templates = data?.templates || [];
+  const logs = data?.logs || [];
+  const variables = data?.variables || [];
 
   // Forms using simple state instead of @mantine/form
   const [templateForm, setTemplateForm] = useState<TemplateFormValues>({
@@ -87,54 +92,33 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   });
 
   useEffect(() => {
-    loadData();
-    loadVariables();
-  }, []);
+    if (!data?.notificationConfig) return;
+    setNotificationForm({
+      sendOnAppointmentCreated: data.notificationConfig.sendOnAppointmentCreated,
+      sendConfirmationEnabled: data.notificationConfig.sendConfirmationEnabled,
+      confirmationHoursBefore: data.notificationConfig.confirmationHoursBefore,
+      sendReminderEnabled: data.notificationConfig.sendReminderEnabled,
+      reminderHoursBefore: data.notificationConfig.reminderHoursBefore,
+    });
+  }, [data?.notificationConfig]);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (!error) return;
+    const err: any = error;
+    notifications.show({
+      title: 'Erro',
+      message: err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao carregar configurações do WhatsApp',
+      color: 'red',
+    });
+  }, [error]);
+
+  const refreshPageData = async () => {
     try {
-      const [templatesData, notificationConfig] = await Promise.all([
-        whatsappService.listTemplates(),
-        whatsappService.getNotificationConfig(),
-      ]);
-
-      setTemplates(templatesData);
-
-      if (notificationConfig) {
-        setNotificationForm({
-          sendOnAppointmentCreated: notificationConfig.sendOnAppointmentCreated,
-          sendConfirmationEnabled: notificationConfig.sendConfirmationEnabled,
-          confirmationHoursBefore: notificationConfig.confirmationHoursBefore,
-          sendReminderEnabled: notificationConfig.sendReminderEnabled,
-          reminderHoursBefore: notificationConfig.reminderHoursBefore,
-        });
-      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappPageData });
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao carregar configurações',
-        color: 'red',
-      });
-    }
-  };
-
-  const loadVariables = async () => {
-    try {
-      const data = await whatsappService.getAvailableVariables();
-      setVariables(data);
-    } catch (error) {
-      console.error('Failed to load variables:', error);
-    }
-  };
-
-  const loadLogs = async () => {
-    try {
-      const data = await whatsappService.listLogs({ limit: 50, offset: 0 });
-      setLogs(data.items);
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erro',
-        message: 'Erro ao carregar logs',
+        message: error.response?.data?.message || 'Erro ao atualizar dados do WhatsApp',
         color: 'red',
       });
     }
@@ -150,7 +134,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         message: 'Configurações de notificação salvas',
         color: 'green',
       });
-      await loadData();
+      await refreshPageData();
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
@@ -201,7 +185,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         hsmTemplateName: '',
         isActive: true,
       });
-      loadData();
+      await refreshPageData();
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
@@ -223,7 +207,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         color: 'green',
       });
       setDeleteConfirmTemplate(null);
-      loadData();
+      await refreshPageData();
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
@@ -242,7 +226,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         message: `${result.synced} template(s) verificados, ${result.updated} atualizado(s).`,
         color: 'green',
       });
-      await loadData();
+      await refreshPageData();
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
@@ -401,10 +385,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                         checked={template.isActive}
                         onChange={async (event) => {
                           await whatsappService.saveTemplate({
-                            ...template,
+                            type: template.type,
+                            name: template.name,
+                            message: template.message,
+                            hsmTemplateName: template.hsmTemplateName || undefined,
                             isActive: event.currentTarget.checked,
                           });
-                          loadData();
+                          await refreshPageData();
                         }}
                       />
                       <ActionIcon
@@ -498,7 +485,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                 <Button
                   type="submit"
                   leftSection={<IconDeviceFloppy size={16} />}
-                  loading={loading}
+                  loading={loading || isFetching}
                 >
                   Salvar Configurações
                 </Button>
@@ -519,7 +506,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
           <Paper shadow="sm" p="xl">
             <Group justify="space-between" mb="md">
               <Title order={4}>Histórico de Mensagens</Title>
-              <Button variant="light" onClick={loadLogs}>
+              <Button variant="light" onClick={refreshPageData} loading={isFetching}>
                 Atualizar
               </Button>
             </Group>
@@ -535,7 +522,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {logs.map((log) => (
+                {logs.map((log: any) => (
                   <Table.Tr key={log.id}>
                     <Table.Td>
                       {new Date(log.createdAt).toLocaleString('pt-BR')}
@@ -636,7 +623,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               <Button variant="light" type="button" onClick={() => setShowTemplateModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" loading={loading}>
+              <Button type="submit" loading={loading || isFetching}>
                 Salvar
               </Button>
             </Group>

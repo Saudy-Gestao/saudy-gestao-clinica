@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Group,
@@ -21,56 +22,27 @@ import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, BarChart3 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
-import teaProfileService from '../../services/teaProfileService';
 import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF } from '../../utils/formatters';
+import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
+import { useTeaReportQuery } from '../../hooks/useTeaReportQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
-interface TeaProfileItem {
+type TeaProfileItem = {
   id: string;
   patient?: {
     name?: string;
     cpf?: string;
   };
-}
+};
 
-interface TeaReportData {
-  patient?: {
-    name?: string;
-    cpf?: string;
-    birthDate?: string;
-  };
-  summary?: {
-    plansTotal?: number;
-    plansActive?: number;
-    plansInactive?: number;
-    evolutionsTotal?: number;
-    evolutionsWithScore?: number;
-    avgProgressScore?: number | null;
-  };
-  latestEvolution?: {
-    sessionDate?: string;
-    professional?: string | null;
-    therapeuticPlan?: {
-      title?: string;
-    } | null;
-    progressScore?: number | null;
-    interventionSummary?: string | null;
-  } | null;
-  pit?: {
-    title?: string;
-    status?: string;
-    startDate?: string | null;
-    reviewDate?: string | null;
-    therapiesCount?: number;
-    therapies?: Array<{
-      id: string;
-      therapyType?: string;
-      weeklyFrequency?: number;
-      durationMinutes?: number | null;
-      professional?: string | null;
-    }>;
-  } | null;
-}
+type TeaReportTherapyItem = {
+  id: string;
+  therapyType?: string;
+  weeklyFrequency?: number;
+  durationMinutes?: number | null;
+  professional?: string | null;
+};
 
 export function TeaRelatorios() {
   const navigate = useNavigate();
@@ -80,77 +52,85 @@ export function TeaRelatorios() {
   const heroBg = colorScheme === 'dark' ? 'var(--mantine-color-body)' : 'var(--mantine-color-gray-0)';
   const cardBg = colorScheme === 'dark' ? 'var(--mantine-color-default)' : 'var(--mantine-color-white)';
 
-  const [teaProfiles, setTeaProfiles] = useState<TeaProfileItem[]>([]);
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [appliedStartDate, setAppliedStartDate] = useState<string>('');
+  const [appliedEndDate, setAppliedEndDate] = useState<string>('');
+  const queryClient = useQueryClient();
 
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
-  const [loadingReport, setLoadingReport] = useState(false);
-  const [reportData, setReportData] = useState<TeaReportData | null>(null);
+  const {
+    data: teaProfiles = [] as TeaProfileItem[],
+    isLoading: loadingProfiles,
+    error: teaProfilesError,
+  } = useTeaProfilesQuery();
+
+  const {
+    data: reportData,
+    isFetching: loadingReport,
+    error: reportError,
+    refetch: refetchReport,
+  } = useTeaReportQuery({
+    teaProfileId: selectedTeaProfileId,
+    startDate: appliedStartDate || undefined,
+    endDate: appliedEndDate || undefined,
+  });
 
   const teaProfileOptions = useMemo(
-    () => teaProfiles.map((it) => ({
+    () => teaProfiles.map((it: TeaProfileItem) => ({
       value: String(it.id),
       label: `${it.patient?.name || 'Paciente sem nome'}${it.patient?.cpf ? ` • ${formatCPF(it.patient.cpf)}` : ''}`,
     })),
     [teaProfiles],
   );
 
-  const loadTeaProfiles = async () => {
-    setLoadingProfiles(true);
-    try {
-      const data: any = await teaProfileService.list({ limit: 300, offset: 0 });
-      const list: TeaProfileItem[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items) ? data.items : []);
-      setTeaProfiles(list);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
-        color: 'red',
-      });
-    } finally {
-      setLoadingProfiles(false);
-    }
-  };
-
-  const loadReport = async () => {
+  const handleGenerateReport = async () => {
     if (!selectedTeaProfileId) {
       showNotification({ title: 'Atenção', message: 'Selecione um paciente TEA', color: 'yellow' });
       return;
     }
 
-    setLoadingReport(true);
-    try {
-      const data = await teaProfileService.getReport(selectedTeaProfileId, {
-        startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : undefined,
-        endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : undefined,
-      });
-      setReportData(data);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Erro ao carregar relatório',
-        color: 'red',
-      });
-      setReportData(null);
-    } finally {
-      setLoadingReport(false);
-    }
+    const nextStartDate = startDate ? dayjs(startDate).format('YYYY-MM-DD') : '';
+    const nextEndDate = endDate ? dayjs(endDate).format('YYYY-MM-DD') : '';
+
+    setAppliedStartDate(nextStartDate);
+    setAppliedEndDate(nextEndDate);
+
+    await queryClient.invalidateQueries({
+      queryKey: [...queryKeys.teaReports, selectedTeaProfileId, nextStartDate, nextEndDate],
+    });
+    await refetchReport();
   };
 
   useEffect(() => {
-    loadTeaProfiles();
-  }, []);
+    if (!teaProfilesError) return;
+    const err: any = teaProfilesError;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
+      color: 'red',
+    });
+  }, [teaProfilesError]);
+
+  useEffect(() => {
+    if (!reportError || !selectedTeaProfileId) return;
+    const err: any = reportError;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Erro ao carregar relatório',
+      color: 'red',
+    });
+  }, [reportError, selectedTeaProfileId]);
 
   useEffect(() => {
     if (!selectedTeaProfileId) {
-      setReportData(null);
+      setAppliedStartDate('');
+      setAppliedEndDate('');
       return;
     }
-    loadReport();
+
+    setAppliedStartDate(startDate ? dayjs(startDate).format('YYYY-MM-DD') : '');
+    setAppliedEndDate(endDate ? dayjs(endDate).format('YYYY-MM-DD') : '');
   }, [selectedTeaProfileId]);
 
   return (
@@ -206,7 +186,7 @@ export function TeaRelatorios() {
               <Button variant="default" onClick={() => { setStartDate(null); setEndDate(null); }}>
                 Limpar período
               </Button>
-              <Button bg={DARK_BLUE} onClick={loadReport} loading={loadingReport} disabled={!selectedTeaProfileId || loadingReport}>
+              <Button bg={DARK_BLUE} onClick={handleGenerateReport} loading={loadingReport} disabled={!selectedTeaProfileId || loadingReport}>
                 Gerar relatório
               </Button>
             </Group>
@@ -293,7 +273,7 @@ export function TeaRelatorios() {
 
                       {(reportData.pit.therapies || []).length > 0 && (
                         <Stack gap={2} mt={4}>
-                          {(reportData.pit.therapies || []).map((therapy) => (
+                          {(reportData.pit.therapies || []).map((therapy: TeaReportTherapyItem) => (
                             <Text key={therapy.id} size="xs" c="dimmed">
                               • {therapy.therapyType || 'Terapia'}
                               {typeof therapy.weeklyFrequency === 'number' ? ` • ${therapy.weeklyFrequency}x/semana` : ''}

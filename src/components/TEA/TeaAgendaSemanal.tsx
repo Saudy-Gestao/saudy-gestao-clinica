@@ -18,23 +18,7 @@ import { ChevronLeft, ChevronRight, CalendarDays, Search } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { Header } from '../Header/Header';
-import appointmentService from '../../services/appointmentService';
-import teaPreReservationService from '../../services/teaPreReservationService';
-import doctorService from '../../services/doctorService';
-import sectorService from '../../services/sectorService';
-
-type TeaAppointment = {
-  id: string;
-  patientName: string;
-  doctorName: string;
-  specialty: string;
-  roomName: string;
-  date: string;
-  time: string;
-  type: string;
-  status: string;
-  source: 'APPOINTMENT' | 'RESERVATION';
-};
+import { useTeaWeeklyAgendaQuery, type TeaAgendaItem } from '../../hooks/useTeaWeeklyAgendaQuery';
 
 const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -88,8 +72,6 @@ export function TeaAgendaSemanal() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
 
-  const [loading, setLoading] = useState(false);
-  const [allTeaAppointments, setAllTeaAppointments] = useState<TeaAppointment[]>([]);
   const [search, setSearch] = useState('');
   const [procedureFilter, setProcedureFilter] = useState<string[]>([]);
   const [doctorFilter, setDoctorFilter] = useState<string[]>([]);
@@ -150,7 +132,7 @@ export function TeaAgendaSemanal() {
   const weekAppointmentsByDate = useMemo(() => {
     const startIso = weekStart.format('YYYY-MM-DD');
     const endIso = weekStart.add(6, 'day').format('YYYY-MM-DD');
-    const grouped: Record<string, TeaAppointment[]> = {};
+    const grouped: Record<string, TeaAgendaItem[]> = {};
 
     filteredAppointments.forEach((item) => {
       if (!item.date) return;
@@ -171,107 +153,19 @@ export function TeaAgendaSemanal() {
     [weekAppointmentsByDate],
   );
 
-  const loadAppointments = async () => {
-    setLoading(true);
-    try {
-      const [data, reservationData, doctorData, sectorData]: any[] = await Promise.all([
-        appointmentService.list({ limit: 4000, offset: 0 }),
-        teaPreReservationService.listCreated({ limit: 4000, offset: 0 }),
-        doctorService.listDoctors(),
-        sectorService.listSectors(),
-      ]);
-
-      const rawItems: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.data?.items) ? data.data.items : []));
-      const reservedItems: any[] = Array.isArray(reservationData?.items) ? reservationData.items : [];
-      const doctors: any[] = Array.isArray(doctorData)
-        ? doctorData
-        : (Array.isArray(doctorData?.items) ? doctorData.items : (Array.isArray(doctorData?.data?.items) ? doctorData.data.items : []));
-      const sectors: any[] = Array.isArray(sectorData)
-        ? sectorData
-        : (Array.isArray(sectorData?.items) ? sectorData.items : (Array.isArray(sectorData?.data?.items) ? sectorData.data.items : []));
-
-      const roomById = new Map<string, string>();
-      sectors.forEach((sector: any) => {
-        const roomId = String(sector?.id || '').trim();
-        const roomName = String(sector?.name || '').trim();
-        const branchName = String(sector?.branch?.tradeName || sector?.branch?.socialName || '').trim();
-        if (!roomId || !roomName) return;
-        roomById.set(roomId, branchName ? `${roomName} (${branchName})` : roomName);
-      });
-
-      const roomByDoctorId = new Map<string, string>();
-      const roomByDoctorName = new Map<string, string>();
-      doctors.forEach((doctor: any) => {
-        const doctorId = String(doctor?.id || doctor?.doctorId || '').trim();
-        const doctorName = String(doctor?.name || doctor?.nome || doctor?.fullName || '').trim();
-        const roomId = Array.isArray(doctor?.roomIds) && doctor.roomIds.length > 0
-          ? String(doctor.roomIds[0] || '').trim()
-          : String(doctor?.roomId || '').trim();
-        const roomName = roomById.get(roomId) || '';
-
-        if (doctorId && roomName) roomByDoctorId.set(doctorId, roomName);
-        if (doctorName && roomName) roomByDoctorName.set(doctorName.toLowerCase(), roomName);
-      });
-
-      const mappedAppointments: TeaAppointment[] = rawItems
-        .map((it: any) => ({
-          id: `appointment-${String(it?.id || '')}`,
-          patientName: String(it?.patientName || it?.patient_name || ''),
-          doctorName: String(it?.doctorName || it?.doctor_name || ''),
-          specialty: String(it?.specialty || it?.procedure || it?.procedureName || ''),
-          roomName: (() => {
-            const doctorId = String(it?.doctorId || it?.doctor?.id || '').trim();
-            const doctorName = String(it?.doctorName || it?.doctor_name || '').trim().toLowerCase();
-            return roomByDoctorId.get(doctorId) || roomByDoctorName.get(doctorName) || '';
-          })(),
-          date: String(it?.date || ''),
-          time: String(it?.time || ''),
-          type: String(it?.type || ''),
-          status: String(it?.status || ''),
-          source: 'APPOINTMENT' as const,
-        }))
-        .filter((item) => item.id && item.date && item.time)
-        .filter((item) => String(item.type || '').toUpperCase().includes('TEA'));
-
-      const mappedReservations: TeaAppointment[] = reservedItems
-        .map((it: any) => ({
-          id: `reservation-${String(it?.id || '')}`,
-          patientName: String(it?.patient?.name || ''),
-          doctorName: String(it?.professionalName || ''),
-          specialty: String(it?.procedureName || ''),
-          roomName: (() => {
-            const doctorId = String(it?.professionalDoctorId || it?.professional?.id || it?.pitTherapy?.professionalDoctorId || '').trim();
-            const doctorName = String(it?.professionalName || '').trim().toLowerCase();
-            return roomByDoctorId.get(doctorId) || roomByDoctorName.get(doctorName) || '';
-          })(),
-          date: it?.suggestedDate ? dayjs(it.suggestedDate).format('YYYY-MM-DD') : '',
-          time: String(it?.suggestedTime || ''),
-          type: 'RESERVA TEA',
-          status: String(it?.status || 'RESERVED'),
-          source: 'RESERVATION' as const,
-        }))
-        .filter((item) => item.id && item.date && item.time);
-      const reservationStatusesThatOccupy = new Set(['RESERVED', 'PROPOSED', 'PENDING_AUTHORIZATION', 'AUTHORIZED']);
-      const occupyingReservations = mappedReservations.filter((item) => reservationStatusesThatOccupy.has(String(item.status || '').toUpperCase()));
-
-      setAllTeaAppointments([...mappedAppointments, ...occupyingReservations]);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar agenda semanal TEA',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     dayjs.locale('pt-br');
-    loadAppointments();
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    const err: any = error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar agenda semanal TEA',
+      color: 'red',
+    });
+  }, [error]);
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
@@ -469,3 +363,8 @@ export function TeaAgendaSemanal() {
     </Box>
   );
 }
+  const {
+    data: allTeaAppointments = [],
+    isLoading: loading,
+    error,
+  } = useTeaWeeklyAgendaQuery();

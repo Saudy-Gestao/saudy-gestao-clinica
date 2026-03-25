@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
@@ -21,8 +22,10 @@ import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, Pencil, Trash2 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
-import procedureService from '../../services/procedureService';
 import teaEvolutionTemplateService from '../../services/teaEvolutionTemplateService';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { useTeaEvolutionTemplatesQuery } from '../../hooks/useTeaEvolutionTemplatesQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 const emptyForm = {
   id: '',
@@ -42,52 +45,46 @@ export function TeaEvolucaoTemplates() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
+  const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [items, setItems] = useState<any[]>([]);
-  const [procedureOptions, setProcedureOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [form, setForm] = useState({ ...emptyForm });
 
+  const {
+    data: procedures = [] as any[],
+    error: proceduresError,
+  } = useProceduresAdminQuery();
+
+  const {
+    data: items = [] as any[],
+    isLoading: loading,
+    isFetching,
+    error: templatesError,
+  } = useTeaEvolutionTemplatesQuery();
+
   const isEditing = useMemo(() => Boolean(form.id), [form.id]);
-
-  const loadProcedures = async () => {
-    try {
-      const data: any = await procedureService.listProcedures({ limit: 300, offset: 0 });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items) ? data.items : []);
-      setProcedureOptions(
-        list
-          .map((item: any) => {
-            const id = String(item?.id || '').trim();
-            const name = String(item?.name || '').trim();
-            return id && name ? { value: id, label: name } : null;
-          })
-          .filter(Boolean) as Array<{ value: string; label: string }>,
-      );
-    } catch {
-      setProcedureOptions([]);
-    }
-  };
-
-  const loadTemplates = async () => {
-    setLoading(true);
-    try {
-      const data: any = await teaEvolutionTemplateService.list({ limit: 200, offset: 0 });
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
-      setItems(list);
-    } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Erro ao carregar templates', color: 'red' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const procedureOptions = useMemo(
+    () => procedures
+      .map((item: any) => {
+        const id = String(item?.id || '').trim();
+        const name = String(item?.name || '').trim();
+        return id && name ? { value: id, label: name } : null;
+      })
+      .filter(Boolean) as Array<{ value: string; label: string }>,
+    [procedures],
+  );
 
   useEffect(() => {
-    loadProcedures();
-    loadTemplates();
-  }, []);
+    if (!proceduresError) return;
+    const err: any = proceduresError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos', color: 'red' });
+  }, [proceduresError]);
+
+  useEffect(() => {
+    if (!templatesError) return;
+    const err: any = templatesError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar templates', color: 'red' });
+  }, [templatesError]);
 
   const handleSave = async () => {
     if (!form.procedureId) {
@@ -124,7 +121,7 @@ export function TeaEvolucaoTemplates() {
 
       showNotification({ title: 'Sucesso', message: isEditing ? 'Template atualizado' : 'Template criado', color: 'green' });
       setForm({ ...emptyForm });
-      await loadTemplates();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teaEvolutionTemplates });
     } catch (err: any) {
       showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Falha ao salvar template', color: 'red' });
     } finally {
@@ -151,7 +148,7 @@ export function TeaEvolucaoTemplates() {
     try {
       await teaEvolutionTemplateService.deactivate(id);
       showNotification({ title: 'Sucesso', message: 'Template desativado', color: 'green' });
-      await loadTemplates();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teaEvolutionTemplates });
     } catch (err: any) {
       showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Falha ao desativar template', color: 'red' });
     }
@@ -215,14 +212,14 @@ export function TeaEvolucaoTemplates() {
         <Paper p="md" mt="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
           <Group mb="sm" justify="space-between">
             <Text fw={700}>Templates cadastrados</Text>
-            {loading && <Loader size="sm" />}
+            {(loading || isFetching) && <Loader size="sm" />}
           </Group>
 
           {items.length === 0 ? (
             <Text size="sm" c="dimmed">Nenhum template cadastrado.</Text>
           ) : (
             <Stack gap="xs">
-              {items.map((item) => (
+              {items.map((item: any) => (
                 <Paper key={item.id} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                   <Group justify="space-between" align="flex-start">
                     <Box>

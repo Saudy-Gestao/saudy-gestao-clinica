@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
@@ -32,6 +33,8 @@ import { Header } from '../components/Header/Header';
 import { DARK_BLUE } from '../themes/theme';
 import ResultModal from '../components/common/ResultModal';
 import financeService from '../services/financeService';
+import { useFinanceEntriesQuery } from '../hooks/useFinanceEntriesQuery';
+import { queryKeys } from '../lib/queryKeys';
 
 interface Lancamento {
   id: string;
@@ -49,6 +52,7 @@ interface Lancamento {
 
 export function Financeiro() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -58,8 +62,11 @@ export function Financeiro() {
   const [modalOpened, setModalOpened] = useState(false);
   const [popoverOpened, setPopoverOpened] = useState(false);
   const [dateInput, setDateInput] = useState('');
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [entriesLoading, setEntriesLoading] = useState(false);
+  const {
+    data: entries = [],
+    isLoading: entriesLoading,
+    error: entriesError,
+  } = useFinanceEntriesQuery();
 
   // Estado do formulário
   const [formData, setFormData] = useState({
@@ -125,41 +132,32 @@ export function Financeiro() {
     });
   };
 
-  // Load entries from backend
   useEffect(() => {
-    const load = async () => {
-      setEntriesLoading(true);
-      try {
-        const data: any = await financeService.getEntries();
-        const list: any[] = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (Array.isArray(data?.items) ? data.items : []));
-        const mapped: Lancamento[] = list.map((it: any) => {
-          const valor = parseNumber(it.value ?? it.amount);
-          const desconto = parseNumber(it.discount ?? 0);
-          return {
-            id: String(it.id),
-            nome: it.relatedName || it.name || it.related_name || '-',
-            dataHora: it.createdAt ? (new Date(it.createdAt)).toLocaleString('pt-BR') : (it.dueDate ? (new Date(it.dueDate)).toLocaleDateString('pt-BR') : ''),
-            tipo: it.type || it.category || '-',
-            status: it.status || 'Pendente',
-            valor: valor,
-            desconto: desconto,
-            valorTotal: valor - (valor * desconto / 100),
-            metodoPagamento: it.paymentMethod || it.payment_method || '-',
-            dueDate: it.dueDate || undefined,
-          };
-        });
-        setLancamentos(mapped);
-      } catch (err: any) {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar lançamentos';
-        setLancamentoErrorMessage(msg);
-        setShowLancamentoError(true);
-      } finally {
-        setEntriesLoading(false);
-      }
-    };
+    if (!entriesError) return;
+    const err: any = entriesError;
+    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar lançamentos';
+    setLancamentoErrorMessage(msg);
+    setShowLancamentoError(true);
+  }, [entriesError]);
 
-    load();
-  }, []);
+  const lancamentos = useMemo<Lancamento[]>(() => (
+    entries.map((it: any) => {
+      const valor = parseNumber(it.value ?? it.amount);
+      const desconto = parseNumber(it.discount ?? 0);
+      return {
+        id: String(it.id),
+        nome: it.relatedName || it.name || it.related_name || '-',
+        dataHora: it.createdAt ? (new Date(it.createdAt)).toLocaleString('pt-BR') : (it.dueDate ? (new Date(it.dueDate)).toLocaleDateString('pt-BR') : ''),
+        tipo: it.type || it.category || '-',
+        status: it.status || 'Pendente',
+        valor,
+        desconto,
+        valorTotal: valor - (valor * desconto / 100),
+        metodoPagamento: it.paymentMethod || it.payment_method || '-',
+        dueDate: it.dueDate || undefined,
+      };
+    })
+  ), [entries]);
 
   const handleSaveLancamento = async () => {
     const valor = parseFloat(formData.valor) || 0;
@@ -195,10 +193,10 @@ export function Financeiro() {
         dueDate: created.dueDate || payload.dueDate || undefined,
       }; 
 
-      setLancamentos(prev => [...prev, mapped]);
       setLastLancamentoName(mapped.nome);
       setShowLancamentoSuccess(true);
       handleModalClose();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.financeEntries });
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Erro ao criar lançamento';
       setLancamentoErrorMessage(msg);
@@ -312,8 +310,8 @@ export function Financeiro() {
     if (payingIds.includes(id)) return;
     setPayingIds((p) => [...p, id]);
     try {
-      const updated = await financeService.updateEntry(id, { status: 'PAID' });
-      setLancamentos((prev) => prev.map((l) => l.id === id ? ({ ...l, status: updated.status || 'Pago' }) : l));
+      await financeService.updateEntry(id, { status: 'PAID' });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.financeEntries });
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Erro ao processar pagamento';
       setLancamentoErrorMessage(msg);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
   Badge,
@@ -25,11 +26,13 @@ import { ChevronLeft, ClipboardCheck, Pencil, Plus, Power, Trash2 } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
-import procedureService from '../../services/procedureService';
 import procedureNursingTemplateService, {
   type NursingQuestionPayload,
   type ProcedureNursingTemplateItem,
 } from '../../services/procedureNursingTemplateService';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { useNursingTemplatesQuery } from '../../hooks/useNursingTemplatesQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type QuestionForm = NursingQuestionPayload & {
   id: string;
@@ -141,15 +144,29 @@ const shouldShowOptions = (responseType?: string) => (
 
 export function CadastroEnfermagem() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const [items, setItems] = useState<ProcedureNursingTemplateItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateForm>(INITIAL_FORM);
-  const [procedures, setProcedures] = useState<Array<{ value: string; label: string }>>([]);
+  const {
+    data: items = [],
+    isLoading: loading,
+    error: templatesError,
+  } = useNursingTemplatesQuery();
+  const {
+    data: proceduresData = [],
+    error: proceduresError,
+  } = useProceduresAdminQuery();
+
+  const procedures = useMemo(() => (
+    proceduresData.map((procedure: any) => ({
+      value: String(procedure.id),
+      label: String(procedure.name || 'Procedimento sem nome'),
+    }))
+  ), [proceduresData]);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -164,36 +181,16 @@ export function CadastroEnfermagem() {
     });
   }, [items, query]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [templatesResponse, proceduresResponse] = await Promise.all([
-        procedureNursingTemplateService.list({ limit: 200 }),
-        procedureService.listProcedures({ limit: 200 }),
-      ]);
-
-      setItems(Array.isArray(templatesResponse?.items) ? templatesResponse.items : []);
-      const procedureItems = Array.isArray(proceduresResponse?.items) ? proceduresResponse.items : [];
-      setProcedures(
-        procedureItems.map((procedure: any) => ({
-          value: String(procedure.id),
-          label: String(procedure.name || 'Procedimento sem nome'),
-        })),
-      );
-    } catch (err: any) {
+  useEffect(() => {
+    const err: any = templatesError || proceduresError;
+    if (err) {
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.error || err?.response?.data?.message || 'Erro ao carregar cadastro de enfermagem',
         color: 'red',
       });
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadData();
-  }, []);
+  }, [templatesError, proceduresError]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM);
@@ -326,7 +323,7 @@ export function CadastroEnfermagem() {
       }
       setModalOpen(false);
       resetForm();
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.nursingTemplates });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -346,7 +343,7 @@ export function CadastroEnfermagem() {
         message: 'O template foi removido da operação.',
         color: 'green',
       });
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.nursingTemplates });
     } catch (err: any) {
       showNotification({
         title: 'Erro',

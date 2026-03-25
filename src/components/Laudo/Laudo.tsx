@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Tabs, Paper, Title } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -9,6 +10,8 @@ import { Header } from '../Header/Header';
 import reportService from '../../services/reportService';
 import ResultModal from '../common/ResultModal';
 import { isValidCPF } from '../../utils/formatters';
+import { useReportsQuery } from '../../hooks/useReportsQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface PatientRow {
   id: string;
@@ -24,14 +27,16 @@ interface PatientRow {
 
 export function Laudo() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
-  const [rows, setRows] = useState<PatientRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-
-  const filtered = rows.filter((r) => r.nomeCompleto.toLowerCase().includes(query.toLowerCase()));
+  const {
+    data: reports = [],
+    error: reportsError,
+  } = useReportsQuery();
 
   const mapApiToRow = (it: any): PatientRow => ({
     id: String(it.id),
@@ -46,28 +51,17 @@ export function Laudo() {
   });
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data: any = await reportService.list();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data)
-              ? data.data
-              : []));
-        setRows(list.map(mapApiToRow));
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar laudos',
-          color: 'red',
-        });
-      }
-    };
+    if (!reportsError) return;
+    const err: any = reportsError;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar laudos',
+      color: 'red',
+    });
+  }, [reportsError]);
 
-    load();
-  }, []);
+  const rows = useMemo<PatientRow[]>(() => reports.map(mapApiToRow), [reports]);
+  const filtered = rows.filter((r) => r.nomeCompleto.toLowerCase().includes(query.toLowerCase()));
 
 
 
@@ -139,10 +133,11 @@ export function Laudo() {
           responsibleDoctor: current?.medicoResponsavel || undefined,
           observation: current?.observacao || undefined,
         });
-        setRows((prev) => prev.map((r) => (r.id === editingId ? mapApiToRow(updated) : r)));
+        await queryClient.invalidateQueries({ queryKey: queryKeys.reports });
+        setLaudoData((prev) => ({ ...prev, status: updated.status || prev.status }));
       } else {
-        const created = await reportService.create(payload);
-        setRows((prev) => [mapApiToRow(created), ...prev]);
+        await reportService.create(payload);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.reports });
       }
 
       // after save, switch to list and clear form/modal state
@@ -237,7 +232,7 @@ export function Laudo() {
     const { id } = deleteTarget;
     try {
       await reportService.remove(id);
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reports });
       showNotification({ title: 'Laudo excluído', message: 'Registro removido com sucesso.', color: 'green' });
       if (editingId === id) {
         setEditingId(null);

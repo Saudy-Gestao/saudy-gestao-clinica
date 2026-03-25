@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
   Badge,
@@ -31,11 +32,13 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import ResultModal from '../common/ResultModal';
 import { DARK_BLUE } from '../../themes/theme';
-import branchService from '../../services/branchService';
-import sectorService from '../../services/sectorService';
-import procedureService from '../../services/procedureService';
 import medicalEquipmentService, { type MedicalEquipmentItem } from '../../services/medicalEquipmentService';
 import { isRoomSector } from '../../utils/sectorClassification';
+import { useMedicalEquipmentsQuery } from '../../hooks/useMedicalEquipmentsQuery';
+import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
+import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface EquipmentForm {
   name: string;
@@ -213,6 +216,7 @@ const mapEquipmentToForm = (item: MedicalEquipmentItem): EquipmentForm => ({
 
 export function CadastroEquipamento() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
 
@@ -232,6 +236,10 @@ export function CadastroEquipamento() {
   const [lastSavedName, setLastSavedName] = useState('');
   const [lastSaveAction, setLastSaveAction] = useState<'create' | 'update'>('create');
   const [testingId, setTestingId] = useState<string | null>(null);
+  const equipmentsQuery = useMedicalEquipmentsQuery();
+  const branchesQuery = useSettingsBranchesQuery();
+  const roomsQuery = useRoomsAdminQuery();
+  const proceduresQuery = useProceduresAdminQuery();
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -274,112 +282,73 @@ export function CadastroEquipamento() {
     }, {});
   }, [branches]);
 
-  const loadItems = async () => {
-    setLoading(true);
-    try {
-      const data = await medicalEquipmentService.list();
-      setItems(data);
-    } catch (err: any) {
+  useEffect(() => {
+    setLoading(equipmentsQuery.isFetching);
+  }, [equipmentsQuery.isFetching]);
+
+  useEffect(() => {
+    if (equipmentsQuery.error) {
+      const err: any = equipmentsQuery.error;
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.message || err?.message || 'Erro ao carregar equipamentos',
         color: 'red',
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [equipmentsQuery.error]);
 
   useEffect(() => {
-    loadItems();
-  }, []);
+    setItems(Array.isArray(equipmentsQuery.data) ? equipmentsQuery.data : []);
+  }, [equipmentsQuery.data]);
 
   useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const data: any = await branchService.listBranches();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.items)
-            ? data.items
-            : Array.isArray(data?.data?.items)
-              ? data.data.items
-              : Array.isArray(data?.data)
-                ? data.data
-                : [];
+    const data: any = branchesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.data?.items)
+          ? data.data.items
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
 
-        setBranches(
-          list
-            .map((branch: any) => ({
-              value: String(branch.id || ''),
-              label: branch.tradeName || branch.socialName || 'Filial sem nome',
-            }))
-            .filter((branch: BranchOption) => Boolean(branch.value)),
-        );
-      } catch {
-        setBranches([]);
-      }
-    };
+    setBranches(
+      list
+        .map((branch: any) => ({
+          value: String(branch.id || ''),
+          label: branch.tradeName || branch.socialName || 'Filial sem nome',
+        }))
+        .filter((branch: BranchOption) => Boolean(branch.value)),
+    );
+  }, [branchesQuery.data]);
 
-    const loadRooms = async () => {
-      try {
-        const data: any = await sectorService.listSectors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.items)
-            ? data.items
-            : Array.isArray(data?.data?.items)
-              ? data.data.items
-              : Array.isArray(data?.data)
-                ? data.data
-                : [];
+  useEffect(() => {
+    const list: any[] = Array.isArray(roomsQuery.data) ? roomsQuery.data : [];
+    setRooms(
+      list
+        .filter((sector: any) => isRoomSector(sector))
+        .map((sector: any) => ({
+          value: String(sector.id || ''),
+          label: sector.name || 'Sala sem nome',
+          branchId: String(sector.branchId || ''),
+        }))
+        .filter((room: RoomOption) => Boolean(room.value) && Boolean(room.branchId)),
+    );
+  }, [roomsQuery.data]);
 
-        setRooms(
-          list
-            .filter((sector: any) => isRoomSector(sector))
-            .map((sector: any) => ({
-              value: String(sector.id || ''),
-              label: sector.name || 'Sala sem nome',
-              branchId: String(sector.branchId || ''),
-            }))
-            .filter((room: RoomOption) => Boolean(room.value) && Boolean(room.branchId)),
-        );
-      } catch {
-        setRooms([]);
-      }
-    };
-
-    const loadProcedures = async () => {
-      try {
-        const data: any = await procedureService.listProcedures({ limit: 300, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.items)
-            ? data.items
-            : Array.isArray(data?.data?.items)
-              ? data.data.items
-              : Array.isArray(data?.data)
-                ? data.data
-                : [];
-
-        setProcedures(
-          list
-            .map((item: any) => ({
-              value: String(item.id || item.procedureId || ''),
-              label: String(item.name || 'Procedimento'),
-              modalities: Array.isArray(item.modalities) ? item.modalities.map((it: any) => String(it)) : [],
-            }))
-            .filter((item: ProcedureOption) => Boolean(item.value)),
-        );
-      } catch {
-        setProcedures([]);
-      }
-    };
-
-    loadBranches();
-    loadRooms();
-    loadProcedures();
-  }, []);
+  useEffect(() => {
+    const list: any[] = Array.isArray(proceduresQuery.data) ? proceduresQuery.data : [];
+    setProcedures(
+      list
+        .map((item: any) => ({
+          value: String(item.id || item.procedureId || ''),
+          label: String(item.name || 'Procedimento'),
+          modalities: Array.isArray(item.modalities) ? item.modalities.map((it: any) => String(it)) : [],
+        }))
+        .filter((item: ProcedureOption) => Boolean(item.value)),
+    );
+  }, [proceduresQuery.data]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM);
@@ -445,7 +414,7 @@ export function CadastroEquipamento() {
       setSuccessOpen(true);
       resetForm();
       setActiveTab('lista');
-      loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.medicalEquipments });
     } catch (err: any) {
       setErrorMessage(err?.response?.data?.message || err?.message || 'Não foi possível salvar o equipamento.');
       setErrorOpen(true);
@@ -459,7 +428,7 @@ export function CadastroEquipamento() {
       await medicalEquipmentService.update(item.id, {
         isActive: !(item.isActive ?? true),
       });
-      loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.medicalEquipments });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -473,7 +442,7 @@ export function CadastroEquipamento() {
     try {
       setTestingId(item.id);
       const result = await medicalEquipmentService.testConnection(item.id);
-      await loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.medicalEquipments });
       showNotification({
         title: result.ok ? 'Teste concluído' : 'Falha no teste',
         message: result.message || 'Teste executado.',

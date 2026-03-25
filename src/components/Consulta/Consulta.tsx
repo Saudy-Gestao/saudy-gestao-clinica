@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -16,6 +17,8 @@ import { ChevronLeft, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import consultationService from '../../services/consultationService';
+import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface ConsultationRow {
   id: string;
@@ -50,12 +53,14 @@ const getAppointmentTypeLabel = (value?: string | null) => {
 
 export function Consulta() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<ConsultationRow[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [loggedDoctorName, setLoggedDoctorName] = useState('');
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const clinicalQueueQuery = useClinicalQueueQuery();
 
   const mapApiToRow = (it: any): ConsultationRow => ({
     id: String(it.id),
@@ -68,32 +73,6 @@ export function Consulta() {
     triageRequired: Boolean(it.triageRequired),
   });
 
-  const loadClinicalQueue = async () => {
-    try {
-      const data: any = await consultationService.list({ queueType: CLINICAL_QUEUE_TYPE, limit: 200 });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : []));
-
-      setRows(
-        list
-          .map(mapApiToRow)
-          .filter((item) => ACTIVE_STATUSES.includes(item.statusFluxo))
-          .filter((item) => getAppointmentTypeLabel(item.appointmentType) !== 'Exame' && !item.triageRequired),
-      );
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar fila clínica',
-        color: 'red',
-      });
-    }
-  };
-
   useEffect(() => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -102,8 +81,16 @@ export function Consulta() {
       setLoggedDoctorName('');
     }
 
-    void loadClinicalQueue();
   }, []);
+
+  useEffect(() => {
+    setRows(
+      (((clinicalQueueQuery.data as any[]) || [])
+        .map(mapApiToRow)
+        .filter((item) => ACTIVE_STATUSES.includes(item.statusFluxo))
+        .filter((item) => getAppointmentTypeLabel(item.appointmentType) !== 'Exame' && !item.triageRequired)),
+    );
+  }, [clinicalQueueQuery.data]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -119,7 +106,7 @@ export function Consulta() {
     try {
       setLoadingId(row.id);
       await consultationService.update(row.id, { queue: nextStatus, queueType: CLINICAL_QUEUE_TYPE });
-      await loadClinicalQueue();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
       showNotification({
         title: 'Fila clínica atualizada',
         message: `${row.nomeCompleto} agora está em "${nextStatus}".`,

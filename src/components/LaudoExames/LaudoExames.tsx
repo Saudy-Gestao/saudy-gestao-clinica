@@ -28,12 +28,12 @@ import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
 import { DARK_BLUE } from '../../themes/theme';
 import reportWorklistService from '../../services/reportWorklistService';
-import reportTemplateService from '../../services/reportTemplateService';
-import reportPhraseService from '../../services/reportPhraseService';
 import reportService from '../../services/reportService';
-import reportConfigService from '../../services/reportConfigService';
 import authService from '../../services/authService';
 import reportAddendumService from '../../services/reportAddendumService';
+import { useReportExamsPageDataQuery } from '../../hooks/useReportExamsPageDataQuery';
+import { useReportPreviousReportsQuery } from '../../hooks/useReportPreviousReportsQuery';
+import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQuery';
 
 type ExamStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type ExamPriority = 'normal' | 'urgente';
@@ -374,7 +374,6 @@ export function LaudoExames() {
   const [selectedPreviousReport, setSelectedPreviousReport] = useState<PreviousReport | null>(null);
   const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Record<string, boolean>>({});
   const [dicomViewerVisible, setDicomViewerVisible] = useState(false);
-  const [previousReportsFromApi, setPreviousReportsFromApi] = useState<Record<string, PreviousReport[]>>({});
   const [requiresReviewer, setRequiresReviewer] = useState(true);
   const [signPasswordModalOpen, setSignPasswordModalOpen] = useState(false);
   const [signPassword, setSignPassword] = useState('');
@@ -386,7 +385,6 @@ export function LaudoExames() {
   const [addendumIssuerSignedAt, setAddendumIssuerSignedAt] = useState<string | null>(null);
   const [addendumReviewerSignedAt, setAddendumReviewerSignedAt] = useState<string | null>(null);
   const [addendumSavedAt, setAddendumSavedAt] = useState<string | null>(null);
-  const [addendumLoading, setAddendumLoading] = useState(false);
   const [addendumSaving, setAddendumSaving] = useState(false);
   const [addendumFinalizing, setAddendumFinalizing] = useState(false);
   const [savingLaudo, setSavingLaudo] = useState(false);
@@ -396,6 +394,17 @@ export function LaudoExames() {
   const [finalizePassword, setFinalizePassword] = useState('');
   const [finalizeTarget, setFinalizeTarget] = useState<'laudo' | 'adendo' | null>(null);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
+  const { data: reportPageData, error: reportPageError } = useReportExamsPageDataQuery();
+  const { data: previousReportsData = [] } = useReportPreviousReportsQuery(selectedExamId ? (examRows.find((exam) => exam.id === selectedExamId)?.cpf || null) : null);
+  const selectedExamReportId = useMemo(() => {
+    const exam = examRows.find((item) => item.id === selectedExamId);
+    return exam ? (exam.reportId || exam.id) : null;
+  }, [examRows, selectedExamId]);
+  const {
+    data: addendumDraft,
+    error: addendumDraftError,
+    isFetching: addendumLoading,
+  } = useReportAddendumDraftQuery(selectedExamReportId, addendumModalOpen);
 
   // ===== Ditado por voz =====
   const [isDictating, setIsDictating] = useState(false);
@@ -600,70 +609,89 @@ export function LaudoExames() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [worklistData, templateData, phraseData, configData] = await Promise.all([
-          reportService.list({ limit: 300, offset: 0 }),
-          reportTemplateService.list({ limit: 300, offset: 0 }),
-          reportPhraseService.list({ limit: 300, offset: 0 }),
-          reportConfigService.get(),
-        ]);
+    if (reportPageData) {
+      const worklistData = reportPageData.reportData;
+      const templateData = reportPageData.templateData;
+      const phraseData = reportPageData.phraseData;
+      const configData = reportPageData.configData;
 
-        const reports = Array.isArray(worklistData)
-          ? worklistData
-          : (Array.isArray(worklistData?.items)
-            ? worklistData.items
-            : (Array.isArray(worklistData?.data?.items)
-              ? worklistData.data.items
-              : []));
-        const templatesList = Array.isArray(templateData)
-          ? templateData
-          : (Array.isArray(templateData?.items)
-            ? templateData.items
-            : (Array.isArray(templateData?.data?.items)
-              ? templateData.data.items
-              : []));
-        const phrasesList = Array.isArray(phraseData)
-          ? phraseData
-          : (Array.isArray(phraseData?.items)
-            ? phraseData.items
-            : (Array.isArray(phraseData?.data?.items)
-              ? phraseData.data.items
-              : []));
+      const reports = Array.isArray(worklistData)
+        ? worklistData
+        : (Array.isArray(worklistData?.items)
+          ? worklistData.items
+          : (Array.isArray(worklistData?.data?.items)
+            ? worklistData.data.items
+            : []));
+      const templatesList = Array.isArray(templateData)
+        ? templateData
+        : (Array.isArray(templateData?.items)
+          ? templateData.items
+          : (Array.isArray(templateData?.data?.items)
+            ? templateData.data.items
+            : []));
+      const phrasesList = Array.isArray(phraseData)
+        ? phraseData
+        : (Array.isArray(phraseData?.items)
+          ? phraseData.items
+          : (Array.isArray(phraseData?.data?.items)
+            ? phraseData.data.items
+            : []));
 
-        setExamRows(reports.map(mapApiToExam).filter((item: ExamItem) => item.id));
-        const mappedTemplates = templatesList.map((item: any) => ({
-          id: String(item.id || ''),
-          name: item.name || '',
-          examType: item.examType || '',
-          group: item.group || 'Outros',
-          content: item.content || TEMPLATE_TEXT,
-        })).filter((item: ReportTemplate) => item.id);
-        setTemplates(mappedTemplates.length > 0 ? mappedTemplates : MOCK_REPORT_TEMPLATES);
+      const nextRows = reports.map(mapApiToExam).filter((item: ExamItem) => item.id);
+      setExamRows((previous) => {
+        if (previous.length === 0) return nextRows;
 
-        const mappedPhrases = phrasesList.map((item: any) => ({
-          id: String(item.id || ''),
-          examType: item.examType || '',
-          label: item.label || '',
-          text: item.text || '',
-        })).filter((item: ReportPhrase) => item.id);
-        setPhrases(mappedPhrases.length > 0 ? mappedPhrases : MOCK_REPORT_PHRASES);
-        setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
-      } catch (err: any) {
-        setExamRows(MOCK_EXAMS);
-        setTemplates(MOCK_REPORT_TEMPLATES);
-        setPhrases(MOCK_REPORT_PHRASES);
-        setRequiresReviewer(true);
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.',
-          color: 'red',
+        const previousMap = new Map(previous.map((item) => [item.id, item]));
+        return nextRows.map((item: ExamItem) => {
+          const current = previousMap.get(item.id);
+          if (!current) return item;
+          const shouldPreserveLocalDraft = modalOpen && selectedExamId === item.id && current.reportText !== item.reportText;
+
+          if (!shouldPreserveLocalDraft) return item;
+
+          return {
+            ...item,
+            reportText: current.reportText,
+            status: current.status,
+            issuerSignedAt: current.issuerSignedAt,
+            reviewerSignedAt: current.reviewerSignedAt,
+            hasFinalizedAddendum: current.hasFinalizedAddendum,
+          };
         });
-      }
-    };
+      });
 
-    loadData();
-  }, []);
+      const mappedTemplates = templatesList.map((item: any) => ({
+        id: String(item.id || ''),
+        name: item.name || '',
+        examType: item.examType || '',
+        group: item.group || 'Outros',
+        content: item.content || TEMPLATE_TEXT,
+      })).filter((item: ReportTemplate) => item.id);
+      setTemplates(mappedTemplates.length > 0 ? mappedTemplates : MOCK_REPORT_TEMPLATES);
+
+      const mappedPhrases = phrasesList.map((item: any) => ({
+        id: String(item.id || ''),
+        examType: item.examType || '',
+        label: item.label || '',
+        text: item.text || '',
+      })).filter((item: ReportPhrase) => item.id);
+      setPhrases(mappedPhrases.length > 0 ? mappedPhrases : MOCK_REPORT_PHRASES);
+      setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
+      return;
+    }
+
+    if (reportPageError) {
+      setExamRows(MOCK_EXAMS);
+      setTemplates(MOCK_REPORT_TEMPLATES);
+      setPhrases(MOCK_REPORT_PHRASES);
+      setRequiresReviewer(true);
+      showNotification({
+        title: 'Erro',
+        message: (reportPageError as any)?.response?.data?.message || (reportPageError as any)?.message || 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.',
+        color: 'red',
+      });
+    }
+  }, [reportPageData, reportPageError, modalOpen, selectedExamId]);
 
   const selectedExam = useMemo(
     () => examRows.find((exam) => exam.id === selectedExamId) || null,
@@ -768,41 +796,15 @@ export function LaudoExames() {
 
   const previousReports = useMemo(() => {
     if (!selectedExam) return [];
-    return previousReportsFromApi[selectedExam.cpf] || MOCK_PREVIOUS_REPORTS[selectedExam.cpf] || [];
-  }, [selectedExam, previousReportsFromApi]);
-
-  useEffect(() => {
-    const loadPreviousReports = async () => {
-      if (!selectedExam?.cpf) return;
-      if (previousReportsFromApi[selectedExam.cpf]) return;
-
-      try {
-        const data: any = await reportService.list({ search: selectedExam.cpf, limit: 20, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : []));
-
-        const mapped = list.map((it: any) => ({
-          id: String(it.id || ''),
-          examType: it.exam || 'Exame',
-          date: it.scheduledFor || '-',
-          status: normalizeExamStatus(it.status),
-          summary: it.conclusion || it.description || 'Sem resumo',
-          content: it.description || TEMPLATE_TEXT,
-        })).filter((it: PreviousReport) => it.id);
-
-        setPreviousReportsFromApi((prev) => ({ ...prev, [selectedExam.cpf]: mapped }));
-      } catch {
-        // Keep fallback without blocking the editor flow.
-      }
-    };
-
-    loadPreviousReports();
-  }, [selectedExam, previousReportsFromApi]);
+    if (previousReportsData.length > 0) {
+      return previousReportsData.map((item) => ({
+        ...item,
+        status: normalizeExamStatus(item.status),
+        content: item.content || TEMPLATE_TEXT,
+      })) as PreviousReport[];
+    }
+    return MOCK_PREVIOUS_REPORTS[selectedExam.cpf] || [];
+  }, [selectedExam, previousReportsData]);
 
   const toggleTemplateGroup = (group: string) => {
     setExpandedTemplateGroups((prev) => ({ ...prev, [group]: !prev[group] }));
@@ -910,41 +912,39 @@ export function LaudoExames() {
     }
   }, [location.search]);
 
-  const openAddendumModal = async () => {
+  const openAddendumModal = () => {
     if (!selectedExam) return;
-
-    setAddendumLoading(true);
     setAddendumModalOpen(true);
-    try {
-      const data = await reportAddendumService.list({ reportId: selectedExam.reportId || selectedExam.id, status: 'draft', limit: 1, offset: 0 });
-      const list = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items) ? data.items : []);
-      const draft = list[0];
-
-      if (draft) {
-        setAddendumId(String(draft.id));
-        setAddendumText(String(draft.content || ''));
-        setAddendumIssuerSignedAt(draft.issuerSignedAt || null);
-        setAddendumReviewerSignedAt(draft.reviewerSignedAt || null);
-        setAddendumSavedAt(draft.savedAt || null);
-      } else {
-        setAddendumId(null);
-        setAddendumText('');
-        setAddendumIssuerSignedAt(null);
-        setAddendumReviewerSignedAt(null);
-        setAddendumSavedAt(null);
-      }
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro ao carregar adendo',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível carregar o rascunho de adendo',
-        color: 'red',
-      });
-    } finally {
-      setAddendumLoading(false);
-    }
   };
+
+  useEffect(() => {
+    if (!addendumModalOpen) return;
+
+    if (addendumDraft) {
+      setAddendumId(String(addendumDraft.id || ''));
+      setAddendumText(String(addendumDraft.content || ''));
+      setAddendumIssuerSignedAt(addendumDraft.issuerSignedAt || null);
+      setAddendumReviewerSignedAt(addendumDraft.reviewerSignedAt || null);
+      setAddendumSavedAt(addendumDraft.savedAt || null);
+      return;
+    }
+
+    setAddendumId(null);
+    setAddendumText('');
+    setAddendumIssuerSignedAt(null);
+    setAddendumReviewerSignedAt(null);
+    setAddendumSavedAt(null);
+  }, [addendumDraft, addendumModalOpen]);
+
+  useEffect(() => {
+    if (!addendumModalOpen || !addendumDraftError) return;
+
+    showNotification({
+      title: 'Erro ao carregar adendo',
+      message: (addendumDraftError as any)?.response?.data?.message || (addendumDraftError as any)?.message || 'Não foi possível carregar o rascunho de adendo',
+      color: 'red',
+    });
+  }, [addendumDraftError, addendumModalOpen]);
 
   const ensureAddendumDraft = async () => {
     if (!selectedExam) return null;
@@ -2568,6 +2568,3 @@ export function LaudoExames() {
     </Box>
   );
 }
-
-
-

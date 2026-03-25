@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
   Badge,
@@ -25,11 +26,13 @@ import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2 } from 'luci
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
-import procedureService from '../../services/procedureService';
 import procedureAnamnesisTemplateService, {
   type AnamnesisQuestionPayload,
   type ProcedureAnamnesisTemplateItem,
 } from '../../services/procedureAnamnesisTemplateService';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { useAnamnesisTemplatesQuery } from '../../hooks/useAnamnesisTemplatesQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type QuestionForm = AnamnesisQuestionPayload & {
   id: string;
@@ -111,15 +114,29 @@ const shouldShowOptions = (responseType?: string) => (
 export function CadastroAnamnese() {
   const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
+  const queryClient = useQueryClient();
 
-  const [items, setItems] = useState<ProcedureAnamnesisTemplateItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateForm>(INITIAL_FORM);
-  const [procedures, setProcedures] = useState<Array<{ value: string; label: string }>>([]);
+  const {
+    data: items = [],
+    isLoading: loading,
+    error: templatesError,
+  } = useAnamnesisTemplatesQuery();
+  const {
+    data: proceduresData = [],
+    error: proceduresError,
+  } = useProceduresAdminQuery();
+
+  const procedures = useMemo(() => (
+    proceduresData.map((procedure: any) => ({
+      value: String(procedure.id),
+      label: String(procedure.name || 'Procedimento sem nome'),
+    }))
+  ), [proceduresData]);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -134,36 +151,16 @@ export function CadastroAnamnese() {
     });
   }, [items, query]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [templatesResponse, proceduresResponse] = await Promise.all([
-        procedureAnamnesisTemplateService.list({ limit: 200 }),
-        procedureService.listProcedures({ limit: 200 }),
-      ]);
-
-      setItems(Array.isArray(templatesResponse?.items) ? templatesResponse.items : []);
-      const procedureItems = Array.isArray(proceduresResponse?.items) ? proceduresResponse.items : [];
-      setProcedures(
-        procedureItems.map((procedure: any) => ({
-          value: String(procedure.id),
-          label: String(procedure.name || 'Procedimento sem nome'),
-        })),
-      );
-    } catch (err: any) {
+  useEffect(() => {
+    const err: any = templatesError || proceduresError;
+    if (err) {
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.error || err?.response?.data?.message || 'Erro ao carregar cadastro de anamnese',
         color: 'red',
       });
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadData();
-  }, []);
+  }, [templatesError, proceduresError]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM);
@@ -294,7 +291,7 @@ export function CadastroAnamnese() {
 
       setModalOpen(false);
       resetForm();
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.anamnesisTemplates });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -314,7 +311,7 @@ export function CadastroAnamnese() {
         message: 'O template foi desativado com sucesso.',
         color: 'green',
       });
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.anamnesisTemplates });
     } catch (err: any) {
       showNotification({
         title: 'Erro',

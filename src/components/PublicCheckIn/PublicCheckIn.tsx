@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
   Badge,
@@ -18,7 +19,9 @@ import {
 import { Camera, CircleAlert, ClipboardCheck, RefreshCcw, UserRoundCheck } from 'lucide-react';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
-import publicCheckInService, { type PublicBranchInfo, type PublicCheckInResponse } from '../../services/publicCheckInService';
+import publicCheckInService, { type PublicCheckInResponse } from '../../services/publicCheckInService';
+import { usePublicBranchInfoQuery } from '../../hooks/usePublicBranchInfoQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 const DARK_SURFACE = '#0F1838';
 const CARD_SURFACE = '#162552';
@@ -39,13 +42,14 @@ const statusConfig: Record<string, { color: string; label: string }> = {
 export function PublicCheckIn() {
   const { branchId: branchIdParam } = useParams();
   const branchId = branchIdParam || '';
+  const queryClient = useQueryClient();
 
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [recognitionResult, setRecognitionResult] = useState<FacialScanResponse | null>(null);
   const [checkInResult, setCheckInResult] = useState<PublicCheckInResponse | null>(null);
-  const [branchInfo, setBranchInfo] = useState<PublicBranchInfo | null>(null);
   const [branchLookupError, setBranchLookupError] = useState<string | null>(null);
+  const { data: branchInfo, error: branchInfoError, isLoading: branchInfoLoading } = usePublicBranchInfoQuery(branchId);
 
   const currentStatus = useMemo(() => {
     const status = checkInResult?.status || '';
@@ -71,34 +75,16 @@ export function PublicCheckIn() {
 
   useEffect(() => {
     if (!branchId) {
-      setBranchInfo(null);
       setBranchLookupError('URL do totem sem filial configurada.');
       return;
     }
-
-    let cancelled = false;
-
-    const loadBranchInfo = async () => {
-      try {
-        setBranchLookupError(null);
-        const branch = await publicCheckInService.getBranchInfo(branchId);
-        if (!cancelled) {
-          setBranchInfo(branch);
-        }
-      } catch (error: any) {
-        if (!cancelled) {
-          setBranchInfo(null);
-          setBranchLookupError(error?.response?.data?.error || 'Não foi possível identificar a filial configurada.');
-        }
-      }
-    };
-
-    loadBranchInfo();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [branchId]);
+    if (!branchInfoError) {
+      setBranchLookupError(null);
+      return;
+    }
+    const error: any = branchInfoError;
+    setBranchLookupError(error?.response?.data?.error || 'Não foi possível identificar a filial configurada.');
+  }, [branchId, branchInfoError]);
 
   const handleFacialScan = async (imageBase64: string) => {
     if (!branchId) {
@@ -128,6 +114,7 @@ export function PublicCheckIn() {
       });
 
       setCheckInResult(checkIn);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicBranchInfo, branchId] });
     } catch (error: any) {
       const responseData = error?.response?.data;
       const fallbackStatus = responseData?.status as PublicCheckInResponse['status'] | undefined;
@@ -195,7 +182,9 @@ export function PublicCheckIn() {
                 <Text c="dimmed">
                   {branchInfo?.tradeName
                     ? `Filial configurada: ${branchInfo.tradeName}`
-                    : branchLookupError || 'Carregando filial...'}
+                    : branchInfoLoading
+                      ? 'Carregando filial...'
+                      : branchLookupError || 'Não foi possível identificar a filial configurada.'}
                 </Text>
               </Box>
 

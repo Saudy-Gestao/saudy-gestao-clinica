@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -21,6 +22,8 @@ import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import insuranceService from '../../services/insuranceService';
+import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface InsuranceRow {
   id: string;
@@ -34,6 +37,7 @@ interface InsuranceRow {
 
 export function CadastroConvenio() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -46,6 +50,7 @@ export function CadastroConvenio() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InsuranceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const insurancesQuery = useInsurancesAdminQuery();
 
   const [form, setForm] = useState({
     name: '',
@@ -66,46 +71,46 @@ export function CadastroConvenio() {
   }, [items, query]);
 
   useEffect(() => {
-    const load = async () => {
-      setItemsLoading(true);
-      try {
-        const data: any = await insuranceService.listInsurances();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+    setItemsLoading(insurancesQuery.isFetching);
+  }, [insurancesQuery.isFetching]);
 
-        const mapped: InsuranceRow[] = list.map((it: any) => ({
-          id: String(it.id ?? it.insuranceId ?? ''),
-          name: it.name || it.nome || '',
-          code: it.code || it.codigo || null,
-          description: it.description || it.descricao || null,
-          isActive: it.isActive ?? true,
-          subInsurances: Array.isArray(it.subInsurances)
-            ? it.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
-            : [],
-          createdAt: it.createdAt || it.created_at || null,
-        })).filter((it: InsuranceRow) => it.id);
+  useEffect(() => {
+    if (insurancesQuery.error) {
+      const err: any = insurancesQuery.error;
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar convenios',
+        color: 'red',
+      });
+    }
+  }, [insurancesQuery.error]);
 
-        setItems(mapped);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convenios',
-          color: 'red',
-        });
-      } finally {
-        setItemsLoading(false);
-      }
-    };
+  useEffect(() => {
+    const data: any = insurancesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
 
-    load();
-  }, []);
+    const mapped: InsuranceRow[] = list.map((it: any) => ({
+      id: String(it.id ?? it.insuranceId ?? ''),
+      name: it.name || it.nome || '',
+      code: it.code || it.codigo || null,
+      description: it.description || it.descricao || null,
+      isActive: it.isActive ?? true,
+      subInsurances: Array.isArray(it.subInsurances)
+        ? it.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
+        : [],
+      createdAt: it.createdAt || it.created_at || null,
+    })).filter((it: InsuranceRow) => it.id);
+
+    setItems(mapped);
+  }, [insurancesQuery.data]);
 
   const openModal = (item?: InsuranceRow) => {
     if (item) {
@@ -134,7 +139,7 @@ export function CadastroConvenio() {
     setSaving(true);
     try {
       if (editingId) {
-        const updated: any = await insuranceService.updateInsurance(editingId, {
+        await insuranceService.updateInsurance(editingId, {
           name: form.name.trim(),
           code: form.code.trim() || undefined,
           description: form.description.trim() || undefined,
@@ -142,20 +147,10 @@ export function CadastroConvenio() {
           subInsurances: form.subInsurances,
         });
 
-        setItems((prev) => prev.map((it) => it.id === editingId ? ({
-          ...it,
-          name: updated.name ?? form.name.trim(),
-          code: updated.code ?? (form.code.trim() || null),
-          description: updated.description ?? (form.description.trim() || null),
-          isActive: updated.isActive ?? form.isActive,
-          subInsurances: Array.isArray(updated?.subInsurances)
-            ? updated.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
-            : form.subInsurances,
-        }) : it));
-
+        await queryClient.invalidateQueries({ queryKey: queryKeys.insurancesAdmin });
         showNotification({ title: 'Atualizado', message: 'Convenio atualizado', color: 'green' });
       } else {
-        const created: any = await insuranceService.createInsurance({
+        await insuranceService.createInsurance({
           name: form.name.trim(),
           code: form.code.trim() || undefined,
           description: form.description.trim() || undefined,
@@ -163,19 +158,7 @@ export function CadastroConvenio() {
           subInsurances: form.subInsurances,
         });
 
-        const newItem: InsuranceRow = {
-          id: String(created.id ?? `tmp-${Date.now()}`),
-          name: created.name || form.name.trim(),
-          code: created.code || form.code.trim() || null,
-          description: created.description || form.description.trim() || null,
-          isActive: created.isActive ?? form.isActive,
-          subInsurances: Array.isArray(created?.subInsurances)
-            ? created.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
-            : form.subInsurances,
-          createdAt: created.createdAt || created.created_at || null,
-        };
-
-        setItems((prev) => [newItem, ...prev]);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.insurancesAdmin });
         showNotification({ title: 'Adicionado', message: 'Convenio cadastrado', color: 'green' });
       }
 
@@ -197,12 +180,8 @@ export function CadastroConvenio() {
   const handleDeactivate = async (item: InsuranceRow) => {
     setDeleting(true);
     try {
-      const updated: any = await insuranceService.updateInsurance(item.id, { isActive: false });
-      setItems((prev) => prev.map((it) => (
-        it.id === item.id
-          ? { ...it, isActive: updated?.isActive ?? false }
-          : it
-      )));
+      await insuranceService.updateInsurance(item.id, { isActive: false });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.insurancesAdmin });
       showNotification({ title: 'Desativado', message: 'Convenio desativado com sucesso', color: 'green' });
       setDeleteModalOpen(false);
       setDeleteTarget(null);

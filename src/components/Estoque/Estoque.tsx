@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput, Center, Loader } from '@mantine/core';
 import inventoryService from '../../services/inventoryService';
@@ -10,6 +11,8 @@ import { Header } from '../Header/Header';
 import { DatePickerInput } from '@mantine/dates';
 import ResultModal from '../common/ResultModal';
 import { FloatingInput } from '../common/FloatingInput';
+import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface StockItem {
   id: string;
@@ -29,12 +32,17 @@ interface StockItem {
 
 export function Estoque() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [items, setItems] = useState<StockItem[]>([]);
-  const [itemsLoading, setItemsLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const {
+    data: inventoryItems = [],
+    isLoading: itemsLoading,
+    error: inventoryError,
+  } = useInventoryItemsQuery();
 
   // Saving & success modal states
   const [savingItem, setSavingItem] = useState(false);
@@ -103,41 +111,32 @@ export function Estoque() {
     if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return undefined;
     return date;
   };
-  // Fetch inventory items from backend
   useEffect(() => {
-    const load = async () => {
-      setItemsLoading(true);
-      try {
-        const data: any = await inventoryService.getItems();
-        // backend may return array or wrapped object — handle both
-        const list: any[] = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (Array.isArray(data?.items) ? data.items : []));
-        const mapped: StockItem[] = list.map((it: any) => ({
-          id: String(it.id),
-          codigo: it.code || '',
-          nome: it.name || '',
-          quantidade: it.quantity ?? 0,
-          minimo: it.minQuantity ?? 0,
-          maximo: it.maxQuantity ?? 0,
-          precoUnitario: parseNumber(it.unitPrice ?? it.unitPrice),
-          validade: it.expiryDate ? (new Date(it.expiryDate)).toLocaleDateString('en-GB') : '-',
-          categoria: it.category || '',
-          unidade: it.unit || '',
-          status: it.status ? String(it.status).toUpperCase() : ((it.quantity ?? 0) <= (it.minQuantity ?? 0) ? 'LOW' : 'AVAILABLE'),
-        }));
-        setItems(mapped);
-      } catch (err: any) {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar itens';
-        setItemErrorTitle('Erro ao carregar itens');
-        setItemErrorMessage(msg);
-        setShowItemErrorModal(true);
-        showNotification({ title: 'Erro', message: msg, color: 'red' });
-      } finally {
-        setItemsLoading(false);
-      }
-    };
+    const mapped: StockItem[] = inventoryItems.map((it: any) => ({
+      id: String(it.id),
+      codigo: it.code || '',
+      nome: it.name || '',
+      quantidade: it.quantity ?? 0,
+      minimo: it.minQuantity ?? 0,
+      maximo: it.maxQuantity ?? 0,
+      precoUnitario: parseNumber(it.unitPrice ?? it.unitPrice),
+      validade: it.expiryDate ? (new Date(it.expiryDate)).toLocaleDateString('en-GB') : '-',
+      categoria: it.category || '',
+      unidade: it.unit || '',
+      status: it.status ? String(it.status).toUpperCase() : ((it.quantity ?? 0) <= (it.minQuantity ?? 0) ? 'LOW' : 'AVAILABLE'),
+    }));
+    setItems(mapped);
+  }, [inventoryItems]);
 
-    load();
-  }, []);
+  useEffect(() => {
+    if (!inventoryError) return;
+    const err: any = inventoryError;
+    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar itens';
+    setItemErrorTitle('Erro ao carregar itens');
+    setItemErrorMessage(msg);
+    setShowItemErrorModal(true);
+    showNotification({ title: 'Erro', message: msg, color: 'red' });
+  }, [inventoryError]);
   const normalizeNumber = (val?: number | string | null) => {
     if (val === undefined || val === null || val === '') return null;
     const n = typeof val === 'number' ? val : Number(val);
@@ -267,6 +266,7 @@ export function Estoque() {
         setLastCreatedItemName(updated.name || form.nome);
         setModalOpen(false);
         setShowItemSuccessModal(true);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.inventoryItems });
       } else {
         const existingByCode = items.find((it) => it.codigo.trim().toLowerCase() === form.codigo.trim().toLowerCase());
 
@@ -307,6 +307,7 @@ export function Estoque() {
           setLastCreatedItemName(updated.name || form.nome);
           setModalOpen(false);
           setShowItemSuccessModal(true);
+          await queryClient.invalidateQueries({ queryKey: queryKeys.inventoryItems });
           showNotification({
             title: 'Quantidade atualizada',
             message: `Item já existente. Quantidade somada em ${qtyToAdd}.`,
@@ -350,6 +351,7 @@ export function Estoque() {
         setLastCreatedItemName(created.name || form.nome);
         setModalOpen(false);
         setShowItemSuccessModal(true);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.inventoryItems });
       }
     } catch (err: any) {
       // if backend returned per-field errors, map them to the form

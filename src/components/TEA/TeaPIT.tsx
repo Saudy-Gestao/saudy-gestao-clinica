@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Group,
@@ -26,10 +27,13 @@ import dayjs from 'dayjs';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import teaProfileService from '../../services/teaProfileService';
-import doctorService from '../../services/doctorService';
-import procedureService from '../../services/procedureService';
 import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
+import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
+import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { useTeaPitQuery } from '../../hooks/useTeaPitQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface TherapyItem {
   id?: string;
@@ -81,14 +85,13 @@ const SHIFT_OPTIONS = [
 export function TeaPIT() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
   const heroBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-gray-0)';
   const contentBg = colorScheme === 'dark' ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-white)';
-  const [teaProfiles, setTeaProfiles] = useState<any[]>([]);
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [title, setTitle] = useState('PIT - Plano Integrado de Terapias');
@@ -97,14 +100,15 @@ export function TeaPIT() {
   const [status, setStatus] = useState('Ativo');
   const [notes, setNotes] = useState('');
   const [therapies, setTherapies] = useState<TherapyItem[]>([{ ...EMPTY_THERAPY }]);
-  const [doctorOptions, setDoctorOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [procedureOptions, setProcedureOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [procedureDataMap, setProcedureDataMap] = useState<Record<string, any>>({});
-  const [loadingCatalogs, setLoadingCatalogs] = useState(false);
   const [removedTherapyDecisions, setRemovedTherapyDecisions] = useState<RemovedTherapyDecision[]>([]);
   const [removeTherapyModalOpened, setRemoveTherapyModalOpened] = useState(false);
   const [removeTherapyTargetIndex, setRemoveTherapyTargetIndex] = useState<number | null>(null);
   const [removeTherapyAction, setRemoveTherapyAction] = useState<'KEEP_FUTURE_APPOINTMENTS' | 'CANCEL_FUTURE_APPOINTMENTS'>('KEEP_FUTURE_APPOINTMENTS');
+
+  const { data: teaProfiles = [], isLoading: loadingProfiles, error: teaProfilesError } = useTeaProfilesQuery();
+  const { data: doctorsData, isLoading: loadingDoctors, error: doctorsError } = useDoctorsAdminQuery();
+  const { data: proceduresData, isLoading: loadingProcedures, error: proceduresError } = useProceduresAdminQuery();
+  const { data: pitData, error: pitError } = useTeaPitQuery(selectedTeaProfileId);
 
   const teaProfileOptions = useMemo(
     () => teaProfiles.map((it: any) => ({
@@ -114,95 +118,88 @@ export function TeaPIT() {
     [teaProfiles],
   );
 
-  const loadTeaProfiles = async () => {
-    setLoading(true);
-    try {
-      const data: any = await teaProfileService.list({ limit: 200, offset: 0 });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items) ? data.items : []);
-      setTeaProfiles(list);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const doctorOptions = useMemo(() => {
+    const doctorList: any[] = Array.isArray(doctorsData)
+      ? doctorsData
+      : (Array.isArray((doctorsData as any)?.items)
+        ? (doctorsData as any).items
+        : (Array.isArray((doctorsData as any)?.data?.items)
+          ? (doctorsData as any).data.items
+          : (Array.isArray((doctorsData as any)?.data)
+            ? (doctorsData as any).data
+            : [])));
+    return doctorList
+      .map((doctor: any) => {
+        const id = String(doctor?.id || doctor?.doctorId || '').trim();
+        const name = String(doctor?.name || doctor?.nome || doctor?.fullName || '').trim();
+        return id && name ? { value: id, label: name } : null;
+      })
+      .filter(Boolean) as Array<{ value: string; label: string }>;
+  }, [doctorsData]);
 
-  const loadCatalogs = async () => {
-    setLoadingCatalogs(true);
-    try {
-      const [doctorData, procedureData] = await Promise.all([
-        doctorService.listDoctors(),
-        procedureService.listProcedures({ limit: 300, offset: 0 }),
-      ]);
-
-      const doctorList: any[] = Array.isArray(doctorData)
-        ? doctorData
-        : (Array.isArray((doctorData as any)?.items)
-          ? (doctorData as any).items
-          : (Array.isArray((doctorData as any)?.data?.items)
-            ? (doctorData as any).data.items
-            : (Array.isArray((doctorData as any)?.data)
-              ? (doctorData as any).data
-              : [])));
-
-      const procedureList: any[] = Array.isArray(procedureData)
-        ? procedureData
-        : (Array.isArray((procedureData as any)?.items)
-          ? (procedureData as any).items
-          : (Array.isArray((procedureData as any)?.data?.items)
-            ? (procedureData as any).data.items
-            : (Array.isArray((procedureData as any)?.data)
-              ? (procedureData as any).data
-              : [])));
-
-      setDoctorOptions(
-        doctorList
-          .map((doctor: any) => {
-            const id = String(doctor?.id || doctor?.doctorId || '').trim();
-            const name = String(doctor?.name || doctor?.nome || doctor?.fullName || '').trim();
-            return id && name ? { value: id, label: name } : null;
-          })
-          .filter(Boolean) as Array<{ value: string; label: string }>,
-      );
-
-      setProcedureOptions(
-        procedureList
-          .map((item: any) => {
-            const id = String(item?.id || '').trim();
-            const name = String(item?.name || item?.nome || '').trim();
-            return id && name ? { value: id, label: name } : null;
-          })
-          .filter(Boolean) as Array<{ value: string; label: string }>,
-      );
-
-      // Manter referência aos dados completos dos procedimentos
-      const procDataMap: Record<string, any> = {};
-      procedureList.forEach((item: any) => {
+  const procedureOptions = useMemo(() => {
+    const procedureList: any[] = Array.isArray(proceduresData)
+      ? proceduresData
+      : (Array.isArray((proceduresData as any)?.items)
+        ? (proceduresData as any).items
+        : (Array.isArray((proceduresData as any)?.data?.items)
+          ? (proceduresData as any).data.items
+          : (Array.isArray((proceduresData as any)?.data)
+            ? (proceduresData as any).data
+            : [])));
+    return procedureList
+      .map((item: any) => {
         const id = String(item?.id || '').trim();
-        if (id) {
-          procDataMap[id] = item;
-        }
-      });
-      setProcedureDataMap(procDataMap);
-    } catch {
-      setDoctorOptions([]);
-      setProcedureOptions([]);
-    } finally {
-      setLoadingCatalogs(false);
-    }
-  };
+        const name = String(item?.name || item?.nome || '').trim();
+        return id && name ? { value: id, label: name } : null;
+      })
+      .filter(Boolean) as Array<{ value: string; label: string }>;
+  }, [proceduresData]);
 
-  const loadPit = async (teaProfileId: string) => {
-    setLoading(true);
+  const procedureDataMap = useMemo(() => {
+    const procedureList: any[] = Array.isArray(proceduresData)
+      ? proceduresData
+      : (Array.isArray((proceduresData as any)?.items)
+        ? (proceduresData as any).items
+        : (Array.isArray((proceduresData as any)?.data?.items)
+          ? (proceduresData as any).data.items
+          : (Array.isArray((proceduresData as any)?.data)
+            ? (proceduresData as any).data
+            : [])));
+    return procedureList.reduce((acc: Record<string, any>, item: any) => {
+      const id = String(item?.id || '').trim();
+      if (id) acc[id] = item;
+      return acc;
+    }, {});
+  }, [proceduresData]);
+
+  useEffect(() => {
+    if (!teaProfilesError) return;
+    const err: any = teaProfilesError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA', color: 'red' });
+  }, [teaProfilesError]);
+
+  useEffect(() => {
+    if (!doctorsError) return;
+    const err: any = doctorsError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos', color: 'red' });
+  }, [doctorsError]);
+
+  useEffect(() => {
+    if (!proceduresError) return;
+    const err: any = proceduresError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos', color: 'red' });
+  }, [proceduresError]);
+
+  useEffect(() => {
+    if (!selectedTeaProfileId) return;
+    if (pitError) {
+      const err: any = pitError;
+      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar PIT', color: 'red' });
+      return;
+    }
+    const pit = (pitData as any)?.item;
     try {
-      const data: any = await teaProfileService.getPit(teaProfileId);
-      const pit = data?.item;
       if (!pit) {
         setTitle('PIT - Plano Integrado de Terapias');
         setStartDate(new Date());
@@ -241,32 +238,18 @@ export function TeaPIT() {
         : [];
       setTherapies(mapped.length > 0 ? mapped : [{ ...EMPTY_THERAPY }]);
       setRemovedTherapyDecisions([]);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar PIT',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
+    } catch {
+      setTherapies([{ ...EMPTY_THERAPY }]);
     }
-  };
+  }, [selectedTeaProfileId, pitData, pitError]);
 
   useEffect(() => {
-    loadTeaProfiles();
-    loadCatalogs();
-
     // if navigated from patient list with preselected profile
     if (location.state && (location.state as any).teaProfileId) {
       const pid = String((location.state as any).teaProfileId);
       setSelectedTeaProfileId(pid);
     }
   }, [location.state]);
-
-  useEffect(() => {
-    if (!selectedTeaProfileId) return;
-    loadPit(selectedTeaProfileId);
-  }, [selectedTeaProfileId]);
 
   const setTherapyField = (index: number, field: keyof TherapyItem, value: any) => {
     setTherapies((prev) => prev.map((item, idx) => idx === index ? { ...item, [field]: value } : item));
@@ -357,7 +340,7 @@ export function TeaPIT() {
       });
 
       showNotification({ title: 'Sucesso', message: 'PIT salvo com sucesso', color: 'green' });
-      await loadPit(selectedTeaProfileId);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.teaPit, selectedTeaProfileId] });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -392,7 +375,7 @@ export function TeaPIT() {
           <Stack gap="md">
             <Select
               label="Paciente TEA"
-              placeholder={loading ? 'Carregando...' : 'Selecione um paciente'}
+              placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
               data={teaProfileOptions}
               value={selectedTeaProfileId}
               onChange={setSelectedTeaProfileId}
@@ -460,7 +443,7 @@ export function TeaPIT() {
                     <div>
                       <Select
                         label="Terapia"
-                        placeholder={loadingCatalogs ? 'Carregando procedimentos...' : 'Selecione um procedimento'}
+                        placeholder={loadingProcedures ? 'Carregando procedimentos...' : 'Selecione um procedimento'}
                         data={procedureOptions}
                         value={therapy.procedureId}
                         onChange={(value) => {
@@ -507,7 +490,7 @@ export function TeaPIT() {
                     <div>
                       <Select
                         label="Profissional"
-                        placeholder={loadingCatalogs ? 'Carregando médicos...' : 'Selecione um médico'}
+                        placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
                         data={doctorOptions}
                         value={therapy.professionalDoctorId}
                         onChange={(value) => {

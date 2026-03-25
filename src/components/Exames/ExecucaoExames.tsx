@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -22,6 +23,8 @@ import { ChevronLeft, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search } fr
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import consultationService from '../../services/consultationService';
+import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface NursingTemplateQuestionOption {
   label: string;
@@ -130,6 +133,7 @@ const requiresOptionList = (responseType?: string) => (
 
 export function ExecucaoExames() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<ConsultationRow[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -148,6 +152,7 @@ export function ExecucaoExames() {
   const [answers, setAnswers] = useState<TriageAnswerForm[]>([]);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const clinicalQueueQuery = useClinicalQueueQuery();
 
   const mapApiToRow = (it: any): ConsultationRow => ({
     id: String(it.id),
@@ -168,30 +173,13 @@ export function ExecucaoExames() {
     || EXAM_FLOW_STATUSES.has(row.statusFluxo)
   );
 
-  const loadExamQueue = async () => {
-    try {
-      const data: any = await consultationService.list({ queueType: CLINICAL_QUEUE_TYPE, limit: 200 });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : []));
-
-      setRows(list.map(mapApiToRow).filter((item) => EXAM_FLOW_STATUSES.has(item.statusFluxo) || isExamRow(item)));
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar fila de exames',
-        color: 'red',
-      });
-    }
-  };
-
   useEffect(() => {
-    void loadExamQueue();
-  }, []);
+    setRows(
+      (((clinicalQueueQuery.data as any[]) || [])
+        .map(mapApiToRow)
+        .filter((item) => EXAM_FLOW_STATUSES.has(item.statusFluxo) || isExamRow(item))),
+    );
+  }, [clinicalQueueQuery.data]);
 
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -207,7 +195,7 @@ export function ExecucaoExames() {
     try {
       setLoadingId(row.id);
       await consultationService.update(row.id, { queue: nextStatus, queueType: CLINICAL_QUEUE_TYPE });
-      await loadExamQueue();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
       showNotification({
         title: 'Fluxo do exame atualizado',
         message: `${row.nomeCompleto} agora está em "${nextStatus}".`,
@@ -242,7 +230,7 @@ export function ExecucaoExames() {
       setPregnant('');
       setAnswers(buildInitialAnswers(row.nursingTemplate));
       setTriageOpen(true);
-      await loadExamQueue();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -294,7 +282,7 @@ export function ExecucaoExames() {
       });
       setTriageOpen(false);
       setSelectedRow(null);
-      await loadExamQueue();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
     } catch (err: any) {
       showNotification({
         title: 'Erro',

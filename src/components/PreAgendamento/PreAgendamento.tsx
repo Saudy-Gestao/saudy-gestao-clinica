@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
   Badge,
@@ -23,6 +24,8 @@ import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import preSchedulingService, { type PreSchedulingItem, type PreSchedulingStatus } from '../../services/preSchedulingService';
 import { formatCPF } from '../../utils/formatters';
+import { usePreSchedulingsQuery } from '../../hooks/usePreSchedulingsQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 const STATUS_LABEL: Record<PreSchedulingStatus, string> = {
   PENDING: 'Pendente',
@@ -48,6 +51,7 @@ const statusOptions = Object.entries(STATUS_LABEL).map(([value, label]) => ({ va
 
 export function PreAgendamento() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<PreSchedulingItem[]>([]);
   const [search, setSearch] = useState('');
@@ -91,31 +95,30 @@ export function PreAgendamento() {
   } | null>(null);
   const [savingReview, setSavingReview] = useState(false);
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null);
+  const preSchedulingsQuery = usePreSchedulingsQuery({
+    search,
+    status: statusFilter,
+    resolvedOnly: viewMode === 'history',
+  });
 
-  const loadItems = async () => {
-    setLoading(true);
-    try {
-      const data = await preSchedulingService.list({
-        search: search || undefined,
-        status: statusFilter || undefined,
-        resolvedOnly: viewMode === 'history',
-        limit: 500,
-      });
-      setItems(Array.isArray(data?.items) ? data.items : []);
-    } catch (err: any) {
+  useEffect(() => {
+    setLoading(preSchedulingsQuery.isFetching);
+  }, [preSchedulingsQuery.isFetching]);
+
+  useEffect(() => {
+    setItems(Array.isArray(preSchedulingsQuery.data) ? preSchedulingsQuery.data : []);
+  }, [preSchedulingsQuery.data]);
+
+  useEffect(() => {
+    if (preSchedulingsQuery.error) {
+      const err: any = preSchedulingsQuery.error;
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.error || err?.message || 'Erro ao carregar pré-agendamentos',
         color: 'red',
       });
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadItems();
-  }, [search, statusFilter, viewMode]);
+  }, [preSchedulingsQuery.error]);
 
   const counters = useMemo(() => {
     return items.reduce((acc, item) => {
@@ -155,7 +158,7 @@ export function PreAgendamento() {
         color: 'green',
       });
       setPreAuthOpen(false);
-      await loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
     } catch (err: any) {
       showNotification({
         title: 'Erro ao pré-autorizar',
@@ -188,7 +191,7 @@ export function PreAgendamento() {
         message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
         color: 'green',
       });
-      await loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
     } catch (err: any) {
       showNotification({
         title: 'Erro ao enviar link',
@@ -232,7 +235,7 @@ export function PreAgendamento() {
         color: action === 'APPROVE' ? 'green' : 'yellow',
       });
       setReviewOpen(false);
-      await loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
     } catch (err: any) {
       showNotification({
         title: 'Erro na revisão',

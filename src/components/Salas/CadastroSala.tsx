@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -21,10 +22,13 @@ import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
-import branchService from '../../services/branchService';
 import sectorService from '../../services/sectorService';
 import doctorService from '../../services/doctorService';
 import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
+import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
+import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
+import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface BranchOption {
   id: string;
@@ -72,6 +76,7 @@ const normalizeDoctorOptions = (data: any): DoctorOption[] => {
 
 export function CadastroSala() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -89,6 +94,9 @@ export function CadastroSala() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SalaRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const roomsQuery = useRoomsAdminQuery();
+  const branchesQuery = useSettingsBranchesQuery();
+  const doctorsQuery = useDoctorsAdminQuery();
 
   const [form, setForm] = useState({
     name: '',
@@ -135,111 +143,96 @@ export function CadastroSala() {
     ));
   }, [displayItems, query]);
 
-  const loadBranches = async () => {
-    setLoadingBranches(true);
-    try {
-      const data: any = await branchService.listBranches();
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data?.items)
-            ? data.data.items
-            : (Array.isArray(data?.data)
-              ? data.data
-              : [])));
+  useEffect(() => {
+    setLoadingBranches(branchesQuery.isFetching);
+  }, [branchesQuery.isFetching]);
 
-      const mapped: BranchOption[] = list.map((branch: any) => ({
-        id: String(branch.id || ''),
-        label: branch.tradeName || branch.socialName || 'Filial sem nome',
-      })).filter((branch: BranchOption) => branch.id);
+  useEffect(() => {
+    if (!branchesQuery.error) return;
+    const err: any = branchesQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.error || err?.message || 'Erro ao carregar filiais',
+      color: 'red',
+    });
+  }, [branchesQuery.error]);
 
-      setBranches(mapped);
-      if (!selectedBranchId && mapped.length > 0) {
-        setSelectedBranchId(mapped[0].id);
-      }
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.error || err?.message || 'Erro ao carregar filiais',
-        color: 'red',
-      });
-    } finally {
-      setLoadingBranches(false);
+  useEffect(() => {
+    const data: any = branchesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
+
+    const mapped: BranchOption[] = list.map((branch: any) => ({
+      id: String(branch.id || ''),
+      label: branch.tradeName || branch.socialName || 'Filial sem nome',
+    })).filter((branch: BranchOption) => branch.id);
+
+    setBranches(mapped);
+    if (!selectedBranchId && mapped.length > 0) {
+      setSelectedBranchId(mapped[0].id);
     }
-  };
+  }, [branchesQuery.data, selectedBranchId]);
 
-  const loadSalas = async (branchId: string | null) => {
-    if (!branchId) {
-      setItems([]);
-      return;
-    }
+  useEffect(() => {
+    setLoading(roomsQuery.isFetching);
+  }, [roomsQuery.isFetching]);
 
-    setLoading(true);
-    try {
-      const data: any = await sectorService.listSectors();
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data?.items)
-            ? data.data.items
-            : (Array.isArray(data?.data)
-              ? data.data
-              : [])));
-
-      const mapped: SalaRow[] = list
-        .filter((sector: any) => isRoomSector(sector))
-        .map((sector: any) => ({
-          id: String(sector.id || ''),
-          name: sector.name || '',
-          description: stripRoomMarker(sector.description) || null,
-          branchId: String(sector.branchId || ''),
-          doctorIds: [],
-          doctorNames: [],
-        }))
-        .filter((sector: SalaRow) => sector.id && sector.branchId === branchId);
-
-      setItems(mapped);
-    } catch (err: any) {
+  useEffect(() => {
+    if (roomsQuery.error) {
+      const err: any = roomsQuery.error;
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.error || err?.message || 'Erro ao carregar salas',
         color: 'red',
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [roomsQuery.error]);
 
   useEffect(() => {
-    loadBranches();
-  }, []);
+    if (!selectedBranchId) {
+      setItems([]);
+      return;
+    }
+    const list = Array.isArray(roomsQuery.data) ? roomsQuery.data : [];
+    const mapped: SalaRow[] = list
+      .filter((sector: any) => isRoomSector(sector))
+      .map((sector: any) => ({
+        id: String(sector.id || ''),
+        name: sector.name || '',
+        description: stripRoomMarker(sector.description) || null,
+        branchId: String(sector.branchId || ''),
+        doctorIds: [],
+        doctorNames: [],
+      }))
+      .filter((sector: SalaRow) => sector.id && sector.branchId === selectedBranchId);
+    setItems(mapped);
+  }, [roomsQuery.data, selectedBranchId]);
 
   useEffect(() => {
-    loadSalas(selectedBranchId);
-  }, [selectedBranchId]);
+    setLoadingDoctors(doctorsQuery.isFetching);
+  }, [doctorsQuery.isFetching]);
 
   useEffect(() => {
-    const loadDoctors = async () => {
-      setLoadingDoctors(true);
-      try {
-        const data: any = await doctorService.listDoctors();
-        setDoctorOptions(normalizeDoctorOptions(data));
-      } catch (err: any) {
-        setDoctorOptions([]);
-        showNotification({
-          title: 'Erro ao carregar médicos',
-          message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'A lista de médicos não pôde ser carregada.',
-          color: 'red',
-        });
-      } finally {
-        setLoadingDoctors(false);
-      }
-    };
+    if (!doctorsQuery.error) return;
+    const err: any = doctorsQuery.error;
+    setDoctorOptions([]);
+    showNotification({
+      title: 'Erro ao carregar médicos',
+      message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'A lista de médicos não pôde ser carregada.',
+      color: 'red',
+    });
+  }, [doctorsQuery.error]);
 
-    loadDoctors();
-  }, []);
+  useEffect(() => {
+    setDoctorOptions(normalizeDoctorOptions(doctorsQuery.data));
+  }, [doctorsQuery.data]);
   const availableDoctorOptions = useMemo(() => {
     return doctorOptions.map((doctor) => ({ value: doctor.value, label: doctor.label }));
   }, [doctorOptions]);
@@ -332,6 +325,7 @@ export function CadastroSala() {
       }
 
       await syncRoomDoctors(roomId, form.doctorIds || []);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.roomsAdmin });
       const selectedDoctors = doctorOptions.filter((doctor) => (form.doctorIds || []).includes(doctor.value));
 
       setItems((prev) => prev.map((item) => {
@@ -364,6 +358,7 @@ export function CadastroSala() {
     setDeleting(true);
     try {
       await sectorService.deleteSector(item.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.roomsAdmin });
       showNotification({ title: 'Removido', message: 'Sala excluída', color: 'green' });
       setItems((prev) => prev.filter((it) => it.id !== item.id));
       setDeleteModalOpen(false);

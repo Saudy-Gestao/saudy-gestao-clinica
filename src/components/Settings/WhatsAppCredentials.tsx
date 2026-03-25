@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Stack,
   TextInput,
@@ -18,6 +19,8 @@ import {
   IconChevronUp,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
+import { useWhatsAppConfigQuery } from '../../hooks/useWhatsAppConfigQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface ConfigFormValues {
   accountSid: string;
@@ -35,10 +38,12 @@ const maskValue = (value: string): string => {
 };
 
 export function WhatsAppCredentials() {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [hasExistingConfig, setHasExistingConfig] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const { data: config, error } = useWhatsAppConfigQuery();
 
   const [configForm, setConfigForm] = useState<ConfigFormValues>({
     accountSid: '',
@@ -56,42 +61,37 @@ export function WhatsAppCredentials() {
   });
 
   useEffect(() => {
-    loadConfig();
-  }, []);
-
-  const loadConfig = async () => {
-    try {
-      const config = await whatsappService.getConfig();
-      
-      if (config) {
-        const hasAuthToken = config.authToken && config.authToken.startsWith('***');
-        setHasExistingConfig(!!config.id);
-        
-        // Valores reais para edição
-        setConfigForm({
-          accountSid: config.accountSid,
-          authToken: hasAuthToken ? '' : (config.authToken || ''),
-          fromNumber: config.fromNumber,
-          appId: config.appId || '',
-          isActive: config.isActive,
-        });
-
-        // Valores mascarados para exibição
-        setDisplayValues({
-          accountSid: maskValue(config.accountSid),
-          authToken: maskValue(config.authToken || ''),
-          fromNumber: maskValue(config.fromNumber),
-          appId: maskValue(config.appId || ''),
-        });
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao carregar configurações',
-        color: 'red',
-      });
+    if (!config) {
+      setHasExistingConfig(false);
+      return;
     }
-  };
+
+    const hasAuthToken = config.authToken && config.authToken.startsWith('***');
+    setHasExistingConfig(!!config.id);
+    setConfigForm({
+      accountSid: config.accountSid,
+      authToken: hasAuthToken ? '' : (config.authToken || ''),
+      fromNumber: config.fromNumber,
+      appId: config.appId || '',
+      isActive: config.isActive,
+    });
+    setDisplayValues({
+      accountSid: maskValue(config.accountSid),
+      authToken: maskValue(config.authToken || ''),
+      fromNumber: maskValue(config.fromNumber),
+      appId: maskValue(config.appId || ''),
+    });
+  }, [config]);
+
+  useEffect(() => {
+    if (!error) return;
+    const err: any = error;
+    notifications.show({
+      title: 'Erro',
+      message: err.response?.data?.message || 'Erro ao carregar configurações',
+      color: 'red',
+    });
+  }, [error]);
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +104,7 @@ export function WhatsAppCredentials() {
         color: 'green',
       });
       setEditing(false);
-      await loadConfig();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConfig });
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
@@ -123,7 +123,15 @@ export function WhatsAppCredentials() {
 
   const handleCancel = () => {
     setEditing(false);
-    loadConfig();
+    if (!config) return;
+    const hasAuthToken = config.authToken && config.authToken.startsWith('***');
+    setConfigForm({
+      accountSid: config.accountSid,
+      authToken: hasAuthToken ? '' : (config.authToken || ''),
+      fromNumber: config.fromNumber,
+      appId: config.appId || '',
+      isActive: config.isActive,
+    });
   };
 
   return (

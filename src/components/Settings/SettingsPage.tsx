@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
@@ -46,12 +47,20 @@ import branchService from '../../services/branchService';
 import branchSettingsService, { type BranchSettings } from '../../services/branchSettingsService';
 import sectorService from '../../services/sectorService';
 import userService from '../../services/userService';
-import doctorService from '../../services/doctorService';
 import accessService from '../../services/accessService';
-import { moduleService, type Module } from '../../services/moduleService';
+import type { Module } from '../../services/moduleService';
 import { FloatingInput } from '../common/FloatingInput';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { WhatsAppCredentials } from './WhatsAppCredentials';
+import { useSettingsCompaniesQuery } from '../../hooks/useSettingsCompaniesQuery';
+import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
+import { useBranchSettingsQuery } from '../../hooks/useBranchSettingsQuery';
+import { useSettingsSectorsQuery } from '../../hooks/useSettingsSectorsQuery';
+import { useSettingsUsersQuery } from '../../hooks/useSettingsUsersQuery';
+import { useSettingsDoctorsQuery } from '../../hooks/useSettingsDoctorsQuery';
+import { useSettingsModulesQuery } from '../../hooks/useSettingsModulesQuery';
+import { useSettingsAccessesQuery } from '../../hooks/useSettingsAccessesQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 // Validations
 import {
@@ -145,6 +154,7 @@ const getStoredBranchQuotas = () => {
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
@@ -158,7 +168,6 @@ export function SettingsPage() {
   
   // Company
   const [companies, setCompanies] = useState<any[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [companyForm, setCompanyForm] = useState({ cnpj: '', legalName: '', tradeName: '', address: '', phone: '' });
   const [savingCompany, setSavingCompany] = useState(false);
@@ -166,7 +175,6 @@ export function SettingsPage() {
 
   // Branches
   const [branches, setBranches] = useState<any[]>([]);
-  const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<any | null>(null);
   const [branchForm, setBranchForm] = useState<{ tradeName: string; address: string; phone: string; type: 'Filial' | 'Matriz' }>({
@@ -207,7 +215,6 @@ export function SettingsPage() {
   // Sectors
   const [sectors, setSectors] = useState<any[]>([]);
   const [allSectors, setAllSectors] = useState<any[]>([]);
-  const [loadingSectors, setLoadingSectors] = useState(false);
   const [selectedBranchForSectors, setSelectedBranchForSectors] = useState<string | null>(null);
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
   const [editingSector, setEditingSector] = useState<any | null>(null);
@@ -217,7 +224,6 @@ export function SettingsPage() {
 
   // Users
   const [users, setUsers] = useState<any[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedSectorForUsers, setSelectedSectorForUsers] = useState<string | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
@@ -243,13 +249,49 @@ export function SettingsPage() {
   
   // Modules
   const [modules, setModules] = useState<Module[]>([]);
-  const [loadingModules, setLoadingModules] = useState(false);
 
   // Branch Settings
   const [selectedBranchForSettings, setSelectedBranchForSettings] = useState<string | null>(null);
   const [branchSettings, setBranchSettings] = useState<BranchSettings | null>(null);
-  const [loadingBranchSettings, setLoadingBranchSettings] = useState(false);
   const [savingBranchSettings, setSavingBranchSettings] = useState(false);
+  const {
+    data: companiesData = [],
+    isLoading: loadingCompanies,
+    error: companiesError,
+  } = useSettingsCompaniesQuery();
+  const {
+    data: branchesData = [],
+    isLoading: loadingBranches,
+    error: branchesError,
+  } = useSettingsBranchesQuery();
+  const {
+    data: branchSettingsData,
+    isLoading: loadingBranchSettings,
+    error: branchSettingsError,
+  } = useBranchSettingsQuery(selectedBranchForSettings);
+  const {
+    data: sectorsData = [],
+    isLoading: loadingSectors,
+    error: sectorsError,
+  } = useSettingsSectorsQuery();
+  const {
+    data: usersData = [],
+    isLoading: loadingUsers,
+    error: usersError,
+  } = useSettingsUsersQuery();
+  const {
+    data: doctorsData = [],
+    error: doctorsError,
+  } = useSettingsDoctorsQuery();
+  const {
+    data: modulesData = [],
+    isLoading: loadingModules,
+    error: modulesError,
+  } = useSettingsModulesQuery();
+  const {
+    data: accessesData = [],
+    error: accessesError,
+  } = useSettingsAccessesQuery();
 
   const openDeleteConfirm = (title: string, message: string, action: () => Promise<void>) => {
     setDeleteConfirmTitle(title);
@@ -317,33 +359,40 @@ export function SettingsPage() {
         console.error('Error parsing user from localStorage:', error);
       }
     }
-    fetchCompanies();
-    fetchAccesses();
-    fetchDoctors();
-    fetchModules();
   }, []);
 
   useEffect(() => {
-    if (selectedCompanyId) {
-      const comp = companies.find((c) => c.id === selectedCompanyId);
-      if (comp) {
-        setCompanyForm({ 
-          cnpj: sanitizeCompanyField(comp.cnpj),
-          legalName: sanitizeCompanyField(comp.legalName),
-          tradeName: sanitizeCompanyField(comp.tradeName),
-          address: sanitizeCompanyField(comp.address),
-          phone: sanitizeCompanyField(comp.phone),
-        });
-        localStorage.removeItem(COMPANY_PREFILL_STORAGE_KEY);
-      }
-      // Forçar refetch dos branches
-      fetchBranches();
-
-      const quotas = getStoredBranchQuotas();
-      setBranchQuota(quotas[selectedCompanyId] || null);
-    } else {
-      setBranchQuota(null);
+    let nextCompanies = companiesData || [];
+    if (userCompanyId) {
+      nextCompanies = nextCompanies.filter((c: any) => c.id === userCompanyId);
     }
+    setCompanies(nextCompanies);
+
+    if (!selectedCompanyId && nextCompanies.length > 0) {
+      setSelectedCompanyId(nextCompanies[0].id);
+    }
+  }, [companiesData, userCompanyId, selectedCompanyId]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setBranchQuota(null);
+      return;
+    }
+
+    const comp = companies.find((c) => c.id === selectedCompanyId);
+    if (comp) {
+      setCompanyForm({
+        cnpj: sanitizeCompanyField(comp.cnpj),
+        legalName: sanitizeCompanyField(comp.legalName),
+        tradeName: sanitizeCompanyField(comp.tradeName),
+        address: sanitizeCompanyField(comp.address),
+        phone: sanitizeCompanyField(comp.phone),
+      });
+      localStorage.removeItem(COMPANY_PREFILL_STORAGE_KEY);
+    }
+
+    const quotas = getStoredBranchQuotas();
+    setBranchQuota(quotas[selectedCompanyId] || null);
   }, [selectedCompanyId, companies]);
 
   const maxBranchesAllowed = branchQuota ? branchQuota.initialBranchCount + branchQuota.allowedCreates : null;
@@ -351,10 +400,22 @@ export function SettingsPage() {
 
   // Reload companies when userCompanyId is set
   useEffect(() => {
-    if (userCompanyId && companies.length === 0) {
-      fetchCompanies();
+    if (!selectedCompanyId && companies.length > 0) {
+      setSelectedCompanyId(companies[0].id);
     }
-  }, [userCompanyId]);
+  }, [companies, selectedCompanyId]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setBranches([]);
+      return;
+    }
+
+    const filtered = (branchesData || [])
+      .filter((b: any) => b.companyId === selectedCompanyId)
+      .map((b: any) => normalizeBranch(b));
+    setBranches(filtered);
+  }, [branchesData, selectedCompanyId]);
 
   useEffect(() => {
     if (branches.length > 0 && !selectedBranchForSectors) {
@@ -368,12 +429,16 @@ export function SettingsPage() {
   }, [branches, loggedBranchId]);
 
   useEffect(() => {
-    if (selectedBranchForSectors) {
-      fetchSectors();
-    } else {
+    if (!selectedBranchForSectors) {
       setSectors([]);
+      setAllSectors([]);
+      return;
     }
-  }, [selectedBranchForSectors]);
+
+    const availableSectors = (sectorsData || []).filter((sector: any) => !isRoomSector(sector));
+    setAllSectors(availableSectors);
+    setSectors(availableSectors.filter((s: any) => s.branchId === selectedBranchForSectors));
+  }, [selectedBranchForSectors, sectorsData]);
 
   useEffect(() => {
     if (sectors.length > 0 && !selectedSectorForUsers) {
@@ -384,34 +449,33 @@ export function SettingsPage() {
   }, [sectors]);
 
   useEffect(() => {
-    if (selectedBranchForSectors || selectedSectorForUsers) {
-      fetchUsers();
+    let filtered = usersData || [];
+    if (userCompanyId) {
+      filtered = filtered.filter((u: any) => u.sector?.branch?.company?.id === userCompanyId || u.sector?.branch?.companyId === userCompanyId);
     }
-  }, [selectedBranchForSectors, selectedSectorForUsers]);
+    if (selectedSectorForUsers) {
+      filtered = filtered.filter((u: any) => u.sector?.id === selectedSectorForUsers);
+    } else if (selectedBranchForSectors) {
+      filtered = filtered.filter((u: any) => u.sector?.branchId === selectedBranchForSectors);
+    }
+    setUsers(filtered);
+  }, [usersData, userCompanyId, selectedSectorForUsers, selectedBranchForSectors]);
+
+  useEffect(() => {
+    setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
+  }, [doctorsData]);
+
+  useEffect(() => {
+    setModules(modulesData || []);
+  }, [modulesData]);
+
+  useEffect(() => {
+    setAccessesList(accessesData || []);
+  }, [accessesData]);
 
   // --- Handlers ---
 
   // Company
-  const fetchCompanies = async () => {
-    setLoadingCompanies(true);
-    try {
-      const data = await companyService.listCompanies();
-      // Filter to show only user's company
-      let filteredCompanies = data || [];
-      if (userCompanyId) {
-        filteredCompanies = filteredCompanies.filter((c: any) => c.id === userCompanyId);
-      }
-      setCompanies(filteredCompanies);
-      if (filteredCompanies.length > 0) {
-        setSelectedCompanyId(filteredCompanies[0].id);
-      }
-    } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar empresas', color: 'red' });
-    } finally {
-      setLoadingCompanies(false);
-    }
-  };
-
   const handleSaveCompany = async () => {
     if (!selectedCompanyId) return;
     
@@ -462,9 +526,9 @@ export function SettingsPage() {
       }
 
       notifications.show({ title: 'Sucesso', message: 'Empresa atualizada', color: 'green' });
-      fetchCompanies();
-      fetchBranches();
-      fetchUsers();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsCompanies });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       refreshLoggedUserInStorage();
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao atualizar empresa', color: 'red' });
@@ -474,26 +538,6 @@ export function SettingsPage() {
   };
 
   // Branches
-  const fetchBranches = async () => {
-    if (!selectedCompanyId) {
-        setBranches([]);
-        return;
-    }
-    setLoadingBranches(true);
-    try {
-      const data = await branchService.listBranches();
-      // Filter by selected company
-      const filtered = (data || [])
-        .filter((b: any) => b.companyId === selectedCompanyId)
-        .map((b: any) => normalizeBranch(b));
-      setBranches(filtered);
-    } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar filiais', color: 'red' });
-    } finally {
-      setLoadingBranches(false);
-    }
-  };
-
   const openBranchModalForCreate = () => {
     if (reachedBranchLimit) {
       notifications.show({
@@ -577,7 +621,7 @@ export function SettingsPage() {
         notifications.show({ title: 'Sucesso', message: 'Filial criada', color: 'green' });
       }
       setBranchModalOpen(false);
-      fetchBranches();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar filial', color: 'red' });
     } finally {
@@ -589,54 +633,9 @@ export function SettingsPage() {
     try {
       await branchService.deleteBranch(id);
       notifications.show({ title: 'Sucesso', message: 'Filial excluída', color: 'green' });
-      fetchBranches();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir filial', color: 'red' });
-    }
-  };
-
-  // Sectors
-  const fetchSectors = async () => {
-    if (!selectedBranchForSectors) {
-        setSectors([]);
-        setAllSectors([]);
-        return;
-    }
-    setLoadingSectors(true);
-    try {
-      const data = await sectorService.listSectors();
-      let availableSectors = (data || []).filter((sector: any) => !isRoomSector(sector));
-
-      // Fallback: when sectors endpoint returns empty, infer sectors from users payload.
-      if (availableSectors.length === 0) {
-        try {
-          const usersData = await userService.listUsers();
-          const inferredSectorsMap = new Map<string, any>();
-          (usersData || []).forEach((user: any) => {
-            const sector = user?.sector;
-            if (sector?.id) {
-              inferredSectorsMap.set(sector.id, {
-                id: sector.id,
-                name: sector.name || 'Sem nome',
-                description: sector.description || '',
-                branchId: sector.branchId || sector.branch?.id || '',
-              });
-            }
-          });
-          availableSectors = Array.from(inferredSectorsMap.values()).filter((sector: any) => !isRoomSector(sector));
-        } catch {
-          // Ignore fallback errors and keep empty state.
-        }
-      }
-
-      setAllSectors(availableSectors);
-
-      const filtered = availableSectors.filter((s: any) => s.branchId === selectedBranchForSectors);
-      setSectors(filtered);
-    } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar setores', color: 'red' });
-    } finally {
-      setLoadingSectors(false);
     }
   };
 
@@ -680,7 +679,7 @@ export function SettingsPage() {
         notifications.show({ title: 'Sucesso', message: 'Setor criado', color: 'green' });
       }
       setSectorModalOpen(false);
-      fetchSectors();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar setor', color: 'red' });
     } finally {
@@ -692,75 +691,9 @@ export function SettingsPage() {
     try {
       await sectorService.deleteSector(id);
       notifications.show({ title: 'Sucesso', message: 'Setor excluído', color: 'green' });
-      fetchSectors();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir setor', color: 'red' });
-    }
-  };
-
-  // Users
-  const fetchAccesses = async () => {
-    try {
-      // Buscar acessos do usuário autenticado
-      const userStr = localStorage.getItem('user');
-      if (!userStr) {
-        setAccessesList([]);
-        return;
-      }
-      
-      const user = JSON.parse(userStr);
-      const freshUser = await userService.getUser(user?.id);
-      setAccessesList(freshUser.accesses || []);
-    } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar acessos', color: 'red' });
-    }
-  };
-
-  const fetchModules = async () => {
-    setLoadingModules(true);
-    try {
-      const data = await moduleService.getAll();
-      setModules(data || []);
-    } catch (error: any) {
-      console.error('Erro ao carregar módulos:', error);
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar módulos', color: 'red' });
-    } finally {
-      setLoadingModules(false);
-    }
-  };
-
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const data = await userService.listUsers();
-      let filtered = data || [];
-      
-      // First filter by company
-      if (userCompanyId) {
-        filtered = filtered.filter((u: any) => u.sector?.branch?.company?.id === userCompanyId || u.sector?.branch?.companyId === userCompanyId);
-      }
-      
-      // Then apply additional filters
-      if (selectedSectorForUsers) {
-        filtered = filtered.filter((u: any) => u.sector?.id === selectedSectorForUsers);
-      } else if (selectedBranchForSectors) {
-        filtered = filtered.filter((u: any) => u.sector?.branchId === selectedBranchForSectors);
-      }
-      
-      setUsers(filtered);
-    } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar usuários', color: 'red' });
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  const fetchDoctors = async () => {
-    try {
-      const data = await doctorService.listDoctors();
-      setDoctors(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao carregar médicos', color: 'red' });
     }
   };
 
@@ -818,8 +751,8 @@ export function SettingsPage() {
         notifications.show({ title: 'Sucesso', message: 'Usuário criado', color: 'green' });
       }
       setUserModalOpen(false);
-      fetchUsers();
-      fetchDoctors();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsDoctors });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar usuário', color: 'red' });
     } finally {
@@ -838,7 +771,7 @@ export function SettingsPage() {
     try {
       await userService.deleteUser(id);
       notifications.show({ title: 'Sucesso', message: 'Usuário excluído', color: 'green' });
-      fetchUsers();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir usuário', color: 'red' });
     }
@@ -934,7 +867,7 @@ export function SettingsPage() {
       }
       setAccessModalOpen(false);
       await refreshLoggedUserInStorage();
-      fetchAccesses();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar acesso', color: 'red' });
     } finally {
@@ -957,30 +890,13 @@ export function SettingsPage() {
       
       notifications.show({ title: 'Sucesso', message: 'Acesso removido', color: 'green' });
       await refreshLoggedUserInStorage();
-      fetchAccesses();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir acesso', color: 'red' });
     }
   };
 
   // Branch Settings functions
-  const fetchBranchSettings = async (branchId: string) => {
-    if (!branchId) return;
-    setLoadingBranchSettings(true);
-    try {
-      const settings = await branchSettingsService.getBranchSettings(branchId);
-      setBranchSettings(settings);
-    } catch (error: any) {
-      notifications.show({ 
-        title: 'Erro', 
-        message: error.response?.data?.error || 'Erro ao carregar configurações', 
-        color: 'red' 
-      });
-    } finally {
-      setLoadingBranchSettings(false);
-    }
-  };
-
   const handleToggleFacialRecognition = async (enabled: boolean) => {
     if (!selectedBranchForSettings) return;
     setSavingBranchSettings(true);
@@ -990,6 +906,7 @@ export function SettingsPage() {
         { requireFacialForReportDelivery: enabled }
       );
       setBranchSettings(updated);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.settingsBranchSettings, selectedBranchForSettings] });
       notifications.show({ 
         title: 'Sucesso', 
         message: 'Configuração atualizada', 
@@ -1015,6 +932,7 @@ export function SettingsPage() {
         { requireFacialForPatientRegistration: enabled }
       );
       setBranchSettings(updated);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.settingsBranchSettings, selectedBranchForSettings] });
       notifications.show({
         title: 'Sucesso',
         message: 'Configuração atualizada',
@@ -1043,6 +961,7 @@ export function SettingsPage() {
         { noShowToleranceMinutes: nextValue }
       );
       setBranchSettings(updated);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.settingsBranchSettings, selectedBranchForSettings] });
       notifications.show({
         title: 'Sucesso',
         message: 'Tempo de tolerância atualizado',
@@ -1059,14 +978,25 @@ export function SettingsPage() {
     }
   };
 
-  // Effect to load branch settings when branch is selected
   useEffect(() => {
-    if (selectedBranchForSettings) {
-      fetchBranchSettings(selectedBranchForSettings);
-    } else {
+    if (!selectedBranchForSettings) {
       setBranchSettings(null);
+      return;
     }
-  }, [selectedBranchForSettings]);
+    if (branchSettingsData) {
+      setBranchSettings(branchSettingsData);
+    }
+  }, [selectedBranchForSettings, branchSettingsData]);
+
+  useEffect(() => {
+    const error: any = companiesError || branchesError || branchSettingsError || sectorsError || usersError || doctorsError || modulesError || accessesError;
+    if (!error) return;
+    notifications.show({
+      title: 'Erro',
+      message: error.response?.data?.error || error.response?.data?.message || 'Erro ao carregar configurações',
+      color: 'red',
+    });
+  }, [companiesError, branchesError, branchSettingsError, sectorsError, usersError, doctorsError, modulesError, accessesError]);
 
   // Common UI components (Moved outside to prevent re-renders)
   const renderTabList = () => (
@@ -1786,7 +1716,6 @@ export function SettingsPage() {
                                             </Group>
                                         </Paper>
 
-                                        {/* WhatsApp Configuration */}
                                         <Paper
                                             p="lg"
                                             radius="md"
@@ -1835,6 +1764,17 @@ export function SettingsPage() {
                                                     </Button>
                                                 </Group>
                                             </Stack>
+                                        </Paper>
+
+                                        <Paper
+                                            p="lg"
+                                            radius="md"
+                                            withBorder
+                                            style={{
+                                                borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                                background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                            }}
+                                        >
                                             <Group mb="md" gap="xs">
                                                 <MessageCircle size={20} />
                                                 <Text fw={600} size="md">

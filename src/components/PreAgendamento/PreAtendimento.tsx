@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -31,12 +32,15 @@ import { FloatingInput } from '../common/FloatingInput';
 import { FacialCapture } from '../common/FacialCapture';
 import preAttendanceService from '../../services/preAttendanceService';
 import patientService from '../../services/patientService';
-import insuranceService from '../../services/insuranceService';
 import invoiceService from '../../services/invoiceService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import consultationService from '../../services/consultationService';
 import convenioAuthorizationService, { type ConvenioAuthorizationAttachment } from '../../services/convenioAuthorizationService';
 import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils/formatters';
+import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useReceptionQueueQuery';
+import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
+import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface Patient extends NovoPatiente {
   id: string;
@@ -115,6 +119,7 @@ const INITIAL_NOVO_PACIENTE: NovoPatiente = {
 
 export function PreAtendimento() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { colorScheme } = useMantineColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -157,11 +162,13 @@ export function PreAtendimento() {
   });
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const RECEPTION_QUEUE_TYPE = 'Autorização e Recepção';
   const RECEPTION_IN_PROGRESS_STATUS = 'Em atendimento na recepção';
   const RECEPTION_CHECKLIST_STATUS = 'Checklist em andamento';
   const RECEPTION_DONE_STATUS = 'Recepção concluída';
   const ACTIVE_RECEPTION_STATUSES = [RECEPTION_IN_PROGRESS_STATUS, RECEPTION_CHECKLIST_STATUS];
+  const receptionQueueQuery = useReceptionQueueQuery();
+  const patientsQuery = usePatientsAdminQuery();
+  const insurancesQuery = useInsurancesAdminQuery();
   const checklistFieldLabelStyle = {
     fontSize: '0.95rem',
     color: 'var(--mantine-color-text)',
@@ -218,6 +225,9 @@ export function PreAtendimento() {
   };
 
   const canEditPayment = checklistData.atendimentoParticular || isPrivateCare(checklistPatient);
+  const invalidateReceptionQueue = async () => {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.receptionQueue });
+  };
 
   const extractDoctorNameFromAgenda = (agenda?: string | null) => {
     const value = String(agenda || '').trim();
@@ -356,25 +366,7 @@ export function PreAtendimento() {
 
   const loadReceptionPatients = async () => {
     try {
-      const data: any = await preAttendanceService.list({
-        queueType: RECEPTION_QUEUE_TYPE,
-      });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : []));
-
-      const mapped = dedupeReceptionPatients(
-        list
-          .map(mapApiToPatient)
-          .filter((item) => hasValidPreAttendanceId(item.id))
-          .filter((item) => ACTIVE_RECEPTION_STATUSES.includes(item.status || '')),
-      );
-
-      setPatients(mapped);
+      await receptionQueueQuery.refetch();
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -489,21 +481,14 @@ export function PreAtendimento() {
     if (hasValidPreAttendanceId(patient.id)) return patient;
 
     try {
-      const data: any = await preAttendanceService.list({
-        queueType: RECEPTION_QUEUE_TYPE,
+      const list = await queryClient.fetchQuery({
+        queryKey: queryKeys.receptionQueue,
+        queryFn: fetchReceptionQueue,
       });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : []));
-
       const mapped = dedupeReceptionPatients(
         list
           .map(mapApiToPatient)
-          .filter((item) => ACTIVE_RECEPTION_STATUSES.includes(item.status || '')),
+          .filter((item: Patient) => ACTIVE_RECEPTION_STATUSES.includes(item.status || '')),
       );
 
       if (mapped.length > 0) {
@@ -517,90 +502,95 @@ export function PreAtendimento() {
   };
 
   useEffect(() => {
-    loadReceptionPatients();
-  }, []);
+    const mapped = dedupeReceptionPatients(
+      ((receptionQueueQuery.data as any[]) || [])
+        .map(mapApiToPatient)
+        .filter((item) => hasValidPreAttendanceId(item.id))
+        .filter((item) => ACTIVE_RECEPTION_STATUSES.includes(item.status || '')),
+    );
+    setPatients(mapped);
+  }, [receptionQueueQuery.data]);
 
   useEffect(() => {
-    const loadPatients = async () => {
-      setPatientsLoading(true);
-      try {
-        const data: any = await patientService.listPatients();
-        const listRaw = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.patients)
-            ? data.patients
-            : (Array.isArray(data?.data?.patients)
-              ? data.data.patients
-              : (Array.isArray(data?.data)
-                ? data.data
-                : (Array.isArray(data?.items) ? data.items : []))));
-
-        const list: any[] = Array.isArray(listRaw) ? listRaw : [];
-        const options = list.map((p: any) => {
-          const id = String(p.id ?? p.patientId ?? '');
-          const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
-          const label = name || 'Paciente';
-          return { value: id || label, label };
-        });
-
-        const byId: Record<string, any> = {};
-        list.forEach((p: any) => {
-          const id = String(p.id ?? p.patientId ?? '');
-          if (id) byId[id] = p;
-        });
-
-        setPatientById(byId);
-        setPatientOptions(options);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
-          color: 'red',
-        });
-      } finally {
-        setPatientsLoading(false);
-      }
-    };
-
-    loadPatients();
-  }, []);
+    setPatientsLoading(patientsQuery.isFetching);
+  }, [patientsQuery.isFetching]);
 
   useEffect(() => {
-    const loadInsurances = async () => {
-      setInsurancesLoading(true);
-      try {
-        const data: any = await insuranceService.listInsurances({ isActive: true });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+    setInsurancesLoading(insurancesQuery.isFetching);
+  }, [insurancesQuery.isFetching]);
 
-        const options = list
-          .map((it: any) => {
-            const name = (it.name || it.nome || '').toString().trim();
-            return name ? { value: name, label: name } : null;
-          })
-          .filter(Boolean) as { value: string; label: string }[];
+  useEffect(() => {
+    if (!patientsQuery.error) return;
+    const err: any = patientsQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      color: 'red',
+    });
+  }, [patientsQuery.error]);
 
-        setInsuranceOptions(options);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
-          color: 'red',
-        });
-      } finally {
-        setInsurancesLoading(false);
-      }
-    };
+  useEffect(() => {
+    if (!insurancesQuery.error) return;
+    const err: any = insurancesQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      color: 'red',
+    });
+  }, [insurancesQuery.error]);
 
-    loadInsurances();
-  }, []);
+  useEffect(() => {
+    const data: any = patientsQuery.data;
+    const listRaw = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.patients)
+        ? data.patients
+        : (Array.isArray(data?.data?.patients)
+          ? data.data.patients
+          : (Array.isArray(data?.data)
+            ? data.data
+            : (Array.isArray(data?.items) ? data.items : []))));
+
+    const list: any[] = Array.isArray(listRaw) ? listRaw : [];
+    const options = list.map((p: any) => {
+      const id = String(p.id ?? p.patientId ?? '');
+      const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+      const label = name || 'Paciente';
+      return { value: id || label, label };
+    });
+
+    const byId: Record<string, any> = {};
+    list.forEach((p: any) => {
+      const id = String(p.id ?? p.patientId ?? '');
+      if (id) byId[id] = p;
+    });
+
+    setPatientById(byId);
+    setPatientOptions(options);
+  }, [patientsQuery.data]);
+
+  useEffect(() => {
+    const data: any = insurancesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
+
+    const options = list
+      .filter((it: any) => it?.isActive !== false)
+      .map((it: any) => {
+        const name = (it.name || it.nome || '').toString().trim();
+        return name ? { value: name, label: name } : null;
+      })
+      .filter(Boolean) as { value: string; label: string }[];
+
+    setInsuranceOptions(options);
+  }, [insurancesQuery.data]);
 
   const filteredPatients = patients.filter((patient) => {
     const q = searchValue.toLowerCase();
@@ -650,6 +640,7 @@ export function PreAtendimento() {
       try {
         const updated = await preAttendanceService.update(editingPatientId, payload);
         setPatients((prev) => prev.map((p) => (p.id === editingPatientId ? mapApiToPatient(updated) : p)));
+        await invalidateReceptionQueue();
       } catch (err: any) {
         showNotification({
           title: 'Erro',
@@ -702,6 +693,7 @@ export function PreAtendimento() {
           agenda: 'Mamografia',
         });
         setPatients((prev) => [mapApiToPatient(created), ...prev]);
+        await invalidateReceptionQueue();
       } catch (err: any) {
         showNotification({
           title: 'Erro',
@@ -890,6 +882,7 @@ export function PreAtendimento() {
         status: RECEPTION_CHECKLIST_STATUS,
         checklistStartedAt: new Date().toISOString(),
       });
+      await invalidateReceptionQueue();
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -979,6 +972,7 @@ export function PreAtendimento() {
       });
 
       await loadReceptionPatients();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
       setChecklistOpen(false);
       resetChecklist();
 
@@ -1034,6 +1028,7 @@ export function PreAtendimento() {
           finalFacialValidationName: result?.patient?.name || undefined,
           finalFacialValidationCpf: result?.patient?.cpf || undefined,
         });
+        await invalidateReceptionQueue();
         showNotification({
           title: 'Identidade não confirmada',
           message: 'A face reconhecida não corresponde ao paciente em atendimento.',
@@ -1052,6 +1047,7 @@ export function PreAtendimento() {
         finalFacialValidationName: result?.patient?.name || checklistPatient.nomeCompleto || undefined,
         finalFacialValidationCpf: result?.patient?.cpf || checklistPatient.cpf || undefined,
       });
+      await invalidateReceptionQueue();
       showNotification({
         title: 'Identidade confirmada',
         message: `${result.patient.name} validado com sucesso na recepção.`,
@@ -1063,6 +1059,7 @@ export function PreAtendimento() {
         finalFacialValidationAt: new Date().toISOString(),
         finalFacialValidationStatus: 'ERRO',
       }).catch(() => undefined);
+      await invalidateReceptionQueue();
       showNotification({
         title: 'Erro na validação facial',
         message: error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Não foi possível validar a identidade do paciente.',
