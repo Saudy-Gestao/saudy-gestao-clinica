@@ -316,6 +316,17 @@ export function TeaPIT() {
       return;
     }
 
+    const therapiesToSave = therapies.filter((t) => t.procedureId.trim() !== '' || t.therapyType.trim() !== '');
+    const therapyWithoutProfessional = therapiesToSave.find((t) => !String(t.professionalDoctorId || '').trim());
+    if (therapyWithoutProfessional) {
+      showNotification({
+        title: 'Profissional obrigatório',
+        message: 'Selecione um profissional para todas as terapias antes de seguir para a pré-reserva.',
+        color: 'red',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       await teaProfileService.upsertPit(selectedTeaProfileId, {
@@ -328,8 +339,7 @@ export function TeaPIT() {
           id: item.id,
           action: item.action,
         })),
-        therapies: therapies
-          .filter((t) => t.procedureId.trim() !== '' || t.therapyType.trim() !== '')
+        therapies: therapiesToSave
           .map((t) => ({
             id: t.id || undefined,
             procedureId: t.procedureId || undefined,

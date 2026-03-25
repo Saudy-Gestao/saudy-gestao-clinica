@@ -24,29 +24,19 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconBrandWhatsapp,
-  IconSettings,
   IconMessage,
   IconBell,
   IconHistory,
   IconTrash,
-  IconDeviceFloppy,
   IconPlus,
   IconEye,
   IconAlertCircle,
   IconClock,
   IconInfoCircle,
   IconRefresh,
+  IconDeviceFloppy,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
-
-interface ConfigFormValues {
-  accountSid: string;
-  authToken: string;
-  fromNumber: string;
-  appId: string;
-  isActive: boolean;
-}
 
 interface TemplateFormValues {
   type: string;
@@ -64,26 +54,22 @@ interface NotificationFormValues {
   reminderHoursBefore: number;
 }
 
-export function WhatsAppConfig() {
-  const [activeTab, setActiveTab] = useState('config');
+interface WhatsAppConfigProps {
+  embedded?: boolean;
+}
+
+export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
+  const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<{ id: string; name: string } | null>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [variables, setVariables] = useState<any[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [testModalOpen, setTestModalOpen] = useState(false);
-  const [hasExistingConfig, setHasExistingConfig] = useState(false);
+  const [showAlert, setShowAlert] = useState(true);
 
   // Forms using simple state instead of @mantine/form
-  const [configForm, setConfigForm] = useState<ConfigFormValues>({
-    accountSid: '',
-    authToken: '',
-    fromNumber: '',
-    appId: '',
-    isActive: true,
-  });
-
   const [templateForm, setTemplateForm] = useState<TemplateFormValues>({
     type: 'APPOINTMENT_CREATED',
     name: '',
@@ -100,11 +86,6 @@ export function WhatsAppConfig() {
     reminderHoursBefore: 2,
   });
 
-  const [testForm, setTestForm] = useState({
-    phone: '',
-    message: 'Teste de envio WhatsApp',
-  });
-
   useEffect(() => {
     loadData();
     loadVariables();
@@ -112,23 +93,10 @@ export function WhatsAppConfig() {
 
   const loadData = async () => {
     try {
-      const [config, templatesData, notificationConfig] = await Promise.all([
-        whatsappService.getConfig(),
+      const [templatesData, notificationConfig] = await Promise.all([
         whatsappService.listTemplates(),
         whatsappService.getNotificationConfig(),
       ]);
-
-      if (config) {
-        const hasAuthToken = config.authToken && config.authToken.startsWith('***');
-        setHasExistingConfig(!!config.id);
-        setConfigForm({
-          accountSid: config.accountSid,
-          authToken: hasAuthToken ? '' : (config.authToken || ''),
-          fromNumber: config.fromNumber,
-          appId: config.appId || '',
-          isActive: config.isActive,
-        });
-      }
 
       setTemplates(templatesData);
 
@@ -172,28 +140,6 @@ export function WhatsAppConfig() {
     }
   };
 
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await whatsappService.saveConfig(configForm);
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Configuração salva com sucesso',
-        color: 'green',
-      });
-      await loadData();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao salvar configuração',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSaveNotificationConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -220,12 +166,33 @@ export function WhatsAppConfig() {
     e.preventDefault();
     setLoading(true);
     try {
-      await whatsappService.saveTemplate(templateForm);
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Template salvo com sucesso',
-        color: 'green',
-      });
+      const saved = await whatsappService.saveTemplate(templateForm);
+
+      // Auto-enviar para Gupshup se o nome HSM estiver preenchido
+      if (templateForm.hsmTemplateName) {
+        try {
+          await whatsappService.pushTemplateToGupshup(saved.id);
+          notifications.show({
+            title: 'Template salvo e enviado para o Gupshup',
+            message: 'Aguarde a aprovação da Meta para usar HSM.',
+            color: 'green',
+          });
+        } catch (pushError: any) {
+          notifications.show({
+            title: 'Template salvo, mas erro ao enviar para Gupshup',
+            message: pushError.response?.data?.error || 'Verifique as credenciais e o App ID do Gupshup.',
+            color: 'yellow',
+            autoClose: 8000,
+          });
+        }
+      } else {
+        notifications.show({
+          title: 'Sucesso',
+          message: 'Template salvo com sucesso',
+          color: 'green',
+        });
+      }
+
       setShowTemplateModal(false);
       setTemplateForm({
         type: 'APPOINTMENT_CREATED',
@@ -238,23 +205,24 @@ export function WhatsAppConfig() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao salvar template',
+        message: error.response?.data?.error || error.response?.data?.message || 'Erro ao salvar template',
         color: 'red',
       });
     } finally {
       setLoading(false);
     }
   };
-  const handleDeleteTemplate = async (id: string) => {
-    if (!window.confirm('Deseja realmente excluir este template?')) return;
-    
+
+  const handleDeleteTemplate = async () => {
+    if (!deleteConfirmTemplate) return;
     try {
-      await whatsappService.deleteTemplate(id);
+      await whatsappService.deleteTemplate(deleteConfirmTemplate.id);
       notifications.show({
-        title: 'Sucesso',
-        message: 'Template excluído',
+        title: 'Excluído',
+        message: `Template "${deleteConfirmTemplate.name}" removido.`,
         color: 'green',
       });
+      setDeleteConfirmTemplate(null);
       loadData();
     } catch (error: any) {
       notifications.show({
@@ -262,29 +230,6 @@ export function WhatsAppConfig() {
         message: 'Erro ao excluir template',
         color: 'red',
       });
-    }
-  };
-
-  const handleTestMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await whatsappService.testMessage(testForm);
-      notifications.show({
-        title: 'Sucesso',
-        message: 'Mensagem de teste enviada',
-        color: 'green',
-      });
-      setTestModalOpen(false);
-      setTestForm({ phone: '', message: 'Teste de envio WhatsApp' });
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erro',
-        message: error.response?.data?.details || 'Erro ao enviar mensagem',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -357,22 +302,38 @@ export function WhatsAppConfig() {
     return <Badge color={config.color}>{config.label}</Badge>;
   };
 
+  const getHsmStatusLabel = (status?: string | null) => {
+    const normalized = String(status || '').trim().toUpperCase();
+    const statusConfig: Record<string, { color: string; label: string }> = {
+      APPROVED: { color: 'green', label: 'Aprovado' },
+      REJECTED: { color: 'red', label: 'Recusado' },
+      FAILED: { color: 'red', label: 'Falhou' },
+      PENDING: { color: 'yellow', label: 'Pendente' },
+      SUBMITTED: { color: 'blue', label: 'Enviado' },
+      IN_REVIEW: { color: 'blue', label: 'Em análise' },
+    };
+    return statusConfig[normalized] || { color: 'gray', label: normalized || 'Sem status' };
+  };
+
   return (
-    <Box p="md">
-      <Group mb="lg">
-        <IconBrandWhatsapp size={32} color="#25D366" />
-        <Title order={2}>Configuração WhatsApp</Title>
-      </Group>
+    <Box p={embedded ? 0 : "md"}>
+      {showAlert && (
+        <Alert 
+          icon={<IconAlertCircle size={16} />} 
+          mb="md" 
+          color="yellow"
+          withCloseButton
+          onClose={() => setShowAlert(false)}
+        >
+          <Text size="sm">
+            <strong>Importante:</strong> Você precisa configurar sua conta na Gupshup e obter aprovação
+            do WhatsApp Business API antes de usar este recurso.
+          </Text>
+        </Alert>
+      )}
 
-      <Alert icon={<IconInfoCircle size={16} />} mb="md" color="blue">
-        Integração com Gupshup para envio de mensagens WhatsApp automatizadas aos pacientes.
-      </Alert>
-
-      <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'config')}>
+      <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'templates')}>
         <Tabs.List>
-          <Tabs.Tab value="config" leftSection={<IconSettings size={16} />}>
-            Configuração Geral
-          </Tabs.Tab>
           <Tabs.Tab value="templates" leftSection={<IconMessage size={16} />}>
             Templates de Mensagens
           </Tabs.Tab>
@@ -383,85 +344,6 @@ export function WhatsAppConfig() {
             Histórico
           </Tabs.Tab>
         </Tabs.List>
-
-        {/* Configuração Geral */}
-        <Tabs.Panel value="config" pt="md">
-          <Paper shadow="sm" p="xl">
-            <form onSubmit={handleSaveConfig}>
-              <Stack gap="md">
-                <Title order={4}>Credenciais Gupshup</Title>
-                
-                <TextInput
-                  label="API Key"
-                  placeholder="Ex: abc123xyz..."
-                  required
-                  value={configForm.accountSid}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, accountSid: e.target.value }))}
-                />
-
-                <TextInput
-                  label="App Name"
-                  placeholder={hasExistingConfig ? "Deixe vazio para manter o atual" : "Digite o nome do seu app no Gupshup"}
-                  description={hasExistingConfig ? "App Name atual configurado. Preencha apenas se quiser alterar." : undefined}
-                  required={!hasExistingConfig}
-                  type="password"
-                  value={configForm.authToken}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, authToken: e.target.value }))}
-                />
-
-                <TextInput
-                  label="Número de Origem (WhatsApp)"
-                  placeholder="Ex: 5511999999999"
-                  description="Número WhatsApp Business no formato: 5511999999999 (somente números, sem +)"
-                  required
-                  value={configForm.fromNumber}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, fromNumber: e.target.value }))}
-                />
-
-                <TextInput
-                  label="App ID (Gupshup)"
-                  placeholder="Ex: c0e21bb7-6e0d-4e2a-a0da-dcf67af1bab5"
-                  description="UUID do seu app no Gupshup — necessário para sincronizar status de templates HSM aprovados"
-                  value={configForm.appId}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, appId: e.target.value }))}
-                />
-
-                <Switch
-                  description="Quando desativado, nenhuma mensagem será enviada"
-                  checked={configForm.isActive}
-                  onChange={(e) => setConfigForm(prev => ({ ...prev, isActive: e.target.checked }))}
-                />
-
-                <Divider my="md" />
-
-                <Group>
-                  <Button
-                    type="submit"
-                    leftSection={<IconDeviceFloppy size={16} />}
-                    loading={loading}
-                  >
-                    Salvar Configuração
-                  </Button>
-                  
-                  <Button
-                    variant="light"
-                    leftSection={<IconBrandWhatsapp size={16} />}
-                    onClick={() => setTestModalOpen(true)}
-                  >
-                    Enviar Teste
-                  </Button>
-                </Group>
-
-                <Alert icon={<IconAlertCircle size={16} />} color="yellow">
-                  <Text size="sm">
-                    <strong>Importante:</strong> Você precisa configurar sua conta na Gupshup e obter aprovação
-                    do WhatsApp Business API antes de usar este recurso.
-                  </Text>
-                </Alert>
-              </Stack>
-            </form>
-          </Paper>
-        </Tabs.Panel>
 
         {/* Templates */}
         <Tabs.Panel value="templates" pt="md">
@@ -501,9 +383,16 @@ export function WhatsAppConfig() {
                           {getMessageTypeLabel(template.type)}
                         </Badge>
                         {template.hsmTemplateName && (
-                          <Badge size="sm" variant="filled" color={template.hsmTemplateApproved ? 'green' : 'red'}>
-                            HSM: {template.hsmTemplateName}{template.hsmTemplateApproved ? ' ✓' : ' ⋅ pendente'}
-                          </Badge>
+                          <>
+                            <Badge size="sm" variant="filled" color={getHsmStatusLabel(template.hsmTemplateStatus).color}>
+                              HSM: {template.hsmTemplateName} · {getHsmStatusLabel(template.hsmTemplateStatus).label}
+                            </Badge>
+                            {template.hsmTemplateId && (
+                              <Badge size="sm" variant="outline" color="gray">
+                                ID: {template.hsmTemplateId}
+                              </Badge>
+                            )}
+                          </>
                         )}
                       </Group>
                     </div>
@@ -528,7 +417,7 @@ export function WhatsAppConfig() {
                       <ActionIcon
                         variant="light"
                         color="red"
-                        onClick={() => handleDeleteTemplate(template.id)}
+                        onClick={() => setDeleteConfirmTemplate({ id: template.id, name: template.name })}
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
@@ -755,41 +644,28 @@ export function WhatsAppConfig() {
         </form>
       </Modal>
 
-      {/* Modal Teste */}
+      {/* Modal Confirmação de Exclusão */}
       <Modal
-        opened={testModalOpen}
-        onClose={() => setTestModalOpen(false)}
-        title="Enviar Mensagem de Teste"
+        opened={!!deleteConfirmTemplate}
+        onClose={() => setDeleteConfirmTemplate(null)}
+        title="Excluir template"
+        size="sm"
+        centered
       >
-        <form onSubmit={handleTestMessage}>
-          <Stack gap="md">
-            <TextInput
-              label="Telefone"
-              placeholder="(11) 98765-4321"
-              required
-              value={testForm.phone}
-              onChange={(e) => setTestForm(prev => ({ ...prev, phone: e.target.value }))}
-            />
-
-            <Textarea
-              label="Mensagem"
-              placeholder="Digite a mensagem de teste"
-              required
-              minRows={4}
-              value={testForm.message}
-              onChange={(e) => setTestForm(prev => ({ ...prev, message: e.target.value }))}
-            />
-
-            <Group justify="flex-end">
-              <Button variant="light" type="button" onClick={() => setTestModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" loading={loading}>
-                Enviar
-              </Button>
-            </Group>
-          </Stack>
-        </form>
+        <Stack gap="md">
+          <Text>
+            Tem certeza que deseja excluir o template{' '}
+            <strong>"{deleteConfirmTemplate?.name}"</strong>? Esta ação não pode ser desfeita.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteConfirmTemplate(null)}>
+              Cancelar
+            </Button>
+            <Button color="red" leftSection={<IconTrash size={16} />} onClick={handleDeleteTemplate}>
+              Excluir
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Box>
   );

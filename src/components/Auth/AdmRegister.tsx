@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, Stack, Text, Group } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -19,6 +19,18 @@ export function AdmRegister() {
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'form' | 'code'>('form');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousScheme = root.getAttribute('data-mantine-color-scheme') || 'light';
+
+    root.setAttribute('data-mantine-color-scheme', 'light');
+
+    return () => {
+      const persistedScheme = localStorage.getItem('mantine-color-scheme') || previousScheme;
+      root.setAttribute('data-mantine-color-scheme', persistedScheme);
+    };
+  }, []);
 
   const passwordStrength = {
     minLength: password.length >= 8,
@@ -102,7 +114,7 @@ export function AdmRegister() {
   };
 
   return (
-    <Box style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#f8f9fa' }}>
+    <Box className="login-light" style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#f8f9fa' }}>
       <Box
         style={{
           width: '40%',
@@ -120,7 +132,10 @@ export function AdmRegister() {
         <Text c="white" mt="xs">Registro Administrador</Text>
       </Box>
 
-      <Box style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem' }}>
+      <Box
+        className="login-right-panel"
+        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem', backgroundColor: '#ffffff' }}
+      >
         <Box w="100%" maw={460}>
           <Stack gap="lg">
             <Box ta="center">

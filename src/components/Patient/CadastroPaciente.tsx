@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -39,6 +39,7 @@ import branchSettingsService from '../../services/branchSettingsService';
 import ResultModal from '../common/ResultModal';
 import { FacialCapture } from '../common/FacialCapture';
 import { FacialInstructionsModal } from '../common/FacialInstructionsModal';
+import { findExistingCpf } from '../../utils/cpfRegistry';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -278,6 +279,7 @@ export function CadastroPaciente() {
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
   const [facialImage, setFacialImage] = useState<string | null>(null);
   const [requireFacialForPatientRegistration, setRequireFacialForPatientRegistration] = useState(true);
+  const lastValidatedCpfRef = useRef<string>('');
 
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
@@ -286,6 +288,45 @@ export function CadastroPaciente() {
       delete next[field];
       return next;
     });
+  };
+
+  const validateCpfUniqueness = async (cpfValue: string, notify = true) => {
+    const normalizedCpf = onlyDigits(cpfValue);
+
+    if (normalizedCpf.length !== 11 || !isValidCPF(normalizedCpf)) {
+      lastValidatedCpfRef.current = '';
+      return false;
+    }
+
+    if (lastValidatedCpfRef.current === normalizedCpf) {
+      return fieldErrors.cpf === 'CPF já cadastrado';
+    }
+
+    const duplicateCpf = await findExistingCpf({
+      cpf: normalizedCpf,
+      currentEntityType: 'patient',
+      currentEntityId: editingPatientId,
+    });
+
+    lastValidatedCpfRef.current = normalizedCpf;
+
+    if (duplicateCpf.exists) {
+      const cpfError = 'CPF já cadastrado';
+      setFieldErrors((prev) => ({ ...prev, cpf: cpfError }));
+      if (notify) {
+        showNotification({ title: 'Erro', message: cpfError, color: 'red' });
+      }
+      return true;
+    }
+
+    setFieldErrors((prev) => {
+      if (prev.cpf !== 'CPF já cadastrado') return prev;
+      const next = { ...prev };
+      delete next.cpf;
+      return next;
+    });
+
+    return false;
   };
 
   // Sincroniza os inputs temporários com os arrays do form
@@ -682,6 +723,19 @@ export function CadastroPaciente() {
       return;
     }
 
+    const duplicateCpf = await findExistingCpf({
+      cpf: form.cpf,
+      currentEntityType: 'patient',
+      currentEntityId: editingPatientId,
+    });
+
+    if (duplicateCpf.exists) {
+      const cpfError = 'CPF já cadastrado';
+      setFieldErrors((prev) => ({ ...prev, cpf: cpfError }));
+      showNotification({ title: 'Erro', message: cpfError, color: 'red' });
+      return;
+    }
+
     setSaving(true);
     try {
       // Converte tipo sanguíneo para o formato enum do backend
@@ -940,7 +994,29 @@ export function CadastroPaciente() {
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
                   <TextInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); clearFieldError('name'); }} error={fieldErrors.name} required />
-                  <TextInput label="CPF" value={formatCPF(form.cpf)} onChange={(e) => { setForm({ ...form, cpf: onlyDigits(e.currentTarget.value) }); clearFieldError('cpf'); }} maxLength={14} required error={fieldErrors.cpf} />
+                  <TextInput
+                    label="CPF"
+                    value={formatCPF(form.cpf)}
+                    onChange={(e) => {
+                      const nextCpf = onlyDigits(e.currentTarget.value);
+                      setForm({ ...form, cpf: nextCpf });
+                      clearFieldError('cpf');
+                      if (nextCpf.length < 11) {
+                        lastValidatedCpfRef.current = '';
+                      }
+                      if (nextCpf.length === 11) {
+                        void validateCpfUniqueness(nextCpf);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (form.cpf.length === 11) {
+                        void validateCpfUniqueness(form.cpf);
+                      }
+                    }}
+                    maxLength={14}
+                    required
+                    error={fieldErrors.cpf}
+                  />
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>

@@ -1,14 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Paper, SimpleGrid, Text, Loader, Center, useMantineColorScheme } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
+import dayjs from 'dayjs';
 import consultationService from '../../services/consultationService';
 import appointmentService from '../../services/appointmentService';
+
+const ACTIVE_CONSULTATION_STATUSES = [
+  'aguardando atendimento',
+  'chamado para atendimento',
+  'em atendimento',
+];
+
+const normalizeAppointmentStatus = (value?: string | null) => String(value || '').trim().toUpperCase();
+
+const extractDateOnly = (value?: string | null) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const parsed = dayjs(raw);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : raw.split('T')[0] || raw.split(' ')[0] || '';
+};
 
 export function StatsCards() {
   const { colorScheme } = useMantineColorScheme();
   const [stats, setStats] = useState({
-    atendimentoHoje: 0,
-    agendamentosPendentes: 0,
+    agendadosHoje: 0,
+    pendentesHoje: 0,
     emAtendimento: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -50,27 +66,28 @@ export function StatsCards() {
           ? appointmentsData
           : (appointmentsData?.items || appointmentsData?.data || []);
 
-        // Atendimento hoje: consultas agendadas para hoje
-        const today = new Date().toISOString().split('T')[0];
-        const atendimentoHoje = consultationsList.filter((c: any) => {
-          const scheduledDate = c.scheduledFor?.split(' ')[0] || c.scheduledFor?.split('T')[0];
-          return scheduledDate === today;
+        const today = dayjs().format('YYYY-MM-DD');
+
+        const appointmentsToday = appointmentsList.filter((a: any) => extractDateOnly(a.date || a.data) === today);
+
+        const agendadosHoje = appointmentsToday.filter((a: any) => {
+          const status = normalizeAppointmentStatus(a.status);
+          return !['CANCELADO', 'CANCELED'].includes(status);
         }).length;
 
-        // Agendamentos pendentes: appointments com status pendente/agendado
-        const agendamentosPendentes = appointmentsList.filter((a: any) => 
-          !a.status || a.status.toLowerCase() === 'pendente' || a.status.toLowerCase() === 'agendado'
-        ).length;
+        const pendentesHoje = appointmentsToday.filter((a: any) => {
+          const status = normalizeAppointmentStatus(a.status);
+          return ['AGENDADO', 'CONFIRMADO', 'PENDENTE'].includes(status) || !status;
+        }).length;
 
-        // Em atendimento: consultas com status "em atendimento" ou similar
-        const emAtendimento = consultationsList.filter((c: any) =>
-          c.convenioStatus?.toLowerCase() === 'em atendimento' || 
-          c.queueType?.toLowerCase() === 'em atendimento'
-        ).length;
+        const emAtendimento = consultationsList.filter((c: any) => {
+          const queueStatus = String(c.queue || c.queueType || '').trim().toLowerCase();
+          return ACTIVE_CONSULTATION_STATUSES.includes(queueStatus);
+        }).length;
 
         setStats({
-          atendimentoHoje,
-          agendamentosPendentes,
+          agendadosHoje,
+          pendentesHoje,
           emAtendimento,
         });
       } catch (err: any) {
@@ -98,8 +115,8 @@ export function StatsCards() {
   return (
     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg" mb={40}>
       {[
-        { label: 'Atendimento hoje', value: stats.atendimentoHoje },
-        { label: 'Agendamentos pendentes', value: stats.agendamentosPendentes },
+        { label: 'Agendados hoje', value: stats.agendadosHoje },
+        { label: 'Pendentes hoje', value: stats.pendentesHoje },
         { label: 'Em atendimento', value: stats.emAtendimento },
       ].map((stat, index) => (
         <Paper

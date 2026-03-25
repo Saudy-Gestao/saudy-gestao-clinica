@@ -8,6 +8,7 @@ import {
   Group,
   Loader,
   Modal,
+  MultiSelect,
   Select,
   Stack,
   Table,
@@ -35,16 +36,39 @@ interface SalaRow {
   name: string;
   description?: string | null;
   branchId: string;
-  doctorId?: string | null;
-  doctorName?: string | null;
+  doctorIds?: string[];
+  doctorNames?: string[];
 }
 
 interface DoctorOption {
   value: string;
   label: string;
   branchId: string;
-  roomId?: string | null;
+  roomIds: string[];
 }
+
+const normalizeDoctorOptions = (data: any): DoctorOption[] => {
+  const list: any[] = Array.isArray(data)
+    ? data
+    : (Array.isArray(data?.items)
+      ? data.items
+      : (Array.isArray(data?.data?.items)
+        ? data.data.items
+        : (Array.isArray(data?.data)
+          ? data.data
+          : [])));
+
+  return list
+    .map((doctor: any) => ({
+      value: String(doctor?.id || ''),
+      label: doctor?.name || 'Médico sem nome',
+      branchId: String(doctor?.branchId || ''),
+      roomIds: Array.isArray(doctor?.roomIds)
+        ? doctor.roomIds.map((roomId: any) => String(roomId || '').trim()).filter(Boolean)
+        : (doctor?.roomId ? [String(doctor.roomId)] : []),
+    }))
+    .filter((doctor: DoctorOption) => Boolean(doctor.value));
+};
 
 export function CadastroSala() {
   const navigate = useNavigate();
@@ -70,7 +94,7 @@ export function CadastroSala() {
     name: '',
     description: '',
     branchId: '',
-    doctorId: '',
+    doctorIds: [] as string[],
   });
 
   const branchLabelById = useMemo(() => {
@@ -80,14 +104,36 @@ export function CadastroSala() {
     }, {});
   }, [branches]);
 
+  const linkedDoctorsByRoomId = useMemo(() => {
+    return doctorOptions.reduce<Record<string, DoctorOption[]>>((acc, doctor) => {
+      for (const roomId of doctor.roomIds) {
+        if (!acc[roomId]) acc[roomId] = [];
+        acc[roomId].push(doctor);
+      }
+      return acc;
+    }, {} as Record<string, DoctorOption[]>);
+  }, [doctorOptions]);
+
+  const displayItems = useMemo(() => {
+    return items.map((item) => {
+      const linkedDoctors = linkedDoctorsByRoomId[item.id] || [];
+      return {
+        ...item,
+        doctorIds: linkedDoctors.map((doctor) => doctor.value),
+        doctorNames: linkedDoctors.map((doctor) => doctor.label),
+      };
+    });
+  }, [items, linkedDoctorsByRoomId]);
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((it) => (
+    if (!q) return displayItems;
+    return displayItems.filter((it) => (
       it.name.toLowerCase().includes(q)
       || (it.description || '').toLowerCase().includes(q)
+      || (it.doctorNames || []).some((doctorName) => doctorName.toLowerCase().includes(q))
     ));
-  }, [items, query]);
+  }, [displayItems, query]);
 
   const loadBranches = async () => {
     setLoadingBranches(true);
@@ -149,8 +195,8 @@ export function CadastroSala() {
           name: sector.name || '',
           description: stripRoomMarker(sector.description) || null,
           branchId: String(sector.branchId || ''),
-          doctorId: null,
-          doctorName: null,
+          doctorIds: [],
+          doctorNames: [],
         }))
         .filter((sector: SalaRow) => sector.id && sector.branchId === branchId);
 
@@ -179,28 +225,14 @@ export function CadastroSala() {
       setLoadingDoctors(true);
       try {
         const data: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const mapped = list
-          .map((doctor: any) => ({
-            value: String(doctor.id || ''),
-            label: doctor.name || 'Médico sem nome',
-            branchId: String(doctor.branchId || ''),
-            roomId: doctor.roomId ? String(doctor.roomId) : null,
-          }))
-          .filter((doctor: DoctorOption) => Boolean(doctor.value));
-
-        setDoctorOptions(mapped);
-      } catch {
+        setDoctorOptions(normalizeDoctorOptions(data));
+      } catch (err: any) {
         setDoctorOptions([]);
+        showNotification({
+          title: 'Erro ao carregar médicos',
+          message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'A lista de médicos não pôde ser carregada.',
+          color: 'red',
+        });
       } finally {
         setLoadingDoctors(false);
       }
@@ -208,39 +240,19 @@ export function CadastroSala() {
 
     loadDoctors();
   }, []);
-
-  useEffect(() => {
-    if (!items.length) return;
-    const doctorByRoomId = doctorOptions.reduce<Record<string, DoctorOption>>((acc, doctor) => {
-      if (doctor.roomId) acc[doctor.roomId] = doctor;
-      return acc;
-    }, {});
-
-    setItems((prev) => prev.map((item) => {
-      const linkedDoctor = doctorByRoomId[item.id];
-      return {
-        ...item,
-        doctorId: linkedDoctor?.value || null,
-        doctorName: linkedDoctor?.label || null,
-      };
-    }));
-  }, [doctorOptions]);
-
   const availableDoctorOptions = useMemo(() => {
-    if (!form.branchId) return [];
-    return doctorOptions
-      .filter((doctor) => doctor.branchId === form.branchId)
-      .map((doctor) => ({ value: doctor.value, label: doctor.label }));
-  }, [doctorOptions, form.branchId]);
+    return doctorOptions.map((doctor) => ({ value: doctor.value, label: doctor.label }));
+  }, [doctorOptions]);
 
   const openModal = (item?: SalaRow) => {
     if (item) {
+      const linkedDoctors = linkedDoctorsByRoomId[item.id] || [];
       setEditingId(item.id);
       setForm({
         name: item.name || '',
         description: item.description || '',
         branchId: item.branchId || selectedBranchId || '',
-        doctorId: item.doctorId || '',
+        doctorIds: linkedDoctors.map((doctor) => doctor.value),
       });
     } else {
       setEditingId(null);
@@ -248,48 +260,42 @@ export function CadastroSala() {
         name: '',
         description: '',
         branchId: selectedBranchId || '',
-        doctorId: '',
+        doctorIds: [],
       });
     }
     setModalOpen(true);
   };
 
-  const syncRoomDoctor = async (roomId: string, nextDoctorId: string | null) => {
-    const linkedDoctors = doctorOptions.filter((doctor) => doctor.roomId === roomId);
+  const syncRoomDoctors = async (roomId: string, nextDoctorIds: string[]) => {
+    const selectedIds = Array.from(new Set(nextDoctorIds.filter(Boolean)));
+    const currentDoctors = doctorOptions.filter((doctor) => doctor.roomIds.includes(roomId));
+    const doctorsToSync = doctorOptions.filter((doctor) =>
+      currentDoctors.some((item) => item.value === doctor.value) || selectedIds.includes(doctor.value),
+    );
 
-    for (const doctor of linkedDoctors) {
-      if (doctor.value !== nextDoctorId) {
-        await doctorService.updateDoctor(doctor.value, { roomId: null });
-      }
+    for (const doctor of doctorsToSync) {
+      const nextRoomIds = selectedIds.includes(doctor.value)
+        ? Array.from(new Set([...doctor.roomIds.filter(Boolean), roomId]))
+        : doctor.roomIds.filter((linkedRoomId) => linkedRoomId !== roomId);
+
+      await doctorService.updateDoctor(doctor.value, {
+        roomIds: nextRoomIds,
+        roomId: nextRoomIds[0] || null,
+      });
     }
 
-    if (nextDoctorId) {
-      await doctorService.updateDoctor(nextDoctorId, { roomId });
-    }
-  };
+    setDoctorOptions((prev) => prev.map((doctor) => {
+      if (!doctorsToSync.some((item) => item.value === doctor.value)) return doctor;
 
-  const refreshDoctors = async () => {
-    const data: any = await doctorService.listDoctors();
-    const list: any[] = Array.isArray(data)
-      ? data
-      : (Array.isArray(data?.items)
-        ? data.items
-        : (Array.isArray(data?.data?.items)
-          ? data.data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : [])));
+      const nextRoomIds = selectedIds.includes(doctor.value)
+        ? Array.from(new Set([...doctor.roomIds.filter(Boolean), roomId]))
+        : doctor.roomIds.filter((linkedRoomId) => linkedRoomId !== roomId);
 
-    const mapped = list
-      .map((doctor: any) => ({
-        value: String(doctor.id || ''),
-        label: doctor.name || 'Médico sem nome',
-        branchId: String(doctor.branchId || ''),
-        roomId: doctor.roomId ? String(doctor.roomId) : null,
-      }))
-      .filter((doctor: DoctorOption) => Boolean(doctor.value));
-
-    setDoctorOptions(mapped);
+      return {
+        ...doctor,
+        roomIds: nextRoomIds,
+      };
+    }));
   };
 
   const handleSave = async () => {
@@ -325,13 +331,24 @@ export function CadastroSala() {
         throw new Error('Não foi possível identificar a sala salva para vincular o médico.');
       }
 
-      await syncRoomDoctor(roomId, form.doctorId || null);
-      await refreshDoctors();
+      await syncRoomDoctors(roomId, form.doctorIds || []);
+      const selectedDoctors = doctorOptions.filter((doctor) => (form.doctorIds || []).includes(doctor.value));
+
+      setItems((prev) => prev.map((item) => {
+        if (item.id === roomId) {
+          return {
+            ...item,
+            doctorIds: selectedDoctors.map((doctor) => doctor.value),
+            doctorNames: selectedDoctors.map((doctor) => doctor.label),
+          };
+        }
+
+        return item;
+      }));
 
       setModalOpen(false);
       setEditingId(null);
-      setForm({ name: '', description: '', branchId: selectedBranchId || '', doctorId: '' });
-      loadSalas(selectedBranchId);
+      setForm({ name: '', description: '', branchId: selectedBranchId || '', doctorIds: [] });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -424,7 +441,7 @@ export function CadastroSala() {
             <Table.Thead>
               <Table.Tr style={{ borderBottom: 'none' }}>
                 <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
-                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médico vinculado</Table.Th>}
+                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos vinculados</Table.Th>}
                 {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
                 {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
                 <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
@@ -436,7 +453,7 @@ export function CadastroSala() {
                     <Table.Td>
                       <Text fw={600}>{item.name}</Text>
                     </Table.Td>
-                    {!isMobile && <Table.Td><Text c="dimmed">{item.doctorName || '-'}</Text></Table.Td>}
+                    {!isMobile && <Table.Td><Text c="dimmed">{(item.doctorNames || []).length > 0 ? item.doctorNames?.join(', ') : '-'}</Text></Table.Td>}
                     {!isMobile && <Table.Td><Text c="dimmed">{item.description || '-'}</Text></Table.Td>}
                     {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
                     <Table.Td>
@@ -499,11 +516,11 @@ export function CadastroSala() {
             }}
             required
           />
-          <Select
-            label="Médico vinculado"
-            placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
-            value={form.doctorId}
-            onChange={(value) => setForm((prev) => ({ ...prev, doctorId: value || '' }))}
+          <MultiSelect
+            label="Médicos vinculados"
+            placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um ou mais médicos'}
+            value={form.doctorIds}
+            onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
             data={availableDoctorOptions}
             searchable
             clearable

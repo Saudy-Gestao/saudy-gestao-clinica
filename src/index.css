@@ -171,7 +171,7 @@ body {
 .floating-field input {
   width: 100%;
   border: none;
-  border-bottom: 1px solid var(--mantine-color-default-border);
+  border-bottom: 1px solid var(--mantine-color-default-border, #ced4da);
   border-radius: 0;
   padding: 10px 0 6px 0;
   background: transparent;
@@ -181,7 +181,7 @@ body {
 
 .floating-field input:focus {
   outline: none;
-  border-bottom: 2px solid var(--mantine-color-darkBlue-6);
+  border-bottom: 2px solid var(--mantine-color-darkBlue-6, #001F54);
   padding-bottom: 5px;
 }
 
@@ -207,7 +207,7 @@ body {
 
 /* make hovering the wrapper give subtle input feedback */
 .floating-field:hover input {
-  border-bottom-color: var(--mantine-color-darkBlue-4);
+  border-bottom-color: var(--mantine-color-darkBlue-4, #4674ff);
 }
 
 /* Floating wrappers for Mantine controls (Select, MultiSelect, DateInput, Textarea) */
@@ -336,6 +336,7 @@ body {
 :root[data-mantine-color-scheme='dark'] .floating-field input {
   color: #eef3ff !important;
   border-bottom-color: #5f78b2;
+  caret-color: #eef3ff;
 }
 
 :root[data-mantine-color-scheme='dark'] .floating-field input:focus {
@@ -343,14 +344,36 @@ body {
 }
 
 :root[data-mantine-color-scheme='dark'] .floating-field label {
-  color: #9fb2df;
+  color: #c9d8fb !important;
 }
 
 :root[data-mantine-color-scheme='dark'] .floating-field.has-value label,
 :root[data-mantine-color-scheme='dark'] .floating-field.is-focused label,
 :root[data-mantine-color-scheme='dark'] .floating-field input:focus + label,
 :root[data-mantine-color-scheme='dark'] .floating-field input:not(:placeholder-shown) + label {
-  color: #cfe0ff;
+  color: #eef3ff !important;
+}
+
+/* Login must stay readable even if the app color scheme is dark */
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field input {
+  color: #2e2e2e !important;
+  border-bottom-color: #adb5bd !important;
+  caret-color: #2e2e2e !important;
+}
+
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field input:focus {
+  border-bottom-color: #001F54 !important;
+}
+
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field label {
+  color: #495057 !important;
+}
+
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field.has-value label,
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field.is-focused label,
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field input:focus + label,
+:root[data-mantine-color-scheme='dark'] .login-light .floating-field input:not(:placeholder-shown) + label {
+  color: #001F54 !important;
 }
 
 /* red asterisk overlay used to simulate a colored '*' inside the placeholder */

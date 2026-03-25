@@ -22,6 +22,7 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronLeft,
+  Upload,
   RefreshCcw,
   History,
   ClipboardList,
@@ -35,6 +36,7 @@ import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import teaProfileService from '../../services/teaProfileService';
+import convenioAuthorizationService from '../../services/convenioAuthorizationService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 
 const STATUS_OPTIONS: Array<{ value: TeaPreReservationStatus; label: string }> = [
@@ -149,6 +151,46 @@ type ManualGridResponse = {
   week?: { startDate: string; endDate: string };
 };
 
+const normalizeManualGridResponse = (grid?: ManualGridResponse): ManualGridResponse => {
+  const days = Array.isArray(grid?.days)
+    ? grid.days.map((day) => {
+      const slotsByTime = new Map<string, ManualGridSlot>();
+      (day?.slots || []).forEach((slot) => {
+        const time = String(slot?.time || '').trim();
+        if (!time) return;
+        const existing = slotsByTime.get(time);
+        if (!existing) {
+          slotsByTime.set(time, {
+            time,
+            occupied: Boolean(slot?.occupied),
+            selectable: Boolean(slot?.selectable),
+          });
+          return;
+        }
+
+        slotsByTime.set(time, {
+          time,
+          occupied: existing.occupied || Boolean(slot?.occupied),
+          selectable: existing.selectable || Boolean(slot?.selectable),
+        });
+      });
+
+      return {
+        ...day,
+        date: String(day?.date || ''),
+        weekday: String(day?.weekday || ''),
+        enabled: Boolean(day?.enabled),
+        slots: Array.from(slotsByTime.values()).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)),
+      };
+    })
+    : [];
+
+  return {
+    ...grid,
+    days,
+  };
+};
+
 type ConversionChecklistItem = {
   key: string;
   label: string;
@@ -181,6 +223,45 @@ type BulkStatusActionState = {
   successMessage: string;
   title: string;
   options: BulkStatusActionOption[];
+};
+
+type AuthorizationAttachmentItem = {
+  id: string;
+  fileName: string;
+  uploadedAt?: string;
+};
+
+const getTimelineEventLabel = (event: any) => {
+  const nextStatus = String(event?.payload?.nextStatus || event?.payload?.requestedStatus || '');
+  if (event?.eventType === 'STATUS_CHANGED') {
+    if (nextStatus === 'PROPOSED') return 'Enviado para aprovação dos pais';
+    if (nextStatus === 'PENDING_AUTHORIZATION') return 'Aprovação dos pais registrada';
+    if (nextStatus === 'AUTHORIZED') return 'Autorização do convênio aprovada';
+    if (nextStatus === 'CONVERTED') return 'Convertido em agendamento';
+    if (nextStatus === 'RESERVED') return 'Horários reservados';
+    if (nextStatus === 'CANCELED') return 'Pré-reserva cancelada';
+    if (nextStatus === 'EXPIRED') return 'Pré-reserva expirada';
+  }
+
+  return event?.eventLabel || event?.eventType || 'Evento';
+};
+
+const getAuthorizationAttachmentsFromItems = (items: any[]) => {
+  const attachmentMap = new Map<string, AuthorizationAttachmentItem>();
+  (items || []).forEach((item) => {
+    const docs = Array.isArray(item?.authorizationAttachments) ? item.authorizationAttachments : [];
+    docs.forEach((doc: any) => {
+      const id = String(doc?.id || '');
+      if (!id || attachmentMap.has(id)) return;
+      attachmentMap.set(id, {
+        id,
+        fileName: String(doc?.fileName || 'Anexo'),
+        uploadedAt: doc?.uploadedAt ? String(doc.uploadedAt) : undefined,
+      });
+    });
+  });
+
+  return Array.from(attachmentMap.values()).sort((a, b) => dayjs(b.uploadedAt).valueOf() - dayjs(a.uploadedAt).valueOf());
 };
 
 const isSlotCoveredBySession = (
@@ -328,6 +409,72 @@ const timeToMinutes = (time: string) => {
   const minute = Number(minuteRaw);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
   return (hour * 60) + minute;
+};
+
+const doSlotsOverlap = (
+  first: { date: string; time: string; durationMinutes?: number | null },
+  second: { date: string; time: string; durationMinutes?: number | null },
+) => {
+  if (first.date !== second.date) return false;
+  const firstStart = timeToMinutes(first.time);
+  const secondStart = timeToMinutes(second.time);
+  const firstDuration = Math.max(1, Number(first.durationMinutes || 30));
+  const secondDuration = Math.max(1, Number(second.durationMinutes || 30));
+  const firstEnd = firstStart + firstDuration;
+  const secondEnd = secondStart + secondDuration;
+  return firstStart < secondEnd && secondStart < firstEnd;
+};
+
+const getPendingApprovalVisualState = (
+  elapsedRatio: number,
+  hasLivePendingApproval: boolean,
+  completed: boolean,
+) => {
+  if (completed) {
+    return {
+      fill: 'var(--mantine-color-teal-6)',
+      glow: 'rgba(20, 184, 166, 0.28)',
+      text: 'teal',
+    } as const;
+  }
+
+  if (!hasLivePendingApproval) {
+    return {
+      fill: 'var(--mantine-color-violet-6)',
+      glow: 'rgba(124, 58, 237, 0.18)',
+      text: 'violet',
+    } as const;
+  }
+
+  if (elapsedRatio >= 0.9) {
+    return {
+      fill: 'linear-gradient(90deg, var(--mantine-color-orange-6) 0%, var(--mantine-color-red-6) 100%)',
+      glow: 'rgba(220, 38, 38, 0.36)',
+      text: 'red',
+    } as const;
+  }
+
+  if (elapsedRatio >= 0.75) {
+    return {
+      fill: 'linear-gradient(90deg, var(--mantine-color-yellow-6) 0%, var(--mantine-color-orange-6) 100%)',
+      glow: 'rgba(249, 115, 22, 0.3)',
+      text: 'orange',
+    } as const;
+  }
+
+  if (elapsedRatio >= 0.5) {
+    return {
+      fill: 'linear-gradient(90deg, var(--mantine-color-violet-6) 0%, var(--mantine-color-yellow-6) 100%)',
+      glow: 'rgba(245, 158, 11, 0.24)',
+      text: 'yellow',
+    } as const;
+  }
+
+  return {
+    fill: 'var(--mantine-color-violet-6)',
+    glow: 'rgba(124, 58, 237, 0.18)',
+    text: 'violet',
+  } as const;
 };
 
 const getManualSelectionAnchors = (slots: Array<{ date: string; time: string }>, slotStepMinutes: number) => {
@@ -509,6 +656,7 @@ export function TeaPreReserva() {
   const [suggestionModalOpened, setSuggestionModalOpened] = useState(false);
   // weekOffset removed: we display the single relevant week without navigation
   const [suggestionModalContext, setSuggestionModalContext] = useState<SuggestionGroupContext | null>(null);
+  const [suggestionExistingSlotsByTherapyId, setSuggestionExistingSlotsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [rejectDecisionOpened, setRejectDecisionOpened] = useState(false);
   const [acceptSuggestionDecisionOpened, setAcceptSuggestionDecisionOpened] = useState(false);
   const [manualModalOpened, setManualModalOpened] = useState(false);
@@ -535,6 +683,10 @@ export function TeaPreReserva() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEventItem[]>([]);
   const [timelineReservationLabel, setTimelineReservationLabel] = useState('');
+  const [authorizationAttachmentsModalOpened, setAuthorizationAttachmentsModalOpened] = useState(false);
+  const [authorizationAttachmentsLabel, setAuthorizationAttachmentsLabel] = useState('');
+  const [authorizationAttachmentsItems, setAuthorizationAttachmentsItems] = useState<AuthorizationAttachmentItem[]>([]);
+  const [openingAuthorizationAttachmentId, setOpeningAuthorizationAttachmentId] = useState<string | null>(null);
   const [checklistModalOpened, setChecklistModalOpened] = useState(false);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistItems, setChecklistItems] = useState<ConversionChecklistItem[]>([]);
@@ -542,12 +694,29 @@ export function TeaPreReserva() {
   const [checklistGroupKey, setChecklistGroupKey] = useState<string | null>(null);
   const [checklistGroupLabel, setChecklistGroupLabel] = useState<string>('');
   const [checklistGroupReservations, setChecklistGroupReservations] = useState<any[]>([]);
-  const [checklistProcedureOptions, setChecklistProcedureOptions] = useState<string[]>([]);
-  const [selectedChecklistProcedure, setSelectedChecklistProcedure] = useState<string | null>(null);
   const [acceptModalOpened, setAcceptModalOpened] = useState(false);
   const [acceptModalMode, setAcceptModalMode] = useState<'suggestion' | 'conversion'>('suggestion');
   const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
-  const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; groupKey: string } | null>(null);
+  const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; pitId?: string; groupKey: string } | null>(null);
+  useEffect(() => {
+    if (!manualSelectedTherapyId) {
+      setManualSelectedSlots([]);
+      return;
+    }
+
+    const grid = manualGridByTherapyId[manualSelectedTherapyId];
+    if (!grid?.days?.length) return;
+
+    setManualSelectedSlots((prev) => prev.filter((selected) => {
+      const isExistingEditableSlot = (manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || [])
+        .some((slot) => slot.date === selected.date && slot.time === selected.time);
+      if (isExistingEditableSlot) return true;
+
+      const day = grid.days.find((item) => item.date === selected.date);
+      const slot = day?.slots?.find((item) => item.time === selected.time);
+      return Boolean(slot && !slot.occupied && slot.selectable);
+    }));
+  }, [manualEditableExistingSlotsByTherapyId, manualGridByTherapyId, manualSelectedTherapyId]);
   useEffect(() => {
     if (!acceptModalOpened) {
       setAcceptModalStartDate('');
@@ -571,16 +740,11 @@ export function TeaPreReserva() {
     }));
   };
 
-  const checklistSelectedProcedureReservations = useMemo(() => {
-    if (!selectedChecklistProcedure) return [] as any[];
-    return checklistGroupReservations.filter(
-      (reservation) => getReservationProcedureName(reservation) === selectedChecklistProcedure,
-    );
-  }, [checklistGroupReservations, selectedChecklistProcedure]);
-
   const checklistCanConvertByProcedure = useMemo(() => {
     const byProcedure = new Map<string, boolean>();
-    checklistProcedureOptions.forEach((procedure) => {
+    Array.from(new Set(
+      checklistItems.map((item) => item.procedureName || 'Procedimento nÃ£o definido'),
+    )).forEach((procedure) => {
       const procedureItems = checklistItems.filter(
         (item) => (item.procedureName || 'Procedimento não definido') === procedure,
       );
@@ -590,17 +754,22 @@ export function TeaPreReserva() {
       );
     });
     return byProcedure;
-  }, [checklistItems, checklistProcedureOptions]);
+  }, [checklistItems]);
 
-  const checklistConvertibleSelectedReservations = useMemo(() => {
-    if (!selectedChecklistProcedure) return [] as any[];
-    return checklistSelectedProcedureReservations.filter((reservation) => {
-      const procedure = getReservationProcedureName(reservation);
-      return checklistCanConvertByProcedure.get(procedure) === true;
-    });
-  }, [checklistCanConvertByProcedure, checklistSelectedProcedureReservations, selectedChecklistProcedure]);
+  const checklistConvertiblePitReservations = useMemo(() => checklistGroupReservations.filter((reservation) => {
+    const procedure = getReservationProcedureName(reservation);
+    return checklistCanConvertByProcedure.get(procedure) === true;
+  }), [checklistCanConvertByProcedure, checklistGroupReservations]);
 
-  const checklistCanConvertSelectedProcedure = checklistConvertibleSelectedReservations.length > 0;
+  const checklistCanConvertWholePit = (
+    checklistGroupReservations.length > 0
+    && checklistConvertiblePitReservations.length === checklistGroupReservations.length
+  );
+
+  const acceptConversionHasMissingStartDate = (
+    acceptModalMode === 'conversion'
+    && acceptTherapies.some((entry) => !String(acceptDateByTherapy[entry.therapy.pitTherapyId] || '').trim())
+  );
 
 
   const filteredItems = useMemo(() => {
@@ -790,9 +959,29 @@ export function TeaPreReserva() {
   const renderProgressTrail = (progress: PitProgressInfo, keyPrefix: string) => {
 
     const hasFrequencyRegression = progress.regressedScheduledCount > 0;
-    const reservedTotal = progress.reservedPartialCount + progress.reservedCompleteCount;
-    const reservedPartialActive = reservedTotal > 0;
-    const reservedCompleteActive = progress.reservedCompleteCount >= progress.totalTherapies;
+    const reservedReachedCount = (
+      progress.reservedPartialCount
+      + progress.reservedCompleteCount
+      + progress.pendingApprovalCount
+      + progress.inAuthorizationCount
+      + progress.authorizedCount
+      + progress.convertedCount
+    );
+    const reservedCompleteReachedCount = (
+      progress.reservedCompleteCount
+      + progress.pendingApprovalCount
+      + progress.inAuthorizationCount
+      + progress.authorizedCount
+      + progress.convertedCount
+    );
+    const reservedPartialActive = reservedReachedCount > 0;
+    const reservedCompleteActive = reservedCompleteReachedCount >= progress.totalTherapies;
+    const hasPendingTherapyRegression = progress.pendingCount > 0 && reservedReachedCount > 0;
+    const hasReservedTherapyRegression = (
+      (progress.reservedPartialCount > 0 || progress.reservedCompleteCount > 0)
+      && (progress.pendingApprovalCount > 0 || progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0)
+    );
+    const hasProgressRegression = hasFrequencyRegression || hasPendingTherapyRegression || hasReservedTherapyRegression;
     const inAuthorizationActive = progress.inAuthorizationCount > 0 || progress.authorizedCount > 0 || progress.convertedCount > 0;
     const pendingApprovalActive = progress.pendingApprovalCount > 0 || inAuthorizationActive;
     const scheduledPartialActive = progress.convertedCount > 0 || progress.regressedScheduledCount > 0;
@@ -806,15 +995,11 @@ export function TeaPreReserva() {
     const pendingDeadline = progress.pendingApprovalDeadlineAt ? dayjs(progress.pendingApprovalDeadlineAt) : null;
     const hasLivePendingApproval = progress.pendingApprovalCount > 0;
     const hasDownstreamProgress = inAuthorizationActive || scheduledCompleteActive;
-    const shouldCarryPendingApprovalInRegression = hasFrequencyRegression && (
-      progress.inAuthorizationCount > 0
-      || progress.authorizedCount > 0
-      || progress.convertedCount > 0
-    );
     const pendingApprovalElapsedRatio = (() => {
-      if (hasFrequencyRegression && !hasLivePendingApproval && !shouldCarryPendingApprovalInRegression) return 0;
+      if ((hasPendingTherapyRegression || hasReservedTherapyRegression) && !hasLivePendingApproval) return 0;
       // Once PIT advances beyond approval step, keep this stage visibly filled.
       if (hasDownstreamProgress) return 1;
+      if (hasFrequencyRegression && !hasLivePendingApproval) return 0;
       if (!hasLivePendingApproval) return stageFilledByStep[pendingApprovalStepIndex] ? 1 : 0;
       if (!pendingRequested?.isValid() || !pendingDeadline?.isValid()) return 0.2;
       const totalMs = pendingDeadline.valueOf() - pendingRequested.valueOf();
@@ -824,6 +1009,11 @@ export function TeaPreReserva() {
       return 1 - remainingRatio;
     })();
     const pendingApprovalStepCompleted = pendingApprovalElapsedRatio >= 1;
+    const pendingApprovalVisual = getPendingApprovalVisualState(
+      pendingApprovalElapsedRatio,
+      hasLivePendingApproval,
+      pendingApprovalStepCompleted,
+    );
     const authorizationDisplayRatio = (() => {
       if (hasFrequencyRegression) {
         if (progress.authorizedCount > 0 || progress.convertedCount >= progress.totalTherapies) return 1;
@@ -833,7 +1023,11 @@ export function TeaPreReserva() {
         }
         return 0.5;
       }
-      return stageFilledByStep[authorizationStepIndex] ? 1 : authorizationRatio;
+      if (hasPendingTherapyRegression || hasReservedTherapyRegression) {
+        if (progress.totalTherapies <= 0) return 0;
+        return Math.max(0, Math.min(1, authorizationDone / progress.totalTherapies));
+      }
+      return authorizationRatio;
     })();
 
     const authorizationStepActive = (
@@ -841,23 +1035,28 @@ export function TeaPreReserva() {
       || stageFilledByStep[4]
       || (hasFrequencyRegression && progress.regressionTargetSessions > 0 && progress.authorizedCount < progress.totalTherapies)
     );
-    const shouldCarryReservedStepsInRegression = hasFrequencyRegression && (
+    const shouldCarryReservedStepsInRegression = hasProgressRegression && (
       progress.pendingApprovalCount > 0
       || progress.inAuthorizationCount > 0
-      || progress.authorizedCount > 0
-      || progress.convertedCount > 0
     );
 
     const activeByStep: boolean[] = [
       stageFilledByStep[0], // PIT gerado
-      hasFrequencyRegression
+      hasProgressRegression
         ? (reservedPartialActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[1]))
         : (reservedPartialActive || stageFilledByStep[1]),
-      hasFrequencyRegression
+      hasProgressRegression
         ? (reservedCompleteActive || (shouldCarryReservedStepsInRegression && stageFilledByStep[2]))
         : (reservedCompleteActive || stageFilledByStep[2]),
-      hasFrequencyRegression
-        ? (progress.pendingApprovalCount > 0 || shouldCarryPendingApprovalInRegression)
+      hasProgressRegression
+        ? (
+          progress.pendingApprovalCount > 0
+          || progress.inAuthorizationCount > 0
+          || (
+            !hasReservedTherapyRegression
+            && (progress.authorizedCount > 0 || progress.convertedCount > 0)
+          )
+        )
         : (pendingApprovalActive || stageFilledByStep[3]),
       authorizationStepActive,
       scheduledPartialActive || stageFilledByStep[5],
@@ -894,21 +1093,24 @@ export function TeaPreReserva() {
                       : (active ? 'var(--mantine-color-teal-6)' : 'var(--mantine-color-default)'),
                     border: '1px solid var(--mantine-color-default-border)',
                     overflow: 'hidden',
+                    boxShadow: isPendingApprovalStep && hasLivePendingApproval
+                      ? `0 0 0 1px ${pendingApprovalVisual.glow} inset, 0 0 12px ${pendingApprovalVisual.glow}`
+                      : undefined,
                   }}
                 >
                   {isPendingApprovalStep && (
                     <Box
                       style={{
-                        width: `${Math.round(Math.max(0, Math.min(1, pendingApprovalElapsedRatio)) * 100)}%`,
+                        width: `${Math.round(
+                          (
+                            hasLivePendingApproval
+                              ? Math.max(0.2, Math.min(1, pendingApprovalElapsedRatio))
+                              : Math.max(0, Math.min(1, pendingApprovalElapsedRatio))
+                          ) * 100,
+                        )}%`,
                         height: '100%',
-                        backgroundColor: pendingApprovalStepCompleted
-                          ? 'var(--mantine-color-teal-6)'
-                          : hasLivePendingApproval && pendingApprovalElapsedRatio >= 0.9
-                            ? 'var(--mantine-color-red-6)'
-                            : hasLivePendingApproval && pendingApprovalElapsedRatio >= 0.7
-                              ? 'var(--mantine-color-yellow-6)'
-                              : 'var(--mantine-color-violet-6)',
-                        transition: 'width 180ms ease',
+                        background: pendingApprovalVisual.fill,
+                        transition: 'width 180ms ease, background 180ms ease',
                       }}
                     />
                   )}
@@ -924,7 +1126,11 @@ export function TeaPreReserva() {
                   )}
                 </Box>
                 <Group justify="space-between" gap={4} mt={4} wrap="nowrap">
-                  <Text size="10px" c={active ? 'teal' : 'dimmed'} lineClamp={1}>
+                  <Text
+                    size="10px"
+                    c={isPendingApprovalStep && hasLivePendingApproval ? pendingApprovalVisual.text : (active ? 'teal' : 'dimmed')}
+                    lineClamp={1}
+                  >
                     {label}
                   </Text>
                   {isPendingApprovalStep && pendingRequested?.isValid() && (
@@ -951,12 +1157,16 @@ export function TeaPreReserva() {
     const isFrequencyAdjustedFlow = String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE';
     const weeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
     const weeklyReserved = Math.max(0, Number(item?.weeklyReservationCount || 0));
-    const regressionCompletedSessions = isFrequencyAdjustedFlow
+    const previousWeeklyFrequency = isFrequencyAdjustedFlow
       ? Math.max(0, Number(item?.previousWeeklyFrequency || 0))
       : 0;
+    const regressionCompletedSessions = previousWeeklyFrequency;
     const regressionTargetSessions = isFrequencyAdjustedFlow
       ? Math.max(1, Number(item?.currentWeeklyFrequency || item?.preferences?.weeklyFrequency || 1))
       : 0;
+    const carriedReservedSessions = isFrequencyAdjustedFlow
+      ? Math.max(weeklyReserved, previousWeeklyFrequency)
+      : weeklyReserved;
     const isRegressionPending = (
       isFrequencyAdjustedFlow
       && (
@@ -964,8 +1174,13 @@ export function TeaPreReserva() {
         || (status === 'RESERVED' && weeklyReserved === 0)
       )
     );
-    const reservedComplete = status === 'RESERVED' && weeklyReserved >= weeklyTarget;
-    const reservedPartial = status === 'RESERVED' && !reservedComplete && !isRegressionPending;
+    const isReservationPreparedStatus = status === 'RESERVED' || status === 'PROPOSED';
+    const reservedComplete = status === 'PROPOSED'
+      || (isReservationPreparedStatus && carriedReservedSessions >= weeklyTarget);
+    const reservedPartial = (
+      (isReservationPreparedStatus && !reservedComplete)
+      || (isFrequencyAdjustedFlow && status === 'PENDING_SCHEDULING' && carriedReservedSessions > 0)
+    );
 
     let stage: PitProgressStage = 'PIT_GERADO';
     let stepIndex = 1;
@@ -973,22 +1188,22 @@ export function TeaPreReserva() {
     if (status === 'CONVERTED') {
       stage = 'AGENDADO_COMPLETO';
       stepIndex = 7;
+    } else if (status === 'PROPOSED') {
+      stage = 'AGUARDANDO_APROVACAO';
+      stepIndex = 4;
     } else if (status === 'PENDING_AUTHORIZATION') {
       stage = 'EM_AUTORIZACAO';
       stepIndex = 5;
     } else if (status === 'AUTHORIZED') {
       stage = 'AGENDADO_PARCIAL';
       stepIndex = 6;
-    } else if (status === 'PROPOSED') {
-      stage = 'AGUARDANDO_APROVACAO';
-      stepIndex = 4;
-    } else if (isRegressionPending) {
-      stage = 'AGENDADO_PARCIAL';
-      stepIndex = 6;
     } else if (reservedComplete) {
       stage = 'RESERVADO_COMPLETO';
       stepIndex = 3;
     } else if (reservedPartial) {
+      stage = 'RESERVADO_PARCIAL';
+      stepIndex = 2;
+    } else if (isRegressionPending) {
       stage = 'RESERVADO_PARCIAL';
       stepIndex = 2;
     }
@@ -1004,11 +1219,11 @@ export function TeaPreReserva() {
       pendingCount: status === 'PENDING_SCHEDULING' ? 1 : 0,
       reservedPartialCount: reservedPartial ? 1 : 0,
       reservedCompleteCount: reservedComplete ? 1 : 0,
-      pendingApprovalCount: status === 'PROPOSED' ? 1 : 0,
-      pendingApprovalRequestedAt: status === 'PROPOSED'
+      pendingApprovalCount: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION' ? 1 : 0,
+      pendingApprovalRequestedAt: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION'
         ? String(item?.approvalRequestedAt || item?.updatedAt || item?.createdAt || '') || null
         : null,
-      pendingApprovalDeadlineAt: status === 'PROPOSED'
+      pendingApprovalDeadlineAt: status === 'PROPOSED' || status === 'PENDING_AUTHORIZATION'
         ? String(item?.approvalDeadlineAt || item?.expiresAt || '') || null
         : null,
       inAuthorizationCount: status === 'PENDING_AUTHORIZATION' ? 1 : 0,
@@ -1080,7 +1295,7 @@ export function TeaPreReserva() {
     if (aggregated.convertedCount >= aggregated.totalTherapies && aggregated.totalTherapies > 0) {
       aggregated.stage = 'AGENDADO_COMPLETO';
       aggregated.stepIndex = 7;
-    } else if (aggregated.convertedCount > 0 || aggregated.regressedScheduledCount > 0 || aggregated.authorizedCount > 0) {
+    } else if (aggregated.convertedCount > 0 || aggregated.authorizedCount > 0) {
       aggregated.stage = 'AGENDADO_PARCIAL';
       aggregated.stepIndex = 6;
     } else if (aggregated.inAuthorizationCount > 0) {
@@ -1106,7 +1321,7 @@ export function TeaPreReserva() {
   const openConversionConfirmationModal = (reservationsToConvert?: any[]) => {
     const scopedReservations = Array.isArray(reservationsToConvert)
       ? reservationsToConvert
-      : checklistSelectedProcedureReservations;
+      : checklistGroupReservations;
     const anchorByTherapy = new Map<string, string>();
     scopedReservations.forEach((item) => {
       const therapyId = String(item?.pitTherapyId || item?.preReservationId || '');
@@ -1188,18 +1403,46 @@ export function TeaPreReserva() {
       return;
     }
 
-    const initialDateByTherapy = preparedTherapies.reduce((acc, entry) => {
-      const firstDate = entry.slots[0]?.date;
-      if (firstDate) acc[entry.therapy.pitTherapyId] = firstDate;
-      return acc;
-    }, {} as Record<string, string>);
-
     setAcceptTherapies(preparedTherapies);
-    setAcceptDateByTherapy(initialDateByTherapy);
+    setAcceptDateByTherapy({});
     setConversionReservationIds(scopedReservationIds);
     setChecklistModalOpened(false);
     setAcceptModalMode('conversion');
     setAcceptModalOpened(true);
+  };
+
+  const handleOpenAuthorizationAttachment = async (attachmentId: string) => {
+    setOpeningAuthorizationAttachmentId(attachmentId);
+    try {
+      const blob = await convenioAuthorizationService.viewAttachment(attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao abrir anexo',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        color: 'red',
+      });
+    } finally {
+      setOpeningAuthorizationAttachmentId(null);
+    }
+  };
+
+  const handleOpenPitAuthorizationAttachments = (label: string, items: any[]) => {
+    const attachments = getAuthorizationAttachmentsFromItems(items);
+    if (attachments.length === 0) {
+      showNotification({
+        title: 'Sem anexos',
+        message: 'Este PIT ainda não possui anexos enviados na autorização de convênio.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setAuthorizationAttachmentsItems(attachments);
+    setAuthorizationAttachmentsLabel(label);
+    setAuthorizationAttachmentsModalOpened(true);
   };
 
   // Move handleOpenGroupTimeline above its first usage
@@ -1217,6 +1460,7 @@ export function TeaPreReserva() {
     const hasReservedReservations = group.reservations.some((item) => String(item?.status || '') === 'RESERVED');
     const hasPendingApprovalReservations = group.reservations.some((item) => String(item?.status || '') === 'PROPOSED');
     const pitProgress = buildPitProgressFromItems(group.reservations);
+    const groupAuthorizationAttachments = getAuthorizationAttachmentsFromItems(group.reservations);
 
     async function handleUpdatePitStatus(resolvedStatus: TeaPreReservationStatus) {
       if (!resolvedStatus) return;
@@ -1280,14 +1524,14 @@ export function TeaPreReserva() {
         return events.map((event: any) => ({
           ...event,
           id: `${event.id}-${reservationId}`,
-          eventLabel: `[${procedureName}] ${event.eventLabel || event.eventType}`,
+          eventLabel: `[${procedureName}] ${getTimelineEventLabel(event)}`,
         })) as TimelineEventItem[];
         }),
       );
 
       const mergedEvents = timelineResponses
         .flat()
-        .sort((a, b) => dayjs(a.createdAt).valueOf() - dayjs(b.createdAt).valueOf());
+        .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf());
 
       setTimelineEvents(mergedEvents);
       setTimelineReservationLabel(`${group.patientName} • PIT`);
@@ -1301,6 +1545,9 @@ export function TeaPreReserva() {
       } finally {
       setTimelineLoading(false);
       }
+    }
+    function handleOpenGroupAuthorizationAttachments() {
+      handleOpenPitAuthorizationAttachments(`${group.patientName} • PIT`, group.reservations);
     }
     async function handleOpenGroupConversionChecklist(group: ReservationGroup) {
       const alreadyConverted = group.reservations.length > 0
@@ -1334,16 +1581,12 @@ export function TeaPreReserva() {
         return;
       }
 
-      const procedureOptions = Array.from(new Set(eligibleReservations.map((item) => getReservationProcedureName(item))));
-
       setChecklistLoading(true);
       setChecklistModalOpened(true);
       setChecklistGroupKey(group.groupKey);
       setChecklistGroupLabel(`${group.patientName} • PIT`);
       setChecklistGroupReservations(eligibleReservations);
-      setChecklistProcedureOptions(procedureOptions);
-      setSelectedChecklistProcedure(procedureOptions[0] || null);
-      setConversionReservationIds([]);
+      setConversionReservationIds(eligibleAnchors.map((item) => String(item?.preReservationId || '')).filter(Boolean));
       setChecklistItems([]);
       try {
       const allItems: ConversionChecklistItem[] = [];
@@ -1422,7 +1665,7 @@ export function TeaPreReserva() {
     }
 
     async function handleDeletePit() {
-      await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey);
+      await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey, group.pitId);
     }
 
     return (
@@ -1487,6 +1730,15 @@ export function TeaPreReserva() {
               onClick={() => handleOpenGroupTimeline(group)}
             >
               Histórico do PIT
+            </Button>
+            <Button
+              variant="default"
+              h={36}
+              leftSection={<Upload size={16} />}
+              onClick={handleOpenGroupAuthorizationAttachments}
+              disabled={groupAuthorizationAttachments.length === 0}
+            >
+              Anexos do convenio
             </Button>
             {!isGroupFullyConverted && hasPartiallyScheduledReservations && (
               <Button
@@ -1645,7 +1897,7 @@ export function TeaPreReserva() {
                     Autorizado em: {dayjs(item.authorizedAt).format('DD/MM/YYYY HH:mm')}
                   </Text>
                 )}
-                {item.status !== 'AUTHORIZED' && item.status !== 'CONVERTED' && item.expiresAt && (
+                {item.status === 'PROPOSED' && item.expiresAt && (
                   <Text size="xs" mt={4} c={item.isExpired ? 'red' : item.isExpiringSoon ? 'orange' : 'dimmed'}>
                     Expira em: {dayjs(item.expiresAt).format('DD/MM/YYYY HH:mm')}
                   </Text>
@@ -1854,7 +2106,7 @@ export function TeaPreReserva() {
     }
   };
 
-  const handleDeletePitByTeaProfileId = async (teaProfileId: string, groupKey: string) => {
+  const handleDeletePitByTeaProfileId = async (teaProfileId: string, groupKey: string, pitId?: string) => {
     if (!teaProfileId) {
       showNotification({
         title: 'PIT inválido',
@@ -1864,7 +2116,7 @@ export function TeaPreReserva() {
       return;
     }
 
-    setDeletePitTarget({ teaProfileId, groupKey });
+    setDeletePitTarget({ teaProfileId, pitId, groupKey });
     setDeletePitConfirmModalOpened(true);
   };
 
@@ -1875,11 +2127,11 @@ export function TeaPreReserva() {
       return;
     }
 
-    const { teaProfileId, groupKey } = deletePitTarget;
+    const { teaProfileId, pitId, groupKey } = deletePitTarget;
 
     setUpdatingId(groupKey);
     try {
-      await teaProfileService.deletePit(teaProfileId);
+      await teaProfileService.deletePit(teaProfileId, pitId);
       showNotification({
         title: 'Sucesso',
         message: 'PIT excluído com sucesso.',
@@ -1891,7 +2143,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
         color: 'red',
       });
     } finally {
@@ -1965,35 +2217,7 @@ export function TeaPreReserva() {
           const data = await teaPreReservationService.getManualGrid(therapy.pitTherapyId, { weekStart });
           return {
             pitTherapyId: therapy.pitTherapyId,
-            data: data as ManualGridResponse,
-          };
-        }),
-      );
-
-      const nextByTherapyId: Record<string, ManualGridResponse> = {};
-      responses.forEach((response) => {
-        nextByTherapyId[response.pitTherapyId] = response.data;
-      });
-
-      setManualGridByTherapyId(nextByTherapyId);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao carregar grade manual',
-        color: 'red',
-      });
-    } finally {
-      setManualLoadingGrid(false);
-    }
-
-    setManualLoadingGrid(true);
-    try {
-      const responses = await Promise.all(
-        context.therapies.map(async (therapy) => {
-          const data = await teaPreReservationService.getManualGrid(therapy.pitTherapyId, { weekStart });
-          return {
-            pitTherapyId: therapy.pitTherapyId,
-            data: data as ManualGridResponse,
+            data: normalizeManualGridResponse(data as ManualGridResponse),
           };
         }),
       );
@@ -2397,8 +2621,10 @@ export function TeaPreReserva() {
         return selected.slice(0, targetCount);
       };
 
-      const results = await Promise.all(
-        context.therapies.map(async (therapy) => {
+      const reservedDoctorSlots = new Map<string, Array<{ date: string; time: string; durationMinutes: number }>>();
+      const results: Array<{ pitTherapyId: string; list: Array<{ date: string; time: string }> }> = [];
+
+      for (const therapy of context.therapies) {
           const weeklyFrequency = Math.max(1, Number(therapy.weeklyFrequency) || 1);
           const existingBase = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
           const existingSignatures = Array.from(new Set(
@@ -2427,6 +2653,8 @@ export function TeaPreReserva() {
             ...previousTried,
             ...existingSignatures,
           ]));
+          const doctorReservationKey = String(therapy.professionalName || '').trim().toLowerCase();
+          const doctorReservedSlots = reservedDoctorSlots.get(doctorReservationKey) || [];
           const data: any = await teaPreReservationService.getSuggestions(therapy.pitTherapyId, {
             daysAhead: options?.daysAhead || 90,
             limit: suggestionLimit,
@@ -2440,13 +2668,38 @@ export function TeaPreReserva() {
               if (dateDiff !== 0) return dateDiff;
               return String(a.time).localeCompare(String(b.time));
             });
-          const list = pickBestSuggestions(sortedList, missingWeeklySlots, therapy);
-          return {
+          const list = pickBestSuggestions(sortedList, missingWeeklySlots, therapy)
+            .filter((slot) => !doctorReservedSlots.some((reservedSlot) => (
+              doSlotsOverlap(
+                {
+                  date: slot.date,
+                  time: slot.time,
+                  durationMinutes: therapy.durationMinutes || 30,
+                },
+                reservedSlot,
+              )
+            )));
+
+          if (doctorReservationKey) {
+            const currentReserved = reservedDoctorSlots.get(doctorReservationKey) || [];
+            reservedDoctorSlots.set(
+              doctorReservationKey,
+              [
+                ...currentReserved,
+                ...list.map((slot) => ({
+                  date: slot.date,
+                  time: slot.time,
+                  durationMinutes: Math.max(1, Number(therapy.durationMinutes || 30)),
+                })),
+              ],
+            );
+          }
+
+          results.push({
             pitTherapyId: therapy.pitTherapyId,
             list,
-          };
-        }),
-      );
+          });
+        }
 
       const nextByTherapyId: Record<string, Array<{ date: string; time: string }>> = {};
       results.forEach((result) => {
@@ -2466,6 +2719,13 @@ export function TeaPreReserva() {
       }
 
       setSuggestionsByTherapyId((prev) => ({ ...prev, ...nextByTherapyId }));
+      setSuggestionExistingSlotsByTherapyId((prev) => {
+        const next = { ...prev };
+        context.therapies.forEach((therapy) => {
+          next[therapy.pitTherapyId] = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
+        });
+        return next;
+      });
       setTriedSlotsByTherapyId((prev) => {
         const next = { ...prev };
         Object.entries(nextByTherapyId).forEach(([therapyId, slots]) => {
@@ -2494,6 +2754,13 @@ export function TeaPreReserva() {
       const next = { ...prev };
       context.therapies.forEach((therapy) => {
         next[therapy.pitTherapyId] = [];
+      });
+      return next;
+    });
+    setSuggestionExistingSlotsByTherapyId((prev) => {
+      const next = { ...prev };
+      context.therapies.forEach((therapy) => {
+        delete next[therapy.pitTherapyId];
       });
       return next;
     });
@@ -2562,9 +2829,42 @@ export function TeaPreReserva() {
     try {
       const validations = await Promise.all(
         therapiesWithSlots.map(async (entry) => {
+          const weeklyFrequency = Math.max(1, Number(entry.therapy.weeklyFrequency || 1));
+          const existingSlots = suggestionExistingSlotsByTherapyId[entry.therapy.pitTherapyId] || [];
+          const existingWeeklyCount = buildWeeklySlotSignatures(existingSlots).length;
+          const combinedWeeklyCount = buildWeeklySlotSignatures([
+            ...existingSlots,
+            ...entry.slotsToApply,
+          ]).length;
+          const previousWeeklyFrequency = Math.max(0, Number(entry.therapy.previousWeeklyFrequency || 0));
+          const baselineReserved = String(entry.therapy.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+            ? Math.max(existingWeeklyCount, previousWeeklyFrequency)
+            : existingWeeklyCount;
+          const resolvedWeeklyCount = String(entry.therapy.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
+            ? Math.max(combinedWeeklyCount, baselineReserved)
+            : combinedWeeklyCount;
+          if (String(entry.therapy.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE') {
+            return {
+              pitTherapyId: entry.therapy.pitTherapyId,
+              valid: resolvedWeeklyCount >= weeklyFrequency,
+              missingWeeks: resolvedWeeklyCount >= weeklyFrequency ? 0 : 1,
+              exceedsWeeks: resolvedWeeklyCount > weeklyFrequency ? 1 : 0,
+              missingSlots: Math.max(0, weeklyFrequency - resolvedWeeklyCount),
+              exceedsSlots: Math.max(0, resolvedWeeklyCount - weeklyFrequency),
+            };
+          }
+
+          const validationSuggestions = Array.from(new Map(
+            [
+              ...existingSlots,
+              ...entry.slotsToApply,
+            ]
+              .filter((slot) => slot?.date && slot?.time)
+              .map((slot) => [`${slot.date}#${slot.time}`, slot] as const),
+          ).values());
           const data: any = await teaPreReservationService.validateWeekly({
             pitTherapyId: entry.therapy.pitTherapyId,
-            suggestions: entry.slotsToApply,
+            suggestions: validationSuggestions,
           });
 
           const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
@@ -3064,7 +3364,11 @@ export function TeaPreReserva() {
           <Stack gap={6}>
             {acceptTherapies.map((entry) => {
               const allDates = Array.from(new Set(entry.slots.map((s) => s.date))).sort((a,b)=>dayjs(a).valueOf()-dayjs(b).valueOf());
-              const dates = buildRecurringPreviewDates(allDates, 6);
+              const previewDates = buildRecurringPreviewDates(allDates, 6);
+              const fallbackDates = allDates
+                .filter((date) => !dayjs(date).isBefore(dayjs(), 'day'))
+                .slice(0, 6);
+              const dates = previewDates.length > 0 ? previewDates : fallbackDates;
               const timeByWeekday = new Map<number, string>();
               [...entry.slots]
                 .sort((a, b) => {
@@ -3086,7 +3390,9 @@ export function TeaPreReserva() {
                   label: `${formatWeekdayPt(d)} • ${dayjs(d).format('DD/MM/YYYY')} • ${labelTime}`,
                 };
               });
-              const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dateOptions[0]?.value || '';
+              const selectedDate = acceptModalMode === 'conversion'
+                ? (acceptDateByTherapy[entry.therapy.pitTherapyId] || '')
+                : (acceptDateByTherapy[entry.therapy.pitTherapyId] || dateOptions[0]?.value || '');
               
               // In conversion mode, use the actual marked slots for this therapy.
               // In suggestion mode, use resolved suggestions from the chosen start date.
@@ -3123,6 +3429,7 @@ export function TeaPreReserva() {
                       style={{ minWidth: 260 }}
                       data={dateOptions}
                       value={selectedDate}
+                      placeholder="Selecione a primeira data disponível"
                       onChange={(v) => {
                         if (!v) return;
                         setAcceptDateByTherapy((prev) => ({ ...prev, [entry.therapy.pitTherapyId]: v }));
@@ -3131,9 +3438,10 @@ export function TeaPreReserva() {
                     <Badge color="blue" variant="light" size="xs">{weeks} semana{weeks !== 1 ? 's' : ''}</Badge>
                     <Badge color="teal" variant="light" size="xs">{totalSessions} sess{totalSessions !== 1 ? 'ões' : 'ão'} (estimado)</Badge>
                   </Group>
-                  {acceptModalMode === 'suggestion' && (
+                  {selectedWeeklySlots.length > 0 && (
                     <Text size="xs" c="dimmed" mt={6}>
-                      Sessões na semana: {selectedWeeklySlots.map((slot) => `${formatWeekdayPt(slot.date)} ${slot.time}`).join(' • ')}
+                      {acceptModalMode === 'suggestion' ? 'Sessoes na semana:' : 'Horarios disponiveis para conversao:'}{' '}
+                      {selectedWeeklySlots.map((slot) => `${formatWeekdayPt(slot.date)} ${slot.time}`).join(' | ')}
                     </Text>
                   )}
                 </Paper>
@@ -3146,6 +3454,7 @@ export function TeaPreReserva() {
             </Button>
             <Button
               color="green"
+              disabled={acceptConversionHasMissingStartDate}
               onClick={async () => {
                 setAcceptModalOpened(false);
                 if (acceptModalMode === 'suggestion') {
@@ -3155,7 +3464,7 @@ export function TeaPreReserva() {
                   if (conversionReservationIds.length === 0 || checklistItems.length === 0) {
                     showNotification({
                       title: 'Checklist pendente',
-                      message: 'Selecione um procedimento válido para conversão.',
+                      message: 'O PIT não possui terapias elegíveis para conversão.',
                       color: 'yellow',
                     });
                     return;
@@ -3257,7 +3566,7 @@ export function TeaPreReserva() {
                         manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
                       ).some((selected) => selected.date === day.date && selected.time === time);
                       const canToggleExistingSlot = isExistingEditableSlot;
-                      const effectiveSelectable = (isSelectable || canToggleExistingSlot) && !isBlockedBySelectedSession;
+                      const effectiveSelectable = ((!isOccupied && isSelectable) || canToggleExistingSlot) && !isBlockedBySelectedSession;
                       const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
                       const canAddNewSelection = !reachedWeeklyLimit || isSelected;
                       const isFree = !isOccupied && effectiveSelectable && day.enabled;
@@ -3279,10 +3588,18 @@ export function TeaPreReserva() {
                           key={`${day.date}-${time}`}
                           size="compact-xs"
                           variant="filled"
-                          disabled={!effectiveSelectable || !manualSelectedTherapyId || !canAddNewSelection}
+                          disabled={isOccupied || !effectiveSelectable || !manualSelectedTherapyId || !canAddNewSelection}
                           title={`${dayLabel} ${time} • ${stateLabel}`}
                           aria-label={`${dayLabel} ${time} • ${stateLabel}`}
                           onClick={() => {
+                            if (isOccupied && !canToggleExistingSlot) {
+                              showNotification({
+                                title: 'Horário ocupado',
+                                message: 'Esse horário já está reservado para outra consulta e não pode ser marcado.',
+                                color: 'yellow',
+                              });
+                              return;
+                            }
                             if (!effectiveSelectable) return;
                             const sortedDaySlots = [...day.slots]
                               .filter((item) => !!item.time)
@@ -3531,6 +3848,42 @@ export function TeaPreReserva() {
       </Modal>
 
       <Modal
+        opened={authorizationAttachmentsModalOpened}
+        onClose={() => setAuthorizationAttachmentsModalOpened(false)}
+        title={`Anexos do convênio • ${authorizationAttachmentsLabel || 'PIT'}`}
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          {authorizationAttachmentsItems.length === 0 ? (
+            <Text size="sm" c="dimmed">Nenhum anexo enviado para este PIT.</Text>
+          ) : (
+            authorizationAttachmentsItems.map((attachment) => (
+              <Paper key={attachment.id} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                <Group justify="space-between" align="center" wrap="wrap">
+                  <Stack gap={2}>
+                    <Text size="sm" fw={600}>{attachment.fileName}</Text>
+                    <Text size="xs" c="dimmed">
+                      {attachment.uploadedAt ? dayjs(attachment.uploadedAt).format('DD/MM/YYYY HH:mm') : 'Data não informada'}
+                    </Text>
+                  </Stack>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    leftSection={<Upload size={14} />}
+                    onClick={() => handleOpenAuthorizationAttachment(attachment.id)}
+                    loading={openingAuthorizationAttachmentId === attachment.id}
+                  >
+                    Visualizar
+                  </Button>
+                </Group>
+              </Paper>
+            ))
+          )}
+        </Stack>
+      </Modal>
+
+      <Modal
         opened={deletePitConfirmModalOpened}
         onClose={() => {
           if (updatingId) return;
@@ -3674,45 +4027,45 @@ export function TeaPreReserva() {
               <Text size="sm" c="dimmed">
                 Valide os itens de todas as terapias do PIT antes da conversão em lote.
               </Text>
-              <Select
-                label="Procedimento do PIT"
-                placeholder="Selecione um procedimento"
-                data={checklistProcedureOptions.map((procedure) => ({ value: procedure, label: procedure }))}
-                value={selectedChecklistProcedure}
-                onChange={setSelectedChecklistProcedure}
-                allowDeselect={false}
-              />
               {(() => {
-                const selectedItems = checklistItems.filter(
-                  (item) => (item.procedureName || 'Procedimento não definido') === selectedChecklistProcedure,
+                const groupedItems = Array.from(
+                  checklistItems.reduce((acc, item) => {
+                    const procedure = item.procedureName || 'Procedimento não definido';
+                    if (!acc.has(procedure)) acc.set(procedure, []);
+                    acc.get(procedure)?.push(item);
+                    return acc;
+                  }, new Map<string, ConversionChecklistItem[]>()),
                 );
-                if (!selectedChecklistProcedure) {
-                  return <Text size="sm" c="dimmed">Selecione um procedimento para visualizar o checklist.</Text>;
-                }
-                if (selectedItems.length === 0) {
-                  return <Text size="sm" c="dimmed">Sem itens de checklist para este procedimento.</Text>;
+                if (groupedItems.length === 0) {
+                  return <Text size="sm" c="dimmed">Sem itens de checklist para este PIT.</Text>;
                 }
 
-                const pendingCount = selectedItems.filter((item) => !item.valid).length;
                 return (
                   <Stack gap={4}>
-                    <Group justify="space-between" wrap="wrap">
-                      <Text fw={600}>{selectedChecklistProcedure}</Text>
-                      <Badge variant="light" color={pendingCount === 0 ? 'teal' : 'yellow'}>
-                        {pendingCount === 0 ? 'Checklist OK' : `${pendingCount} pendência(s)`}
-                      </Badge>
-                    </Group>
-                    {selectedItems.map((item) => (
-                      <Paper key={item.key} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                        <Group justify="space-between" align="center" wrap="wrap">
-                          <Text size="sm">{item.label}</Text>
-                          <Badge color={item.valid ? 'teal' : 'red'} variant="light">
-                            {item.valid ? 'OK' : 'Pendente'}
-                          </Badge>
-                        </Group>
-                        <Text size="xs" c="dimmed">{item.message}</Text>
-                      </Paper>
-                    ))}
+                    {groupedItems.map(([procedure, procedureItems]) => {
+                      const pendingCount = procedureItems.filter((item) => !item.valid).length;
+                      return (
+                        <Stack key={procedure} gap={4}>
+                          <Group justify="space-between" wrap="wrap">
+                            <Text fw={600}>{procedure}</Text>
+                            <Badge variant="light" color={pendingCount === 0 ? 'teal' : 'yellow'}>
+                              {pendingCount === 0 ? 'Checklist OK' : `${pendingCount} pendência(s)`}
+                            </Badge>
+                          </Group>
+                          {procedureItems.map((item) => (
+                            <Paper key={item.key} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                              <Group justify="space-between" align="center" wrap="wrap">
+                                <Text size="sm">{item.label}</Text>
+                                <Badge color={item.valid ? 'teal' : 'red'} variant="light">
+                                  {item.valid ? 'OK' : 'Pendente'}
+                                </Badge>
+                              </Group>
+                              <Text size="xs" c="dimmed">{item.message}</Text>
+                            </Paper>
+                          ))}
+                        </Stack>
+                      );
+                    })}
                   </Stack>
                 );
               })()}
@@ -3722,11 +4075,11 @@ export function TeaPreReserva() {
                 </Button>
                 <Button
                   color="green"
-                  disabled={!checklistCanConvertSelectedProcedure}
+                  disabled={!checklistCanConvertWholePit}
                   loading={!!checklistGroupKey && updatingId === checklistGroupKey}
-                  onClick={() => openConversionConfirmationModal(checklistConvertibleSelectedReservations)}
+                  onClick={() => openConversionConfirmationModal(checklistConvertiblePitReservations)}
                 >
-                  {`Finalizar Agendamento${checklistCanConvertSelectedProcedure ? ` (${checklistConvertibleSelectedReservations.length})` : ''}`}
+                  {`Finalizar Agendamento${checklistConvertiblePitReservations.length > 0 ? ` (${checklistConvertiblePitReservations.length})` : ''}`}
                 </Button>
               </Group>
             </>
@@ -3842,6 +4195,15 @@ export function TeaPreReserva() {
                       const groupTeaProfileId = String(group.therapies[0]?.teaProfileId || group.therapies[0]?.pitId || '');
                       const removedTherapies = group.therapies.filter((item) => Boolean(item?.removedFromPit));
                       const frequencyChangedTherapies = group.therapies.filter((item) => String(item?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE');
+                      const allReservationsForSamePit = [
+                        ...(existingGroupForSamePit?.reservations || []),
+                        ...(completedGroupForSamePit?.reservations || []),
+                      ];
+                      const pitAuthorizationAttachments = getAuthorizationAttachmentsFromItems([
+                        ...(group.therapies || []),
+                        ...existingReservationsWithoutDuplicates,
+                        ...completedReservationsWithoutDuplicates,
+                      ]);
                       const pitProgress = buildPitProgressFromItems([
                         ...group.therapies,
                         ...existingReservationsWithoutDuplicates,
@@ -3853,8 +4215,7 @@ export function TeaPreReserva() {
                       const canScheduleGroup = groupContext.therapies.length > 0;
                       const existingSlotsByTherapy = buildExistingSlotsByTherapyFromReservations([
                         ...(group.therapies || []),
-                        ...existingReservationsWithoutDuplicates,
-                        ...completedReservationsWithoutDuplicates,
+                        ...allReservationsForSamePit,
                       ]);
                       const hasSchedulableTherapiesInPending = group.therapies.some((item) => {
                         const status = String(item?.status || '');
@@ -4057,11 +4418,24 @@ export function TeaPreReserva() {
                               )}
                               <Button
                                 size="xs"
+                                variant="default"
+                                leftSection={<Upload size={14} />}
+                                onClick={() => handleOpenPitAuthorizationAttachments(`${group.patientName} • PIT`, [
+                                  ...(group.therapies || []),
+                                  ...existingReservationsWithoutDuplicates,
+                                  ...completedReservationsWithoutDuplicates,
+                                ])}
+                                disabled={pitAuthorizationAttachments.length === 0}
+                              >
+                                Ver anexos
+                              </Button>
+                              <Button
+                                size="xs"
                                 color="red"
                                 variant="light"
                                 leftSection={<Trash2 size={14} />}
                                 loading={updatingId === group.groupKey}
-                                onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey)}
+                                onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey, String(group.therapies[0]?.pitId || ''))}
                                 disabled={!groupTeaProfileId}
                               >
                                 Excluir PIT

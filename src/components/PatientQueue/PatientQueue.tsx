@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Paper, Button, Stack, Loader, Center } from '@mantine/core';
+import { Box, Group, Text, Paper, Button, Stack, Loader, Center, Badge } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
 import { Play, ChevronRight, ArrowRight, Clock } from 'lucide-react';
@@ -16,9 +16,29 @@ interface QueuePatient {
   doctor: string;
   position: number;
   status: string;
+  createdAt?: string;
 }
 
-export function PatientQueue() {
+const parseAgendaSummary = (agenda?: string | null) => {
+  const parts = String(agenda || '')
+    .split('•')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return {
+    time: parts[0] || '--:--',
+    type: parts[1] || 'Consulta',
+    doctor: parts[2] || 'Profissional não informado',
+  };
+};
+
+interface PatientQueueProps {
+  limit?: number;
+  showViewAll?: boolean;
+  fullPage?: boolean;
+}
+
+export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }: PatientQueueProps) {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
@@ -30,7 +50,7 @@ export function PatientQueue() {
     const loadQueue = async () => {
       try {
         setLoading(true);
-        const data: any = await preAttendanceService.list({ limit: 10 });
+        const data: any = await preAttendanceService.list({ limit: 100 });
         
         const list: any[] = Array.isArray(data)
           ? data
@@ -40,20 +60,31 @@ export function PatientQueue() {
         const queueData = list
           .filter((item: any) => {
             const status = String(item.status || '').trim().toLowerCase();
-            return status === 'na fila da recepção';
+            return status === 'na fila da recepção' || status === 'atrasado';
           })
-          .slice(0, 10) // Limitar para 10 primeiros
-          .map((item: any, index: number) => ({
+          .sort((a: any, b: any) => {
+            const createdAtA = new Date(a.createdAt || 0).getTime();
+            const createdAtB = new Date(b.createdAt || 0).getTime();
+            if (createdAtA !== createdAtB) return createdAtA - createdAtB;
+
+            const updatedAtA = new Date(a.updatedAt || 0).getTime();
+            const updatedAtB = new Date(b.updatedAt || 0).getTime();
+            return updatedAtA - updatedAtB;
+          })
+          .map((item: any, index: number) => {
+            const summary = parseAgendaSummary(item.agenda);
+            return ({
             id: String(item.id),
             name: item.fullName || item.patientName || 'Paciente sem nome',
-            time: item.agenda || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            type: item.queueType || 'Consulta',
-            doctor: item.notes || 'Médico não definido',
+            time: summary.time,
+            type: summary.type,
+            doctor: summary.doctor,
             position: index + 1,
             status: item.status || '',
-          }));
+            createdAt: item.createdAt,
+          })});
 
-        setQueue(queueData);
+        setQueue(limit ? queueData.slice(0, limit) : queueData);
       } catch (err: any) {
         showNotification({
           title: 'Erro',
@@ -137,10 +168,12 @@ export function PatientQueue() {
     <Box mb={40}>
       <Group justify="space-between" mb="md">
         <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
-        <Group gap={4} style={{ cursor: 'pointer' }}>
-          {!isMobile && <Text size="sm" c="dimmed">Ver agenda completa</Text>}
-          {isMobile ? <ChevronRight size={20} color="currentColor" /> : <ArrowRight size={16} color="currentColor" />}
-        </Group>
+        {showViewAll && !fullPage && (
+          <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => navigate('/fila-atendimento')}>
+            {!isMobile && <Text size="sm" c="dimmed">Ver agenda completa</Text>}
+            {isMobile ? <ChevronRight size={20} color="currentColor" /> : <ArrowRight size={16} color="currentColor" />}
+          </Group>
+        )}
       </Group>
 
       <Stack gap="sm">
@@ -169,6 +202,9 @@ export function PatientQueue() {
                   <Text fw={600} size="lg">{firstPatient.name}</Text>
                   {isMobile ? (
                     <Box>
+                      {firstPatient.status === 'Atrasado' && (
+                        <Badge color="red" variant="light" mb={6}>Atrasado</Badge>
+                      )}
                       <Group gap="xs">
                         <Clock size={16} />
                         <Text size="sm">{firstPatient.time}</Text>
@@ -177,12 +213,17 @@ export function PatientQueue() {
                       <Text size="sm">{firstPatient.doctor}</Text>
                     </Box>
                   ) : (
-                    <Group gap="xs" c={isMobile ? 'black' : undefined}>
-                      <Clock size={16} />
-                      <Text size="sm">{firstPatient.time}</Text>
-                      <Text size="sm">{firstPatient.type}</Text>
-                      <Text size="sm">{firstPatient.doctor}</Text>
-                    </Group>
+                    <Stack gap={4}>
+                      {firstPatient.status === 'Atrasado' && (
+                        <Badge color="red" variant="light" w="fit-content">Atrasado</Badge>
+                      )}
+                      <Group gap="xs" c={isMobile ? 'black' : undefined}>
+                        <Clock size={16} />
+                        <Text size="sm">{firstPatient.time}</Text>
+                        <Text size="sm">{firstPatient.type}</Text>
+                        <Text size="sm">{firstPatient.doctor}</Text>
+                      </Group>
+                    </Stack>
                   )}
                 </Box>
               </Group>
@@ -227,6 +268,9 @@ export function PatientQueue() {
                   <Text fw={600} size="lg">{patient.name}</Text>
                   {isMobile ? (
                     <Box>
+                      {patient.status === 'Atrasado' && (
+                        <Badge color="red" variant="light" mb={6}>Atrasado</Badge>
+                      )}
                       <Group gap="xs">
                         <Clock size={16} />
                         <Text size="sm">{patient.time}</Text>
@@ -235,12 +279,17 @@ export function PatientQueue() {
                       <Text size="sm">{patient.doctor}</Text>
                     </Box>
                   ) : (
-                    <Group gap="xs">
-                      <Clock size={16} />
-                      <Text size="sm">{patient.time}</Text>
-                      <Text size="sm">{patient.type}</Text>
-                      <Text size="sm">{patient.doctor}</Text>
-                    </Group>
+                    <Stack gap={4}>
+                      {patient.status === 'Atrasado' && (
+                        <Badge color="red" variant="light" w="fit-content">Atrasado</Badge>
+                      )}
+                      <Group gap="xs">
+                        <Clock size={16} />
+                        <Text size="sm">{patient.time}</Text>
+                        <Text size="sm">{patient.type}</Text>
+                        <Text size="sm">{patient.doctor}</Text>
+                      </Group>
+                    </Stack>
                   )}
                 </Box>
               </Group>

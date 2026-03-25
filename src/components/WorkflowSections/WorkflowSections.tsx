@@ -7,12 +7,11 @@ import {
   Calendar,
   CalendarCheck,
   ClipboardList,
-  HeartPulse,
   Stethoscope,
   FileText,
-  Folder,
   Package,
   Warehouse,
+  ScanLine,
   Wallet,
   DollarSign,
   Brain,
@@ -89,9 +88,7 @@ export function WorkflowSections() {
       items: [
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
         { icon: CalendarCheck, label: 'Pré-agendamento', desc: 'Pré-autorização e documentos', route: '/pre-agendamento', moduleName: 'pre-agendamento' },
-        { icon: ClipboardList, label: 'Anamnese', desc: 'Histórico médico', route: '/anamnese', moduleName: 'anamnese' },
         { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
-        { icon: HeartPulse, label: 'Enfermagem', desc: 'Triagem e sinais vitais', route: '/enfermagem', moduleName: 'enfermagem' },
       ]
     },
     {
@@ -102,7 +99,6 @@ export function WorkflowSections() {
         { icon: FileText, label: 'Configurações de Laudo', desc: 'Padrões e frases', route: '/laudo-configuracoes', moduleName: 'laudo' },
         { icon: ShieldCheck, label: 'Autorização Convênio', desc: 'Autorizações pendentes', route: '/autorizacao-convenio', moduleName: 'autorizacao-convenio' },
         { icon: Brain, label: 'Módulo TEA', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
-        { icon: Folder, label: 'Documentos', desc: 'Gestão documental', moduleName: 'documentos' },
       ]
     },
     {
@@ -118,6 +114,7 @@ export function WorkflowSections() {
         { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio', moduleName: 'cadastro-convenio' },
         { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente', moduleName: 'cadastro-paciente' },
         { icon: Warehouse, label: 'Cadastro de Salas', desc: 'Salas por filial', route: '/cadastro-sala', moduleName: 'cadastro-sala' },
+        { icon: ScanLine, label: 'Cadastro de Equipamentos', desc: 'Modalidades e DICOM', route: '/cadastro-equipamento', moduleName: 'cadastro-equipamento' },
       ]
     }
   ];

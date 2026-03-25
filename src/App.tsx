@@ -34,6 +34,7 @@ import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
 import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
+import { CadastroEquipamento } from './components/Equipamentos/CadastroEquipamento';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
 import { WhatsAppPage } from './components/Settings/WhatsAppPage';
@@ -45,6 +46,7 @@ import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
 import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
+import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -118,6 +120,10 @@ function App() {
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+          />
+          <Route
+            path="/fila-atendimento"
+            element={<ProtectedRoute><PatientQueuePage /></ProtectedRoute>}
           />
           <Route 
             path="/settings" 
@@ -194,6 +200,10 @@ function App() {
           <Route
             path="/cadastro-sala"
             element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-equipamento"
+            element={<ProtectedRoute><CadastroEquipamento /></ProtectedRoute>}
           />
           <Route
             path="/whatsapp"
