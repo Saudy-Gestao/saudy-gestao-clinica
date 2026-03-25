@@ -177,8 +177,11 @@ export default {
     return res.data;
   },
 
-  async deletePit(teaProfileId: string) {
-    const res = await api.delete(`/care/tea-profiles/${teaProfileId}/pit`);
+  async deletePit(teaProfileId: string, pitId?: string) {
+    const res = await api.delete(`/care/tea-profiles/${teaProfileId}/pit`, {
+      params: pitId ? { pitId } : undefined,
+      data: pitId ? { pitId } : undefined,
+    });
     return res.data;
   },
 };

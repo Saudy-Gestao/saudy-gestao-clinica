@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Layers, Mic, MicOff, SpellCheck } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, ScanLine, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DicomViewer } from '../DicomViewer/DicomViewer';
@@ -355,6 +355,7 @@ export function LaudoExames() {
   const [query, setQuery] = useState('');
   const [examRows, setExamRows] = useState<ExamItem[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+  const [returnToPath, setReturnToPath] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [templatePickerModalOpen, setTemplatePickerModalOpen] = useState(false);
   const location = useLocation();
@@ -458,7 +459,7 @@ export function LaudoExames() {
           return;
         }
 
-        // Falha transitória (sessão expirou no Chrome, etc.) — reconecta silenciosamente
+        // Falha transitória (sessão expirou no Chrome, etc.)  -  reconecta silenciosamente
         if (shouldRestartRef.current) {
           const delay = Math.min(500 * consecutiveNetworkFailsRef.current, 3000);
           sessionStartedAtRef.current = Date.now();
@@ -900,8 +901,12 @@ export function LaudoExames() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const itemId = params.get('itemId');
+    const returnTo = params.get('returnTo');
     if (itemId) {
       openExam(itemId);
+      setReturnToPath(returnTo || null);
+    } else {
+      setReturnToPath(null);
     }
   }, [location.search]);
 
@@ -988,6 +993,10 @@ export function LaudoExames() {
     setAddendumIssuerSignedAt(null);
     setAddendumReviewerSignedAt(null);
     setAddendumSavedAt(null);
+
+    if (returnToPath) {
+      navigate(returnToPath, { replace: true });
+    }
   };
 
   const getAllLaudoContent = (): string => {
@@ -1077,9 +1086,9 @@ export function LaudoExames() {
         </head>
         <body>
           <h1>Laudo - ${selectedExam.examType}</h1>
-          <div class="meta">Paciente: ${selectedExam.patientName} • CPF: ${selectedExam.cpf} • Exame: ${selectedExam.id}</div>
+          <div class="meta">Paciente: ${selectedExam.patientName}  •  CPF: ${selectedExam.cpf}  •  Exame: ${selectedExam.id}</div>
           <div class="block">${resolvedContent}</div>
-          <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'} • Revisor: ${requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Nao obrigatorio'}</div>
+          <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'}  •  Revisor: ${requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Não obrigatório'}</div>
         </body>
       </html>
     `;
@@ -1575,8 +1584,6 @@ export function LaudoExames() {
                 </Table.Thead>
                 <Table.Tbody>
                   {filteredRows.map((exam) => {
-                    const ohifKey = exam.dicomStudyUid || exam.id;
-
                     return (
                     <Table.Tr
                       key={exam.id}
@@ -1629,11 +1636,6 @@ export function LaudoExames() {
                           <Tooltip label="Abrir Exame (DICOM)">
                             <ActionIcon variant="subtle" color="cyan" onClick={() => navigate(`/dicom-viewer/${encodeURIComponent(exam.id)}`)}>
                               <Eye size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                          <Tooltip label="Abrir OHIF Viewer">
-                            <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/ohif/${encodeURIComponent(ohifKey)}`)}>
-                              <Layers size={16} />
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Abrir Laudo">
@@ -1713,7 +1715,7 @@ export function LaudoExames() {
                         <Text size="sm" c="dimmed" fw={500}>
                           CPF: {selectedExam.cpf}
                         </Text>
-                        <Text size="sm" c="dimmed">•</Text>
+                        <Text size="sm" c="dimmed"> • </Text>
                         <Badge variant="outline" color="gray" size="sm" radius="sm">
                           Convênio: {selectedExam.convenio}
                         </Badge>
@@ -1881,7 +1883,7 @@ export function LaudoExames() {
                             }}
                             className="dynamic-field-badge"
                             onClick={() => insertPlaceholder(item.key)}
-                            title={`${item.label} — clique para inserir`}
+                            title={`${item.label}  -  clique para inserir`}
                             leftSection={<Plus size={12} />}
                           >
                             {item.label}
@@ -2206,7 +2208,7 @@ export function LaudoExames() {
                   </ThemeIcon>
                   <Box>
                     <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{selectedExam.patientName}</Text>
-                    <Text size="xs" c="dimmed">CPF: {selectedExam.cpf} • {previousReports.length} laudo(s) anterior(es)</Text>
+                    <Text size="xs" c="dimmed">CPF: {selectedExam.cpf}  •  {previousReports.length} laudo(s) anterior(es)</Text>
                   </Box>
                 </Group>
               </Paper>
@@ -2566,3 +2568,6 @@ export function LaudoExames() {
     </Box>
   );
 }
+
+
+
