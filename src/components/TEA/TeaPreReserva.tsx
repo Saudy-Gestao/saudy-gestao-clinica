@@ -223,6 +223,21 @@ type BulkStatusActionState = {
   options: BulkStatusActionOption[];
 };
 
+const getTimelineEventLabel = (event: any) => {
+  const nextStatus = String(event?.payload?.nextStatus || event?.payload?.requestedStatus || '');
+  if (event?.eventType === 'STATUS_CHANGED') {
+    if (nextStatus === 'PROPOSED') return 'Enviado para aprovação dos pais';
+    if (nextStatus === 'PENDING_AUTHORIZATION') return 'Aprovação dos pais registrada';
+    if (nextStatus === 'AUTHORIZED') return 'Autorização do convênio aprovada';
+    if (nextStatus === 'CONVERTED') return 'Convertido em agendamento';
+    if (nextStatus === 'RESERVED') return 'Horários reservados';
+    if (nextStatus === 'CANCELED') return 'Pré-reserva cancelada';
+    if (nextStatus === 'EXPIRED') return 'Pré-reserva expirada';
+  }
+
+  return event?.eventLabel || event?.eventType || 'Evento';
+};
+
 const isSlotCoveredBySession = (
   daySlots: ManualGridSlot[],
   anchorTime: string,
@@ -1444,14 +1459,14 @@ export function TeaPreReserva() {
         return events.map((event: any) => ({
           ...event,
           id: `${event.id}-${reservationId}`,
-          eventLabel: `[${procedureName}] ${event.eventLabel || event.eventType}`,
+          eventLabel: `[${procedureName}] ${getTimelineEventLabel(event)}`,
         })) as TimelineEventItem[];
         }),
       );
 
       const mergedEvents = timelineResponses
         .flat()
-        .sort((a, b) => dayjs(a.createdAt).valueOf() - dayjs(b.createdAt).valueOf());
+        .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf());
 
       setTimelineEvents(mergedEvents);
       setTimelineReservationLabel(`${group.patientName} • PIT`);
