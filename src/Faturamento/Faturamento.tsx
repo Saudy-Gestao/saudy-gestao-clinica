@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput, Paper, Loader, Popover, Grid } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
@@ -9,6 +10,8 @@ import { DARK_BLUE } from '../themes/theme';
 import { DatePicker } from '@mantine/dates';
 import { formatDateInput } from '../utils/formatters';
 import ResultModal from '../components/common/ResultModal';
+import { useInvoicesQuery } from '../hooks/useInvoicesQuery';
+import { queryKeys } from '../lib/queryKeys';
 
 export function Header() {
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -64,14 +67,16 @@ interface InvoiceRow {
 
 export function Faturamento() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
-  const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const {
+    data: invoices = [],
+    isLoading: invoicesLoading,
+    error: invoicesError,
+  } = useInvoicesQuery();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-
-  const filtered = rows.filter((r) => r.codigo.toLowerCase().includes(query.toLowerCase()) || r.convenio.toLowerCase().includes(query.toLowerCase()));
 
 
 
@@ -162,28 +167,15 @@ export function Faturamento() {
     };
   };
 
-  const loadInvoices = async () => {
-    setInvoicesLoading(true);
-    try {
-      const response: any = await invoiceService.getInvoices();
-      const items = Array.isArray(response) ? response : response?.items;
-
-      if (Array.isArray(items)) {
-        setRows(items.map(mapInvoiceToRow));
-      } else {
-        setRows([]);
-      }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar faturas';
-      showNotification({ title: 'Erro', message: msg, color: 'red' });
-    } finally {
-      setInvoicesLoading(false);
-    }
-  };
-
   useEffect(() => {
-    void loadInvoices();
-  }, []);
+    if (!invoicesError) return;
+    const err: any = invoicesError;
+    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar faturas';
+    showNotification({ title: 'Erro', message: msg, color: 'red' });
+  }, [invoicesError]);
+
+  const rows = useMemo<InvoiceRow[]>(() => invoices.map(mapInvoiceToRow), [invoices]);
+  const filtered = rows.filter((r) => r.codigo.toLowerCase().includes(query.toLowerCase()) || r.convenio.toLowerCase().includes(query.toLowerCase()));
 
 
 
@@ -243,28 +235,9 @@ export function Faturamento() {
           paymentMethod: invoiceData.formaPagamento || undefined,
         };
         const updated: any = await invoiceService.updateInvoice(editingId, payload);
-
-        setRows((prev) =>
-          prev.map((r) =>
-            r.id === editingId
-              ? {
-                  ...r,
-                  codigo: updated.number || r.codigo,
-                  nome: updated.patientName ?? invoiceData.nome ?? r.nome,
-                  vencimento: updated.dueDate ? formatBackendDate(updated.dueDate) : r.vencimento,
-                  convenio: updated.convention || invoiceData.categoria || invoiceData.tipo || r.convenio,
-                  valor: updated.value ?? invoiceData.valor ?? r.valor,
-                  descontoPercent: updated.discount ?? invoiceData.desconto ?? r.descontoPercent,
-                  valorTotal:
-                    updated.total ??
-                    ((updated.value ?? invoiceData.valor ?? r.valor) - (updated.discount ?? invoiceData.desconto ?? r.descontoPercent ?? 0)),
-                  formaPagamento: updated.paymentMethod ?? invoiceData.formaPagamento ?? r.formaPagamento,
-                }
-              : r,
-          ),
-        );
         setLastInvoiceCode(updated.number || String(editingId));
         setShowInvoiceSuccess(true);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
       } catch (err: any) {
         const msg = err?.response?.data?.message || err?.response?.data?.details || err?.message || 'Erro ao atualizar fatura';
         setInvoiceErrorTitle('Erro ao atualizar fatura');
@@ -305,9 +278,9 @@ export function Faturamento() {
           formaPagamento: created.paymentMethod ?? invoiceData.formaPagamento,
         };
 
-        setRows((prev) => [newRow, ...prev]);
         setLastInvoiceCode(newRow.codigo);
         setShowInvoiceSuccess(true);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
       } catch (err: any) {
         const msg = err?.response?.data?.message || err?.message || 'Erro ao criar fatura';
         setInvoiceErrorTitle('Erro ao criar fatura');

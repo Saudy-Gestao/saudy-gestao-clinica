@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
   Box,
@@ -21,8 +22,10 @@ import { showNotification } from '@mantine/notifications';
 import { CheckCheck } from 'lucide-react';
 import dayjs from 'dayjs';
 import { FacialCapture } from '../common/FacialCapture';
-import preSchedulingService, { type PublicPreSchedulingMeta } from '../../services/preSchedulingService';
+import preSchedulingService from '../../services/preSchedulingService';
 import facialRecognitionService from '../../services/facialRecognitionService';
+import { usePublicPreSchedulingMetaQuery } from '../../hooks/usePublicPreSchedulingMetaQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 const DOCUMENT_TYPES = [
   { value: 'DOCUMENTO_IDENTIDADE', label: 'Documento de identidade' },
@@ -40,8 +43,7 @@ const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) 
 
 export function PublicPreAgendamentoDocs() {
   const { token } = useParams<{ token: string }>();
-  const [loading, setLoading] = useState(true);
-  const [meta, setMeta] = useState<PublicPreSchedulingMeta | null>(null);
+  const queryClient = useQueryClient();
   const [verified, setVerified] = useState(false);
   const [facialOpen, setFacialOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -59,49 +61,42 @@ export function PublicPreAgendamentoDocs() {
     answerBoolean?: boolean | null;
     answerNumber?: number | null;
   }>>({});
-
-  const loadMeta = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const data = await preSchedulingService.getPublicMeta(token);
-      setMeta(data);
-      setVerified(Boolean(data.verified));
-      setExpired(false);
-      const answersMap: Record<string, {
-        answerText?: string;
-        answerValues?: string[];
-        answerBoolean?: boolean | null;
-        answerNumber?: number | null;
-      }> = {};
-      (data.anamnesis?.answers || []).forEach((answer) => {
-        if (!answer.questionId) return;
-        answersMap[String(answer.questionId)] = {
-          answerText: answer.answerText || '',
-          answerValues: answer.answerValues || [],
-          answerBoolean: answer.answerBoolean ?? null,
-          answerNumber: answer.answerNumber ?? null,
-        };
-      });
-      setAnamnesisAnswers(answersMap);
-    } catch (err: any) {
-      if (err?.response?.status === 410) {
-        setExpired(true);
-      }
-      showNotification({
-        title: 'Link inválido',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível abrir esse link.',
-        color: 'red',
-      });
-      setMeta(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: meta, isLoading: loading, error: metaError } = usePublicPreSchedulingMetaQuery(token);
 
   useEffect(() => {
-    loadMeta();
-  }, [token]);
+    if (!meta) return;
+    setVerified(Boolean(meta.verified));
+    setExpired(false);
+    const answersMap: Record<string, {
+      answerText?: string;
+      answerValues?: string[];
+      answerBoolean?: boolean | null;
+      answerNumber?: number | null;
+    }> = {};
+    (meta.anamnesis?.answers || []).forEach((answer) => {
+      if (!answer.questionId) return;
+      answersMap[String(answer.questionId)] = {
+        answerText: answer.answerText || '',
+        answerValues: answer.answerValues || [],
+        answerBoolean: answer.answerBoolean ?? null,
+        answerNumber: answer.answerNumber ?? null,
+      };
+    });
+    setAnamnesisAnswers(answersMap);
+  }, [meta]);
+
+  useEffect(() => {
+    if (!metaError) return;
+    const err: any = metaError;
+    if (err?.response?.status === 410) {
+      setExpired(true);
+    }
+    showNotification({
+      title: 'Link inválido',
+      message: err?.response?.data?.error || err?.message || 'Não foi possível abrir esse link.',
+      color: 'red',
+    });
+  }, [metaError]);
 
   const scheduleSummary = useMemo(() => {
     if (!meta?.appointment) return '-';
@@ -165,7 +160,7 @@ export function PublicPreAgendamentoDocs() {
         message: meta?.anamnesis ? 'Você já pode responder a anamnese e enviar os documentos.' : 'Você já pode enviar os documentos.',
         color: 'green',
       });
-      await loadMeta();
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicPreSchedulingMeta, token || ''] });
     } catch (err: any) {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
@@ -195,7 +190,7 @@ export function PublicPreAgendamentoDocs() {
         color: 'green',
       });
       setSelectedFile(null);
-      await loadMeta();
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicPreSchedulingMeta, token || ''] });
     } catch (err: any) {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
@@ -226,7 +221,7 @@ export function PublicPreAgendamentoDocs() {
         message: 'Documentos enviados e liberados para revisão da clínica.',
         color: 'green',
       });
-      await loadMeta();
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicPreSchedulingMeta, token || ''] });
     } catch (err: any) {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
@@ -281,7 +276,7 @@ export function PublicPreAgendamentoDocs() {
         message: 'As respostas foram registradas com sucesso.',
         color: 'green',
       });
-      await loadMeta();
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicPreSchedulingMeta, token || ''] });
     } catch (err: any) {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({

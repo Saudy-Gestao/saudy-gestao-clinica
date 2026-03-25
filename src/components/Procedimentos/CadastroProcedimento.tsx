@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Group,
@@ -29,11 +30,13 @@ import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
-import doctorService from '../../services/doctorService';
 import procedureService from '../../services/procedureService';
-import insuranceService from '../../services/insuranceService';
-import inventoryService from '../../services/inventoryService';
 import ResultModal from '../common/ResultModal';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
+import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
+import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface ProcedureForm {
   name: string;
@@ -84,6 +87,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function CadastroProcedimento() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
@@ -112,6 +116,10 @@ export function CadastroProcedimento() {
   const [materialDirectory, setMaterialDirectory] = useState<Record<string, { name: string; code?: string; unit?: string }>>({});
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [selectedMaterialQuantity, setSelectedMaterialQuantity] = useState<number | ''>(1);
+  const proceduresQuery = useProceduresAdminQuery();
+  const doctorsQuery = useDoctorsAdminQuery();
+  const insurancesQuery = useInsurancesAdminQuery();
+  const inventoryItemsQuery = useInventoryItemsQuery();
 
   const doctorLabelById = useMemo(() => {
     return doctorOptions.reduce<Record<string, string>>((acc, option) => {
@@ -154,185 +162,163 @@ export function CadastroProcedimento() {
   );
 
   useEffect(() => {
-    const loadProcedures = async () => {
-      setProceduresLoading(true);
-      try {
-        const data: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
-          id: String(it.id ?? it.procedureId ?? ''),
-          name: it.name || 'Procedimento',
-          appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
-          acceptsInsurance: Boolean(it.acceptsInsurance),
-          acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
-          modalities: Array.isArray(it.modalities) ? it.modalities : [],
-          doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
-          materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
-          isActive: Boolean(it.isActive ?? true),
-          doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
-        })).filter((item) => Boolean(item.id));
-
-        setProcedures(mapped);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
-          color: 'red',
-        });
-      } finally {
-        setProceduresLoading(false);
-      }
-    };
-    loadProcedures();
-  }, []);
+    setProceduresLoading(proceduresQuery.isFetching);
+  }, [proceduresQuery.isFetching]);
 
   useEffect(() => {
-    const loadDoctors = async () => {
-      setLoadingDoctors(true);
-      try {
-        const data: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const options = list.map((doctor: any) => {
-          const id = String(doctor.id ?? doctor.doctorId ?? '');
-          const name = doctor.name || doctor.nome || doctor.fullName || 'Sem nome';
-          return { value: id, label: name };
-        }).filter((item: { value: string }) => item.value);
-
-        const directory = list.reduce<Record<string, { name?: string }>>((acc, doctor: any) => {
-          const id = String(doctor.id ?? doctor.doctorId ?? '');
-          if (!id) return acc;
-          acc[id] = { name: doctor.name || doctor.nome || doctor.fullName || undefined };
-          return acc;
-        }, {});
-
-        setDoctorOptions(options);
-        setDoctorDirectory(directory);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar medicos',
-          color: 'red',
-        });
-      } finally {
-        setLoadingDoctors(false);
-      }
-    };
-
-    loadDoctors();
-  }, []);
+    if (proceduresQuery.error) {
+      const err: any = proceduresQuery.error;
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+        color: 'red',
+      });
+    }
+  }, [proceduresQuery.error]);
 
   useEffect(() => {
-    const loadInsurances = async () => {
-      setLoadingInsurances(true);
-      try {
-        const data: any = await insuranceService.listInsurances({ isActive: true, limit: 300, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const mapped = list
-          .map((item: any) => {
-            const name = String(item?.name || item?.nome || '').trim();
-            if (!name) return null;
-            const subInsurances = Array.isArray(item?.subInsurances)
-              ? item.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
-              : [];
-            return { value: name, label: name, subInsurances };
-          })
-          .filter((item: { value: string; label: string; subInsurances: string[] } | null): item is { value: string; label: string; subInsurances: string[] } => Boolean(item))
-          .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
-
-        setInsuranceCatalog(mapped);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
-          color: 'red',
-        });
-      } finally {
-        setLoadingInsurances(false);
-      }
-    };
-
-    loadInsurances();
-  }, []);
+    const list = Array.isArray(proceduresQuery.data) ? proceduresQuery.data : [];
+    const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
+      id: String(it.id ?? it.procedureId ?? ''),
+      name: it.name || 'Procedimento',
+      appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
+      acceptsInsurance: Boolean(it.acceptsInsurance),
+      acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
+      modalities: Array.isArray(it.modalities) ? it.modalities : [],
+      doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
+      materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
+      isActive: Boolean(it.isActive ?? true),
+      doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
+    })).filter((item) => Boolean(item.id));
+    setProcedures(mapped);
+  }, [proceduresQuery.data]);
 
   useEffect(() => {
-    const loadMaterials = async () => {
-      setLoadingMaterials(true);
-      try {
-        const data: any = await inventoryService.getItems();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
+    setLoadingDoctors(doctorsQuery.isFetching);
+  }, [doctorsQuery.isFetching]);
 
-        const mapped = list
-          .filter((item: any) => item && item.id)
-          .map((item: any) => {
-            const id = String(item.id);
-            const name = String(item.name || '').trim();
-            const code = String(item.code || '').trim();
-            return {
-              id,
-              name: name || 'Material',
-              code: code || undefined,
-              unit: item.unit ? String(item.unit) : undefined,
-            };
-          });
+  useEffect(() => {
+    if (!doctorsQuery.error) return;
+    const err: any = doctorsQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar medicos',
+      color: 'red',
+    });
+  }, [doctorsQuery.error]);
 
-        setMaterialOptions(mapped.map((item: any) => ({
-          value: item.id,
-          label: item.code ? `${item.name} (${item.code})` : item.name,
-        })));
-        setMaterialDirectory(
-          mapped.reduce((acc: Record<string, { name: string; code?: string; unit?: string }>, item: any) => {
-            acc[item.id] = { name: item.name, code: item.code, unit: item.unit };
-            return acc;
-          }, {}),
-        );
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar materiais do estoque',
-          color: 'red',
-        });
-      } finally {
-        setLoadingMaterials(false);
-      }
-    };
+  useEffect(() => {
+    const data: any = doctorsQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
 
-    loadMaterials();
-  }, []);
+    const options = list.map((doctor: any) => {
+      const id = String(doctor.id ?? doctor.doctorId ?? '');
+      const name = doctor.name || doctor.nome || doctor.fullName || 'Sem nome';
+      return { value: id, label: name };
+    }).filter((item: { value: string }) => item.value);
+
+    const directory = list.reduce<Record<string, { name?: string }>>((acc, doctor: any) => {
+      const id = String(doctor.id ?? doctor.doctorId ?? '');
+      if (!id) return acc;
+      acc[id] = { name: doctor.name || doctor.nome || doctor.fullName || undefined };
+      return acc;
+    }, {});
+
+    setDoctorOptions(options);
+    setDoctorDirectory(directory);
+  }, [doctorsQuery.data]);
+
+  useEffect(() => {
+    setLoadingInsurances(insurancesQuery.isFetching);
+  }, [insurancesQuery.isFetching]);
+
+  useEffect(() => {
+    if (!insurancesQuery.error) return;
+    const err: any = insurancesQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      color: 'red',
+    });
+  }, [insurancesQuery.error]);
+
+  useEffect(() => {
+    const data: any = insurancesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.data?.items)
+          ? data.data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : [])));
+
+    const mapped = list
+      .filter((item: any) => item?.isActive !== false)
+      .map((item: any) => {
+        const name = String(item?.name || item?.nome || '').trim();
+        if (!name) return null;
+        const subInsurances = Array.isArray(item?.subInsurances)
+          ? item.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
+          : [];
+        return { value: name, label: name, subInsurances };
+      })
+      .filter((item: { value: string; label: string; subInsurances: string[] } | null): item is { value: string; label: string; subInsurances: string[] } => Boolean(item))
+      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+
+    setInsuranceCatalog(mapped);
+  }, [insurancesQuery.data]);
+
+  useEffect(() => {
+    setLoadingMaterials(inventoryItemsQuery.isFetching);
+  }, [inventoryItemsQuery.isFetching]);
+
+  useEffect(() => {
+    if (!inventoryItemsQuery.error) return;
+    const err: any = inventoryItemsQuery.error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar materiais do estoque',
+      color: 'red',
+    });
+  }, [inventoryItemsQuery.error]);
+
+  useEffect(() => {
+    const list: any[] = Array.isArray(inventoryItemsQuery.data) ? inventoryItemsQuery.data : [];
+    const mapped = list
+      .filter((item: any) => item && item.id)
+      .map((item: any) => {
+        const id = String(item.id);
+        const name = String(item.name || '').trim();
+        const code = String(item.code || '').trim();
+        return {
+          id,
+          name: name || 'Material',
+          code: code || undefined,
+          unit: item.unit ? String(item.unit) : undefined,
+        };
+      });
+
+    setMaterialOptions(mapped.map((item: any) => ({
+      value: item.id,
+      label: item.code ? `${item.name} (${item.code})` : item.name,
+    })));
+    setMaterialDirectory(
+      mapped.reduce((acc: Record<string, { name: string; code?: string; unit?: string }>, item: any) => {
+        acc[item.id] = { name: item.name, code: item.code, unit: item.unit };
+        return acc;
+      }, {}),
+    );
+  }, [inventoryItemsQuery.data]);
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -385,29 +371,7 @@ export function CadastroProcedimento() {
         setSelectedMaterialQuantity(1);
         setProcedureQuery('');
       }
-      const refreshed: any = await procedureService.listProcedures({ limit: 200, offset: 0 });
-      const list: any[] = Array.isArray(refreshed)
-        ? refreshed
-        : (Array.isArray(refreshed?.items)
-          ? refreshed.items
-          : (Array.isArray(refreshed?.data?.items)
-            ? refreshed.data.items
-            : (Array.isArray(refreshed?.data)
-              ? refreshed.data
-              : [])));
-      const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
-        id: String(it.id ?? it.procedureId ?? ''),
-        name: it.name || 'Procedimento',
-        appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
-        acceptsInsurance: Boolean(it.acceptsInsurance),
-        acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
-        modalities: Array.isArray(it.modalities) ? it.modalities : [],
-        doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
-        materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
-        isActive: Boolean(it.isActive ?? true),
-        doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
-      })).filter((item) => Boolean(item.id));
-      setProcedures(mapped);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || 'Erro ao salvar procedimento';
       setErrorMessage(message);
@@ -525,14 +489,7 @@ export function CadastroProcedimento() {
       await procedureService.updateProcedure(item.id, {
         isActive: !item.isActive,
       });
-
-      setProcedures((prev) =>
-        prev.map((p) =>
-          p.id === item.id
-            ? { ...p, isActive: !p.isActive }
-            : p
-        )
-      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
 
       showNotification({
         title: 'Status atualizado',

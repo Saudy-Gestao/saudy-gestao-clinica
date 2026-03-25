@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Group,
@@ -21,9 +22,11 @@ import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, CalendarX2, X } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
-import teaProfileService from '../../services/teaProfileService';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import { formatCPF } from '../../utils/formatters';
+import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
+import { useTeaCancellationTherapiesQuery } from '../../hooks/useTeaCancellationTherapiesQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type CancellationTherapyItem = {
   pitTherapyId: string;
@@ -63,14 +66,11 @@ export function TeaDesmarcacaoLote() {
   const [searchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
+  const queryClient = useQueryClient();
+  const fromDate = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
 
-  const [teaProfiles, setTeaProfiles] = useState<any[]>([]);
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
-  const [loadingTherapies, setLoadingTherapies] = useState(false);
   const [canceling, setCanceling] = useState(false);
-
-  const [therapies, setTherapies] = useState<CancellationTherapyItem[]>([]);
   const [confirmModalOpened, setConfirmModalOpened] = useState(false);
   const [selectedTherapy, setSelectedTherapy] = useState<CancellationTherapyItem | null>(null);
   const [cancellationScope, setCancellationScope] = useState<CancellationScope>('single');
@@ -78,6 +78,22 @@ export function TeaDesmarcacaoLote() {
   const [weekdayModalOpened, setWeekdayModalOpened] = useState(false);
   const [weekdayCancelTarget, setWeekdayCancelTarget] = useState<WeekdayCancellationTarget | null>(null);
   const [cancelingWeekday, setCancelingWeekday] = useState(false);
+
+  const {
+    data: teaProfiles = [] as any[],
+    isLoading: loadingProfiles,
+    error: teaProfilesError,
+  } = useTeaProfilesQuery({ hasActivePit: true });
+
+  const {
+    data: therapies = [] as CancellationTherapyItem[],
+    isLoading: loadingTherapies,
+    isFetching: fetchingTherapies,
+    error: therapiesError,
+  } = useTeaCancellationTherapiesQuery({
+    teaProfileId: selectedTeaProfileId,
+    fromDate,
+  });
 
   const teaProfileOptions = useMemo(
     () => teaProfiles.map((it: any) => ({
@@ -92,63 +108,31 @@ export function TeaDesmarcacaoLote() {
     [teaProfiles, selectedTeaProfileId],
   );
 
-  const loadTeaProfiles = async () => {
-    setLoadingProfiles(true);
-    try {
-      const data: any = await teaProfileService.list({ limit: 300, offset: 0, hasActivePit: true });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items) ? data.items : []);
-      setTeaProfiles(list);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
-        color: 'red',
-      });
-    } finally {
-      setLoadingProfiles(false);
-    }
-  };
-
-  const loadTherapies = async (teaProfileId: string) => {
-    setLoadingTherapies(true);
-    try {
-      const data: any = await teaPreReservationService.listCancellationTherapies({
-        teaProfileId,
-        fromDate: dayjs().format('YYYY-MM-DD'),
-      });
-      const items = Array.isArray(data?.items) ? data.items : [];
-      setTherapies(items);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar terapias agendadas',
-        color: 'red',
-      });
-      setTherapies([]);
-    } finally {
-      setLoadingTherapies(false);
-    }
-  };
+  useEffect(() => {
+    if (!teaProfilesError) return;
+    const err: any = teaProfilesError;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
+      color: 'red',
+    });
+  }, [teaProfilesError]);
 
   useEffect(() => {
-    loadTeaProfiles();
-  }, []);
+    if (!therapiesError || !selectedTeaProfileId) return;
+    const err: any = therapiesError;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar terapias agendadas',
+      color: 'red',
+    });
+  }, [therapiesError, selectedTeaProfileId]);
 
   useEffect(() => {
     const queryTeaProfileId = String(searchParams.get('teaProfileId') || '').trim();
     if (!queryTeaProfileId) return;
     setSelectedTeaProfileId((prev) => prev || queryTeaProfileId);
   }, [searchParams]);
-
-  useEffect(() => {
-    if (!selectedTeaProfileId) {
-      setTherapies([]);
-      return;
-    }
-    loadTherapies(selectedTeaProfileId);
-  }, [selectedTeaProfileId]);
 
   const openCancelModal = (therapy: CancellationTherapyItem) => {
     setCancellationScope('single');
@@ -170,7 +154,7 @@ export function TeaDesmarcacaoLote() {
   };
 
   const totalSessionsAllTherapies = useMemo(
-    () => therapies.reduce((acc, item) => acc + Number(item.totalSessions || 0), 0),
+    () => therapies.reduce((acc: number, item: CancellationTherapyItem) => acc + Number(item.totalSessions || 0), 0),
     [therapies],
   );
 
@@ -183,7 +167,7 @@ export function TeaDesmarcacaoLote() {
         teaProfileId: selectedTeaProfileId,
         pitTherapyId: cancellationScope === 'single' ? selectedTherapy?.pitTherapyId : undefined,
         cancelAll: cancellationScope === 'all',
-        fromDate: dayjs().format('YYYY-MM-DD'),
+        fromDate,
         reason: cancelReason.trim() || undefined,
       });
 
@@ -198,7 +182,9 @@ export function TeaDesmarcacaoLote() {
 
       setConfirmModalOpened(false);
       setSelectedTherapy(null);
-      await loadTherapies(selectedTeaProfileId);
+      await queryClient.invalidateQueries({
+        queryKey: [...queryKeys.teaCancellationTherapies, selectedTeaProfileId, fromDate],
+      });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -217,7 +203,7 @@ export function TeaDesmarcacaoLote() {
       const result: any = await teaPreReservationService.cancelTherapySeries({
         teaProfileId: selectedTeaProfileId,
         cancelAll: true,
-        fromDate: dayjs().format('YYYY-MM-DD'),
+        fromDate,
         weekdayIndex: weekdayCancelTarget.weekdayIndex,
         reason: `Desmarcação por dia da semana: ${weekdayCancelTarget.weekdayLabel}`,
       });
@@ -231,7 +217,9 @@ export function TeaDesmarcacaoLote() {
 
       setWeekdayModalOpened(false);
       setWeekdayCancelTarget(null);
-      await loadTherapies(selectedTeaProfileId);
+      await queryClient.invalidateQueries({
+        queryKey: [...queryKeys.teaCancellationTherapies, selectedTeaProfileId, fromDate],
+      });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -377,7 +365,7 @@ export function TeaDesmarcacaoLote() {
               </Paper>
             )}
 
-            {loadingTherapies ? (
+            {(loadingTherapies || fetchingTherapies) ? (
               <Group justify="center"><Loader size="sm" /></Group>
             ) : !selectedTeaProfileId ? (
               <Text size="sm" c="dimmed">Selecione um paciente para listar terapias agendadas.</Text>
@@ -385,15 +373,15 @@ export function TeaDesmarcacaoLote() {
               <Text size="sm" c="dimmed">Nenhuma terapia com sessões futuras encontrada para esse paciente.</Text>
             ) : (
               <Stack gap="xs">
-                {therapies.map((therapy) => {
+                {therapies.map((therapy: CancellationTherapyItem) => {
                   const weeklyPatternByWeekdayMap = therapy.slots
-                    .map((slot) => ({
+                    .map((slot: { date: string; time: string }) => ({
                       weekdayLabel: getWeekdayLabel(slot.date),
                       weekdayIndex: getWeekdayIndex(slot.date),
                       time: String(slot.time || '').trim(),
                     }))
-                    .filter((slot) => slot.weekdayLabel !== 'Dia inválido' && slot.time)
-                    .reduce((acc, slot) => {
+                    .filter((slot: { weekdayLabel: string; weekdayIndex: number; time: string }) => slot.weekdayLabel !== 'Dia inválido' && slot.time)
+                    .reduce((acc: Map<number, { weekdayIndex: number; weekdayLabel: string; times: string[] }>, slot: { weekdayLabel: string; weekdayIndex: number; time: string }) => {
                       const existing = acc.get(slot.weekdayIndex);
                       if (!existing) {
                         acc.set(slot.weekdayIndex, {
@@ -411,7 +399,7 @@ export function TeaDesmarcacaoLote() {
                     }, new Map<number, { weekdayIndex: number; weekdayLabel: string; times: string[] }>());
 
                   const weeklyPatternByDay = Array.from(weeklyPatternByWeekdayMap.values())
-                    .map((slot) => ({
+                    .map((slot: { weekdayIndex: number; weekdayLabel: string; times: string[] }) => ({
                       ...slot,
                       times: [...slot.times].sort((a, b) => a.localeCompare(b)),
                     }))

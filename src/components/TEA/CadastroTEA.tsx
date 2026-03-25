@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Group,
@@ -26,12 +27,15 @@ import { ChevronLeft, Brain, Pencil, Search, Plus, Trash2, ClipboardList, Activi
 import dayjs from 'dayjs';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
-import patientService from '../../services/patientService';
 import teaProfileService from '../../services/teaProfileService';
-import doctorService from '../../services/doctorService';
-import insuranceService from '../../services/insuranceService';
 import { DARK_BLUE } from '../../themes/theme';
 import { onlyDigits, formatCPF, isValidCPF, isValidEmail, normalizeEmail, parseApiDateToLocalDate } from '../../utils/formatters';
+import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
+import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
+import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
+import { useTeaPlansQuery } from '../../hooks/useTeaPlansQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type Gender = 'MALE' | 'FEMALE' | 'OTHER' | '';
 export type TeaSubmodule = 'cadastro' | 'pacientes' | 'plano' | 'evolucao' | 'relatorios';
@@ -162,6 +166,7 @@ function parseBirthDateInput(value: string): Date | null {
 export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const [enteredShell, setEnteredShell] = useState(false);
@@ -186,23 +191,21 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const [form, setForm] = useState<TeaForm>(INITIAL_FORM);
   const [birthDateInput, setBirthDateInput] = useState('');
   const [saving, setSaving] = useState(false);
-  const [patientsLoading, setPatientsLoading] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [patientOptions, setPatientOptions] = useState<{ value: string; label: string }[]>([]);
-  const [patientById, setPatientById] = useState<Record<string, any>>({});
-  const [teaItems, setTeaItems] = useState<TeaProfileRow[]>([]);
   const [teaSearch, setTeaSearch] = useState('');
-  const [teaLoading, setTeaLoading] = useState(false);
   const [activeSubmodule, setActiveSubmodule] = useState<TeaSubmodule>(forcedSubmodule || 'cadastro');
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState<PlanForm>(INITIAL_PLAN_FORM);
-  const [plans, setPlans] = useState<TherapeuticPlanRow[]>([]);
-  const [plansLoading, setPlansLoading] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
-  const [doctorOptions, setDoctorOptions] = useState<{ value: string; label: string }[]>([]);
-  const [loadingDoctors, setLoadingDoctors] = useState(false);
-  const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
-  const [loadingInsurances, setLoadingInsurances] = useState(false);
+
+  const { data: patientsData, isLoading: patientsLoading, error: patientsError } = usePatientsAdminQuery();
+  const { data: doctorsData, isLoading: loadingDoctors, error: doctorsError } = useDoctorsAdminQuery();
+  const { data: insurancesData, isLoading: loadingInsurances, error: insurancesError } = useInsurancesAdminQuery();
+  const { data: teaProfilesData = [], isLoading: teaLoading, error: teaProfilesError } = useTeaProfilesQuery({ search: teaSearch || undefined });
+  const { data: plansData = [], isLoading: plansLoading, error: plansError } = useTeaPlansQuery({
+    teaProfileId: activeSubmodule === 'plano' ? selectedTeaProfileId : null,
+    isActive: true,
+  });
 
   const setTeaField = <K extends keyof TeaForm>(field: K, value: TeaForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -213,6 +216,51 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   };
 
   const cpfDigits = useMemo(() => onlyDigits(form.patientCpf || '').slice(0, 11), [form.patientCpf]);
+  const normalizedPatients = useMemo(() => {
+    return Array.isArray(patientsData)
+      ? patientsData
+      : (Array.isArray((patientsData as any)?.patients)
+        ? (patientsData as any).patients
+        : (Array.isArray((patientsData as any)?.items)
+          ? (patientsData as any).items
+          : (Array.isArray((patientsData as any)?.data?.patients)
+            ? (patientsData as any).data.patients
+            : (Array.isArray((patientsData as any)?.data)
+              ? (patientsData as any).data
+              : []))));
+  }, [patientsData]);
+  const patientById = useMemo(() => {
+    const byId: Record<string, any> = {};
+    normalizedPatients.forEach((p: any) => {
+      const id = String(p?.id || '');
+      if (id) byId[id] = p;
+    });
+    return byId;
+  }, [normalizedPatients]);
+  const patientOptions = useMemo(() => normalizedPatients
+    .map((p: any) => {
+      const id = String(p?.id || '');
+      if (!id) return null;
+      const name = String(p?.name || '').trim();
+      const cpf = String(p?.cpf || '').trim();
+      return {
+        value: id,
+        label: cpf ? `${name} • ${formatCPF(cpf)}` : name,
+      };
+    })
+    .filter(Boolean) as { value: string; label: string }[], [normalizedPatients]);
+  const teaItems = useMemo(() => {
+    const list: any[] = Array.isArray(teaProfilesData) ? teaProfilesData : [];
+    return list.map((it: any) => ({
+      id: String(it.id || ''),
+      patientId: String(it.patient?.id || it.patientId || ''),
+      patientName: String(it.patient?.name || ''),
+      patientCpf: String(it.patient?.cpf || ''),
+      supportLevel: String(it.supportLevel || ''),
+      isActive: Boolean(it.isActive),
+      raw: it,
+    })).filter((it: TeaProfileRow) => it.id);
+  }, [teaProfilesData]);
   const teaProfileOptions = useMemo(
     () => teaItems.map((item) => ({
       value: item.id,
@@ -221,6 +269,51 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     [teaItems],
   );
 
+  useEffect(() => {
+    setBirthDateInput(form.birthDate ? dayjs(form.birthDate).format('DD/MM/YYYY') : '');
+  }, [form.birthDate]);
+  const doctorOptions = useMemo(() => {
+    const list: any[] = Array.isArray(doctorsData)
+      ? doctorsData
+      : (Array.isArray((doctorsData as any)?.items)
+        ? (doctorsData as any).items
+        : (Array.isArray((doctorsData as any)?.data?.items)
+          ? (doctorsData as any).data.items
+          : (Array.isArray((doctorsData as any)?.data)
+            ? (doctorsData as any).data
+            : [])));
+    return list
+      .map((doctor: any) => {
+        const id = String(doctor?.id || doctor?.doctorId || '').trim();
+        const name = String(doctor?.name || doctor?.nome || doctor?.fullName || '').trim();
+        return id && name ? { value: id, label: name } : null;
+      })
+      .filter(Boolean) as { value: string; label: string }[];
+  }, [doctorsData]);
+  const insuranceOptions = useMemo(() => {
+    const list: any[] = Array.isArray(insurancesData)
+      ? insurancesData
+      : Array.isArray((insurancesData as any)?.items)
+        ? (insurancesData as any).items
+        : Array.isArray((insurancesData as any)?.insurances)
+          ? (insurancesData as any).insurances
+          : Array.isArray((insurancesData as any)?.data?.items)
+            ? (insurancesData as any).data.items
+            : Array.isArray((insurancesData as any)?.data?.insurances)
+              ? (insurancesData as any).data.insurances
+              : Array.isArray((insurancesData as any)?.data)
+                ? (insurancesData as any).data
+                : [];
+    return list
+      .map((item: any) => {
+        const name = String(item?.name || item?.nome || '').trim();
+        if (!name) return null;
+        return { value: name, label: name };
+      })
+      .filter((item: { value: string; label: string } | null): item is { value: string; label: string } => Boolean(item))
+      .filter((item, index, arr) => arr.findIndex((candidate) => candidate.value === item.value) === index)
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }, [insurancesData]);
   const insuranceSelectOptions = useMemo(() => {
     const patientInsuranceOptions = Object.values(patientById)
       .map((patient: any) => String(patient?.healthInsuranceName || '').trim())
@@ -248,184 +341,55 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     return base;
   }, [insuranceOptions, patientById, form.healthInsuranceName]);
 
-  const loadPatients = async () => {
-    setPatientsLoading(true);
-    try {
-      const patientData = await patientService.listPatients();
-
-      const list: any[] = Array.isArray(patientData)
-        ? patientData
-        : (Array.isArray(patientData?.patients)
-          ? patientData.patients
-          : (Array.isArray(patientData?.items)
-            ? patientData.items
-            : (Array.isArray(patientData?.data?.patients)
-              ? patientData.data.patients
-              : (Array.isArray(patientData?.data)
-                ? patientData.data
-                : []))));
-
-      const byId: Record<string, any> = {};
-      const options = list
-        .map((p: any) => {
-          const id = String(p.id || '');
-          if (!id) return null;
-          byId[id] = p;
-          const name = String(p.name || '').trim();
-          const cpf = String(p.cpf || '').trim();
-          return {
-            value: id,
-            label: cpf ? `${name} • ${formatCPF(cpf)}` : name,
-          };
-        })
-        .filter(Boolean) as { value: string; label: string }[];
-
-      setPatientById(byId);
-      setPatientOptions(options);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
-        color: 'red',
-      });
-    } finally {
-      setPatientsLoading(false);
-    }
-  };
+  const plans = useMemo(() => {
+    const list: any[] = Array.isArray(plansData) ? plansData : [];
+    return list.map((it: any) => ({
+      id: String(it.id || ''),
+      title: String(it.title || ''),
+      objective: String(it.objective || ''),
+      priority: String(it.priority || ''),
+      status: String(it.status || ''),
+      responsibleDoctorId: String(it.responsibleDoctorId || ''),
+      responsibleProfessional: String(it.responsibleProfessional || ''),
+      targetDate: it.targetDate ? String(it.targetDate) : '',
+      isActive: Boolean(it.isActive),
+    })).filter((it: TherapeuticPlanRow) => it.id);
+  }, [plansData]);
 
   useEffect(() => {
-    loadPatients();
-  }, []);
+    if (!patientsError) return;
+    const err: any = patientsError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes', color: 'red' });
+  }, [patientsError]);
 
   useEffect(() => {
-    setBirthDateInput(form.birthDate ? dayjs(form.birthDate).format('DD/MM/YYYY') : '');
-  }, [form.birthDate]);
+    if (!doctorsError) return;
+    const err: any = doctorsError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos', color: 'red' });
+  }, [doctorsError]);
 
   useEffect(() => {
-    const loadDoctors = async () => {
-      setLoadingDoctors(true);
-      try {
-        const data: any = await doctorService.listDoctors();
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (Array.isArray(data?.items)
-            ? data.items
-            : (Array.isArray(data?.data?.items)
-              ? data.data.items
-              : (Array.isArray(data?.data)
-                ? data.data
-                : [])));
-
-        const options = list
-          .map((doctor: any) => {
-            const id = String(doctor?.id || doctor?.doctorId || '').trim();
-            const name = String(doctor?.name || doctor?.nome || doctor?.fullName || '').trim();
-            return id && name ? { value: id, label: name } : null;
-          })
-          .filter(Boolean) as { value: string; label: string }[];
-
-        setDoctorOptions(options);
-      } catch {
-        setDoctorOptions([]);
-      } finally {
-        setLoadingDoctors(false);
-      }
-    };
-
-    loadDoctors();
-  }, []);
+    if (!insurancesError) return;
+    const err: any = insurancesError;
+    showNotification({ title: 'Aviso', message: err?.response?.data?.message || err?.message || 'Não foi possível carregar a lista de convênios', color: 'yellow' });
+  }, [insurancesError]);
 
   useEffect(() => {
-    const loadInsurances = async () => {
-      setLoadingInsurances(true);
-      try {
-        const data: any = await insuranceService.listInsurances({ limit: 300, offset: 0 });
-        const list: any[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.items)
-            ? data.items
-            : Array.isArray(data?.insurances)
-              ? data.insurances
-              : Array.isArray(data?.data?.items)
-                ? data.data.items
-                : Array.isArray(data?.data?.insurances)
-                  ? data.data.insurances
-                  : Array.isArray(data?.data)
-                    ? data.data
-                  : [];
+    if (!teaProfilesError) return;
+    const err: any = teaProfilesError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA', color: 'red' });
+  }, [teaProfilesError]);
 
-        const mapped = list
-          .map((item: any) => {
-            const name = String(item?.name || item?.nome || '').trim();
-            if (!name) return null;
-            return { value: name, label: name };
-          })
-          .filter((item: { value: string; label: string } | null): item is { value: string; label: string } => Boolean(item))
-          .filter((item, index, arr) => arr.findIndex((candidate) => candidate.value === item.value) === index)
-          .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-
-        setInsuranceOptions(mapped);
-      } catch (err: any) {
-        setInsuranceOptions([]);
-        showNotification({
-          title: 'Aviso',
-          message: err?.response?.data?.message || err?.message || 'Não foi possível carregar a lista de convênios',
-          color: 'yellow',
-        });
-      } finally {
-        setLoadingInsurances(false);
-      }
-    };
-
-    loadInsurances();
-  }, []);
+  useEffect(() => {
+    if (!plansError || activeSubmodule !== 'plano' || !selectedTeaProfileId) return;
+    const err: any = plansError;
+    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar planos terapêuticos', color: 'red' });
+  }, [plansError, activeSubmodule, selectedTeaProfileId]);
 
   useEffect(() => {
     if (!forcedSubmodule) return;
     setActiveSubmodule(forcedSubmodule);
   }, [forcedSubmodule]);
-
-  const loadTeaProfiles = async (search?: string) => {
-    setTeaLoading(true);
-    try {
-      const data: any = await teaProfileService.list({
-        search: search || undefined,
-        limit: 100,
-        offset: 0,
-      });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.data?.items)
-            ? data.data.items
-            : []));
-
-      const mapped: TeaProfileRow[] = list.map((it: any) => ({
-        id: String(it.id || ''),
-        patientId: String(it.patient?.id || it.patientId || ''),
-        patientName: String(it.patient?.name || ''),
-        patientCpf: String(it.patient?.cpf || ''),
-        supportLevel: String(it.supportLevel || ''),
-        isActive: Boolean(it.isActive),
-        raw: it,
-      })).filter((it) => it.id);
-
-      setTeaItems(mapped);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
-        color: 'red',
-      });
-    } finally {
-      setTeaLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTeaProfiles(teaSearch);
-  }, [teaSearch]);
 
   useEffect(() => {
     const shellDelay = isFromModuleHub ? 120 : 40;
@@ -538,8 +502,10 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         color: 'green',
       });
 
-      await loadPatients();
-      await loadTeaProfiles(teaSearch);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.patientsAdmin }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.teaProfiles }),
+      ]);
     } catch (err: any) {
       const details = err?.response?.data?.fields
         ? Object.values(err.response.data.fields).join(' | ')
@@ -607,45 +573,10 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const loadPlans = async (teaProfileId: string) => {
-    setPlansLoading(true);
-    try {
-      const data: any = await teaProfileService.listPlans(teaProfileId, { isActive: true });
-      const list: any[] = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.items)
-          ? data.items
-          : []);
-
-      const mapped: TherapeuticPlanRow[] = list.map((it: any) => ({
-        id: String(it.id || ''),
-        title: String(it.title || ''),
-        objective: String(it.objective || ''),
-        priority: String(it.priority || ''),
-        status: String(it.status || ''),
-        responsibleDoctorId: String(it.responsibleDoctorId || ''),
-        responsibleProfessional: String(it.responsibleProfessional || ''),
-        targetDate: it.targetDate ? String(it.targetDate) : '',
-        isActive: Boolean(it.isActive),
-      })).filter((it) => it.id);
-
-      setPlans(mapped);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar planos terapêuticos',
-        color: 'red',
-      });
-    } finally {
-      setPlansLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (activeSubmodule !== 'plano') return;
 
     if (selectedTeaProfileId) {
-      loadPlans(selectedTeaProfileId);
       return;
     }
 
@@ -653,12 +584,9 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       const byPatient = teaItems.find((it) => it.patientId === selectedPatientId);
       if (byPatient?.id) {
         setSelectedTeaProfileId(byPatient.id);
-        loadPlans(byPatient.id);
         return;
       }
     }
-
-    setPlans([]);
   }, [activeSubmodule, selectedTeaProfileId, selectedPatientId, teaItems]);
 
   const submodules: Array<{
@@ -731,7 +659,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
       showNotification({ title: 'Sucesso', message: 'Plano terapêutico criado com sucesso', color: 'green' });
       setPlanForm(INITIAL_PLAN_FORM);
-      await loadPlans(selectedTeaProfileId);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.teaPlans, selectedTeaProfileId] });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -748,7 +676,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     try {
       await teaProfileService.deactivatePlan(planId);
       showNotification({ title: 'Sucesso', message: 'Plano terapêutico inativado', color: 'green' });
-      await loadPlans(selectedTeaProfileId);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.teaPlans, selectedTeaProfileId] });
     } catch (err: any) {
       showNotification({
         title: 'Erro',

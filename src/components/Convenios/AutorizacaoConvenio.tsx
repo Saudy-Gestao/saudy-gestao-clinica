@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -28,6 +29,8 @@ import convenioAuthorizationService, {
   type ConvenioAuthorizationSourceType,
   type ConvenioAuthorizationStatus,
 } from '../../services/convenioAuthorizationService';
+import { useConvenioAuthorizationsQuery } from '../../hooks/useConvenioAuthorizationsQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type AuthorizationItem = {
   id: string;
@@ -70,12 +73,11 @@ const resolveInsuranceName = (item: AuthorizationItem): string => (
 
 export function AutorizacaoConvenio() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-text)' : DARK_BLUE;
 
-  const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<AuthorizationItem[]>([]);
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
@@ -86,25 +88,34 @@ export function AutorizacaoConvenio() {
     file: File;
     objectUrl: string | null;
   } | null>(null);
+  const {
+    data: items = [] as AuthorizationItem[],
+    isLoading: loading,
+    error,
+  } = useConvenioAuthorizationsQuery({
+    search,
+    sourceFilter,
+    statusFilter,
+  });
 
-  const filteredItems = useMemo(() => {
+  const filteredItems = useMemo<AuthorizationItem[]>(() => {
     if (insuranceTypeFilter.length === 0) return items;
-    return items.filter((item) => insuranceTypeFilter.includes(resolveInsuranceName(item)));
+    return items.filter((item: AuthorizationItem) => insuranceTypeFilter.includes(resolveInsuranceName(item)));
   }, [items, insuranceTypeFilter]);
 
   const insuranceTypeOptions = useMemo(() => {
-    const unique = Array.from(new Set(items.map((item) => resolveInsuranceName(item)).filter(Boolean)));
+    const unique = Array.from(new Set(items.map((item: AuthorizationItem) => resolveInsuranceName(item)).filter(Boolean)));
     const withoutParticular = unique
-      .filter((name) => name.toLowerCase() !== 'particular')
+      .filter((name): name is string => typeof name === 'string' && name.toLowerCase() !== 'particular')
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    const hasParticular = unique.some((name) => name.toLowerCase() === 'particular');
+    const hasParticular = unique.some((name) => typeof name === 'string' && name.toLowerCase() === 'particular');
     const ordered = hasParticular ? [...withoutParticular, 'Particular'] : withoutParticular;
-    return ordered.map((name) => ({ value: name, label: name }));
+    return ordered.map((name): { value: string; label: string } => ({ value: name, label: name }));
   }, [items]);
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
 
   const summary = useMemo(() => {
-    return filteredItems.reduce((acc, item) => {
+    return filteredItems.reduce((acc: { pending: number; authorized: number; denied: number }, item: AuthorizationItem) => {
       if (item.status === 'PENDING') acc.pending += 1;
       if (item.status === 'AUTHORIZED') acc.authorized += 1;
       if (item.status === 'DENIED') acc.denied += 1;
@@ -112,33 +123,15 @@ export function AutorizacaoConvenio() {
     }, { pending: 0, authorized: 0, denied: 0 });
   }, [filteredItems]);
 
-  const loadItems = async () => {
-    setLoading(true);
-    try {
-      const data: any = await convenioAuthorizationService.list({
-        search,
-        statuses: statusFilter,
-        sourceTypes: sourceFilter,
-        limit: 5000,
-        offset: 0,
-      });
-
-      const mapped = Array.isArray(data?.items) ? data.items : [];
-      setItems(mapped);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar autorizações',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadItems();
-  }, [search, JSON.stringify(sourceFilter), JSON.stringify(statusFilter)]);
+    if (!error) return;
+    const err: any = error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar autorizações',
+      color: 'red',
+    });
+  }, [error]);
 
   const handleUpdateStatus = async (
     item: AuthorizationItem,
@@ -156,7 +149,7 @@ export function AutorizacaoConvenio() {
         message: `${item.patientName || 'Item'} atualizado para ${STATUS_OPTIONS.find((it) => it.value === status)?.label || status}.`,
         color: 'green',
       });
-      await loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.convenioAuthorizations });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -191,7 +184,7 @@ export function AutorizacaoConvenio() {
         message: `${file.name} anexado com sucesso.`,
         color: 'green',
       });
-      await loadItems();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.convenioAuthorizations });
     } catch (err: any) {
       showNotification({
         title: 'Erro ao anexar',
@@ -339,7 +332,7 @@ export function AutorizacaoConvenio() {
             variant="light"
             color="indigo"
             leftSection={<RefreshCcw size={16} />}
-            onClick={loadItems}
+            onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.convenioAuthorizations })}
             loading={loading}
           >
             Atualizar
@@ -418,7 +411,7 @@ export function AutorizacaoConvenio() {
                         </Table.Td>
                       </Table.Tr>
                     ) : (
-                      filteredItems.map((item) => {
+                      filteredItems.map((item: AuthorizationItem) => {
                         const rowKey = `${item.sourceType}-${item.id}`;
                         const resolvedInsuranceName = resolveInsuranceName(item);
                         return (
@@ -463,7 +456,7 @@ export function AutorizacaoConvenio() {
                               )}
                             </Table.Td>
                             <Table.Td>
-                              <Badge color={STATUS_COLOR[item.status]} variant="light">
+                              <Badge color={STATUS_COLOR[item.status as ConvenioAuthorizationStatus]} variant="light">
                                 {STATUS_OPTIONS.find((opt) => opt.value === item.status)?.label || item.status}
                               </Badge>
                             </Table.Td>
@@ -506,7 +499,7 @@ export function AutorizacaoConvenio() {
                                 {(item.attachmentsCount || 0) > 0 && (
                                   <Text size="xs" c="dimmed">{item.attachmentsCount} anexo(s)</Text>
                                 )}
-                                {(item.attachments || []).slice(0, 3).map((doc) => (
+                                {(item.attachments || []).slice(0, 3).map((doc: ConvenioAuthorizationAttachment) => (
                                   <Group key={doc.id} gap={4} wrap="nowrap">
                                     <Text size="xs" c="dimmed" lineClamp={1}>{doc.fileName}</Text>
                                     <ActionIcon

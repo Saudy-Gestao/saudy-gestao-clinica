@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
   Badge,
@@ -26,9 +27,9 @@ import { DARK_BLUE } from '../../themes/theme';
 import reportTemplateService from '../../services/reportTemplateService';
 import reportPhraseService from '../../services/reportPhraseService';
 import reportWorklistService from '../../services/reportWorklistService';
-import procedureService from '../../services/procedureService';
-import insuranceService from '../../services/insuranceService';
 import reportConfigService from '../../services/reportConfigService';
+import { useReportSettingsQuery } from '../../hooks/useReportSettingsQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
@@ -65,6 +66,7 @@ interface WorklistItem {
 
 export function LaudoConfiguracoes() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
 
   const [activeTab, setActiveTab] = useState<string | null>('templates');
@@ -103,6 +105,10 @@ export function LaudoConfiguracoes() {
     priority: 'normal' as WorklistPriority,
     status: 'sem_laudo' as WorklistStatus,
   });
+  const {
+    data: settingsData,
+    error: settingsError,
+  } = useReportSettingsQuery();
 
   const normalizeStatus = (status: any): WorklistStatus => {
     if (status === 'finalizado') return 'finalizado';
@@ -130,104 +136,104 @@ export function LaudoConfiguracoes() {
     return worklist.filter((item) => item.patientName.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
   }, [worklist, worklistQuery]);
 
-  const loadAll = async () => {
-    try {
-      const [templatesData, phrasesData, worklistData, proceduresData, insurancesData, configData] = await Promise.all([
-        reportTemplateService.list({ limit: 400, offset: 0 }),
-        reportPhraseService.list({ limit: 400, offset: 0 }),
-        reportWorklistService.list({ limit: 400, offset: 0 }),
-        procedureService.listProcedures({ limit: 400, offset: 0 }),
-        insuranceService.listInsurances({ limit: 400, offset: 0 }),
-        reportConfigService.get(),
-      ]);
+  useEffect(() => {
+    if (!settingsData) return;
 
-      const templatesList = Array.isArray(templatesData)
-        ? templatesData
-        : (Array.isArray(templatesData?.items) ? templatesData.items : []);
-      const phrasesList = Array.isArray(phrasesData)
-        ? phrasesData
-        : (Array.isArray(phrasesData?.items) ? phrasesData.items : []);
-      const worklistList = Array.isArray(worklistData)
-        ? worklistData
-        : (Array.isArray(worklistData?.items) ? worklistData.items : []);
-      const proceduresList = Array.isArray(proceduresData)
-        ? proceduresData
-        : (Array.isArray(proceduresData?.items) ? proceduresData.items : []);
-      const insurancesList = Array.isArray(insurancesData)
-        ? insurancesData
-        : (Array.isArray(insurancesData?.items) ? insurancesData.items : []);
+    const {
+      templatesData,
+      phrasesData,
+      worklistData,
+      proceduresData,
+      insurancesData,
+      configData,
+    } = settingsData;
 
-      const mappedTemplates = templatesList.map((item: any) => ({
-        id: String(item.id || ''),
-        name: item.name || '',
-        examType: item.examType || '',
-        group: item.group || '',
-        content: item.content || '',
-      })).filter((item: TemplateItem) => item.id);
+    const templatesList = Array.isArray(templatesData)
+      ? templatesData
+      : (Array.isArray((templatesData as any)?.items) ? (templatesData as any).items : []);
+    const phrasesList = Array.isArray(phrasesData)
+      ? phrasesData
+      : (Array.isArray((phrasesData as any)?.items) ? (phrasesData as any).items : []);
+    const worklistList = Array.isArray(worklistData)
+      ? worklistData
+      : (Array.isArray((worklistData as any)?.items) ? (worklistData as any).items : []);
+    const proceduresList = Array.isArray(proceduresData)
+      ? proceduresData
+      : (Array.isArray((proceduresData as any)?.items) ? (proceduresData as any).items : []);
+    const insurancesList = Array.isArray(insurancesData)
+      ? insurancesData
+      : (Array.isArray((insurancesData as any)?.items) ? (insurancesData as any).items : []);
 
-      const mappedPhrases = phrasesList.map((item: any) => ({
-        id: String(item.id || ''),
-        examType: item.examType || '',
-        label: item.label || '',
-        text: item.text || '',
-      })).filter((item: PhraseItem) => item.id);
+    const mappedTemplates = templatesList.map((item: any) => ({
+      id: String(item.id || ''),
+      name: item.name || '',
+      examType: item.examType || '',
+      group: item.group || '',
+      content: item.content || '',
+    })).filter((item: TemplateItem) => item.id);
 
-      const mappedWorklist = worklistList.map((item: any) => ({
-        id: String(item.id || ''),
-        patientName: item.patientName || '',
-        patientCpf: item.patientCpf || '',
-        examType: item.examType || '',
-        scheduledAt: item.scheduledAt || '',
-        requestingDoctor: item.requestingDoctor || '',
-        assignedTo: item.assignedTo || '',
-        convenio: item.convenio || '',
-        priority: item.priority === 'urgente' ? 'urgente' : 'normal',
-        status: normalizeStatus(item.status),
-      })).filter((item: WorklistItem) => item.id);
+    const mappedPhrases = phrasesList.map((item: any) => ({
+      id: String(item.id || ''),
+      examType: item.examType || '',
+      label: item.label || '',
+      text: item.text || '',
+    })).filter((item: PhraseItem) => item.id);
 
-      setTemplates(mappedTemplates);
-      setPhrases(mappedPhrases);
-      setWorklist(mappedWorklist);
-      setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
+    const mappedWorklist = worklistList.map((item: any) => ({
+      id: String(item.id || ''),
+      patientName: item.patientName || '',
+      patientCpf: item.patientCpf || '',
+      examType: item.examType || '',
+      scheduledAt: item.scheduledAt || '',
+      requestingDoctor: item.requestingDoctor || '',
+      assignedTo: item.assignedTo || '',
+      convenio: item.convenio || '',
+      priority: item.priority === 'urgente' ? 'urgente' : 'normal',
+      status: normalizeStatus(item.status),
+    })).filter((item: WorklistItem) => item.id);
 
-      const examTypes = new Set<string>();
-      proceduresList.forEach((item: any) => {
-        const name = String(item?.name || '').trim();
-        if (name) examTypes.add(name);
-      });
-      mappedTemplates.forEach((item: TemplateItem) => {
-        if (item.examType) examTypes.add(item.examType);
-      });
-      mappedPhrases.forEach((item: PhraseItem) => {
-        if (item.examType) examTypes.add(item.examType);
-      });
-      mappedWorklist.forEach((item: WorklistItem) => {
-        if (item.examType) examTypes.add(item.examType);
-      });
+    setTemplates(mappedTemplates);
+    setPhrases(mappedPhrases);
+    setWorklist(mappedWorklist);
+    setRequiresReviewer(Boolean((configData as any)?.requiresReviewer ?? true));
 
-      const convenios = new Set<string>();
-      insurancesList.forEach((item: any) => {
-        const name = String(item?.name || '').trim();
-        if (name) convenios.add(name);
-      });
-      mappedWorklist.forEach((item: WorklistItem) => {
-        if (item.convenio) convenios.add(item.convenio);
-      });
+    const examTypes = new Set<string>();
+    proceduresList.forEach((item: any) => {
+      const name = String(item?.name || '').trim();
+      if (name) examTypes.add(name);
+    });
+    mappedTemplates.forEach((item: TemplateItem) => {
+      if (item.examType) examTypes.add(item.examType);
+    });
+    mappedPhrases.forEach((item: PhraseItem) => {
+      if (item.examType) examTypes.add(item.examType);
+    });
+    mappedWorklist.forEach((item: WorklistItem) => {
+      if (item.examType) examTypes.add(item.examType);
+    });
 
-      setExamTypeOptions(Array.from(examTypes).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value })));
-      setConvenioOptions(Array.from(convenios).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value })));
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar configuracoes do laudo',
-        color: 'red',
-      });
-    }
-  };
+    const convenios = new Set<string>();
+    insurancesList.forEach((item: any) => {
+      const name = String(item?.name || '').trim();
+      if (name) convenios.add(name);
+    });
+    mappedWorklist.forEach((item: WorklistItem) => {
+      if (item.convenio) convenios.add(item.convenio);
+    });
+
+    setExamTypeOptions(Array.from(examTypes).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value })));
+    setConvenioOptions(Array.from(convenios).sort((a, b) => a.localeCompare(b)).map((value) => ({ value, label: value })));
+  }, [settingsData]);
 
   useEffect(() => {
-    loadAll();
-  }, []);
+    if (!settingsError) return;
+    const err: any = settingsError;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar configuracoes do laudo',
+      color: 'red',
+    });
+  }, [settingsError]);
 
   const handleRequiresReviewerChange = async (nextValue: boolean) => {
     setRequiresReviewer(nextValue);
@@ -235,6 +241,7 @@ export function LaudoConfiguracoes() {
 
     try {
       await reportConfigService.update({ requiresReviewer: nextValue });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({
         title: 'Configuracao atualizada',
         message: nextValue ? 'Laudo agora exige revisor para finalizacao.' : 'Laudo pode ser finalizado sem revisor.',
@@ -304,7 +311,7 @@ export function LaudoConfiguracoes() {
       }
 
       setTemplateModalOpen(false);
-      await loadAll();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Padrao de laudo salvo com sucesso.', color: 'green' });
     } catch (err: any) {
       showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar padrao.', color: 'red' });
@@ -333,7 +340,7 @@ export function LaudoConfiguracoes() {
       }
 
       setPhraseModalOpen(false);
-      await loadAll();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Frase de laudo salva com sucesso.', color: 'green' });
     } catch (err: any) {
       showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar frase.', color: 'red' });
@@ -366,7 +373,7 @@ export function LaudoConfiguracoes() {
       }
 
       setWorklistModalOpen(false);
-      await loadAll();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Item da fila salvo com sucesso.', color: 'green' });
     } catch (err: any) {
       showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar item da fila.', color: 'red' });
@@ -429,7 +436,7 @@ export function LaudoConfiguracoes() {
                           </ActionIcon>
                           <ActionIcon variant="subtle" color="red" onClick={async () => {
                             await reportTemplateService.remove(item.id);
-                            await loadAll();
+                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
                           }}>
                             <Trash2 size={16} />
                           </ActionIcon>
@@ -474,7 +481,7 @@ export function LaudoConfiguracoes() {
                           </ActionIcon>
                           <ActionIcon variant="subtle" color="red" onClick={async () => {
                             await reportPhraseService.remove(item.id);
-                            await loadAll();
+                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
                           }}>
                             <Trash2 size={16} />
                           </ActionIcon>
@@ -541,7 +548,7 @@ export function LaudoConfiguracoes() {
                           </ActionIcon>
                           <ActionIcon variant="subtle" color="red" onClick={async () => {
                             await reportWorklistService.remove(item.id);
-                            await loadAll();
+                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
                           }}>
                             <Trash2 size={16} />
                           </ActionIcon>

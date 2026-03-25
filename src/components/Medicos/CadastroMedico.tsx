@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -33,6 +34,8 @@ import doctorService from '../../services/doctorService';
 import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
 import { findExistingCpf } from '../../utils/cpfRegistry';
+import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 type Gender = 'male' | 'female' | 'other' | '';
 
@@ -219,6 +222,7 @@ const getWorkingSchedulesFromRaw = (raw: ApiRecord): WorkingSchedule[] => {
 
 export function CadastroMedico() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -279,6 +283,7 @@ export function CadastroMedico() {
   const [zipLoading, setZipLoading] = useState(false);
   const [lastZipLookup, setLastZipLookup] = useState('');
   const lastValidatedCpfRef = useRef<string>('');
+  const doctorsQuery = useDoctorsAdminQuery();
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
       if (!(field in prev)) return prev;
@@ -402,41 +407,37 @@ export function CadastroMedico() {
   };
 
   useEffect(() => {
-    const loadDoctors = async () => {
-      setDoctorsLoading(true);
-      try {
-        const data: unknown = await doctorService.listDoctors();
-        const list = getApiList(data);
+    setDoctorsLoading(doctorsQuery.isFetching);
+  }, [doctorsQuery.isFetching]);
 
-        const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
-          const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
-          const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
-          return {
-            id: String(item.id ?? item.doctorId ?? ''),
-            name,
-            crm: String(item.crm ?? ''),
-            crmState: String(item.crmState ?? item.ufCrm ?? ''),
-            specialty: String(item.specialty ?? specialties[0] ?? ''),
-            isActive: Boolean(item.isActive ?? item.active ?? true),
-            raw: item,
-          };
-        }).filter((item: DoctorListItem) => item.id);
+  useEffect(() => {
+    if (doctorsQuery.error) {
+      const err = doctorsQuery.error as ApiError;
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+        color: 'red',
+      });
+    }
+  }, [doctorsQuery.error]);
 
-        setDoctors(mapped);
-      } catch (e: unknown) {
-        const err = e as ApiError;
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
-          color: 'red',
-        });
-      } finally {
-        setDoctorsLoading(false);
-      }
-    };
-
-    loadDoctors();
-  }, []);
+  useEffect(() => {
+    const list = getApiList(doctorsQuery.data);
+    const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
+      const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
+      const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
+      return {
+        id: String(item.id ?? item.doctorId ?? ''),
+        name,
+        crm: String(item.crm ?? ''),
+        crmState: String(item.crmState ?? item.ufCrm ?? ''),
+        specialty: String(item.specialty ?? specialties[0] ?? ''),
+        isActive: Boolean(item.isActive ?? item.active ?? true),
+        raw: item,
+      };
+    }).filter((item: DoctorListItem) => item.id);
+    setDoctors(mapped);
+  }, [doctorsQuery.data]);
 
   const statesOptions = [
     'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
@@ -599,26 +600,7 @@ export function CadastroMedico() {
         setFieldErrors({});
         setShowSuccessModal(true);
       }
-      try {
-        const refreshed: unknown = await doctorService.listDoctors();
-        const list = getApiList(refreshed);
-        const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
-          const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
-          const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
-          return {
-            id: String(item.id ?? item.doctorId ?? ''),
-            name,
-            crm: String(item.crm ?? ''),
-            crmState: String(item.crmState ?? item.ufCrm ?? ''),
-            specialty: String(item.specialty ?? specialties[0] ?? ''),
-            isActive: Boolean(item.isActive ?? item.active ?? true),
-            raw: item,
-          };
-        }).filter((item: DoctorListItem) => item.id);
-        setDoctors(mapped);
-      } catch {
-        // Silent refresh failure after save.
-      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.doctorsAdmin });
     } catch (e: unknown) {
       const err = e as ApiError;
       // handle field-level errors returned by server
@@ -657,7 +639,7 @@ export function CadastroMedico() {
   const handleDeleteDoctor = async (item: DoctorListItem) => {
     try {
       await doctorService.deleteDoctor(item.id);
-      setDoctors((prev) => prev.filter((d) => d.id !== item.id));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.doctorsAdmin });
       showNotification({ title: 'Médico excluído', message: 'Registro removido com sucesso.', color: 'green' });
       setDeleteConfirmOpen(false);
       setDeleteTarget(null);
@@ -670,18 +652,8 @@ export function CadastroMedico() {
 
   const handleToggleActive = async (item: DoctorListItem) => {
     try {
-
-      setDoctors((prev) =>
-        prev.map((d) =>
-          d.id === item.id
-            ? {
-                ...d,
-                isActive: !d.isActive,
-                raw: { ...d.raw, isActive: !d.isActive },
-              }
-            : d
-        )
-      );
+      await doctorService.updateDoctor(item.id, { isActive: !item.isActive } as any);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.doctorsAdmin });
 
       showNotification({
         title: 'Status atualizado',

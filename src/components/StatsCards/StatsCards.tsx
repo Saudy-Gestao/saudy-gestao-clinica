@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Paper, SimpleGrid, Text, Loader, Center, useMantineColorScheme } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import dayjs from 'dayjs';
-import consultationService from '../../services/consultationService';
-import appointmentService from '../../services/appointmentService';
+import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
+import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 
 const ACTIVE_CONSULTATION_STATUSES = [
   'aguardando atendimento',
@@ -22,87 +22,46 @@ const extractDateOnly = (value?: string | null) => {
 
 export function StatsCards() {
   const { colorScheme } = useMantineColorScheme();
-  const [stats, setStats] = useState({
-    agendadosHoje: 0,
-    pendentesHoje: 0,
-    emAtendimento: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { data: consultations = [], isLoading: consultationsLoading, error: consultationsError } = useClinicalQueueQuery();
+  const { data: appointments = [], isLoading: appointmentsLoading, error: appointmentsError } = useAppointmentsQuery();
 
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        setLoading(true);
+    const err: any = consultationsError || appointmentsError;
+    if (!err) return;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar estatísticas',
+      color: 'red',
+    });
+  }, [consultationsError, appointmentsError]);
 
-        // Buscar dados em paralelo e tratar 403 como falta de permissao sem toast de erro.
-        const [consultationsResult, appointmentsResult] = await Promise.allSettled([
-          consultationService.list({ limit: 1000 }),
-          appointmentService.list({ limit: 1000 }),
-        ]);
+  const stats = useMemo(() => {
+    const today = dayjs().format('YYYY-MM-DD');
+    const appointmentsToday = appointments.filter((a: any) => extractDateOnly(a.date || a.data) === today);
 
-        const extractData = (result: PromiseSettledResult<any>) => {
-          if (result.status === 'fulfilled') {
-            return result.value;
-          }
+    const agendadosHoje = appointmentsToday.filter((a: any) => {
+      const status = normalizeAppointmentStatus(a.status);
+      return !['CANCELADO', 'CANCELED'].includes(status);
+    }).length;
 
-          const status = (result.reason as any)?.response?.status;
-          if (status === 403) {
-            return [];
-          }
+    const pendentesHoje = appointmentsToday.filter((a: any) => {
+      const status = normalizeAppointmentStatus(a.status);
+      return ['AGENDADO', 'CONFIRMADO', 'PENDENTE'].includes(status) || !status;
+    }).length;
 
-          throw result.reason;
-        };
+    const emAtendimento = consultations.filter((c: any) => {
+      const queueStatus = String(c.queue || c.queueType || '').trim().toLowerCase();
+      return ACTIVE_CONSULTATION_STATUSES.includes(queueStatus);
+    }).length;
 
-        const consultationsData = extractData(consultationsResult);
-        const appointmentsData = extractData(appointmentsResult);
-
-        // Processar consultations
-        const consultationsList = Array.isArray(consultationsData) 
-          ? consultationsData 
-          : (consultationsData?.items || consultationsData?.data || []);
-
-        // Processar appointments
-        const appointmentsList = Array.isArray(appointmentsData)
-          ? appointmentsData
-          : (appointmentsData?.items || appointmentsData?.data || []);
-
-        const today = dayjs().format('YYYY-MM-DD');
-
-        const appointmentsToday = appointmentsList.filter((a: any) => extractDateOnly(a.date || a.data) === today);
-
-        const agendadosHoje = appointmentsToday.filter((a: any) => {
-          const status = normalizeAppointmentStatus(a.status);
-          return !['CANCELADO', 'CANCELED'].includes(status);
-        }).length;
-
-        const pendentesHoje = appointmentsToday.filter((a: any) => {
-          const status = normalizeAppointmentStatus(a.status);
-          return ['AGENDADO', 'CONFIRMADO', 'PENDENTE'].includes(status) || !status;
-        }).length;
-
-        const emAtendimento = consultationsList.filter((c: any) => {
-          const queueStatus = String(c.queue || c.queueType || '').trim().toLowerCase();
-          return ACTIVE_CONSULTATION_STATUSES.includes(queueStatus);
-        }).length;
-
-        setStats({
-          agendadosHoje,
-          pendentesHoje,
-          emAtendimento,
-        });
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar estatísticas',
-          color: 'red',
-        });
-      } finally {
-        setLoading(false);
-      }
+    return {
+      agendadosHoje,
+      pendentesHoje,
+      emAtendimento,
     };
+  }, [appointments, consultations]);
 
-    loadStats();
-  }, []);
+  const loading = consultationsLoading || appointmentsLoading;
 
   if (loading) {
     return (

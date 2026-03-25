@@ -8,16 +8,7 @@ import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
-import consultationService from '../../services/consultationService';
-
-interface Appointment {
-  id: string;
-  doctorName: string;
-  specialty: string;
-  time: string;
-  status: string;
-  room?: string;
-}
+import { usePatientTodayAppointmentsQuery } from '../../hooks/usePatientTodayAppointmentsQuery';
 
 export function FacialRecognition() {
   const navigate = useNavigate();
@@ -27,8 +18,8 @@ export function FacialRecognition() {
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
   const [recognitionResult, setRecognitionResult] = useState<FacialScanResponse | null>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const patientId = recognitionResult?.patient?.id || null;
+  const { data: appointments = [], isLoading: loadingAppointments } = usePatientTodayAppointmentsQuery(patientId);
 
   const handleFacialScan = async (imageBase64: string) => {
     setRecognizing(true);
@@ -43,11 +34,6 @@ export function FacialRecognition() {
 
       setRecognitionResult(result);
       
-      // Buscar consultas do dia para o paciente reconhecido
-      if (result.patient && result.patient.id) {
-        await loadTodayAppointments(result.patient.id);
-      }
-
       showNotification({
         title: 'Reconhecimento bem-sucedido',
         message: `Bem-vindo(a), ${result.patient.name}!`,
@@ -65,50 +51,8 @@ export function FacialRecognition() {
     }
   };
 
-  const loadTodayAppointments = async (patientId: string) => {
-    setLoadingAppointments(true);
-    try {
-      // Buscar consultas do paciente
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
-
-      const response: any = await consultationService.list();
-      
-      // Filtrar consultas do dia do paciente
-      const allConsultations = Array.isArray(response) ? response : (response?.data || []);
-      const todayConsultations = allConsultations.filter((c: any) => {
-        const consultDate = new Date(c.scheduledAt || c.scheduled_at || c.date);
-        const isToday = consultDate >= new Date(startOfDay) && consultDate <= new Date(endOfDay);
-        const isPatient = String(c.patientId || c.patient_id || c.patient?.id) === patientId;
-        return isToday && isPatient;
-      });
-
-      const mapped: Appointment[] = todayConsultations.map((c: any) => ({
-        id: String(c.id || c.consultationId),
-        doctorName: c.doctorName || c.doctor_name || c.doctor?.name || 'Médico não informado',
-        specialty: c.specialty || c.doctor?.specialty || '-',
-        time: new Date(c.scheduledAt || c.scheduled_at || c.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        status: c.status || 'SCHEDULED',
-        room: c.room || c.roomNumber || '-',
-      }));
-
-      setAppointments(mapped);
-    } catch (error: any) {
-      console.error('Erro ao carregar consultas:', error);
-      showNotification({
-        title: 'Aviso',
-        message: 'Não foi possível carregar as consultas do paciente.',
-        color: 'yellow',
-      });
-    } finally {
-      setLoadingAppointments(false);
-    }
-  };
-
   const handleReset = () => {
     setRecognitionResult(null);
-    setAppointments([]);
   };
 
   const getTrustColor = (trust: string) => {

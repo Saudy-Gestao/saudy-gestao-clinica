@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Box, Group, Text, Paper, Button, Stack, Loader, Center, Badge } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
@@ -7,30 +8,8 @@ import { Play, ChevronRight, ArrowRight, Clock } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import preAttendanceService from '../../services/preAttendanceService';
-
-interface QueuePatient {
-  id: string;
-  name: string;
-  time: string;
-  type: string;
-  doctor: string;
-  position: number;
-  status: string;
-  createdAt?: string;
-}
-
-const parseAgendaSummary = (agenda?: string | null) => {
-  const parts = String(agenda || '')
-    .split('•')
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  return {
-    time: parts[0] || '--:--',
-    type: parts[1] || 'Consulta',
-    doctor: parts[2] || 'Profissional não informado',
-  };
-};
+import { usePatientQueueQuery, type QueuePatient } from '../../hooks/usePatientQueueQuery';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface PatientQueueProps {
   limit?: number;
@@ -40,64 +19,22 @@ interface PatientQueueProps {
 
 export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }: PatientQueueProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
-  const [queue, setQueue] = useState<QueuePatient[]>([]);
-  const [loading, setLoading] = useState(true);
   const [callingId, setCallingId] = useState<string | null>(null);
+  const { data: queueData = [], isLoading: loading, error } = usePatientQueueQuery();
+  const queue = useMemo(() => (limit ? queueData.slice(0, limit) : queueData), [queueData, limit]);
 
   useEffect(() => {
-    const loadQueue = async () => {
-      try {
-        setLoading(true);
-        const data: any = await preAttendanceService.list({ limit: 100 });
-        
-        const list: any[] = Array.isArray(data)
-          ? data
-          : (data?.items || data?.data || []);
-
-        // Mapear para formato da fila
-        const queueData = list
-          .filter((item: any) => {
-            const status = String(item.status || '').trim().toLowerCase();
-            return status === 'na fila da recepção' || status === 'atrasado';
-          })
-          .sort((a: any, b: any) => {
-            const createdAtA = new Date(a.createdAt || 0).getTime();
-            const createdAtB = new Date(b.createdAt || 0).getTime();
-            if (createdAtA !== createdAtB) return createdAtA - createdAtB;
-
-            const updatedAtA = new Date(a.updatedAt || 0).getTime();
-            const updatedAtB = new Date(b.updatedAt || 0).getTime();
-            return updatedAtA - updatedAtB;
-          })
-          .map((item: any, index: number) => {
-            const summary = parseAgendaSummary(item.agenda);
-            return ({
-            id: String(item.id),
-            name: item.fullName || item.patientName || 'Paciente sem nome',
-            time: summary.time,
-            type: summary.type,
-            doctor: summary.doctor,
-            position: index + 1,
-            status: item.status || '',
-            createdAt: item.createdAt,
-          })});
-
-        setQueue(limit ? queueData.slice(0, limit) : queueData);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar fila',
-          color: 'red',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadQueue();
-  }, []);
+    if (!error) return;
+    const err: any = error;
+    showNotification({
+      title: 'Erro',
+      message: err?.response?.data?.message || err?.message || 'Erro ao carregar fila',
+      color: 'red',
+    });
+  }, [error]);
 
   if (loading) {
     return (
@@ -143,8 +80,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
         status: 'Em atendimento na recepção',
         queueType: 'Autorização e Recepção',
       });
-
-      setQueue((prev) => prev.filter((item) => item.id !== patient.id));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.patientQueue });
 
       showNotification({
         title: 'Paciente chamado',
