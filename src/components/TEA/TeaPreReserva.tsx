@@ -649,8 +649,6 @@ export function TeaPreReserva() {
   const [checklistGroupKey, setChecklistGroupKey] = useState<string | null>(null);
   const [checklistGroupLabel, setChecklistGroupLabel] = useState<string>('');
   const [checklistGroupReservations, setChecklistGroupReservations] = useState<any[]>([]);
-  const [checklistProcedureOptions, setChecklistProcedureOptions] = useState<string[]>([]);
-  const [selectedChecklistProcedure, setSelectedChecklistProcedure] = useState<string | null>(null);
   const [acceptModalOpened, setAcceptModalOpened] = useState(false);
   const [acceptModalMode, setAcceptModalMode] = useState<'suggestion' | 'conversion'>('suggestion');
   const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
@@ -697,16 +695,11 @@ export function TeaPreReserva() {
     }));
   };
 
-  const checklistSelectedProcedureReservations = useMemo(() => {
-    if (!selectedChecklistProcedure) return [] as any[];
-    return checklistGroupReservations.filter(
-      (reservation) => getReservationProcedureName(reservation) === selectedChecklistProcedure,
-    );
-  }, [checklistGroupReservations, selectedChecklistProcedure]);
-
   const checklistCanConvertByProcedure = useMemo(() => {
     const byProcedure = new Map<string, boolean>();
-    checklistProcedureOptions.forEach((procedure) => {
+    Array.from(new Set(
+      checklistItems.map((item) => item.procedureName || 'Procedimento nÃ£o definido'),
+    )).forEach((procedure) => {
       const procedureItems = checklistItems.filter(
         (item) => (item.procedureName || 'Procedimento não definido') === procedure,
       );
@@ -716,17 +709,22 @@ export function TeaPreReserva() {
       );
     });
     return byProcedure;
-  }, [checklistItems, checklistProcedureOptions]);
+  }, [checklistItems]);
 
-  const checklistConvertibleSelectedReservations = useMemo(() => {
-    if (!selectedChecklistProcedure) return [] as any[];
-    return checklistSelectedProcedureReservations.filter((reservation) => {
-      const procedure = getReservationProcedureName(reservation);
-      return checklistCanConvertByProcedure.get(procedure) === true;
-    });
-  }, [checklistCanConvertByProcedure, checklistSelectedProcedureReservations, selectedChecklistProcedure]);
+  const checklistConvertiblePitReservations = useMemo(() => checklistGroupReservations.filter((reservation) => {
+    const procedure = getReservationProcedureName(reservation);
+    return checklistCanConvertByProcedure.get(procedure) === true;
+  }), [checklistCanConvertByProcedure, checklistGroupReservations]);
 
-  const checklistCanConvertSelectedProcedure = checklistConvertibleSelectedReservations.length > 0;
+  const checklistCanConvertWholePit = (
+    checklistGroupReservations.length > 0
+    && checklistConvertiblePitReservations.length === checklistGroupReservations.length
+  );
+
+  const acceptConversionHasMissingStartDate = (
+    acceptModalMode === 'conversion'
+    && acceptTherapies.some((entry) => !String(acceptDateByTherapy[entry.therapy.pitTherapyId] || '').trim())
+  );
 
 
   const filteredItems = useMemo(() => {
@@ -991,8 +989,6 @@ export function TeaPreReserva() {
       inAuthorizationActive
       || stageFilledByStep[4]
       || (hasFrequencyRegression && progress.regressionTargetSessions > 0 && progress.authorizedCount < progress.totalTherapies)
-      || hasPendingTherapyRegression
-      || hasReservedTherapyRegression
     );
     const shouldCarryReservedStepsInRegression = hasProgressRegression && (
       progress.pendingApprovalCount > 0
@@ -1280,7 +1276,7 @@ export function TeaPreReserva() {
   const openConversionConfirmationModal = (reservationsToConvert?: any[]) => {
     const scopedReservations = Array.isArray(reservationsToConvert)
       ? reservationsToConvert
-      : checklistSelectedProcedureReservations;
+      : checklistGroupReservations;
     const anchorByTherapy = new Map<string, string>();
     scopedReservations.forEach((item) => {
       const therapyId = String(item?.pitTherapyId || item?.preReservationId || '');
@@ -1362,14 +1358,8 @@ export function TeaPreReserva() {
       return;
     }
 
-    const initialDateByTherapy = preparedTherapies.reduce((acc, entry) => {
-      const firstDate = entry.slots[0]?.date;
-      if (firstDate) acc[entry.therapy.pitTherapyId] = firstDate;
-      return acc;
-    }, {} as Record<string, string>);
-
     setAcceptTherapies(preparedTherapies);
-    setAcceptDateByTherapy(initialDateByTherapy);
+    setAcceptDateByTherapy({});
     setConversionReservationIds(scopedReservationIds);
     setChecklistModalOpened(false);
     setAcceptModalMode('conversion');
@@ -1508,16 +1498,12 @@ export function TeaPreReserva() {
         return;
       }
 
-      const procedureOptions = Array.from(new Set(eligibleReservations.map((item) => getReservationProcedureName(item))));
-
       setChecklistLoading(true);
       setChecklistModalOpened(true);
       setChecklistGroupKey(group.groupKey);
       setChecklistGroupLabel(`${group.patientName} • PIT`);
       setChecklistGroupReservations(eligibleReservations);
-      setChecklistProcedureOptions(procedureOptions);
-      setSelectedChecklistProcedure(procedureOptions[0] || null);
-      setConversionReservationIds([]);
+      setConversionReservationIds(eligibleAnchors.map((item) => String(item?.preReservationId || '')).filter(Boolean));
       setChecklistItems([]);
       try {
       const allItems: ConversionChecklistItem[] = [];
@@ -3286,7 +3272,11 @@ export function TeaPreReserva() {
           <Stack gap={6}>
             {acceptTherapies.map((entry) => {
               const allDates = Array.from(new Set(entry.slots.map((s) => s.date))).sort((a,b)=>dayjs(a).valueOf()-dayjs(b).valueOf());
-              const dates = buildRecurringPreviewDates(allDates, 6);
+              const previewDates = buildRecurringPreviewDates(allDates, 6);
+              const fallbackDates = allDates
+                .filter((date) => !dayjs(date).isBefore(dayjs(), 'day'))
+                .slice(0, 6);
+              const dates = previewDates.length > 0 ? previewDates : fallbackDates;
               const timeByWeekday = new Map<number, string>();
               [...entry.slots]
                 .sort((a, b) => {
@@ -3308,7 +3298,9 @@ export function TeaPreReserva() {
                   label: `${formatWeekdayPt(d)} • ${dayjs(d).format('DD/MM/YYYY')} • ${labelTime}`,
                 };
               });
-              const selectedDate = acceptDateByTherapy[entry.therapy.pitTherapyId] || dateOptions[0]?.value || '';
+              const selectedDate = acceptModalMode === 'conversion'
+                ? (acceptDateByTherapy[entry.therapy.pitTherapyId] || '')
+                : (acceptDateByTherapy[entry.therapy.pitTherapyId] || dateOptions[0]?.value || '');
               
               // In conversion mode, use the actual marked slots for this therapy.
               // In suggestion mode, use resolved suggestions from the chosen start date.
@@ -3345,6 +3337,7 @@ export function TeaPreReserva() {
                       style={{ minWidth: 260 }}
                       data={dateOptions}
                       value={selectedDate}
+                      placeholder="Selecione a primeira data disponível"
                       onChange={(v) => {
                         if (!v) return;
                         setAcceptDateByTherapy((prev) => ({ ...prev, [entry.therapy.pitTherapyId]: v }));
@@ -3353,9 +3346,10 @@ export function TeaPreReserva() {
                     <Badge color="blue" variant="light" size="xs">{weeks} semana{weeks !== 1 ? 's' : ''}</Badge>
                     <Badge color="teal" variant="light" size="xs">{totalSessions} sess{totalSessions !== 1 ? 'ões' : 'ão'} (estimado)</Badge>
                   </Group>
-                  {acceptModalMode === 'suggestion' && (
+                  {selectedWeeklySlots.length > 0 && (
                     <Text size="xs" c="dimmed" mt={6}>
-                      Sessões na semana: {selectedWeeklySlots.map((slot) => `${formatWeekdayPt(slot.date)} ${slot.time}`).join(' • ')}
+                      {acceptModalMode === 'suggestion' ? 'Sessoes na semana:' : 'Horarios disponiveis para conversao:'}{' '}
+                      {selectedWeeklySlots.map((slot) => `${formatWeekdayPt(slot.date)} ${slot.time}`).join(' | ')}
                     </Text>
                   )}
                 </Paper>
@@ -3368,6 +3362,7 @@ export function TeaPreReserva() {
             </Button>
             <Button
               color="green"
+              disabled={acceptConversionHasMissingStartDate}
               onClick={async () => {
                 setAcceptModalOpened(false);
                 if (acceptModalMode === 'suggestion') {
@@ -3377,7 +3372,7 @@ export function TeaPreReserva() {
                   if (conversionReservationIds.length === 0 || checklistItems.length === 0) {
                     showNotification({
                       title: 'Checklist pendente',
-                      message: 'Selecione um procedimento válido para conversão.',
+                      message: 'O PIT não possui terapias elegíveis para conversão.',
                       color: 'yellow',
                     });
                     return;
@@ -3904,45 +3899,45 @@ export function TeaPreReserva() {
               <Text size="sm" c="dimmed">
                 Valide os itens de todas as terapias do PIT antes da conversão em lote.
               </Text>
-              <Select
-                label="Procedimento do PIT"
-                placeholder="Selecione um procedimento"
-                data={checklistProcedureOptions.map((procedure) => ({ value: procedure, label: procedure }))}
-                value={selectedChecklistProcedure}
-                onChange={setSelectedChecklistProcedure}
-                allowDeselect={false}
-              />
               {(() => {
-                const selectedItems = checklistItems.filter(
-                  (item) => (item.procedureName || 'Procedimento não definido') === selectedChecklistProcedure,
+                const groupedItems = Array.from(
+                  checklistItems.reduce((acc, item) => {
+                    const procedure = item.procedureName || 'Procedimento não definido';
+                    if (!acc.has(procedure)) acc.set(procedure, []);
+                    acc.get(procedure)?.push(item);
+                    return acc;
+                  }, new Map<string, ConversionChecklistItem[]>()),
                 );
-                if (!selectedChecklistProcedure) {
-                  return <Text size="sm" c="dimmed">Selecione um procedimento para visualizar o checklist.</Text>;
-                }
-                if (selectedItems.length === 0) {
-                  return <Text size="sm" c="dimmed">Sem itens de checklist para este procedimento.</Text>;
+                if (groupedItems.length === 0) {
+                  return <Text size="sm" c="dimmed">Sem itens de checklist para este PIT.</Text>;
                 }
 
-                const pendingCount = selectedItems.filter((item) => !item.valid).length;
                 return (
                   <Stack gap={4}>
-                    <Group justify="space-between" wrap="wrap">
-                      <Text fw={600}>{selectedChecklistProcedure}</Text>
-                      <Badge variant="light" color={pendingCount === 0 ? 'teal' : 'yellow'}>
-                        {pendingCount === 0 ? 'Checklist OK' : `${pendingCount} pendência(s)`}
-                      </Badge>
-                    </Group>
-                    {selectedItems.map((item) => (
-                      <Paper key={item.key} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                        <Group justify="space-between" align="center" wrap="wrap">
-                          <Text size="sm">{item.label}</Text>
-                          <Badge color={item.valid ? 'teal' : 'red'} variant="light">
-                            {item.valid ? 'OK' : 'Pendente'}
-                          </Badge>
-                        </Group>
-                        <Text size="xs" c="dimmed">{item.message}</Text>
-                      </Paper>
-                    ))}
+                    {groupedItems.map(([procedure, procedureItems]) => {
+                      const pendingCount = procedureItems.filter((item) => !item.valid).length;
+                      return (
+                        <Stack key={procedure} gap={4}>
+                          <Group justify="space-between" wrap="wrap">
+                            <Text fw={600}>{procedure}</Text>
+                            <Badge variant="light" color={pendingCount === 0 ? 'teal' : 'yellow'}>
+                              {pendingCount === 0 ? 'Checklist OK' : `${pendingCount} pendência(s)`}
+                            </Badge>
+                          </Group>
+                          {procedureItems.map((item) => (
+                            <Paper key={item.key} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                              <Group justify="space-between" align="center" wrap="wrap">
+                                <Text size="sm">{item.label}</Text>
+                                <Badge color={item.valid ? 'teal' : 'red'} variant="light">
+                                  {item.valid ? 'OK' : 'Pendente'}
+                                </Badge>
+                              </Group>
+                              <Text size="xs" c="dimmed">{item.message}</Text>
+                            </Paper>
+                          ))}
+                        </Stack>
+                      );
+                    })}
                   </Stack>
                 );
               })()}
@@ -3952,11 +3947,11 @@ export function TeaPreReserva() {
                 </Button>
                 <Button
                   color="green"
-                  disabled={!checklistCanConvertSelectedProcedure}
+                  disabled={!checklistCanConvertWholePit}
                   loading={!!checklistGroupKey && updatingId === checklistGroupKey}
-                  onClick={() => openConversionConfirmationModal(checklistConvertibleSelectedReservations)}
+                  onClick={() => openConversionConfirmationModal(checklistConvertiblePitReservations)}
                 >
-                  {`Finalizar Agendamento${checklistCanConvertSelectedProcedure ? ` (${checklistConvertibleSelectedReservations.length})` : ''}`}
+                  {`Finalizar Agendamento${checklistConvertiblePitReservations.length > 0 ? ` (${checklistConvertiblePitReservations.length})` : ''}`}
                 </Button>
               </Group>
             </>
