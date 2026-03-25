@@ -1327,7 +1327,6 @@ export function Agendamento() {
 
   const schedulingDate = viewedDate || novoAgendamento.data || dataHoraFiltro || new Date();
   const resolvedAppointmentType = deriveAppointmentType(selectedSpecialties, novoAgendamento.tipoConsulta);
-  const selectedProcedureDuration = Math.max(
   const isMultiProcedureFlow = selectedSpecialties.length > 1;
   const anchorSelection = manualProcedureSelections[0] || null;
   const totalSelectedProcedureDuration = Math.max(
@@ -3302,4 +3301,3 @@ export function Agendamento() {
     </Box>
   );
 }
-
