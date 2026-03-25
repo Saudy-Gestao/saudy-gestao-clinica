@@ -71,6 +71,11 @@ const toWeekStartMonday = (reference: dayjs.Dayjs) => {
 export function TeaAgendaSemanal() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const {
+    data: allTeaAppointments = [],
+    isLoading: loading,
+    error,
+  } = useTeaWeeklyAgendaQuery();
 
   const [search, setSearch] = useState('');
   const [procedureFilter, setProcedureFilter] = useState<string[]>([]);
@@ -363,8 +368,3 @@ export function TeaAgendaSemanal() {
     </Box>
   );
 }
-  const {
-    data: allTeaAppointments = [],
-    isLoading: loading,
-    error,
-  } = useTeaWeeklyAgendaQuery();
