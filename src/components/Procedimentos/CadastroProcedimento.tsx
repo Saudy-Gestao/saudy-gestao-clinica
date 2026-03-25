@@ -38,6 +38,7 @@ import ResultModal from '../common/ResultModal';
 interface ProcedureForm {
   name: string;
   description: string;
+  appointmentType: 'CONSULTA' | 'EXAME';
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   acceptedSubInsurances: Record<string, string[]>;
@@ -50,6 +51,7 @@ interface ProcedureForm {
 interface ProcedureItem {
   id: string;
   name: string;
+  appointmentType: 'CONSULTA' | 'EXAME';
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   modalities: string[];
@@ -62,6 +64,7 @@ interface ProcedureItem {
 const INITIAL_FORM: ProcedureForm = {
   name: '',
   description: '',
+  appointmentType: 'CONSULTA',
   acceptsInsurance: false,
   acceptedInsurances: [],
   acceptedSubInsurances: {},
@@ -165,9 +168,10 @@ export function CadastroProcedimento() {
                 ? data.data
                 : [])));
 
-        const mapped: ProcedureItem[] = list.map((it: any) => ({
+        const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
           id: String(it.id ?? it.procedureId ?? ''),
           name: it.name || 'Procedimento',
+          appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
           acceptsInsurance: Boolean(it.acceptsInsurance),
           acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
           modalities: Array.isArray(it.modalities) ? it.modalities : [],
@@ -175,7 +179,7 @@ export function CadastroProcedimento() {
           materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
           isActive: Boolean(it.isActive ?? true),
           doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
-        })).filter((item: ProcedureItem) => item.id);
+        })).filter((item) => Boolean(item.id));
 
         setProcedures(mapped);
       } catch (err: any) {
@@ -352,6 +356,7 @@ export function CadastroProcedimento() {
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
+        appointmentType: form.appointmentType,
         durationMinutes: form.durationMinutes ?? null,
         acceptsInsurance: form.acceptsInsurance,
         acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
@@ -390,9 +395,10 @@ export function CadastroProcedimento() {
             : (Array.isArray(refreshed?.data)
               ? refreshed.data
               : [])));
-      const mapped: ProcedureItem[] = list.map((it: any) => ({
+      const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
         id: String(it.id ?? it.procedureId ?? ''),
         name: it.name || 'Procedimento',
+        appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
         acceptsInsurance: Boolean(it.acceptsInsurance),
         acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
         modalities: Array.isArray(it.modalities) ? it.modalities : [],
@@ -400,7 +406,7 @@ export function CadastroProcedimento() {
         materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
         isActive: Boolean(it.isActive ?? true),
         doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
-      })).filter((item: ProcedureItem) => item.id);
+      })).filter((item) => Boolean(item.id));
       setProcedures(mapped);
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || 'Erro ao salvar procedimento';
@@ -552,6 +558,7 @@ export function CadastroProcedimento() {
       setForm({
         name: data.name || '',
         description: data.description || '',
+        appointmentType: String(data.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
         durationMinutes: data.durationMinutes !== undefined && data.durationMinutes !== null
           ? Number(data.durationMinutes)
           : null,
@@ -627,6 +634,20 @@ export function CadastroProcedimento() {
                 />
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <Select
+                    label="Tipo do procedimento"
+                    placeholder="Selecione o tipo"
+                    data={[
+                      { value: 'CONSULTA', label: 'Consulta' },
+                      { value: 'EXAME', label: 'Exame' },
+                    ]}
+                    value={form.appointmentType}
+                    onChange={(value) => setForm((prev) => ({
+                      ...prev,
+                      appointmentType: value === 'EXAME' ? 'EXAME' : 'CONSULTA',
+                    }))}
+                    allowDeselect={false}
+                  />
                   <NumberInput
                     label="Duração (minutos)"
                     placeholder="Ex: 50"
@@ -809,6 +830,7 @@ export function CadastroProcedimento() {
                       <Table.Thead>
                         <Table.Tr style={{ borderBottom: 'none' }}>
                           <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidades</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
@@ -820,7 +842,7 @@ export function CadastroProcedimento() {
                       <Table.Tbody>
                         {filteredProcedures.length === 0 ? (
                             <Table.Tr>
-                            <Table.Td colSpan={8}>
+                            <Table.Td colSpan={9}>
                               <Text size="sm" c="dimmed" ta="center">Nenhum procedimento encontrado</Text>
                             </Table.Td>
                           </Table.Tr>
@@ -838,6 +860,13 @@ export function CadastroProcedimento() {
                               <Table.Td>
                                 <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.name}</Text>
                               </Table.Td>
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
+                                    {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                  </Badge>
+                                </Table.Td>
+                              )}
                               {!isTablet && (
                                 <Table.Td>
                                   <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.acceptsInsurance ? 'Sim' : 'Não'}</Text>

@@ -19,6 +19,7 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
 import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
+import { ExecucaoExames } from './components/Exames/ExecucaoExames';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
 import { DicomViewerPage } from './components/DicomViewer/DicomViewerPage';
@@ -36,6 +37,8 @@ import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio'
 import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
 import { CadastroEquipamento } from './components/Equipamentos/CadastroEquipamento';
+import { CadastroAnamnese } from './components/Anamnese/CadastroAnamnese';
+import { CadastroEnfermagem } from './components/Enfermagem/CadastroEnfermagem';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
 import { WhatsAppPage } from './components/Settings/WhatsAppPage';
@@ -147,6 +150,10 @@ function App() {
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
           />
           <Route
+            path="/execucao-exames"
+            element={<ProtectedRoute><ExecucaoExames /></ProtectedRoute>}
+          />
+          <Route
             path="/laudo-exames"
             element={<ProtectedRoute><LaudoExames /></ProtectedRoute>}
           />
@@ -209,6 +216,14 @@ function App() {
           <Route
             path="/cadastro-equipamento"
             element={<ProtectedRoute><CadastroEquipamento /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-anamnese"
+            element={<ProtectedRoute><CadastroAnamnese /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-enfermagem"
+            element={<ProtectedRoute><CadastroEnfermagem /></ProtectedRoute>}
           />
           <Route
             path="/whatsapp"

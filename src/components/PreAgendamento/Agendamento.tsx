@@ -92,6 +92,7 @@ interface DoctorScheduleMeta {
 
 interface ProcedureMeta {
   name: string;
+  appointmentType: 'CONSULTA' | 'EXAME';
   durationMinutes?: number | null;
   doctorIds: string[];
   doctorNames: string[];
@@ -120,7 +121,7 @@ const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   data: null,
   hora: '',
   profissional: '',
-  tipoConsulta: '',
+  tipoConsulta: 'CONSULTA',
   informacoes: '',
 };
 
@@ -197,6 +198,10 @@ const normalizeComparableText = (value?: string | null): string => {
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+};
+
+const normalizeProcedureAppointmentType = (value?: string | null): 'CONSULTA' | 'EXAME' => {
+  return String(value || '').trim().toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA';
 };
 
 const getBranchWeekdayLabel = (date: Date): string => {
@@ -366,7 +371,7 @@ export function Agendamento() {
     convenio: it.convenio || it.insurance || it.healthInsuranceName || '',
     data: normalizeDateOnly(it.date || it.data || ''),
     hora: it.time || it.hora || '',
-    tipoConsulta: it.type || it.tipoConsulta || '',
+    tipoConsulta: it.type || it.tipoConsulta || 'CONSULTA',
     status: normalizeAppointmentStatus(it.status),
     observacoes: it.observations || it.observacoes || '',
     totem: it.totem ?? undefined,
@@ -377,6 +382,20 @@ export function Agendamento() {
     const parts = [agendamento.tipoConsulta, agendamento.especialidade].filter(Boolean);
     const base = parts.length ? parts.join(' | ') : '—';
     return agendamento.medicoNome ? `${base} | Dr(a): ${agendamento.medicoNome}` : base;
+  };
+
+  const getAppointmentTypeLabel = (value?: string | null) => (
+    normalizeProcedureAppointmentType(value) === 'EXAME' ? 'Exame' : 'Consulta'
+  );
+
+  const deriveAppointmentType = (
+    procedureNames: string[],
+    fallbackValue?: string | null,
+  ): 'CONSULTA' | 'EXAME' => {
+    if (procedureNames.some((name) => normalizeProcedureAppointmentType(procedureMetaByName[name]?.appointmentType) === 'EXAME')) {
+      return 'EXAME';
+    }
+    return normalizeProcedureAppointmentType(fallbackValue);
   };
 
   const loadAgendamentos = async () => {
@@ -652,6 +671,7 @@ export function Agendamento() {
           const linkedDoctors = Array.isArray(item.doctors) ? item.doctors : [];
           acc[name] = {
             name,
+            appointmentType: normalizeProcedureAppointmentType(item.appointmentType),
             durationMinutes: Number.isFinite(Number(item.durationMinutes)) ? Number(item.durationMinutes) : null,
             doctorIds: linkedDoctors
               .map((doctor: any) => String(doctor?.doctorId || doctor?.id || '').trim())
@@ -974,6 +994,7 @@ export function Agendamento() {
           convenio: novoAgendamento.convenio || undefined,
           date: formatDateForApi(novoAgendamento.data),
           time: novoAgendamento.hora,
+          type: resolvedAppointmentType,
           observations: novoAgendamento.informacoes || undefined,
         };
         await appointmentService.update(editingAgendamentoId, {
@@ -1025,6 +1046,7 @@ export function Agendamento() {
               convenio: novoAgendamento.convenio || undefined,
               date: formatDateForApi(suggestion.date),
               time: suggestion.time,
+              type: deriveAppointmentType([suggestion.procedure], novoAgendamento.tipoConsulta),
               observations: novoAgendamento.informacoes || undefined,
               status: 'AGENDADO',
               totem: Math.floor(Math.random() * 100) + 1,
@@ -1043,6 +1065,7 @@ export function Agendamento() {
             convenio: novoAgendamento.convenio || undefined,
             date: formatDateForApi(novoAgendamento.data),
             time: novoAgendamento.hora,
+            type: resolvedAppointmentType,
             observations: novoAgendamento.informacoes || undefined,
             status: 'AGENDADO',
             totem: Math.floor(Math.random() * 100) + 1,
@@ -1215,6 +1238,7 @@ export function Agendamento() {
   }, [location.state, navigate]);
 
   const schedulingDate = viewedDate || novoAgendamento.data || dataHoraFiltro || new Date();
+  const resolvedAppointmentType = deriveAppointmentType(selectedSpecialties, novoAgendamento.tipoConsulta);
   const selectedProcedureDuration = Math.max(
     15,
     selectedSpecialties.reduce((total, selected) => {
@@ -2045,6 +2069,7 @@ export function Agendamento() {
               <FloatingInput label="Nome completo" value={novoAgendamento.pacienteNome || ''} readOnly />
               <FloatingInput label="Convênio" value={novoAgendamento.convenio || ''} readOnly />
               <FloatingInput label="Procedimento" value={selectedProcedureSummary.join(', ')} readOnly />
+              <FloatingInput label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
               <FloatingInput label="Data" value={novoAgendamento.data ? dayjs(novoAgendamento.data).format('DD/MM/YYYY') : ''} readOnly />
               <FloatingInput label="Horário" value={novoAgendamento.hora || selectedSuggestedSchedules[0]?.time || ''} readOnly />
               <FloatingInput label="Profissional respons." value={novoAgendamento.profissional || selectedSuggestedSchedules[0]?.doctorName || ''} readOnly />
@@ -2410,7 +2435,7 @@ export function Agendamento() {
                       <Group justify="apart" align="flex-start">
                         <Box>
                           <Text fw={700}>{a.pacienteNome || '—'}</Text>
-                          <Text size="xs" c="dimmed">{a.hora} • {a.tipoConsulta}</Text>
+                          <Text size="xs" c="dimmed">{a.hora} • {getAppointmentTypeLabel(a.tipoConsulta)}</Text>
                         </Box>
                         <Text size="xs" c={a.status ? 'green.5' : 'dimmed'}>{a.status || '—'}</Text>
                       </Group>

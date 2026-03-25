@@ -34,6 +34,9 @@ export interface PreSchedulingItem {
   preAuthorizedAt?: string | null;
   guideNumber?: string | null;
   docsCount?: number;
+  hasAnamnesis?: boolean;
+  anamnesisAnswered?: boolean;
+  anamnesisAnswersCount?: number;
   tokenAvailable?: boolean;
   isResolved?: boolean;
 }
@@ -50,6 +53,8 @@ export interface PublicPreSchedulingMeta {
   };
   status: PreSchedulingStatus;
   verified: boolean;
+  verificationExpiresAt?: string | null;
+  interactionCompleted?: boolean;
   documentsCount: number;
   documents: Array<{
     id: string;
@@ -57,6 +62,38 @@ export interface PublicPreSchedulingMeta {
     fileName: string;
     uploadedAt: string;
   }>;
+  anamnesis?: {
+    templateId: string;
+    name: string;
+    description?: string | null;
+    answered: boolean;
+    answeredAt?: string | null;
+    questions: Array<{
+      id: string;
+      label: string;
+      helpText?: string | null;
+      responseType: string;
+      placeholder?: string | null;
+      isRequired: boolean;
+      orderIndex: number;
+      options: Array<{
+        id: string;
+        label: string;
+        value: string;
+        orderIndex: number;
+      }>;
+    }>;
+    answers: Array<{
+      questionId?: string | null;
+      questionLabel: string;
+      responseType: string;
+      answerText?: string | null;
+      answerValues?: string[];
+      answerBoolean?: boolean | null;
+      answerNumber?: number | null;
+      orderIndex: number;
+    }>;
+  } | null;
 }
 
 const preSchedulingService = {
@@ -84,6 +121,7 @@ const preSchedulingService = {
     return response.data as {
       message: string;
       publicUrl: string;
+      hasAnamnesis?: boolean;
       whatsappMock: {
         provider: 'mock';
         to?: string | null;
@@ -103,6 +141,22 @@ const preSchedulingService = {
         sizeBytes?: number | null;
         uploadedAt: string;
       }>;
+      anamnesis?: {
+        templateId: string;
+        templateName: string;
+        answered: boolean;
+        answeredAt?: string | null;
+        answers: Array<{
+          id: string;
+          questionLabel: string;
+          responseType: string;
+          answerText?: string | null;
+          answerValues?: string[];
+          answerBoolean?: boolean | null;
+          answerNumber?: number | null;
+          orderIndex: number;
+        }>;
+      } | null;
     };
   },
 
@@ -133,7 +187,12 @@ const preSchedulingService = {
     facialImageBase64?: string;
   }) {
     const response = await publicApi.post(`/care/pre-scheduling/public/${token}/verify`, payload);
-    return response.data as { verified: boolean; trust?: number | null; patientName?: string | null };
+    return response.data as {
+      verified: boolean;
+      trust?: number | null;
+      patientName?: string | null;
+      verificationExpiresAt?: string | null;
+    };
   },
 
   async uploadPublicDocument(token: string, payload: {
@@ -145,6 +204,19 @@ const preSchedulingService = {
   }) {
     const response = await publicApi.post(`/care/pre-scheduling/public/${token}/upload`, payload);
     return response.data;
+  },
+
+  async submitPublicAnamnesis(token: string, payload: {
+    answers: Array<{
+      questionId: string;
+      answerText?: string | null;
+      answerValues?: string[];
+      answerBoolean?: boolean | null;
+      answerNumber?: number | null;
+    }>;
+  }) {
+    const response = await publicApi.post(`/care/pre-scheduling/public/${token}/anamnesis`, payload);
+    return response.data as { message: string };
   },
 
   async finalizePublicDocuments(token: string) {
