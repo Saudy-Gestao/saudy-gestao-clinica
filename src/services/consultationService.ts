@@ -30,6 +30,30 @@ export interface ConsultationPayload {
   triageNotes?: string;
 }
 
+export interface ConsultationNursingAnswerPayload {
+  questionId?: string | null;
+  questionLabel: string;
+  responseType: string;
+  answerText?: string | null;
+  answerValues?: string[];
+  answerBoolean?: boolean | null;
+  answerNumber?: number | null;
+  orderIndex?: number;
+}
+
+export interface ConsultationNursingPayload {
+  bloodPressure?: string;
+  heartRate?: string;
+  temperature?: string;
+  oxygenSaturation?: string;
+  weight?: string;
+  height?: string;
+  glucose?: string;
+  pregnant?: string;
+  triageNotes?: string;
+  answers?: ConsultationNursingAnswerPayload[];
+}
+
 export default {
   async list(params?: { search?: string; convenioStatus?: string; queueType?: string; limit?: number; offset?: number }) {
     const url = '/care/consultations/';
@@ -46,6 +70,12 @@ export default {
   async update(id: string, payload: Partial<ConsultationPayload>) {
     const url = `/care/consultations/${id}`;
     const res = await api.put(url, payload);
+    return res.data;
+  },
+
+  async submitNursingTriage(id: string, payload: ConsultationNursingPayload) {
+    const url = `/care/consultations/${id}/nursing-triage`;
+    const res = await api.post(url, payload);
     return res.data;
   },
 

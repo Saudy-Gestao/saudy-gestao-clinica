@@ -212,6 +212,11 @@ export function PreAtendimento() {
     return !convenio || convenio === 'particular';
   }
 
+  const hasValidPreAttendanceId = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    return Boolean(normalized) && !normalized.startsWith('tmp-');
+  };
+
   const canEditPayment = checklistData.atendimentoParticular || isPrivateCare(checklistPatient);
 
   const extractDoctorNameFromAgenda = (agenda?: string | null) => {
@@ -362,9 +367,12 @@ export function PreAtendimento() {
             ? data.data
             : []));
 
-      const mapped = list
-        .map(mapApiToPatient)
-        .filter((item) => ACTIVE_RECEPTION_STATUSES.includes(item.status || ''));
+      const mapped = dedupeReceptionPatients(
+        list
+          .map(mapApiToPatient)
+          .filter((item) => hasValidPreAttendanceId(item.id))
+          .filter((item) => ACTIVE_RECEPTION_STATUSES.includes(item.status || '')),
+      );
 
       setPatients(mapped);
     } catch (err: any) {
@@ -391,9 +399,48 @@ export function PreAtendimento() {
     return `${day}/${month}/${year}`;
   };
 
+  const isSameReceptionPatient = (left: Patient, right: Patient) => {
+    const leftAppointmentId = String(left.appointmentId || '').trim();
+    const rightAppointmentId = String(right.appointmentId || '').trim();
+    if (leftAppointmentId && rightAppointmentId && leftAppointmentId === rightAppointmentId) return true;
+
+    const leftPatientId = String(left.patientId || '').trim();
+    const rightPatientId = String(right.patientId || '').trim();
+    if (leftPatientId && rightPatientId && leftPatientId === rightPatientId) return true;
+
+    const leftCpf = onlyDigits(left.cpf || '');
+    const rightCpf = onlyDigits(right.cpf || '');
+    if (leftCpf && rightCpf && leftCpf === rightCpf) return true;
+
+    return false;
+  };
+
+  const dedupeReceptionPatients = (items: Patient[]): Patient[] => {
+    const deduped: Patient[] = [];
+
+    for (const item of items) {
+      const existingIndex = deduped.findIndex((current) => isSameReceptionPatient(current, item));
+      if (existingIndex === -1) {
+        deduped.push(item);
+        continue;
+      }
+
+      const existing = deduped[existingIndex];
+      const shouldReplace =
+        (!hasValidPreAttendanceId(existing.id) && hasValidPreAttendanceId(item.id))
+        || ((existing.status || '') !== RECEPTION_CHECKLIST_STATUS && (item.status || '') === RECEPTION_CHECKLIST_STATUS);
+
+      if (shouldReplace) {
+        deduped[existingIndex] = item;
+      }
+    }
+
+    return deduped;
+  };
+
   const mapApiToPatient = (it: any): Patient => {
     const raw = it?.item || it?.data || it;
-    const id = raw?.id || raw?.preAttendanceId || raw?.pre_attendance_id || raw?.patientId || raw?.patient_id || `tmp-${Math.random().toString(36).slice(2)}`;
+    const id = raw?.id || raw?.preAttendanceId || raw?.pre_attendance_id || raw?.preAttendance?.id || raw?.pre_attendance?.id || '';
     const nomeCompleto = (raw?.fullName || raw?.full_name || raw?.name || raw?.patientName || raw?.patient_name || raw?.patient?.name || '').toString().trim();
 
     return {
@@ -436,6 +483,37 @@ export function PreAtendimento() {
       doctorId: raw?.doctorId || raw?.doctor_id || raw?.doctor?.id || '',
       doctorName: raw?.doctorName || raw?.doctor_name || raw?.doctor?.name || '',
     };
+  };
+
+  const resolvePatientWithValidPreAttendanceId = async (patient: Patient): Promise<Patient | null> => {
+    if (hasValidPreAttendanceId(patient.id)) return patient;
+
+    try {
+      const data: any = await preAttendanceService.list({
+        queueType: RECEPTION_QUEUE_TYPE,
+      });
+      const list: any[] = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.items)
+          ? data.items
+          : (Array.isArray(data?.data)
+            ? data.data
+            : []));
+
+      const mapped = dedupeReceptionPatients(
+        list
+          .map(mapApiToPatient)
+          .filter((item) => ACTIVE_RECEPTION_STATUSES.includes(item.status || '')),
+      );
+
+      if (mapped.length > 0) {
+        setPatients(dedupeReceptionPatients(mapped.filter((item) => hasValidPreAttendanceId(item.id))));
+      }
+
+      return mapped.find((item) => hasValidPreAttendanceId(item.id) && isSameReceptionPatient(item, patient)) || null;
+    } catch {
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -668,23 +746,36 @@ export function PreAtendimento() {
   };
 
   const openChecklistForPatient = async (patient: Patient) => {
+    const resolvedPatient = await resolvePatientWithValidPreAttendanceId(patient);
+    const targetPatient = resolvedPatient || patient;
+
+    if (!hasValidPreAttendanceId(targetPatient.id)) {
+      showNotification({
+        title: 'Registro inconsistente',
+        message: 'Este paciente não possui um identificador válido de pré-atendimento. Atualize a fila e tente novamente.',
+        color: 'red',
+      });
+      await loadReceptionPatients();
+      return;
+    }
+
     const basePatient: Patient = {
-      ...patient,
-      patientId: patient.patientId,
-      nomeCompleto: patient.nomeCompleto,
-      cpf: patient.cpf,
-      dataNascimento: patient.dataNascimento,
-      sexo: patient.sexo,
-      telefone: patient.telefone,
-      email: patient.email,
-      endereco: patient.endereco,
-      convenio: patient.convenio,
-      validadeConvenio: patient.validadeConvenio,
-      numCarteira: patient.numCarteira,
-      status: patient.status,
-      fila: patient.fila,
-      tipoFila: patient.tipoFila,
-      agenda: patient.agenda,
+      ...targetPatient,
+      patientId: targetPatient.patientId,
+      nomeCompleto: targetPatient.nomeCompleto,
+      cpf: targetPatient.cpf,
+      dataNascimento: targetPatient.dataNascimento,
+      sexo: targetPatient.sexo,
+      telefone: targetPatient.telefone,
+      email: targetPatient.email,
+      endereco: targetPatient.endereco,
+      convenio: targetPatient.convenio,
+      validadeConvenio: targetPatient.validadeConvenio,
+      numCarteira: targetPatient.numCarteira,
+      status: targetPatient.status,
+      fila: targetPatient.fila,
+      tipoFila: targetPatient.tipoFila,
+      agenda: targetPatient.agenda,
     };
     let enrichedPatient = basePatient;
 
@@ -726,8 +817,10 @@ export function PreAtendimento() {
       // Mantém os dados já disponíveis no pre-attendance se o fetch detalhado falhar.
     }
 
-    setPatients((prev) => prev.map((item) => (item.id === patient.id ? { ...item, ...basePatient } : item)));
-    setChecklistPreAttendanceId(patient.id);
+    setPatients((prev) => prev.map((item) => (
+      isSameReceptionPatient(item, targetPatient) ? { ...item, ...basePatient, id: targetPatient.id } : item
+    )));
+    setChecklistPreAttendanceId(targetPatient.id);
     setChecklistPatient(enrichedPatient);
     setChecklistData((prev) => ({
       ...prev,
@@ -742,45 +835,58 @@ export function PreAtendimento() {
   };
 
   const handleStartChecklist = async (patient: Patient) => {
-    if ((patient.status || '').trim() === RECEPTION_DONE_STATUS) {
+    const resolvedPatient = await resolvePatientWithValidPreAttendanceId(patient);
+    const targetPatient = resolvedPatient || patient;
+
+    if (!hasValidPreAttendanceId(targetPatient.id)) {
+      showNotification({
+        title: 'Registro inconsistente',
+        message: 'Não foi possível localizar o pré-atendimento desse paciente. Atualize a fila.',
+        color: 'red',
+      });
+      await loadReceptionPatients();
+      return;
+    }
+
+    if ((targetPatient.status || '').trim() === RECEPTION_DONE_STATUS) {
       return;
     }
 
     try {
       setChecklistLoading(true);
-      const alreadyStarted = (patient.status || '').trim() === RECEPTION_CHECKLIST_STATUS;
+      const alreadyStarted = (targetPatient.status || '').trim() === RECEPTION_CHECKLIST_STATUS;
 
       if (alreadyStarted) {
-        await openChecklistForPatient(patient);
+        await openChecklistForPatient(targetPatient);
         return;
       }
 
-      const updated = await preAttendanceService.update(patient.id, {
+      const updated = await preAttendanceService.update(targetPatient.id, {
         status: RECEPTION_CHECKLIST_STATUS,
       });
       const mapped = mapApiToPatient(updated);
       const startedPatient: Patient = {
-        ...patient,
+        ...targetPatient,
         ...mapped,
-        patientId: mapped.patientId || patient.patientId,
-        nomeCompleto: mapped.nomeCompleto || patient.nomeCompleto,
-        cpf: mapped.cpf || patient.cpf,
-        dataNascimento: mapped.dataNascimento || patient.dataNascimento,
-        sexo: mapped.sexo || patient.sexo,
-        telefone: mapped.telefone || patient.telefone,
-        email: mapped.email || patient.email,
-        endereco: mapped.endereco || patient.endereco,
-        convenio: mapped.convenio || patient.convenio,
-        validadeConvenio: mapped.validadeConvenio || patient.validadeConvenio,
-        numCarteira: mapped.numCarteira || patient.numCarteira,
-        status: mapped.status || patient.status,
-        fila: mapped.fila || patient.fila,
-        tipoFila: mapped.tipoFila || patient.tipoFila,
-        agenda: mapped.agenda || patient.agenda,
+        patientId: mapped.patientId || targetPatient.patientId,
+        nomeCompleto: mapped.nomeCompleto || targetPatient.nomeCompleto,
+        cpf: mapped.cpf || targetPatient.cpf,
+        dataNascimento: mapped.dataNascimento || targetPatient.dataNascimento,
+        sexo: mapped.sexo || targetPatient.sexo,
+        telefone: mapped.telefone || targetPatient.telefone,
+        email: mapped.email || targetPatient.email,
+        endereco: mapped.endereco || targetPatient.endereco,
+        convenio: mapped.convenio || targetPatient.convenio,
+        validadeConvenio: mapped.validadeConvenio || targetPatient.validadeConvenio,
+        numCarteira: mapped.numCarteira || targetPatient.numCarteira,
+        status: mapped.status || targetPatient.status,
+        fila: mapped.fila || targetPatient.fila,
+        tipoFila: mapped.tipoFila || targetPatient.tipoFila,
+        agenda: mapped.agenda || targetPatient.agenda,
       };
       await openChecklistForPatient(startedPatient);
 
-      await preAttendanceService.update(patient.id, {
+      await preAttendanceService.update(targetPatient.id, {
         status: RECEPTION_CHECKLIST_STATUS,
         checklistStartedAt: new Date().toISOString(),
       });
@@ -796,7 +902,14 @@ export function PreAtendimento() {
   };
 
   const handleFinishChecklist = async () => {
-    if (!checklistPatient || !checklistPreAttendanceId) return;
+    if (!checklistPatient || !checklistPreAttendanceId || !hasValidPreAttendanceId(checklistPreAttendanceId)) {
+      showNotification({
+        title: 'Pré-atendimento inválido',
+        message: 'Não encontramos um identificador válido para concluir o checklist.',
+        color: 'red',
+      });
+      return;
+    }
     try {
       setChecklistLoading(true);
       let generatedInvoice: any = null;
@@ -888,7 +1001,14 @@ export function PreAtendimento() {
   };
 
   const handleFinalFacialValidation = async (imageBase64: string) => {
-    if (!checklistPatient || !checklistPreAttendanceId) return;
+    if (!checklistPatient || !checklistPreAttendanceId || !hasValidPreAttendanceId(checklistPreAttendanceId)) {
+      showNotification({
+        title: 'Pré-atendimento inválido',
+        message: 'Não encontramos um identificador válido para finalizar a validação facial.',
+        color: 'red',
+      });
+      return;
+    }
 
     try {
       setFacialValidationLoading(true);

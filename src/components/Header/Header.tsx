@@ -22,6 +22,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
   { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },
   { key: 'consulta', label: 'Consulta', route: '/consulta', prefixes: ['/consulta'] },
+  { key: 'execucao-exames', label: 'Execução de Exames', route: '/execucao-exames', prefixes: ['/execucao-exames'] },
   { key: 'laudo', label: 'Laudo', route: '/laudo-exames', prefixes: ['/laudo'] },
   { key: 'autorizacao-convenio', label: 'Autorização Convênio', route: '/autorizacao-convenio', prefixes: ['/autorizacao-convenio'] },
   { key: 'modulo-tea', label: 'Módulo TEA', route: '/tea', prefixes: ['/tea'] },
@@ -35,6 +36,8 @@ const MODULES: ModuleDefinition[] = [
   { key: 'cadastro-paciente', label: 'Cadastro de Paciente', route: '/cadastro-paciente', prefixes: ['/cadastro-paciente'] },
   { key: 'cadastro-sala', label: 'Cadastro de Salas', route: '/cadastro-sala', prefixes: ['/cadastro-sala'] },
   { key: 'cadastro-equipamento', label: 'Cadastro de Equipamentos', route: '/cadastro-equipamento', prefixes: ['/cadastro-equipamento'] },
+  { key: 'cadastro-anamnese', label: 'Cadastro de Anamnese', route: '/cadastro-anamnese', prefixes: ['/cadastro-anamnese'] },
+  { key: 'cadastro-enfermagem', label: 'Cadastro de Enfermagem', route: '/cadastro-enfermagem', prefixes: ['/cadastro-enfermagem'] },
 ];
 
 const resolveModuleByPath = (pathname: string): ModuleDefinition | null => {

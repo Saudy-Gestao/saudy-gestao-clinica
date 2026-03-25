@@ -3,6 +3,7 @@ import api from './api';
 export interface CreateProcedurePayload {
   name: string;
   description?: string;
+  appointmentType?: 'CONSULTA' | 'EXAME';
   price?: number | null;
   durationMinutes?: number | null;
   acceptsInsurance?: boolean;
@@ -16,6 +17,7 @@ export interface CreateProcedurePayload {
 export interface UpdateProcedurePayload {
   name?: string;
   description?: string;
+  appointmentType?: 'CONSULTA' | 'EXAME';
   price?: number | null;
   durationMinutes?: number | null;
   acceptsInsurance?: boolean;

@@ -1,21 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, ActionIcon, Badge } from '@mantine/core';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Table,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, ChevronLeft, PhoneCall, Play, CheckCircle2 } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { ChevronLeft, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { DARK_BLUE } from '../../themes/theme';
 import consultationService from '../../services/consultationService';
 
 interface ConsultationRow {
   id: string;
   nomeCompleto: string;
   convenio?: string;
-  statusConvenio: string;
   agendadoPara: string;
   agenda: string;
   statusFluxo: string;
+  appointmentType: string;
+  triageRequired: boolean;
 }
 
 const CLINICAL_QUEUE_TYPE = 'Fila clínica';
@@ -23,7 +33,6 @@ const WAITING_STATUS = 'Aguardando atendimento';
 const CALLED_STATUS = 'Chamado para atendimento';
 const IN_PROGRESS_STATUS = 'Em atendimento';
 const DONE_STATUS = 'Atendimento concluído';
-
 const ACTIVE_STATUSES = [WAITING_STATUS, CALLED_STATUS, IN_PROGRESS_STATUS];
 
 const statusBadge = (status: string) => {
@@ -31,6 +40,12 @@ const statusBadge = (status: string) => {
   if (status === CALLED_STATUS) return { color: 'blue', label: 'Chamado' };
   if (status === IN_PROGRESS_STATUS) return { color: 'green', label: 'Em atendimento' };
   return { color: 'gray', label: status || '-' };
+};
+
+const getAppointmentTypeLabel = (value?: string | null) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'EXAME' || normalized === 'EXAM') return 'Exame';
+  return 'Consulta';
 };
 
 export function Consulta() {
@@ -46,10 +61,11 @@ export function Consulta() {
     id: String(it.id),
     nomeCompleto: it.patientName || '',
     convenio: it.convenio || '',
-    statusConvenio: it.convenioStatus || '',
     agendadoPara: it.scheduledFor || '-',
     agenda: it.agenda || '-',
     statusFluxo: it.queue || WAITING_STATUS,
+    appointmentType: String(it.appointmentType || it.appointment?.type || ''),
+    triageRequired: Boolean(it.triageRequired),
   });
 
   const loadClinicalQueue = async () => {
@@ -63,7 +79,12 @@ export function Consulta() {
             ? data.data
             : []));
 
-      setRows(list.map(mapApiToRow).filter((item) => ACTIVE_STATUSES.includes(item.statusFluxo)));
+      setRows(
+        list
+          .map(mapApiToRow)
+          .filter((item) => ACTIVE_STATUSES.includes(item.statusFluxo))
+          .filter((item) => getAppointmentTypeLabel(item.appointmentType) !== 'Exame' && !item.triageRequired),
+      );
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -81,14 +102,14 @@ export function Consulta() {
       setLoggedDoctorName('');
     }
 
-    loadClinicalQueue();
+    void loadClinicalQueue();
   }, []);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return rows;
-    return rows.filter((r) =>
-      [r.nomeCompleto, r.convenio, r.agenda, r.agendadoPara, r.statusFluxo]
+    return rows.filter((row) =>
+      [row.nomeCompleto, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized)),
     );
@@ -130,29 +151,24 @@ export function Consulta() {
                 Consulta
               </Text>
               <Text size="sm" c="dimmed">
-                {loggedDoctorName ? `Fila clínica do(a) Dr(a). ${loggedDoctorName}` : 'Fila clínica e chamada do atendimento'}
+                {loggedDoctorName ? `Fila clínica do(a) Dr(a). ${loggedDoctorName}` : 'Fila clínica de atendimento médico'}
               </Text>
             </Box>
           </Group>
-          {loggedDoctorName && (
-            <Badge variant="light" color="blue" radius="sm">
-              Fila médica ativa
-            </Badge>
-          )}
+          <Badge variant="light" color="blue" radius="sm">
+            Fila clínica
+          </Badge>
         </Group>
 
         <Box mb={isMobile ? 20 : 30}>
-          <Group gap="md" align="flex-end">
-            <TextInput
-              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
-              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
-              radius="md"
-              size={isMobile ? 'sm' : 'md'}
-              style={{ flex: 1 }}
-            />
-          </Group>
+          <TextInput
+            placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
+            leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            radius="md"
+            size={isMobile ? 'sm' : 'md'}
+          />
         </Box>
 
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
@@ -167,7 +183,7 @@ export function Consulta() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {filtered.map((row) => {
+              {filtered.length > 0 ? filtered.map((row) => {
                 const badge = statusBadge(row.statusFluxo);
                 return (
                   <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
@@ -256,7 +272,13 @@ export function Consulta() {
                     </Table.Td>
                   </Table.Tr>
                 );
-              })}
+              }) : (
+                <Table.Tr>
+                  <Table.Td colSpan={5}>
+                    <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
             </Table.Tbody>
           </Table>
         </Box>

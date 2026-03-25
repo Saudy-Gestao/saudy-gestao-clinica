@@ -7,6 +7,8 @@ import {
   Calendar,
   CalendarCheck,
   ClipboardList,
+  ClipboardPenLine,
+  ClipboardCheck,
   Stethoscope,
   FileText,
   Package,
@@ -95,6 +97,7 @@ export function WorkflowSections() {
       title: 'Suporte Clínico',
       items: [
         { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta', moduleName: 'consulta' },
+        { icon: ClipboardCheck, label: 'Execução de Exames', desc: 'Triagem e andamento do exame', route: '/execucao-exames', moduleName: 'execucao-exames' },
         { icon: FileText, label: 'Laudo por Exame', desc: 'Fila com editor de laudo', route: '/laudo-exames', moduleName: 'laudo' },
         { icon: FileText, label: 'Configurações de Laudo', desc: 'Padrões e frases', route: '/laudo-configuracoes', moduleName: 'laudo' },
         { icon: ShieldCheck, label: 'Autorização Convênio', desc: 'Autorizações pendentes', route: '/autorizacao-convenio', moduleName: 'autorizacao-convenio' },
@@ -115,6 +118,8 @@ export function WorkflowSections() {
         { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente', moduleName: 'cadastro-paciente' },
         { icon: Warehouse, label: 'Cadastro de Salas', desc: 'Salas por filial', route: '/cadastro-sala', moduleName: 'cadastro-sala' },
         { icon: ScanLine, label: 'Cadastro de Equipamentos', desc: 'Modalidades e DICOM', route: '/cadastro-equipamento', moduleName: 'cadastro-equipamento' },
+        { icon: ClipboardPenLine, label: 'Cadastro de Anamnese', desc: 'Perguntas por procedimento', route: '/cadastro-anamnese', moduleName: 'cadastro-anamnese' },
+        { icon: ClipboardCheck, label: 'Cadastro de Enfermagem', desc: 'Triagens por procedimento', route: '/cadastro-enfermagem', moduleName: 'cadastro-enfermagem' },
       ]
     }
   ];

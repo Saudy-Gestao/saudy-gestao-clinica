@@ -73,6 +73,22 @@ export function PreAgendamento() {
     sizeBytes?: number | null;
     uploadedAt: string;
   }>>([]);
+  const [reviewAnamnesis, setReviewAnamnesis] = useState<{
+    templateId: string;
+    templateName: string;
+    answered: boolean;
+    answeredAt?: string | null;
+    answers: Array<{
+      id: string;
+      questionLabel: string;
+      responseType: string;
+      answerText?: string | null;
+      answerValues?: string[];
+      answerBoolean?: boolean | null;
+      answerNumber?: number | null;
+      orderIndex: number;
+    }>;
+  } | null>(null);
   const [savingReview, setSavingReview] = useState(false);
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null);
 
@@ -169,7 +185,7 @@ export function PreAgendamento() {
       });
       showNotification({
         title: 'Link enviado (mock)',
-        message: 'Link de documentos gerado com sucesso.',
+        message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
         color: 'green',
       });
       await loadItems();
@@ -191,6 +207,7 @@ export function PreAgendamento() {
     try {
       const data = await preSchedulingService.getDocuments(item.appointmentId);
       setReviewDocuments(Array.isArray(data?.items) ? data.items : []);
+      setReviewAnamnesis(data?.anamnesis || null);
     } catch (err: any) {
       showNotification({
         title: 'Erro ao carregar anexos',
@@ -198,6 +215,7 @@ export function PreAgendamento() {
         color: 'red',
       });
       setReviewDocuments([]);
+      setReviewAnamnesis(null);
     } finally {
       setReviewLoading(false);
     }
@@ -471,7 +489,7 @@ export function PreAgendamento() {
         </Stack>
       </Modal>
 
-      <Modal opened={reviewOpen} onClose={() => setReviewOpen(false)} title="Revisar documentos" centered size="lg">
+      <Modal opened={reviewOpen} onClose={() => setReviewOpen(false)} title="Revisar envio do paciente" centered size="lg">
         <Stack>
           <Text size="sm" c="dimmed">
             {selectedItem?.patientName || 'Paciente'} • {selectedItem?.specialty || 'Procedimento'}
@@ -479,30 +497,74 @@ export function PreAgendamento() {
 
           {reviewLoading ? (
             <Group justify="center" py="md"><Loader size="sm" /></Group>
-          ) : reviewDocuments.length === 0 ? (
-            <Text size="sm" c="dimmed">Nenhum documento enviado ainda.</Text>
           ) : (
             <Stack gap="xs">
-              {reviewDocuments.map((doc) => (
-                <Paper key={doc.id} p="xs" withBorder>
-                  <Text size="sm" fw={600}>{doc.documentType}</Text>
-                  <Text size="sm">{doc.fileName}</Text>
-                  <Text size="xs" c="dimmed">
-                    {dayjs(doc.uploadedAt).format('DD/MM/YYYY HH:mm')}
-                    {typeof doc.sizeBytes === 'number' ? ` • ${Math.round(doc.sizeBytes / 1024)} KB` : ''}
-                  </Text>
-                  <Group justify="flex-end" mt={6}>
-                    <Button
-                      size="xs"
-                      variant="light"
-                      loading={openingDocumentId === doc.id}
-                      onClick={() => handleViewDocument(doc.id)}
-                    >
-                      Visualizar
-                    </Button>
-                  </Group>
+              <Paper p="sm" withBorder>
+                <Stack gap={6}>
+                  <Text fw={700}>Documentos</Text>
+                  {reviewDocuments.length === 0 ? (
+                    <Text size="sm" c="dimmed">Nenhum documento enviado.</Text>
+                  ) : (
+                    reviewDocuments.map((doc) => (
+                      <Paper key={doc.id} p="xs" withBorder>
+                        <Text size="sm" fw={600}>{doc.documentType}</Text>
+                        <Text size="sm">{doc.fileName}</Text>
+                        <Text size="xs" c="dimmed">
+                          {dayjs(doc.uploadedAt).format('DD/MM/YYYY HH:mm')}
+                          {typeof doc.sizeBytes === 'number' ? ` • ${Math.round(doc.sizeBytes / 1024)} KB` : ''}
+                        </Text>
+                        <Group justify="flex-end" mt={6}>
+                          <Button
+                            size="xs"
+                            variant="light"
+                            loading={openingDocumentId === doc.id}
+                            onClick={() => handleViewDocument(doc.id)}
+                          >
+                            Visualizar
+                          </Button>
+                        </Group>
+                      </Paper>
+                    ))
+                  )}
+                </Stack>
+              </Paper>
+
+              {reviewAnamnesis && (
+                <Paper p="sm" withBorder>
+                  <Stack gap={6}>
+                    <Group justify="space-between">
+                      <Text fw={700}>Anamnese</Text>
+                      <Badge color={reviewAnamnesis.answered ? 'green' : 'yellow'} variant="light">
+                        {reviewAnamnesis.answered ? 'Respondida' : 'Pendente'}
+                      </Badge>
+                    </Group>
+                    <Text size="sm" c="dimmed">{reviewAnamnesis.templateName}</Text>
+                    {reviewAnamnesis.answeredAt && (
+                      <Text size="xs" c="dimmed">
+                        Respondida em {dayjs(reviewAnamnesis.answeredAt).format('DD/MM/YYYY HH:mm')}
+                      </Text>
+                    )}
+                    {(reviewAnamnesis.answers || []).length === 0 ? (
+                      <Text size="sm" c="dimmed">Nenhuma resposta registrada.</Text>
+                    ) : (
+                      reviewAnamnesis.answers.map((answer) => (
+                        <Paper key={answer.id} p="xs" withBorder>
+                          <Text size="sm" fw={600}>{answer.questionLabel}</Text>
+                          <Text size="sm">
+                            {answer.answerValues && answer.answerValues.length > 0
+                              ? answer.answerValues.join(', ')
+                              : answer.answerBoolean !== null && answer.answerBoolean !== undefined
+                                ? (answer.answerBoolean ? 'Sim' : 'Não')
+                                : answer.answerNumber !== null && answer.answerNumber !== undefined
+                                  ? String(answer.answerNumber)
+                                  : answer.answerText || 'Sem resposta'}
+                          </Text>
+                        </Paper>
+                      ))
+                    )}
+                  </Stack>
                 </Paper>
-              ))}
+              )}
             </Stack>
           )}
 
@@ -510,7 +572,7 @@ export function PreAgendamento() {
             <Button
               variant="default"
               color="yellow"
-              disabled={reviewLoading || reviewDocuments.length === 0}
+              disabled={reviewLoading || (reviewDocuments.length === 0 && !reviewAnamnesis?.answered)}
               loading={savingReview}
               onClick={() => handleReviewAction('REQUEST_RESUBMISSION')}
             >
@@ -518,11 +580,11 @@ export function PreAgendamento() {
             </Button>
             <Button
               color="green"
-              disabled={reviewLoading || reviewDocuments.length === 0}
+              disabled={reviewLoading || (reviewDocuments.length === 0 && !reviewAnamnesis?.answered)}
               loading={savingReview}
               onClick={() => handleReviewAction('APPROVE')}
             >
-              Aprovar documentos
+              Aprovar envio
             </Button>
           </Group>
         </Stack>
