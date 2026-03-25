@@ -25,6 +25,20 @@ export interface ReportWorklistPayload {
   metadata?: Record<string, unknown>;
 }
 
+export interface DicomSeriesFileItem {
+  id: string;
+  seriesUid: string | null;
+  instanceId?: string | null;
+  url: string;
+}
+
+export interface DicomSeriesSummaryItem {
+  id: string;
+  seriesUid: string | null;
+  instancesCount: number;
+  url: string;
+}
+
 export default {
   async list(params?: { search?: string; status?: string; examType?: string; limit?: number; offset?: number }) {
     const res = await api.get('/care/report-worklist/', { params });
@@ -66,27 +80,55 @@ export default {
    * Return all DICOM buffers attached to a worklist item (or study UID)
    */
   async fetchDicomSeries(key: string) {
-    const res = await api.get(`/dicom/${key}/files`);
-    const files: Array<{ id: string; url: string }> = res.data.files || [];
-    const buffers: ArrayBuffer[] = [];
-    for (const f of files) {
+    const res = await api.get(`/dicom/${key}/files`, { params: { view: 'instances' } });
+    const files: DicomSeriesFileItem[] = res.data?.files || [];
+    return this.downloadDicomFiles(files);
+  },
+
+  async fetchDicomSeriesSummary(key: string) {
+    const res = await api.get(`/dicom/${key}/files`, {
+      params: { view: 'series', includeInstances: 'false' },
+    });
+    const series: DicomSeriesSummaryItem[] = res.data?.series || res.data?.files || [];
+    return series;
+  },
+
+  async fetchDicomSeriesFiles(key: string, seriesUid: string | null) {
+    const safeSeriesUid = seriesUid ?? '__NO_SERIES__';
+    const res = await api.get(`/dicom/${key}/files`, {
+      params: { seriesUid: safeSeriesUid },
+    });
+    const files: DicomSeriesFileItem[] = res.data?.instances || res.data?.files || [];
+    return files;
+  },
+
+  async downloadDicomFiles(files: DicomSeriesFileItem[], onProgress?: (loaded: number, total: number) => void) {
+    const total = files.length;
+    let loaded = 0;
+    const promises = files.map(async (f) => {
       const r = await api.get(f.url, { responseType: 'arraybuffer' });
-      buffers.push(r.data as ArrayBuffer);
-    }
-    return buffers;
+      loaded += 1;
+      if (onProgress) onProgress(loaded, total);
+      return r.data as ArrayBuffer;
+    });
+    return Promise.all(promises);
   },
 
   /**
-   * Ensure the target study exists in Orthanc for OHIF (rehydrates from GCS on cache miss).
+   * Build a WADO imageId string for a given file URL (relative path from backend).
    */
-  async ensureOrthancStudy(key: string) {
-    const res = await api.post(`/dicom/${key}/ensure-orthanc`);
-    return res.data as {
-      key: string;
-      status: 'cache_hit' | 'cache_miss_rehydrated';
-      studyInstanceUid: string;
-      orthancStudyId: string | null;
-      uploadedInstances: number;
-    };
+  buildSeriesImageId(fileUrl: string): string {
+    const base = ((import.meta.env.VITE_API_URL as string) ?? '').replace(/\/$/, '');
+    const path = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+    return `wadouri:${base}${path}`;
+  },
+
+  /**
+   * Get WADO imageIds for all instances of a series without downloading the files.
+   * Cornerstone will fetch them on demand (with auth) as images are requested.
+   */
+  async fetchDicomSeriesImageIds(key: string, seriesUid: string | null): Promise<string[]> {
+    const files = await this.fetchDicomSeriesFiles(key, seriesUid);
+    return files.map((f) => this.buildSeriesImageId(f.url));
   },
 };

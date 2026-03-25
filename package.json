@@ -6,8 +6,6 @@
   "description": "Sistema de gestão clínica Saudy",
   "scripts": {
     "dev": "vite",
-    "copy-ohif": "node scripts/copy-ohif.js",
-    "prebuild": "node scripts/copy-ohif.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -19,8 +17,6 @@
     "@mantine/dates": "7.13.2",
     "@mantine/hooks": "7.13.2",
     "@mantine/notifications": "7.13.2",
-    "@ohif/core": "^3.12.0",
-    "@ohif/viewer": "4.0.0",
     "@tabler/icons-react": "^3.35.0",
     "@tinymce/tinymce-react": "^5.1.1",
     "axios": "^1.13.2",
