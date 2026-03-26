@@ -252,6 +252,18 @@ const normalizeProcedureAppointmentType = (value?: string | null): 'CONSULTA' | 
   return String(value || '').trim().toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA';
 };
 
+const matchesDoctorToProcedure = (doctorSpecialties: string[], procedureName: string): boolean => {
+  const normalizedProcedure = normalizeComparableText(procedureName);
+  if (!normalizedProcedure) return false;
+
+  return doctorSpecialties
+    .flatMap((specialty) => String(specialty || '')
+      .split(/[;,/|]/)
+      .map(normalizeComparableText)
+      .filter(Boolean))
+    .some((specialty) => specialty === normalizedProcedure);
+};
+
 const getBranchWeekdayLabel = (date: Date): string => {
   const days = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
   return days[date.getDay()] || '';
@@ -1361,9 +1373,7 @@ export function Agendamento() {
       }
 
       if (doctorSpecialties.length === 0) return false;
-      return doctorSpecialties.some((doctorSpecialty) =>
-        doctorSpecialty.includes(normalizedSelected) || normalizedSelected.includes(doctorSpecialty),
-      );
+      return matchesDoctorToProcedure(doctorSpecialties, normalizedSelected);
     });
   });
   const schedulerDoctors = (() => {
@@ -1643,9 +1653,7 @@ export function Agendamento() {
           );
         }
 
-        return doctorSpecialties.some((doctorSpecialty) =>
-          doctorSpecialty.includes(normalizedSelected) || normalizedSelected.includes(doctorSpecialty),
-        );
+        return matchesDoctorToProcedure(doctorSpecialties, normalizedSelected);
       })
       .map((option) => option.value);
   };
