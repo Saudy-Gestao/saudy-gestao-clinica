@@ -28,6 +28,8 @@ interface StockItem {
   status?: string;
 }
 
+const EMPTY_INVENTORY_ITEMS: any[] = [];
+
 // SAMPLE_ITEMS removed — items are now fetched from backend (/inventory/).
 
 export function Estoque() {
@@ -39,10 +41,11 @@ export function Estoque() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const {
-    data: inventoryItems = [],
+    data: inventoryItemsData,
     isLoading: itemsLoading,
     error: inventoryError,
   } = useInventoryItemsQuery();
+  const inventoryItems = Array.isArray(inventoryItemsData) ? inventoryItemsData : EMPTY_INVENTORY_ITEMS;
 
   // Saving & success modal states
   const [savingItem, setSavingItem] = useState(false);

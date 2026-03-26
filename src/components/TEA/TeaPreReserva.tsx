@@ -40,9 +40,9 @@ import teaProfileService from '../../services/teaProfileService';
 import convenioAuthorizationService from '../../services/convenioAuthorizationService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 import { useTeaPendingReservationsQuery } from '../../hooks/useTeaPendingReservationsQuery';
-import { useTeaReservationTimelineQuery } from '../../hooks/useTeaReservationTimelineQuery';
+import { useTeaReservationTimelineQuery, type TeaTimelineEventItem } from '../../hooks/useTeaReservationTimelineQuery';
 import { useTeaReservationChecklistQuery, type TeaConversionChecklistItem } from '../../hooks/useTeaReservationChecklistQuery';
-import { useTeaManualGridQuery, type TeaManualGridSlot } from '../../hooks/useTeaManualGridQuery';
+import { useTeaManualGridQuery, type TeaManualGridDay, type TeaManualGridSlot } from '../../hooks/useTeaManualGridQuery';
 import { queryKeys } from '../../lib/queryKeys';
 
 const STATUS_OPTIONS: Array<{ value: TeaPreReservationStatus; label: string }> = [
@@ -477,6 +477,11 @@ const getTherapyStatusOptions = (currentStatus?: string): Array<{ value: TeaPreR
   return STATUS_OPTIONS.filter((item) => allowed.has(item.value));
 };
 
+const EMPTY_PENDING_ITEMS: any[] = [];
+const EMPTY_TIMELINE_EVENTS: TeaTimelineEventItem[] = [];
+const EMPTY_CHECKLIST_ITEMS: TeaConversionChecklistItem[] = [];
+const EMPTY_MANUAL_GRID_BY_THERAPY_ID: Record<string, any> = {};
+
 export function TeaPreReserva() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -610,7 +615,7 @@ export function TeaPreReserva() {
   const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
   const [deletePitTarget, setDeletePitTarget] = useState<{ teaProfileId: string; pitId?: string; groupKey: string } | null>(null);
   const {
-    data: items = [] as any[],
+    data: pendingItemsData,
     isLoading: loading,
     isFetching: fetchingPending,
     error: pendingError,
@@ -619,17 +624,17 @@ export function TeaPreReserva() {
     status: statusFilter,
   });
   const {
-    data: timelineEvents = [],
+    data: timelineEventsData,
     isLoading: timelineLoading,
     error: timelineError,
   } = useTeaReservationTimelineQuery(timelineReservations, timelineModalOpened);
   const {
-    data: checklistItems = [],
+    data: checklistItemsData,
     isLoading: checklistLoading,
     error: checklistError,
   } = useTeaReservationChecklistQuery(checklistReservations, checklistModalOpened);
   const {
-    data: manualGridByTherapyId = {},
+    data: manualGridByTherapyIdData,
     isLoading: manualLoadingGrid,
     error: manualGridError,
   } = useTeaManualGridQuery(
@@ -637,6 +642,10 @@ export function TeaPreReserva() {
     manualWeekStart,
     manualModalOpened && Boolean(manualContext?.therapies?.length),
   );
+  const items = pendingItemsData ?? EMPTY_PENDING_ITEMS;
+  const timelineEvents = timelineEventsData ?? EMPTY_TIMELINE_EVENTS;
+  const checklistItems = checklistItemsData ?? EMPTY_CHECKLIST_ITEMS;
+  const manualGridByTherapyId = manualGridByTherapyIdData ?? EMPTY_MANUAL_GRID_BY_THERAPY_ID;
   useEffect(() => {
     if (!manualSelectedTherapyId) {
       setManualSelectedSlots([]);
@@ -651,8 +660,8 @@ export function TeaPreReserva() {
         .some((slot) => slot.date === selected.date && slot.time === selected.time);
       if (isExistingEditableSlot) return true;
 
-      const day = grid.days.find((item) => item.date === selected.date);
-      const slot = day?.slots?.find((item) => item.time === selected.time);
+      const day = grid.days.find((item: TeaManualGridDay) => item.date === selected.date);
+      const slot = day?.slots?.find((item: TeaManualGridSlot) => item.time === selected.time);
       return Boolean(slot && !slot.occupied && slot.selectable);
     }));
   }, [manualEditableExistingSlotsByTherapyId, manualGridByTherapyId, manualSelectedTherapyId]);
@@ -1899,7 +1908,7 @@ export function TeaPreReserva() {
     [manualSelectedTherapyId, manualGridByTherapyId],
   );
 
-  const manualWeekDays = useMemo(() => {
+  const manualWeekDays = useMemo<TeaManualGridDay[]>(() => {
     if (manualSelectedGrid?.days?.length) return manualSelectedGrid.days;
 
     return WEEKDAY_COLUMNS.map((column) => {
@@ -1909,13 +1918,13 @@ export function TeaPreReserva() {
         weekday: '',
         enabled: false,
         slots: [],
-      } as any;
+      };
     });
   }, [manualSelectedGrid, manualWeekStart]);
 
   const manualTimeRows = useMemo(() => {
     const allTimes = new Set<string>();
-    manualWeekDays.forEach((day) => {
+    manualWeekDays.forEach((day: TeaManualGridDay) => {
       day.slots.forEach((slot: TeaManualGridSlot) => allTimes.add(slot.time));
     });
     return Array.from(allTimes).sort((a, b) => a.localeCompare(b));
@@ -3393,7 +3402,7 @@ export function TeaPreReserva() {
                 <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                   <Text size="xs" fw={700}>Horário</Text>
                 </Paper>
-                {manualWeekDays.map((day) => (
+                {manualWeekDays.map((day: TeaManualGridDay) => (
                   <Paper key={`head-${day.date}`} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                     <Text size="xs" fw={700}>
                       {day.weekday ? String(day.weekday).slice(0, 3) : formatWeekdayPt(day.date).slice(0, 3)}
@@ -3406,7 +3415,7 @@ export function TeaPreReserva() {
                     <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                       <Text size="xs" fw={600}>{time}</Text>
                     </Paper>
-                    {manualWeekDays.map((day) => {
+                    {manualWeekDays.map((day: TeaManualGridDay) => {
                       const slot = day.slots.find((item: TeaManualGridSlot) => item.time === time);
                       const selectedDurationMinutes = Math.max(1, Number(manualSelectedTherapy?.durationMinutes || 30));
                       const isSelected = manualSelectedSlots.some(
