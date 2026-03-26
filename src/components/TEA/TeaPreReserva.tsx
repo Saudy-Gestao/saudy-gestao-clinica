@@ -372,6 +372,13 @@ const timeToMinutes = (time: string) => {
   return (hour * 60) + minute;
 };
 
+const minutesToTime = (value: number) => {
+  const normalized = Math.max(0, Number(value) || 0);
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 const doSlotsOverlap = (
   first: { date: string; time: string; durationMinutes?: number | null },
   second: { date: string; time: string; durationMinutes?: number | null },
@@ -445,6 +452,57 @@ export function TeaPreReserva() {
     if (!date) return '';
     const index = dayjs(date).day();
     return WEEKDAY_PT_LONG[index] || '';
+  };
+
+  const formatScheduledSlotsSummary = (slots: Array<{ date: string; time: string }> = []) => {
+    const groupedByDate = [...slots]
+      .filter((slot) => slot?.date && slot?.time)
+      .sort((a, b) => {
+        const aStamp = dayjs(`${a.date}T${a.time}:00`).valueOf();
+        const bStamp = dayjs(`${b.date}T${b.time}:00`).valueOf();
+        return aStamp - bStamp;
+      })
+      .reduce((acc, slot) => {
+        if (!acc[slot.date]) acc[slot.date] = [];
+        acc[slot.date].push(String(slot.time).trim());
+        return acc;
+      }, {} as Record<string, string[]>);
+
+    return Object.entries(groupedByDate)
+      .map(([date, times]) => {
+        const sortedTimes = Array.from(new Set(times)).sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+        const slotStepMinutes = sortedTimes.length > 1
+          ? Math.max(15, timeToMinutes(sortedTimes[1]) - timeToMinutes(sortedTimes[0]))
+          : 15;
+        const ranges: Array<{ start: string; end: string }> = [];
+
+        sortedTimes.forEach((time) => {
+          const lastRange = ranges[ranges.length - 1];
+          if (!lastRange) {
+            ranges.push({ start: time, end: time });
+            return;
+          }
+
+          const isSequential = timeToMinutes(time) - timeToMinutes(lastRange.end) === 15;
+          if (isSequential) {
+            lastRange.end = time;
+            return;
+          }
+
+          ranges.push({ start: time, end: time });
+        });
+
+        const formattedRanges = ranges
+          .map((range) => {
+            if (range.start === range.end) return range.start;
+            const rangeEnd = minutesToTime(timeToMinutes(range.end) + slotStepMinutes);
+            return `${range.start} - ${rangeEnd}`;
+          })
+          .join(' | ');
+
+        return `${formatWeekdayPt(date)} ${formattedRanges}`.trim();
+      })
+      .join(' | ');
   };
 
   const buildRecurringPreviewDates = (sourceDates: string[] = [], count = 5) => {
@@ -4369,6 +4427,7 @@ export function TeaPreReserva() {
                               {group.therapies.map((therapyItem, index) => {
                                 const pendingCardKey = `pending-${group.groupKey}-${String(therapyItem.pitTherapyId || 'unknown')}`;
                                 const isPendingCardCollapsed = Boolean(collapsedTherapyCards[pendingCardKey]);
+                                const existingScheduledSlots = existingSlotsByTherapy[String(therapyItem?.pitTherapyId || '')] || [];
                                 const hasExpandableAlerts = Boolean(
                                   therapyItem?.removedFromPit
                                   || String(therapyItem?.source || '') === 'PIT_PENDING_FREQUENCY_CHANGE'
@@ -4387,9 +4446,14 @@ export function TeaPreReserva() {
                                         <Text size="sm" fw={500}>
                                           {Math.max(1, Number(therapyItem.preferences?.weeklyFrequency || 1))}x/semana
                                         </Text>
-                                      <Text size="sm" ta="right">
-                                        {formatWeekdaySummary(therapyItem.preferences?.weekdays)}
-                                      </Text>
+                                        <Text size="sm" ta="right">
+                                          {formatWeekdaySummary(therapyItem.preferences?.weekdays)}
+                                        </Text>
+                                        {existingScheduledSlots.length > 0 && (
+                                          <Text size="xs" c="dimmed" ta="right" style={{ whiteSpace: 'nowrap' }}>
+                                            Horários já agendados: {formatScheduledSlotsSummary(existingScheduledSlots)}
+                                          </Text>
+                                        )}
                                     </Stack>
                                     {hasExpandableAlerts && (
                                       <ActionIcon
@@ -4409,6 +4473,11 @@ export function TeaPreReserva() {
                                     )}
                                     </Group>
                                   </Group>
+                                  {false && existingScheduledSlots.length > 0 && (
+                                    <Text size="xs" c="dimmed" mt={4}>
+                                      Horários já agendados: {formatScheduledSlotsSummary(existingScheduledSlots)}
+                                    </Text>
+                                  )}
                                   {hasExpandableAlerts && !isPendingCardCollapsed && (
                                     <>
                                   {therapyItem?.removedFromPit && (
