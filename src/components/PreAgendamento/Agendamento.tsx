@@ -1704,13 +1704,18 @@ export function Agendamento() {
         return sameDoctorConflict || samePatientConflict;
       });
 
-    const scoreAssigned = (assigned: Assigned, date: Date) => {
+    const getAssignedWaitMinutes = (assigned: Assigned) => {
       const ordered = [...assigned].sort((a, b) => a.start - b.start);
-      const waitScore = ordered.reduce((score, item, index) => {
+      return ordered.reduce((score, item, index) => {
         if (index === 0) return score;
         const previous = ordered[index - 1];
         return score + Math.max(0, item.start - previous.end);
       }, 0);
+    };
+
+    const scoreAssigned = (assigned: Assigned, date: Date) => {
+      const ordered = [...assigned].sort((a, b) => a.start - b.start);
+      const waitScore = getAssignedWaitMinutes(assigned);
 
       if (anchorEndMinute === null) return waitScore;
 
@@ -1753,12 +1758,16 @@ export function Agendamento() {
         (a, b) => (candidatesByProcedure[a]?.length || 0) - (candidatesByProcedure[b]?.length || 0),
       );
 
-      const foundOptions: Array<{ assigned: Assigned; score: number }> = [];
+      const foundOptions: Array<{ assigned: Assigned; score: number; waitMinutes: number }> = [];
 
       const dfs = (index: number, assigned: Assigned) => {
         if (index >= procedureOrder.length) {
           const currentScore = scoreAssigned(assigned, date);
-          foundOptions.push({ assigned: [...assigned], score: currentScore });
+          foundOptions.push({
+            assigned: [...assigned],
+            score: currentScore,
+            waitMinutes: getAssignedWaitMinutes(assigned),
+          });
           return;
         }
 
@@ -1805,7 +1814,7 @@ export function Agendamento() {
 
           return {
             id: `${dayjs(date).format('YYYYMMDD')}-${index}`,
-            totalWaitMinutes: option.score,
+            totalWaitMinutes: option.waitMinutes,
             items: [anchorSelection.procedure, ...remainingProcedureNames].map((procedureName) => ({
               procedure: procedureName,
               doctorName: byProcedure[procedureName].doctorName,
