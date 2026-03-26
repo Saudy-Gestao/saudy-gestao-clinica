@@ -6,13 +6,10 @@ import {
   Container,
   Group,
   Modal,
-  Select,
   Stack,
   Table,
   Tabs,
-  TextInput,
   Badge,
-  Textarea,
   Grid,
   Paper,
   Avatar,
@@ -20,7 +17,7 @@ import {
   Popover,
   ActionIcon,
   Menu,
-  Loader,
+  Skeleton,
   useMantineColorScheme,
 } from '@mantine/core';
 import { Calendar as CalendarIcon, MoreVertical, ChevronLeft } from 'lucide-react';
@@ -29,6 +26,8 @@ import { DatePicker } from '@mantine/dates';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { FloatingInput } from '../components/common/FloatingInput';
+import { FloatingSelect } from '../components/common/FloatingSelect';
+import { FloatingTextarea } from '../components/common/FloatingTextarea';
 import { Header } from '../components/Header/Header';
 import { DARK_BLUE } from '../themes/theme';
 import ResultModal from '../components/common/ResultModal';
@@ -329,7 +328,6 @@ export function Financeiro() {
       <Box
         style={{
           backgroundColor: 'var(--mantine-color-body)',
-          borderBottom: '1px solid var(--mantine-color-default-border)',
           padding: isMobile ? '12px 16px' : '16px 24px',
         }}
       >
@@ -352,10 +350,10 @@ export function Financeiro() {
             <Tabs value={activeTab} onChange={setActiveTab} style={{ flexGrow: isMobile ? 1 : 0 }}>
               <Tabs.List
                 style={{
-                  backgroundColor: 'var(--mantine-color-default)',
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 10,
-                  padding: 4,
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  padding: 0,
                 }}
               >
                 <Tabs.Tab value="todos">Todos</Tabs.Tab>
@@ -364,18 +362,12 @@ export function Financeiro() {
               </Tabs.List>
             </Tabs>
 
-            <TextInput
+            <FloatingInput
+              label="Buscar lançamentos"
               placeholder="Buscar paciente por nome ou CPF..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.currentTarget.value)}
-              style={{ flex: 1, minWidth: isMobile ? '100%' : 240 }}
-              styles={{
-                input: {
-                  backgroundColor: 'var(--mantine-color-default)',
-                  borderColor: 'var(--mantine-color-default-border)',
-                  color: 'var(--mantine-color-text)',
-                },
-              }}
+              containerProps={{ style: { flex: 1, minWidth: isMobile ? '100%' : 240 } }}
             />
 
             <Button
@@ -404,13 +396,18 @@ export function Financeiro() {
             style={{
               borderRadius: '8px',
               padding: 24,
-              textAlign: 'center',
               backgroundColor: 'var(--mantine-color-default)',
               border: '1px solid var(--mantine-color-default-border)',
             }}
           >
-            <Loader />
-            <Text mt={8}>Carregando lançamentos...</Text>
+            <Stack gap="sm">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Stack key={index} gap="sm">
+                  <Skeleton height={18} width="30%" radius="xl" />
+                  <Skeleton height={16} width="100%" radius="xl" />
+                </Stack>
+              ))}
+            </Stack>
           </Paper>
         ) : (
           <Paper
@@ -436,7 +433,20 @@ export function Financeiro() {
                   <Table.Th c="dimmed">Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
-              <Table.Tbody>{rows}</Table.Tbody>
+              <Table.Tbody>
+                {rows.length > 0 ? rows : (
+                  <Table.Tr>
+                    <Table.Td colSpan={10}>
+                      <Stack align="center" py="xl" gap={6}>
+                        <Text fw={600}>Nenhum lançamento encontrado</Text>
+                        <Text c="dimmed" size="sm" ta="center">
+                          Cadastre um novo lançamento ou ajuste os filtros para localizar registros financeiros.
+                        </Text>
+                      </Stack>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
             </Table>
           </Paper>
         )}
@@ -461,6 +471,7 @@ export function Financeiro() {
           },
           body: {
             backgroundColor: 'var(--mantine-color-default)',
+            paddingTop: 28,
           },
           title: {
             color: 'var(--mantine-color-text)',
@@ -471,7 +482,7 @@ export function Financeiro() {
         <Stack gap="md">
           <Grid grow>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Select
+              <FloatingSelect
                 label="Tipo"
                 placeholder="Selecione um tipo"
                 data={[
@@ -486,7 +497,7 @@ export function Financeiro() {
               />
             </Grid.Col>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Select
+              <FloatingSelect
                 label="Categoria"
                 placeholder="Selecione uma categoria"
                 data={[
@@ -502,7 +513,7 @@ export function Financeiro() {
             </Grid.Col>
           </Grid>
 
-          <Textarea
+          <FloatingTextarea
             label="Descrição"
             placeholder="Descreva o lançamento"
             value={formData.descricao}
@@ -512,76 +523,73 @@ export function Financeiro() {
 
           <Grid grow>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Box>
-                <Text size="sm" fw={500} mb={4}>Valor (R$)</Text>
-                <TextInput
-                  value={formData.valor}
-                  onChange={(e) => setFormData({ ...formData, valor: e.currentTarget.value })}
-                  type="number"
-                />
-              </Box>
+              <FloatingInput
+                label="Valor (R$)"
+                value={formData.valor}
+                onChange={(e) => setFormData({ ...formData, valor: e.currentTarget.value })}
+                type="number"
+                alwaysFloatLabel
+              />
             </Grid.Col>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Box>
-                <Text size="sm" fw={500} mb={4}>Desconto (%)</Text>
-                <TextInput
-                  value={formData.desconto}
-                  onChange={(e) => setFormData({ ...formData, desconto: e.currentTarget.value })}
-                  type="number"
-                  min="0"
-                  max="100"
-                />
-              </Box>
+              <FloatingInput
+                label="Desconto (%)"
+                value={formData.desconto}
+                onChange={(e) => setFormData({ ...formData, desconto: e.currentTarget.value })}
+                type="number"
+                min="0"
+                max="100"
+                alwaysFloatLabel
+              />
             </Grid.Col>
           </Grid>
 
           <Grid grow>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Box>
-                <Text size="sm" fw={500} mb={4}>Vencimento</Text>
-                <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
-                  <Popover.Target>
-                    <TextInput
-                      placeholder="dd/mm/yyyy"
-                      value={dateInput}
-                      onChange={(e) => {
-                        const v = e.currentTarget.value;
-                        setDateInput(formatDateInput(v));
-                      }}
-                      onBlur={() => {
-                        if (!dateInput) {
-                          setFormData({ ...formData, vencimento: null });
-                          return;
-                        }
-                        const parsed = parseDate(dateInput);
-                        if (!parsed) {
-                          setFormData({ ...formData, vencimento: null });
-                        } else {
-                          setFormData({ ...formData, vencimento: parsed });
-                        }
-                      }}
-                      rightSection={
-                        <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
-                          <CalendarIcon size={16} />
-                        </ActionIcon>
+              <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
+                <Popover.Target>
+                  <FloatingInput
+                    label="Vencimento"
+                    placeholder="dd/mm/yyyy"
+                    value={dateInput}
+                    onChange={(e) => {
+                      const v = e.currentTarget.value;
+                      setDateInput(formatDateInput(v));
+                    }}
+                    onBlur={() => {
+                      if (!dateInput) {
+                        setFormData({ ...formData, vencimento: null });
+                        return;
                       }
-                    />
-                  </Popover.Target>
-                  <Popover.Dropdown style={{ padding: 8 }}>
-                    <DatePicker 
-                      value={formData.vencimento} 
-                      onChange={(d) => { 
-                        setFormData({ ...formData, vencimento: d }); 
-                        setDateInput(formatDate(d)); 
-                        setPopoverOpened(false); 
-                      }} 
-                    />
-                  </Popover.Dropdown>
-                </Popover>
-              </Box>
+                      const parsed = parseDate(dateInput);
+                      if (!parsed) {
+                        setFormData({ ...formData, vencimento: null });
+                      } else {
+                        setFormData({ ...formData, vencimento: parsed });
+                      }
+                    }}
+                    rightSection={
+                      <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
+                        <CalendarIcon size={16} />
+                      </ActionIcon>
+                    }
+                    alwaysFloatLabel
+                  />
+                </Popover.Target>
+                <Popover.Dropdown style={{ padding: 8 }}>
+                  <DatePicker 
+                    value={formData.vencimento} 
+                    onChange={(d) => { 
+                      setFormData({ ...formData, vencimento: d }); 
+                      setDateInput(formatDate(d)); 
+                      setPopoverOpened(false); 
+                    }} 
+                  />
+                </Popover.Dropdown>
+              </Popover>
             </Grid.Col>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Select
+              <FloatingSelect
                 label="Forma de pagamento"
                 placeholder="Selecione uma forma de pagamento"
                 data={[

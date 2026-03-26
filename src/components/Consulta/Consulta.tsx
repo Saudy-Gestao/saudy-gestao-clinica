@@ -9,20 +9,25 @@ import {
   Group,
   Table,
   Text,
-  TextInput,
+  Stack,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { FloatingInput } from '../common/FloatingInput';
 import consultationService from '../../services/consultationService';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
+import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { formatCPF } from '../../utils/formatters';
 
 interface ConsultationRow {
   id: string;
+  appointmentId?: string;
   nomeCompleto: string;
+  cpf?: string;
   convenio?: string;
   agendadoPara: string;
   agenda: string;
@@ -51,6 +56,40 @@ const getAppointmentTypeLabel = (value?: string | null) => {
   return 'Consulta';
 };
 
+const getClinicalActionConfig = (status: string) => {
+  if (status === WAITING_STATUS) {
+    return {
+      label: 'Chamar',
+      color: 'blue',
+      variant: 'filled' as const,
+      icon: <PhoneCall size={14} />,
+      nextStatus: CALLED_STATUS,
+    };
+  }
+
+  if (status === CALLED_STATUS) {
+    return {
+      label: 'Iniciar atendimento',
+      color: 'green',
+      variant: 'filled' as const,
+      icon: <Play size={14} />,
+      nextStatus: IN_PROGRESS_STATUS,
+    };
+  }
+
+  if (status === IN_PROGRESS_STATUS) {
+    return {
+      label: 'Finalizar',
+      color: 'teal',
+      variant: 'light' as const,
+      icon: <CheckCircle2 size={14} />,
+      nextStatus: DONE_STATUS,
+    };
+  }
+
+  return null;
+};
+
 export function Consulta() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -61,10 +100,21 @@ export function Consulta() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const clinicalQueueQuery = useClinicalQueueQuery();
+  const appointmentsQuery = useAppointmentsQuery();
 
   const mapApiToRow = (it: any): ConsultationRow => ({
     id: String(it.id),
+    appointmentId: String(it.appointmentId || it.appointment_id || it.appointment?.id || ''),
     nomeCompleto: it.patientName || '',
+    cpf:
+      it.patientCpf
+      || it.patient_cpf
+      || it.cpf
+      || it.patient?.cpf
+      || it.patient?.document
+      || it.patientDocument
+      || it.patient_document
+      || '',
     convenio: it.convenio || '',
     agendadoPara: it.scheduledFor || '-',
     agenda: it.agenda || '-',
@@ -72,6 +122,16 @@ export function Consulta() {
     appointmentType: String(it.appointmentType || it.appointment?.type || ''),
     triageRequired: Boolean(it.triageRequired),
   });
+
+  const appointmentCpfById = useMemo(() => {
+    const items = Array.isArray(appointmentsQuery.data) ? appointmentsQuery.data : [];
+    return items.reduce<Record<string, string>>((acc, item: any) => {
+      const key = String(item?.id || '').trim();
+      const cpf = String(item?.patientCpf || item?.patient_cpf || item?.patient?.cpf || '').trim();
+      if (key && cpf) acc[key] = cpf;
+      return acc;
+    }, {});
+  }, [appointmentsQuery.data]);
 
   useEffect(() => {
     try {
@@ -86,11 +146,17 @@ export function Consulta() {
   useEffect(() => {
     setRows(
       (((clinicalQueueQuery.data as any[]) || [])
-        .map(mapApiToRow)
+        .map((item) => {
+          const mapped = mapApiToRow(item);
+          return {
+            ...mapped,
+            cpf: mapped.cpf || appointmentCpfById[mapped.appointmentId || ''] || '',
+          };
+        })
         .filter((item) => ACTIVE_STATUSES.includes(item.statusFluxo))
         .filter((item) => getAppointmentTypeLabel(item.appointmentType) !== 'Exame' && !item.triageRequired)),
     );
-  }, [clinicalQueueQuery.data]);
+  }, [appointmentCpfById, clinicalQueueQuery.data]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -148,13 +214,14 @@ export function Consulta() {
         </Group>
 
         <Box mb={isMobile ? 20 : 30}>
-          <TextInput
+          <FloatingInput
+            label="Buscar"
+            alwaysFloatLabel
             placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
-            leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            radius="md"
-            size={isMobile ? 'sm' : 'md'}
+            rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
+            containerProps={{ style: { minHeight: 64 } }}
           />
         </Box>
 
@@ -172,6 +239,7 @@ export function Consulta() {
             <Table.Tbody>
               {filtered.length > 0 ? filtered.map((row) => {
                 const badge = statusBadge(row.statusFluxo);
+                const action = getClinicalActionConfig(row.statusFluxo);
                 return (
                   <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                     <Table.Td>
@@ -194,22 +262,27 @@ export function Consulta() {
                           </Text>
                           {!isTablet && (
                             <Text size="xs" c="dimmed">
-                              {row.agendadoPara || row.agenda || '-'}
+                              CPF: {row.cpf ? formatCPF(row.cpf) : 'Não informado'}
                             </Text>
                           )}
                         </Box>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
-                        {row.agenda || row.agendadoPara || '-'}
-                      </Text>
+                      <Stack gap={2}>
+                        <Text size="xs" fw={600} style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
+                          {row.agenda || row.agendadoPara || '-'}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {getAppointmentTypeLabel(row.appointmentType)}
+                        </Text>
+                      </Stack>
                     </Table.Td>
                     {!isTablet && (
                       <Table.Td>
-                        <Text size="xs" style={{ fontSize: '0.82rem' }}>
+                        <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
                           {row.convenio || 'Particular'}
-                        </Text>
+                        </Badge>
                       </Table.Td>
                     )}
                     <Table.Td>
@@ -219,40 +292,16 @@ export function Consulta() {
                     </Table.Td>
                     <Table.Td>
                       <Group gap={8} justify="flex-end">
-                        {row.statusFluxo === WAITING_STATUS && (
+                        {action && (
                           <Button
                             size="xs"
-                            variant="light"
-                            color="blue"
-                            leftSection={<PhoneCall size={14} />}
-                            onClick={() => updateClinicalStatus(row, CALLED_STATUS)}
+                            variant={action.variant}
+                            color={action.color}
+                            leftSection={action.icon}
+                            onClick={() => updateClinicalStatus(row, action.nextStatus)}
                             loading={loadingId === row.id}
                           >
-                            Chamar
-                          </Button>
-                        )}
-                        {row.statusFluxo === CALLED_STATUS && (
-                          <Button
-                            size="xs"
-                            variant="light"
-                            color="green"
-                            leftSection={<Play size={14} />}
-                            onClick={() => updateClinicalStatus(row, IN_PROGRESS_STATUS)}
-                            loading={loadingId === row.id}
-                          >
-                            Iniciar atendimento
-                          </Button>
-                        )}
-                        {row.statusFluxo === IN_PROGRESS_STATUS && (
-                          <Button
-                            size="xs"
-                            variant="light"
-                            color="teal"
-                            leftSection={<CheckCircle2 size={14} />}
-                            onClick={() => updateClinicalStatus(row, DONE_STATUS)}
-                            loading={loadingId === row.id}
-                          >
-                            Finalizar
+                            {action.label}
                           </Button>
                         )}
                       </Group>

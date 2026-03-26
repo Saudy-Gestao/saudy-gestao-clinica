@@ -8,13 +8,12 @@ import {
   Group,
   Modal,
   Paper,
-  Select,
+  Skeleton,
   Stack,
   Switch,
   Table,
   Tabs,
   Text,
-  TextInput,
   Title,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -24,6 +23,8 @@ import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
 import reportTemplateService from '../../services/reportTemplateService';
 import reportPhraseService from '../../services/reportPhraseService';
 import reportWorklistService from '../../services/reportWorklistService';
@@ -108,6 +109,7 @@ export function LaudoConfiguracoes() {
   const {
     data: settingsData,
     error: settingsError,
+    isLoading: settingsLoading,
   } = useReportSettingsQuery();
 
   const normalizeStatus = (status: any): WorklistStatus => {
@@ -135,6 +137,17 @@ export function LaudoConfiguracoes() {
     if (!q) return worklist;
     return worklist.filter((item) => item.patientName.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
   }, [worklist, worklistQuery]);
+
+  const renderTableSkeleton = (columns: number) =>
+    Array.from({ length: 5 }).map((_, index) => (
+      <Table.Tr key={`report-settings-skeleton-${columns}-${index}`}>
+        {Array.from({ length: columns }).map((__, cellIndex) => (
+          <Table.Td key={`report-settings-skeleton-cell-${cellIndex}`}>
+            <Skeleton height={16} radius="sm" width={cellIndex === columns - 1 ? 72 : cellIndex === 0 ? '70%' : '60%'} />
+          </Table.Td>
+        ))}
+      </Table.Tr>
+    ));
 
   useEffect(() => {
     if (!settingsData) return;
@@ -407,7 +420,13 @@ export function LaudoConfiguracoes() {
           <Tabs.Panel value="templates" pt="md">
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
-                <TextInput placeholder="Buscar padrão..." value={templateQuery} onChange={(e) => setTemplateQuery(e.currentTarget.value)} style={{ flex: 1 }} />
+                <FloatingInput
+                  label="Buscar padrões"
+                  placeholder="Buscar padrão por nome ou exame"
+                  value={templateQuery}
+                  onChange={(e) => setTemplateQuery(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                />
                 <Button leftSection={<Plus size={16} />} onClick={openTemplateCreate}>Novo padrão</Button>
               </Group>
               <Table striped highlightOnHover>
@@ -420,7 +439,16 @@ export function LaudoConfiguracoes() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredTemplates.map((item) => (
+                  {settingsLoading && templates.length === 0 ? renderTableSkeleton(4) : filteredTemplates.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={4}>
+                        <Stack align="center" py="lg" gap={6}>
+                          <Text fw={600} size="sm">Nenhum padrão encontrado</Text>
+                          <Text size="sm" c="dimmed">Crie um novo padrão ou ajuste a busca para encontrar um modelo existente.</Text>
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : filteredTemplates.map((item) => (
                     <Table.Tr key={item.id}>
                       <Table.Td>{item.name}</Table.Td>
                       <Table.Td>{item.examType}</Table.Td>
@@ -452,7 +480,13 @@ export function LaudoConfiguracoes() {
           <Tabs.Panel value="phrases" pt="md">
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
-                <TextInput placeholder="Buscar frase..." value={phraseQuery} onChange={(e) => setPhraseQuery(e.currentTarget.value)} style={{ flex: 1 }} />
+                <FloatingInput
+                  label="Buscar frases"
+                  placeholder="Buscar frase por rótulo, exame ou conteúdo"
+                  value={phraseQuery}
+                  onChange={(e) => setPhraseQuery(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                />
                 <Button leftSection={<Plus size={16} />} onClick={openPhraseCreate}>Nova frase</Button>
               </Group>
               <Table striped highlightOnHover>
@@ -465,7 +499,16 @@ export function LaudoConfiguracoes() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredPhrases.map((item) => (
+                  {settingsLoading && phrases.length === 0 ? renderTableSkeleton(4) : filteredPhrases.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={4}>
+                        <Stack align="center" py="lg" gap={6}>
+                          <Text fw={600} size="sm">Nenhuma frase encontrada</Text>
+                          <Text size="sm" c="dimmed">Cadastre frases frequentes para acelerar o preenchimento dos laudos.</Text>
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : filteredPhrases.map((item) => (
                     <Table.Tr key={item.id}>
                       <Table.Td>{item.label}</Table.Td>
                       <Table.Td>{item.examType}</Table.Td>
@@ -497,7 +540,13 @@ export function LaudoConfiguracoes() {
           <Tabs.Panel value="worklist" pt="md">
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
-                <TextInput placeholder="Buscar item da fila..." value={worklistQuery} onChange={(e) => setWorklistQuery(e.currentTarget.value)} style={{ flex: 1 }} />
+                <FloatingInput
+                  label="Buscar fila de laudo"
+                  placeholder="Buscar paciente, exame ou item da fila"
+                  value={worklistQuery}
+                  onChange={(e) => setWorklistQuery(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                />
                 <Button leftSection={<Plus size={16} />} onClick={openWorklistCreate}>Novo item de fila</Button>
               </Group>
               <Table striped highlightOnHover>
@@ -512,11 +561,30 @@ export function LaudoConfiguracoes() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredWorklist.map((item) => (
+                  {settingsLoading && worklist.length === 0 ? renderTableSkeleton(6) : filteredWorklist.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={6}>
+                        <Stack align="center" py="lg" gap={6}>
+                          <Text fw={600} size="sm">Nenhum item na fila manual</Text>
+                          <Text size="sm" c="dimmed">Use esta aba para montar a fila manualmente enquanto a integração DICOM não estiver completa.</Text>
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : filteredWorklist.map((item) => (
                     <Table.Tr key={item.id}>
-                      <Table.Td>{item.patientName}</Table.Td>
-                      <Table.Td>{item.examType}</Table.Td>
-                      <Table.Td>{item.convenio || '-'}</Table.Td>
+                      <Table.Td>
+                        <Stack gap={0}>
+                          <Text size="sm" fw={500}>{item.patientName}</Text>
+                          <Text size="xs" c="dimmed">CPF: {item.patientCpf || 'Não informado'}</Text>
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td>
+                        <Stack gap={0}>
+                          <Text size="sm">{item.examType}</Text>
+                          <Text size="xs" c="dimmed">{item.scheduledAt || 'Data não informada'}</Text>
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td>{item.convenio ? <Badge variant="outline" color="blue">{item.convenio}</Badge> : '-'}</Table.Td>
                       <Table.Td>
                         <Badge color={item.status === 'finalizado' ? 'green' : item.status === 'revisado' ? 'cyan' : item.status === 'laudado' ? 'blue' : 'gray'} variant="light">
                           {item.status === 'sem_laudo' ? 'Sem laudo' : item.status === 'laudado' ? 'Laudado' : item.status === 'revisado' ? 'Revisado' : 'Finalizado'}
@@ -582,7 +650,7 @@ export function LaudoConfiguracoes() {
 
       <Modal opened={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateEditingId ? 'Editar padrão' : 'Novo padrão'} centered size="xl">
         <Stack>
-          <TextInput
+          <FloatingInput
             label="Nome"
             value={templateForm.name}
             onChange={(e) => {
@@ -591,16 +659,15 @@ export function LaudoConfiguracoes() {
             }}
             required
           />
-          <Select
+          <FloatingSelect
             label="Tipo de exame"
             data={examTypeOptions}
             searchable
             value={templateForm.examType || null}
             onChange={(value) => setTemplateForm((prev) => ({ ...prev, examType: value || '' }))}
-            placeholder="Selecione o tipo de exame"
             required
           />
-          <TextInput
+          <FloatingInput
             label="Grupo"
             value={templateForm.group}
             onChange={(e) => {
@@ -632,16 +699,15 @@ export function LaudoConfiguracoes() {
 
       <Modal opened={phraseModalOpen} onClose={() => setPhraseModalOpen(false)} title={phraseEditingId ? 'Editar frase' : 'Nova frase'} centered size="lg">
         <Stack>
-          <Select
+          <FloatingSelect
             label="Tipo de exame"
             data={examTypeOptions}
             searchable
             value={phraseForm.examType || null}
             onChange={(value) => setPhraseForm((prev) => ({ ...prev, examType: value || '' }))}
-            placeholder="Selecione o tipo de exame"
             required
           />
-          <TextInput
+          <FloatingInput
             label="Rótulo"
             value={phraseForm.label}
             onChange={(e) => {
@@ -674,7 +740,7 @@ export function LaudoConfiguracoes() {
 
       <Modal opened={worklistModalOpen} onClose={() => setWorklistModalOpen(false)} title={worklistEditingId ? 'Editar item da fila' : 'Novo item da fila'} centered size="lg">
         <Stack>
-          <TextInput
+          <FloatingInput
             label="Paciente"
             value={worklistForm.patientName}
             onChange={(e) => {
@@ -683,7 +749,7 @@ export function LaudoConfiguracoes() {
             }}
             required
           />
-          <TextInput
+          <FloatingInput
             label="CPF"
             value={worklistForm.patientCpf}
             onChange={(e) => {
@@ -691,25 +757,23 @@ export function LaudoConfiguracoes() {
               setWorklistForm((prev) => ({ ...prev, patientCpf: value }));
             }}
           />
-          <Select
+          <FloatingSelect
             label="Tipo de exame"
             data={examTypeOptions}
             searchable
             value={worklistForm.examType || null}
             onChange={(value) => setWorklistForm((prev) => ({ ...prev, examType: value || '' }))}
-            placeholder="Selecione o tipo de exame"
             required
           />
-          <Select
+          <FloatingSelect
             label="Convênio"
             data={convenioOptions}
             searchable
             clearable
             value={worklistForm.convenio || null}
             onChange={(value) => setWorklistForm((prev) => ({ ...prev, convenio: value || '' }))}
-            placeholder="Selecione o convenio"
           />
-          <TextInput
+          <FloatingInput
             label="Data/Hora agendada"
             value={worklistForm.scheduledAt}
             onChange={(e) => {
@@ -718,7 +782,7 @@ export function LaudoConfiguracoes() {
             }}
             placeholder="dd/mm/aaaa hh:mm"
           />
-          <TextInput
+          <FloatingInput
             label="Solicitante"
             value={worklistForm.requestingDoctor}
             onChange={(e) => {
@@ -726,7 +790,7 @@ export function LaudoConfiguracoes() {
               setWorklistForm((prev) => ({ ...prev, requestingDoctor: value }));
             }}
           />
-          <TextInput
+          <FloatingInput
             label="Laudante"
             value={worklistForm.assignedTo}
             onChange={(e) => {
@@ -734,13 +798,13 @@ export function LaudoConfiguracoes() {
               setWorklistForm((prev) => ({ ...prev, assignedTo: value }));
             }}
           />
-          <Select
+          <FloatingSelect
             label="Prioridade"
             data={[{ value: 'normal', label: 'Normal' }, { value: 'urgente', label: 'Urgente' }]}
             value={worklistForm.priority}
             onChange={(value) => setWorklistForm((prev) => ({ ...prev, priority: (value as WorklistPriority) || 'normal' }))}
           />
-          <Select
+          <FloatingSelect
             label="Status"
             data={[
               { value: 'sem_laudo', label: 'Sem laudo' },

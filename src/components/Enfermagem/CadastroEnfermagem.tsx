@@ -5,22 +5,19 @@ import {
   Badge,
   Box,
   Button,
-  Center,
   Checkbox,
   Group,
-  Loader,
   Modal,
   Paper,
-  Select,
+  Skeleton,
   SimpleGrid,
   Stack,
   Switch,
   Table,
   Text,
-  TextInput,
-  Textarea,
   Title,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, ClipboardCheck, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -33,6 +30,9 @@ import procedureNursingTemplateService, {
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useNursingTemplatesQuery } from '../../hooks/useNursingTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 
 type QuestionForm = NursingQuestionPayload & {
   id: string;
@@ -145,6 +145,7 @@ const shouldShowOptions = (responseType?: string) => (
 export function CadastroEnfermagem() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -374,7 +375,8 @@ export function CadastroEnfermagem() {
         </Group>
 
         <Paper withBorder radius="lg" p="md" mb="lg">
-          <TextInput
+          <FloatingInput
+            label="Buscar triagens"
             placeholder="Buscar por procedimento, nome da triagem ou pergunta..."
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
@@ -383,63 +385,140 @@ export function CadastroEnfermagem() {
 
         <Paper withBorder radius="lg" p="md">
           {loading ? (
-            <Center py="xl">
-              <Loader />
-            </Center>
+            <Stack gap="md">
+              <Skeleton height={20} width="28%" radius="xl" />
+              {(isMobile ? Array.from({ length: 3 }) : Array.from({ length: 5 })).map((_, index) => (
+                <Paper key={index} withBorder radius="md" p="md">
+                  <Stack gap="sm">
+                    <Skeleton height={20} width={isMobile ? '70%' : '30%'} radius="xl" />
+                    <Skeleton height={16} width={isMobile ? '45%' : '20%'} radius="xl" />
+                    <Skeleton height={16} width={isMobile ? '55%' : '24%'} radius="xl" />
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
           ) : (
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Triagem</Table.Th>
-                  <Table.Th>Procedimento</Table.Th>
-                  <Table.Th>Campos padrão</Table.Th>
-                  <Table.Th>Perguntas livres</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filteredItems.length > 0 ? filteredItems.map((item) => {
-                  const standardCount = STANDARD_FIELDS.filter((field) => Boolean(item[field.key])).length;
-                  return (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>
-                        <Text fw={600}>{item.name}</Text>
-                        {item.description && (
-                          <Text size="sm" c="dimmed">{item.description}</Text>
-                        )}
-                      </Table.Td>
-                      <Table.Td>{item.procedure?.name || '-'}</Table.Td>
-                      <Table.Td>{standardCount > 0 ? `${standardCount} habilitado(s)` : 'Nenhum'}</Table.Td>
-                      <Table.Td>{item.questions?.length || 0}</Table.Td>
-                      <Table.Td>
-                        <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
-                          {item.isActive ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Group gap="xs" justify="flex-end">
-                          <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="light" color="red" onClick={() => handleDeactivate(item.id)}>
-                            <Power size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
+            <>
+              {!isMobile ? (
+                <Table highlightOnHover verticalSpacing="md">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Triagem</Table.Th>
+                      <Table.Th>Procedimento</Table.Th>
+                      <Table.Th>Campos padrão</Table.Th>
+                      <Table.Th>Perguntas livres</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th style={{ textAlign: 'right' }}>Ações</Table.Th>
                     </Table.Tr>
-                  );
-                }) : (
-                  <Table.Tr>
-                    <Table.Td colSpan={6}>
-                      <Center py="xl">
-                        <Text c="dimmed">Nenhuma triagem cadastrada.</Text>
-                      </Center>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {filteredItems.length > 0 ? filteredItems.map((item) => {
+                      const standardCount = STANDARD_FIELDS.filter((field) => Boolean(item[field.key])).length;
+                      return (
+                        <Table.Tr key={item.id}>
+                          <Table.Td>
+                            <Text fw={700}>{item.name}</Text>
+                            {item.description && (
+                              <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge variant="light" color="blue" radius="xl">
+                              {item.procedure?.name || 'Sem procedimento'}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text fw={600}>{standardCount > 0 ? `${standardCount} habilitado(s)` : 'Nenhum'}</Text>
+                            <Text size="sm" c="dimmed">
+                              {standardCount > 0 ? 'Sinais vitais e checagens padrão ativos' : 'Nenhum campo padrão selecionado'}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text fw={600}>{item.questions?.length || 0}</Text>
+                            <Text size="sm" c="dimmed">
+                              {(item.questions?.length || 0) === 1 ? 'pergunta específica' : 'perguntas específicas'}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge color={item.isActive ? 'green' : 'gray'} variant="light" radius="xl">
+                              {item.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Group gap="xs" justify="flex-end">
+                              <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)}>
+                                <Pencil size={16} />
+                              </ActionIcon>
+                              <ActionIcon variant="light" color="red" onClick={() => handleDeactivate(item.id)}>
+                                <Power size={16} />
+                              </ActionIcon>
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    }) : (
+                      <Table.Tr>
+                        <Table.Td colSpan={6}>
+                          <Stack align="center" py="xl" gap={6}>
+                            <Text fw={600}>Nenhuma triagem cadastrada</Text>
+                            <Text c="dimmed" size="sm">Cadastre uma triagem por procedimento para organizar o preparo dos exames.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Table.Tbody>
+                </Table>
+              ) : (
+                <Stack gap="sm">
+                  {filteredItems.length > 0 ? filteredItems.map((item) => {
+                    const standardCount = STANDARD_FIELDS.filter((field) => Boolean(item[field.key])).length;
+                    return (
+                      <Paper key={item.id} withBorder radius="md" p="md">
+                        <Stack gap="sm">
+                          <Group justify="space-between" align="flex-start">
+                            <Box style={{ flex: 1 }}>
+                              <Text fw={700}>{item.name}</Text>
+                              <Text size="sm" c="dimmed">{item.procedure?.name || 'Sem procedimento'}</Text>
+                            </Box>
+                            <Badge color={item.isActive ? 'green' : 'gray'} variant="light" radius="xl">
+                              {item.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </Group>
+                          {item.description && (
+                            <Text size="sm" c="dimmed" lineClamp={3}>{item.description}</Text>
+                          )}
+                          <Group gap="xs">
+                            <Badge variant="light" color="blue" radius="xl">
+                              {standardCount > 0 ? `${standardCount} campos padrão` : 'Sem padrão'}
+                            </Badge>
+                            <Badge variant="light" color="grape" radius="xl">
+                              {item.questions?.length || 0} perguntas
+                            </Badge>
+                          </Group>
+                          <Group gap="xs" justify="flex-end">
+                            <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)}>
+                              <Pencil size={16} />
+                            </ActionIcon>
+                            <ActionIcon variant="light" color="red" onClick={() => handleDeactivate(item.id)}>
+                              <Power size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Stack>
+                      </Paper>
+                    );
+                  }) : (
+                    <Paper withBorder radius="md" p="xl">
+                      <Stack align="center" gap={6}>
+                        <Text fw={600}>Nenhuma triagem cadastrada</Text>
+                        <Text c="dimmed" size="sm" ta="center">
+                          Cadastre uma triagem por procedimento para organizar o preparo dos exames.
+                        </Text>
+                      </Stack>
+                    </Paper>
+                  )}
+                </Stack>
+              )}
+            </>
           )}
         </Paper>
       </Box>
@@ -453,20 +532,23 @@ export function CadastroEnfermagem() {
         title={editingId ? 'Editar triagem' : 'Nova triagem'}
         size="xl"
         centered
+        styles={{ body: { paddingTop: 28 } }}
       >
         <Stack gap="lg">
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-            <Select
+            <FloatingSelect
               label="Procedimento"
               placeholder="Selecione"
               data={procedures}
               searchable
+              alwaysFloatLabel
               value={form.procedureId}
               onChange={(value) => setForm((prev) => ({ ...prev, procedureId: value || '' }))}
             />
-            <TextInput
+            <FloatingInput
               label="Nome da triagem"
               placeholder="Ex.: Triagem de contraste"
+              alwaysFloatLabel
               value={form.name}
               onChange={(event) => {
                 const value = event.currentTarget.value;
@@ -475,7 +557,7 @@ export function CadastroEnfermagem() {
             />
           </SimpleGrid>
 
-          <Textarea
+          <FloatingTextarea
             label="Descrição"
             placeholder="Instruções gerais e contexto da triagem"
             minRows={2}
@@ -545,7 +627,7 @@ export function CadastroEnfermagem() {
                   </Group>
 
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    <TextInput
+                    <FloatingInput
                       label="Pergunta"
                       placeholder="Ex.: Vai realizar contraste?"
                       value={question.label}
@@ -554,7 +636,7 @@ export function CadastroEnfermagem() {
                         updateQuestion(question.id, { label: value });
                       }}
                     />
-                    <Select
+                    <FloatingSelect
                       label="Tipo de resposta"
                       data={RESPONSE_TYPE_OPTIONS}
                       value={question.responseType}
@@ -563,7 +645,7 @@ export function CadastroEnfermagem() {
                   </SimpleGrid>
 
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    <TextInput
+                    <FloatingInput
                       label="Ajuda"
                       placeholder="Texto complementar"
                       value={question.helpText || ''}
@@ -572,7 +654,7 @@ export function CadastroEnfermagem() {
                         updateQuestion(question.id, { helpText: value });
                       }}
                     />
-                    <TextInput
+                    <FloatingInput
                       label="Placeholder"
                       placeholder="Ex.: Informe o medicamento"
                       value={question.placeholder || ''}
@@ -593,7 +675,7 @@ export function CadastroEnfermagem() {
                   />
 
                   {shouldShowOptions(question.responseType) && (
-                    <Textarea
+                    <FloatingTextarea
                       label="Opções"
                       placeholder="Uma opção por linha"
                       minRows={3}

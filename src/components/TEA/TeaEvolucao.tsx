@@ -7,20 +7,17 @@ import {
   Text,
   Button,
   Paper,
-  Select,
-  Textarea,
-  NumberInput,
   Stack,
   Badge,
-  Loader,
   ThemeIcon,
   useMantineColorScheme,
   TagsInput,
   Divider,
   ActionIcon,
   Alert,
+  Skeleton,
+  SimpleGrid,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Activity, Pencil, WandSparkles } from 'lucide-react';
 import dayjs from 'dayjs';
@@ -37,6 +34,10 @@ import { useTeaPitQuery } from '../../hooks/useTeaPitQuery';
 import { useTeaEvolutionsQuery } from '../../hooks/useTeaEvolutionsQuery';
 import { usePatientAppointmentsQuery } from '../../hooks/usePatientAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingDateInput } from '../common/FloatingDateInput';
+import { FloatingTextarea } from '../common/FloatingTextarea';
+import { FloatingNumberInput } from '../common/FloatingNumberInput';
 
 interface EvolutionForm {
   sessionDate: Date | null;
@@ -243,6 +244,8 @@ export function TeaEvolucao() {
       });
   }, [appointmentsData]);
 
+  const showFormSkeleton = loadingProfiles || (Boolean(selectedTeaProfileId) && loadingEvolutions && !evolutions.length);
+
   useEffect(() => {
     if (!teaProfilesError) return;
     const err: any = teaProfilesError;
@@ -436,10 +439,16 @@ export function TeaEvolucao() {
       <Header />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
+        <Group mb={18} gap="md" align="flex-start">
+          <ActionIcon
+            variant="default"
+            size={isMobile ? 44 : 52}
+            radius="md"
+            onClick={() => navigate('/tea')}
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={22} />
+          </ActionIcon>
           <Box>
             <Text fw={800} size="lg" style={{ color: titleColor }}>Evolução</Text>
             <Text size="sm" c="dimmed">Registro por sessão do paciente TEA</Text>
@@ -452,7 +461,7 @@ export function TeaEvolucao() {
             <Text fw={700}>Acompanhamento clínico</Text>
           </Group>
           <Stack gap="md">
-            <Select
+            <FloatingSelect
               label="Paciente TEA"
               placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
               data={teaProfileOptions}
@@ -473,107 +482,133 @@ export function TeaEvolucao() {
               </Badge>
             )}
 
-            <Group grow>
-              <DateInput
-                label="Data da sessão"
-                value={form.sessionDate}
-                onChange={(value) => setForm((prev) => ({ ...prev, sessionDate: value || null }))}
-                valueFormat="DD/MM/YYYY"
-                locale="pt-br"
-              />
-              <Select
-                label="Plano terapêutico (opcional)"
-                data={planOptions}
-                value={form.therapeuticPlanId}
-                onChange={(value) => {
-                  const planId = value || '';
-                  const selectedPlan = planOptions.find((item) => item.value === planId);
-                  setForm((prev) => ({ ...prev, therapeuticPlanId: planId }));
-                  if (selectedPlan?.label) {
-                    void applyTemplate({ procedureName: selectedPlan.label, sourceLabel: 'plano terapêutico' });
-                  }
-                }}
-                searchable
-                clearable
-              />
-              <Select
-                label="Sessão/agendamento vinculado (opcional)"
-                data={appointmentOptions}
-                value={form.appointmentId || null}
-                onChange={(value) => {
-                  const appointmentId = value || '';
-                  const selectedAppointment = appointmentOptions.find((item) => item.value === appointmentId);
-                  const procedureName = selectedAppointment?.label?.split('•')[1]?.trim() || '';
-                  setForm((prev) => ({ ...prev, appointmentId }));
-                  if (procedureName) {
-                    void applyTemplate({ procedureName, sourceLabel: 'sessão vinculada' });
-                  }
-                }}
-                searchable
-                clearable
-                nothingFoundMessage="Nenhum agendamento encontrado"
-              />
-              <Select
-                label="Profissional"
-                data={doctorOptions}
-                value={form.professionalDoctorId}
-                onChange={(value) => {
-                  const doctorId = value || '';
-                  const selectedDoctor = doctorOptions.find((item) => item.value === doctorId);
-                  setForm((prev) => ({
-                    ...prev,
-                    professionalDoctorId: doctorId,
-                    professional: selectedDoctor?.label || '',
-                  }));
-                }}
-                searchable
-                clearable
-                nothingFoundMessage="Nenhum médico encontrado"
-              />
-            </Group>
-            <Group grow>
-              <Select
-                label="Procedimento da sessão (template)"
-                data={pitProcedureOptions}
-                value={form.procedureContextId || null}
-                onChange={(value) => {
-                  const procedure = value || '';
-                  const selectedProcedure = pitProcedureOptions.find((item) => item.value === procedure);
-                  const procedureName = selectedProcedure?.label || '';
-                  const procedureId = procedure.startsWith('name:') ? '' : procedure;
-                  setForm((prev) => ({
-                    ...prev,
-                    procedureContextId: procedure,
-                    procedureContextLabel: procedureName,
-                  }));
-                  if (procedure) {
-                    void applyTemplate({ procedureName, procedureId, sourceLabel: 'procedimento selecionado' });
-                  }
-                }}
-                searchable
-                clearable
-                nothingFoundMessage="Sem procedimentos ativos no PIT"
-              />
-              <Group align="flex-end" justify="flex-end">
-                <Button
-                  variant="light"
-                  leftSection={<WandSparkles size={16} />}
-                  onClick={() => void applyTemplate({
-                    procedureName: form.procedureContextLabel || undefined,
-                    procedureId: form.procedureContextId.startsWith('name:') ? undefined : form.procedureContextId,
-                  })}
-                  disabled={!form.procedureContextId}
-                >
-                  Aplicar template
-                </Button>
-              </Group>
-            </Group>
+            {showFormSkeleton ? (
+              <Stack gap="md">
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Skeleton key={index} height={56} radius="md" />
+                  ))}
+                </SimpleGrid>
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                  <Skeleton height={56} radius="md" />
+                  <Skeleton height={44} width={180} radius="md" ml="auto" />
+                </SimpleGrid>
+                <Skeleton height={92} radius="md" />
+                <Skeleton height={72} radius="md" />
+                <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
+                  <Skeleton height={56} radius="md" />
+                  <Skeleton height={56} radius="md" />
+                  <Skeleton height={56} radius="md" />
+                </SimpleGrid>
+                <Skeleton height={92} radius="md" />
+                <Skeleton height={92} radius="md" />
+              </Stack>
+            ) : (
+              <>
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" verticalSpacing="md">
+                  <FloatingDateInput
+                    label="Data da sessão"
+                    value={form.sessionDate}
+                    onChange={(value) => setForm((prev) => ({ ...prev, sessionDate: value || null }))}
+                    valueFormat="DD/MM/YYYY"
+                    locale="pt-br"
+                  />
+                  <FloatingSelect
+                    label="Plano terapêutico (opcional)"
+                    data={planOptions}
+                    value={form.therapeuticPlanId}
+                    onChange={(value) => {
+                      const planId = value || '';
+                      const selectedPlan = planOptions.find((item) => item.value === planId);
+                      setForm((prev) => ({ ...prev, therapeuticPlanId: planId }));
+                      if (selectedPlan?.label) {
+                        void applyTemplate({ procedureName: selectedPlan.label, sourceLabel: 'plano terapêutico' });
+                      }
+                    }}
+                    searchable
+                    clearable
+                  />
+                  <FloatingSelect
+                    label="Sessão/agendamento vinculado (opcional)"
+                    data={appointmentOptions}
+                    value={form.appointmentId || null}
+                    onChange={(value) => {
+                      const appointmentId = value || '';
+                      const selectedAppointment = appointmentOptions.find((item) => item.value === appointmentId);
+                      const procedureName = selectedAppointment?.label?.split('•')[1]?.trim() || '';
+                      setForm((prev) => ({ ...prev, appointmentId }));
+                      if (procedureName) {
+                        void applyTemplate({ procedureName, sourceLabel: 'sessão vinculada' });
+                      }
+                    }}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhum agendamento encontrado"
+                  />
+                  <FloatingSelect
+                    label="Profissional"
+                    data={doctorOptions}
+                    value={form.professionalDoctorId}
+                    onChange={(value) => {
+                      const doctorId = value || '';
+                      const selectedDoctor = doctorOptions.find((item) => item.value === doctorId);
+                      setForm((prev) => ({
+                        ...prev,
+                        professionalDoctorId: doctorId,
+                        professional: selectedDoctor?.label || '',
+                      }));
+                    }}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhum médico encontrado"
+                  />
+                </SimpleGrid>
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
+                  <FloatingSelect
+                    label="Procedimento da sessão (template)"
+                    data={pitProcedureOptions}
+                    value={form.procedureContextId || null}
+                    onChange={(value) => {
+                      const procedure = value || '';
+                      const selectedProcedure = pitProcedureOptions.find((item) => item.value === procedure);
+                      const procedureName = selectedProcedure?.label || '';
+                      const procedureId = procedure.startsWith('name:') ? '' : procedure;
+                      setForm((prev) => ({
+                        ...prev,
+                        procedureContextId: procedure,
+                        procedureContextLabel: procedureName,
+                      }));
+                      if (procedure) {
+                        void applyTemplate({ procedureName, procedureId, sourceLabel: 'procedimento selecionado' });
+                      }
+                    }}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Sem procedimentos ativos no PIT"
+                  />
+                  <Group align="flex-end" justify={isMobile ? 'stretch' : 'flex-end'}>
+                    <Button
+                      variant="light"
+                      leftSection={<WandSparkles size={16} />}
+                      onClick={() => void applyTemplate({
+                        procedureName: form.procedureContextLabel || undefined,
+                        procedureId: form.procedureContextId.startsWith('name:') ? undefined : form.procedureContextId,
+                      })}
+                      disabled={!form.procedureContextId}
+                      fullWidth={isMobile}
+                    >
+                      Aplicar template
+                    </Button>
+                  </Group>
+                </SimpleGrid>
+              </>
+            )}
             {autoTemplateInfo && (
               <Alert color="indigo" variant="light" title="Template da evolução">
                 {autoTemplateInfo}
               </Alert>
             )}
-            <Textarea
+            <FloatingTextarea
               label="Objetivo trabalhado na sessão"
               minRows={2}
               value={form.sessionGoal}
@@ -589,31 +624,31 @@ export function TeaEvolucao() {
               onChange={(value) => setForm((prev) => ({ ...prev, strategiesUsed: value }))}
               clearable
             />
-            <Group grow>
-              <Select
+            <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" verticalSpacing="md">
+              <FloatingSelect
                 label="Engajamento"
                 data={engagementOptions}
                 value={form.engagementLevel || null}
                 onChange={(value) => setForm((prev) => ({ ...prev, engagementLevel: value || '' }))}
                 clearable
               />
-              <Select
+              <FloatingSelect
                 label="Regulação"
                 data={regulationOptions}
                 value={form.regulationLevel || null}
                 onChange={(value) => setForm((prev) => ({ ...prev, regulationLevel: value || '' }))}
                 clearable
               />
-              <Select
+              <FloatingSelect
                 label="Comportamento"
                 data={behaviorOptions}
                 value={form.behaviorLevel || null}
                 onChange={(value) => setForm((prev) => ({ ...prev, behaviorLevel: value || '' }))}
                 clearable
               />
-            </Group>
+            </SimpleGrid>
 
-            <Textarea
+            <FloatingTextarea
               label="Intervenção realizada"
               minRows={2}
               value={form.interventionSummary}
@@ -623,7 +658,7 @@ export function TeaEvolucao() {
               }}
             />
 
-            <Textarea
+            <FloatingTextarea
               label="Resposta do paciente"
               minRows={2}
               value={form.patientResponse}
@@ -633,15 +668,15 @@ export function TeaEvolucao() {
               }}
             />
 
-            <Group grow>
-              <NumberInput
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
+              <FloatingNumberInput
                 label="Score de progresso (0-10)"
                 value={form.progressScore ?? undefined}
                 onChange={(value) => setForm((prev) => ({ ...prev, progressScore: typeof value === 'number' ? value : null }))}
                 min={0}
                 max={10}
               />
-              <Textarea
+              <FloatingTextarea
                 label="Observações"
                 minRows={1}
                 value={form.notes}
@@ -650,9 +685,9 @@ export function TeaEvolucao() {
                   setForm((prev) => ({ ...prev, notes: value }));
                 }}
               />
-            </Group>
-            <Group grow align="flex-start">
-              <Textarea
+            </SimpleGrid>
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
+              <FloatingTextarea
                 label="Devolutiva para família"
                 minRows={2}
                 value={form.familyFeedback}
@@ -661,7 +696,7 @@ export function TeaEvolucao() {
                   setForm((prev) => ({ ...prev, familyFeedback: value }));
                 }}
               />
-              <Textarea
+              <FloatingTextarea
                 label="Plano para casa / próxima sessão"
                 minRows={2}
                 value={form.homePlan}
@@ -670,8 +705,8 @@ export function TeaEvolucao() {
                   setForm((prev) => ({ ...prev, homePlan: value }));
                 }}
               />
-            </Group>
-            <Textarea
+            </SimpleGrid>
+            <FloatingTextarea
               label="Alertas clínicos / riscos"
               minRows={2}
               value={form.alerts}
@@ -681,7 +716,7 @@ export function TeaEvolucao() {
               }}
             />
             {editingEvolutionId && (
-              <Textarea
+              <FloatingTextarea
                 label="Motivo da retificação"
                 minRows={2}
                 required
@@ -704,7 +739,16 @@ export function TeaEvolucao() {
 
             <Text fw={600}>Evoluções registradas</Text>
             {loadingEvolutions ? (
-              <Group justify="center"><Loader size="sm" /></Group>
+              <Stack gap="xs">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Paper key={index} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: cardBg }}>
+                    <Skeleton height={16} width="32%" mb={10} radius="xl" />
+                    <Skeleton height={12} width="48%" mb={8} radius="xl" />
+                    <Skeleton height={10} width="76%" mb={8} radius="xl" />
+                    <Skeleton height={10} width="64%" radius="xl" />
+                  </Paper>
+                ))}
+              </Stack>
             ) : evolutions.length === 0 ? (
               <Text size="sm" c="dimmed">Nenhuma evolução registrada.</Text>
             ) : (

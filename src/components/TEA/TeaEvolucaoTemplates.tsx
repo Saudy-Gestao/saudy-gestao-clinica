@@ -6,16 +6,13 @@ import {
   Button,
   Group,
   Paper,
-  Select,
   Stack,
   Text,
-  Textarea,
   Badge,
   ActionIcon,
-  Loader,
-  TagsInput,
   Switch,
   useMantineColorScheme,
+  Skeleton,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -26,6 +23,10 @@ import teaEvolutionTemplateService from '../../services/teaEvolutionTemplateServ
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useTeaEvolutionTemplatesQuery } from '../../hooks/useTeaEvolutionTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTagsInput } from '../common/FloatingTagsInput';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 
 const emptyForm = {
   id: '',
@@ -159,10 +160,16 @@ export function TeaEvolucaoTemplates() {
       <Header />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
+        <Group mb={18} gap="md" align="flex-start">
+          <ActionIcon
+            variant="default"
+            size={isMobile ? 44 : 52}
+            radius="md"
+            onClick={() => navigate('/tea')}
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={22} />
+          </ActionIcon>
           <Box>
             <Text fw={800} size="lg" style={{ color: titleColor }}>Templates da Evolução TEA</Text>
             <Text size="sm" c="dimmed">Padronize campos por procedimento</Text>
@@ -172,7 +179,7 @@ export function TeaEvolucaoTemplates() {
         <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
           <Stack gap="sm">
             <Group grow align="flex-start">
-              <Select
+              <FloatingSelect
                 label="Procedimento"
                 data={procedureOptions}
                 value={form.procedureId || null}
@@ -180,21 +187,24 @@ export function TeaEvolucaoTemplates() {
                 searchable
                 clearable={false}
               />
-              <Textarea
+              <FloatingInput
                 label="Nome interno do template"
                 value={form.name}
                 onChange={(e) => setForm((prev) => ({ ...prev, name: e.currentTarget.value }))}
-                minRows={1}
               />
             </Group>
 
-            <Textarea label="Objetivo padrão" minRows={2} value={form.sessionGoal} onChange={(e) => setForm((prev) => ({ ...prev, sessionGoal: e.currentTarget.value }))} />
-            <Textarea label="Intervenção padrão" minRows={2} value={form.interventionSummary} onChange={(e) => setForm((prev) => ({ ...prev, interventionSummary: e.currentTarget.value }))} />
-            <Textarea label="Resposta padrão" minRows={2} value={form.patientResponse} onChange={(e) => setForm((prev) => ({ ...prev, patientResponse: e.currentTarget.value }))} />
-            <TagsInput label="Estratégias padrão" value={form.strategiesUsed} onChange={(value) => setForm((prev) => ({ ...prev, strategiesUsed: value }))} />
+            <FloatingTextarea label="Objetivo padrão" minRows={2} value={form.sessionGoal} onChange={(e) => setForm((prev) => ({ ...prev, sessionGoal: e.currentTarget.value }))} />
+            <FloatingTextarea label="Intervenção padrão" minRows={2} value={form.interventionSummary} onChange={(e) => setForm((prev) => ({ ...prev, interventionSummary: e.currentTarget.value }))} />
+            <FloatingTextarea label="Resposta padrão" minRows={2} value={form.patientResponse} onChange={(e) => setForm((prev) => ({ ...prev, patientResponse: e.currentTarget.value }))} />
+            <FloatingTagsInput
+              label="Estratégias padrão"
+              value={form.strategiesUsed}
+              onChange={(value) => setForm((prev) => ({ ...prev, strategiesUsed: value }))}
+            />
             <Group grow align="flex-start">
-              <Textarea label="Devolutiva padrão" minRows={2} value={form.familyFeedback} onChange={(e) => setForm((prev) => ({ ...prev, familyFeedback: e.currentTarget.value }))} />
-              <Textarea label="Plano de casa padrão" minRows={2} value={form.homePlan} onChange={(e) => setForm((prev) => ({ ...prev, homePlan: e.currentTarget.value }))} />
+              <FloatingTextarea label="Devolutiva padrão" minRows={2} value={form.familyFeedback} onChange={(e) => setForm((prev) => ({ ...prev, familyFeedback: e.currentTarget.value }))} />
+              <FloatingTextarea label="Plano de casa padrão" minRows={2} value={form.homePlan} onChange={(e) => setForm((prev) => ({ ...prev, homePlan: e.currentTarget.value }))} />
             </Group>
             <Switch
               label="Template ativo"
@@ -212,10 +222,20 @@ export function TeaEvolucaoTemplates() {
         <Paper p="md" mt="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
           <Group mb="sm" justify="space-between">
             <Text fw={700}>Templates cadastrados</Text>
-            {(loading || isFetching) && <Loader size="sm" />}
           </Group>
 
-          {items.length === 0 ? (
+          {(loading || isFetching) ? (
+            <Stack gap="xs">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Paper key={index} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                  <Skeleton height={16} width="30%" mb={10} radius="xl" />
+                  <Skeleton height={12} width="46%" mb={8} radius="xl" />
+                  <Skeleton height={10} width="72%" mb={8} radius="xl" />
+                  <Skeleton height={24} width="34%" radius="xl" />
+                </Paper>
+              ))}
+            </Stack>
+          ) : items.length === 0 ? (
             <Text size="sm" c="dimmed">Nenhum template cadastrado.</Text>
           ) : (
             <Stack gap="xs">

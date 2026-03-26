@@ -8,13 +8,11 @@ import {
   Button,
   ActionIcon,
   Paper,
-  Select,
   Stack,
   Badge,
-  Loader,
   Modal,
-  Textarea,
   Divider,
+  Skeleton,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -27,6 +25,8 @@ import { formatCPF } from '../../utils/formatters';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaCancellationTherapiesQuery } from '../../hooks/useTeaCancellationTherapiesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 
 type CancellationTherapyItem = {
   pitTherapyId: string;
@@ -83,7 +83,7 @@ export function TeaDesmarcacaoLote() {
     data: teaProfiles = [] as any[],
     isLoading: loadingProfiles,
     error: teaProfilesError,
-  } = useTeaProfilesQuery({ hasActivePit: true });
+  } = useTeaProfilesQuery();
 
   const {
     data: therapies = [] as CancellationTherapyItem[],
@@ -267,7 +267,7 @@ export function TeaDesmarcacaoLote() {
               </Paper>
             </>
           )}
-          <Textarea
+          <FloatingTextarea
             label="Motivo (opcional)"
             placeholder="Informe o motivo do cancelamento em lote"
             value={cancelReason}
@@ -325,10 +325,16 @@ export function TeaDesmarcacaoLote() {
       </Modal>
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
+        <Group mb={14} gap="md" align="flex-start">
+          <ActionIcon
+            variant="default"
+            size={isMobile ? 44 : 52}
+            radius="md"
+            onClick={() => navigate('/tea')}
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={22} />
+          </ActionIcon>
           <Box>
             <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Desmarcação em lote</Text>
             <Text size="sm" c="dimmed">Cancelar terapias recorrentes de um paciente TEA</Text>
@@ -342,7 +348,7 @@ export function TeaDesmarcacaoLote() {
               <Text fw={700}>Seleção de paciente</Text>
             </Group>
 
-            <Select
+            <FloatingSelect
               label="Paciente TEA"
               placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
               data={teaProfileOptions}
@@ -366,7 +372,25 @@ export function TeaDesmarcacaoLote() {
             )}
 
             {(loadingTherapies || fetchingTherapies) ? (
-              <Group justify="center"><Loader size="sm" /></Group>
+              <Stack gap="xs">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Paper key={index} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                    <Group justify="space-between" align="center" wrap="wrap">
+                      <Box style={{ flex: 1 }}>
+                        <Skeleton height={16} width="34%" mb={8} radius="xl" />
+                        <Skeleton height={12} width="28%" radius="xl" />
+                      </Box>
+                      <Skeleton height={24} width={120} radius="xl" />
+                    </Group>
+                    <Group gap={8} wrap="wrap" mt="sm">
+                      <Skeleton height={24} width={140} radius="xl" />
+                      <Skeleton height={24} width={120} radius="xl" />
+                      <Skeleton height={24} width={180} radius="xl" />
+                    </Group>
+                    <Skeleton height={50} mt="sm" radius="md" />
+                  </Paper>
+                ))}
+              </Stack>
             ) : !selectedTeaProfileId ? (
               <Text size="sm" c="dimmed">Selecione um paciente para listar terapias agendadas.</Text>
             ) : therapies.length === 0 ? (

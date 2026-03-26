@@ -1,22 +1,20 @@
 import { Box, Text, Select, type BoxProps, type SelectProps } from '@mantine/core';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 
 interface FloatingSelectProps extends SelectProps {
-  label: string;
+  label: ReactNode;
   containerProps?: BoxProps;
+  alwaysFloatLabel?: boolean;
 }
 
-export function FloatingSelect({ label, containerProps, value, error, ...props }: FloatingSelectProps) {
-  const [isFocused, setIsFocused] = useState(false);
+export function FloatingSelect({ label, containerProps, value, error, alwaysFloatLabel = false, ...props }: FloatingSelectProps) {
   const hasValue = value !== null && value !== undefined;
 
   return (
     <Box w="100%" {...containerProps}>
       <Box
-        className={`floating-mantine-field ${isFocused || hasValue ? 'has-value' : ''}`}
+        className={`floating-mantine-field ${hasValue || alwaysFloatLabel ? 'has-value' : ''}`}
         w="100%"
-        onFocusCapture={() => setIsFocused(true)}
-        onBlurCapture={() => setIsFocused(false)}
         style={{ borderColor: error ? '#fa5252' : undefined }}
       >
         <Select

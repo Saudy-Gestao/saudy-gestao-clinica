@@ -14,6 +14,21 @@ body {
   color: var(--mantine-color-text);
 }
 
+:root {
+  --tea-pre-bg: linear-gradient(180deg, #f7f8fb 0%, #eef2f8 100%);
+  --tea-pre-surface: rgba(255, 255, 255, 0.88);
+  --tea-pre-surface-strong: #ffffff;
+  --tea-pre-border: rgba(10, 37, 104, 0.14);
+  --tea-pre-border-strong: rgba(10, 37, 104, 0.22);
+  --tea-pre-text: #2b2f38;
+  --tea-pre-muted: #6d7485;
+  --tea-pre-primary: #0a2a6b;
+  --tea-pre-primary-soft: rgba(10, 42, 107, 0.08);
+  --tea-pre-success: #63b347;
+  --tea-pre-danger: #c14646;
+  --tea-pre-shadow: 0 18px 48px rgba(14, 31, 66, 0.08);
+}
+
 :root[data-mantine-color-scheme='dark'] {
   --mantine-color-body: #0A1128;
   --mantine-color-text: #eef3ff;
@@ -23,6 +38,995 @@ body {
   --mantine-color-default-hover: #16285b;
   --mantine-color-default-color: #eef3ff;
   --mantine-color-default-border: #2b3f73;
+  --tea-pre-bg: linear-gradient(180deg, #0b1229 0%, #0f1730 100%);
+  --tea-pre-surface: rgba(12, 21, 47, 0.9);
+  --tea-pre-surface-strong: #121c3d;
+  --tea-pre-border: rgba(101, 130, 224, 0.35);
+  --tea-pre-border-strong: rgba(101, 130, 224, 0.52);
+  --tea-pre-text: #f7f8fc;
+  --tea-pre-muted: #7e93d6;
+  --tea-pre-primary: #0c2d6f;
+  --tea-pre-primary-soft: rgba(18, 56, 141, 0.44);
+  --tea-pre-success: #66b84e;
+  --tea-pre-danger: #c64747;
+  --tea-pre-shadow: 0 20px 54px rgba(1, 4, 15, 0.4);
+}
+
+.tea-pre-reserva-page {
+  min-height: 100vh;
+  background: var(--tea-pre-bg);
+}
+
+.tea-pre-reserva-shell {
+  width: min(1400px, 100%);
+  margin: 0 auto;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-panel {
+  background: var(--tea-pre-surface);
+  border: 1px solid var(--tea-pre-border) !important;
+  box-shadow: var(--tea-pre-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-back-button {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 14px;
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  color: var(--tea-pre-text);
+  box-shadow: 0 8px 20px rgba(10, 37, 104, 0.08);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-tab-button {
+  height: 40px;
+  padding-inline: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--tea-pre-border);
+  background: var(--tea-pre-surface-strong);
+  color: var(--tea-pre-text);
+  box-shadow: 0 8px 20px rgba(10, 37, 104, 0.06);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: rgba(54, 62, 88, 0.92);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-tab-button[data-active='true'] {
+  background: var(--tea-pre-primary);
+  border-color: var(--tea-pre-primary);
+  color: #fff;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-tab-button[data-active='true'] .tea-pre-reserva-tab-count {
+  background: rgba(111, 132, 214, 0.95);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-search .mantine-Input-input {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--tea-pre-border-strong);
+  background: var(--tea-pre-surface-strong);
+  color: var(--tea-pre-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-search .mantine-Input-input::placeholder {
+  color: var(--tea-pre-muted);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--tea-pre-border) !important;
+  background: var(--tea-pre-surface-strong);
+  color: var(--tea-pre-text);
+  box-shadow: 0 6px 14px rgba(10, 37, 104, 0.08), 0 1px 0 rgba(255, 255, 255, 0.75) inset;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  font-size: 0.95rem;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(10, 37, 104, 0.1), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip[data-active='true'] {
+  background: var(--tea-pre-primary);
+  border-color: var(--tea-pre-primary) !important;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(10, 37, 104, 0.2);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip[data-active='true'] svg,
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip[data-active='true'] * {
+  color: inherit;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(54, 62, 88, 0.12);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-filter-chip[data-active='true'] .tea-pre-reserva-filter-chip-count {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-card {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong) !important;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(10, 37, 104, 0.04);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-subcard {
+  background: color-mix(in srgb, var(--tea-pre-surface-strong) 90%, transparent);
+  border: 1px solid var(--tea-pre-border) !important;
+  border-radius: 10px;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-inline-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-inline-status--approval {
+  background: rgba(123, 97, 255, 0.1);
+  color: #6e57f5;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-inline-status--authorization {
+  background: rgba(240, 138, 0, 0.12);
+  color: #d17b00;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-inline-status--authorized {
+  background: rgba(54, 179, 126, 0.12);
+  color: #2b9b69;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-inline-status--scheduled {
+  background: rgba(49, 130, 246, 0.12);
+  color: #2367d1;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress {
+  padding-top: 4px;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tea-pre-border) 55%, transparent);
+  overflow: visible;
+  margin-inline: 12px;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #a6de93 0%, #8dd472 100%);
+  height: 100%;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-nodes {
+  position: absolute;
+  inset: -4px 0 0 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-node {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 3px solid var(--tea-pre-surface-strong);
+  background: #d9dce3;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tea-pre-border-strong) 70%, transparent);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-node[data-active='true'] {
+  background: #a6de93;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-labels {
+  position: relative;
+  height: 22px;
+  margin-top: 12px;
+  padding-inline: 12px;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-label {
+  position: absolute;
+  top: 0;
+  font-size: 12px;
+  color: var(--tea-pre-muted);
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-label[data-align='center'] {
+  transform: translateX(-50%);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-label[data-align='right'] {
+  transform: translateX(-100%);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-progress-label[data-active='true'] {
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-action-btn {
+  min-height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--tea-pre-border-strong);
+  font-weight: 500;
+  font-size: 0.94rem;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-action-btn--primary,
+.tea-pre-reserva-page .tea-pre-reserva-action-btn--neutral {
+  background: var(--tea-pre-primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-action-btn--secondary {
+  background: var(--tea-pre-surface-strong);
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-action-btn--success {
+  background: var(--tea-pre-success);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-action-btn--danger {
+  background: var(--tea-pre-danger);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-action-btn:disabled {
+  opacity: 0.55;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-actions-grid > * {
+  width: 100%;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-actions-grid--approval {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-actions-grid--approval > * {
+  width: auto;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-actions-grid--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-actions-grid--compact > * {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 980px) {
+  .tea-pre-reserva-page .tea-pre-reserva-actions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .tea-pre-reserva-page .tea-pre-reserva-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-section-title {
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-page .tea-pre-reserva-muted {
+  color: var(--tea-pre-muted);
+}
+
+.tea-pre-reserva-bulk-modal {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  box-shadow: var(--tea-pre-shadow);
+}
+
+.tea-pre-reserva-bulk-modal__header {
+  padding: 20px 24px 8px;
+}
+
+.tea-pre-reserva-bulk-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-bulk-modal__body {
+  padding: 8px 24px 24px;
+}
+
+.tea-pre-reserva-bulk-modal__close {
+  border-radius: 16px;
+  border: 2px solid #3156cc;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-bulk-shell {
+  gap: 18px;
+}
+
+.tea-pre-reserva-bulk-hero,
+.tea-pre-reserva-bulk-footer {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tea-pre-surface-strong) 92%, transparent) 0%, var(--tea-pre-surface-strong) 100%);
+  border-color: var(--tea-pre-border-strong) !important;
+  border-radius: 18px;
+}
+
+.tea-pre-reserva-bulk-hero__eyebrow {
+  letter-spacing: 0.08em;
+  color: var(--tea-pre-primary);
+}
+
+.tea-pre-reserva-bulk-option {
+  display: block;
+  width: 100%;
+  padding: 18px 20px;
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(10, 37, 104, 0.05);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, background-color 140ms ease;
+}
+
+.tea-pre-reserva-bulk-option:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(10, 37, 104, 0.08);
+}
+
+.tea-pre-reserva-bulk-option[data-selected='true'] {
+  border-color: #4f72ee;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 55%, var(--tea-pre-surface-strong));
+  box-shadow: 0 14px 28px rgba(34, 82, 216, 0.12);
+}
+
+.tea-pre-reserva-bulk-option__check {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 2px solid var(--tea-pre-border-strong);
+  background: var(--tea-pre-surface-strong);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.tea-pre-reserva-bulk-option__check[data-selected='true'] {
+  border-color: #1f6fe5;
+  background: #1f6fe5;
+}
+
+.tea-pre-reserva-bulk-toolbar {
+  padding-top: 2px;
+}
+
+.tea-pre-reserva-checklist-modal {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  box-shadow: var(--tea-pre-shadow);
+}
+
+.tea-pre-reserva-checklist-modal__header {
+  padding: 20px 20px 6px;
+}
+
+.tea-pre-reserva-checklist-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-checklist-modal__body {
+  padding: 8px 20px 24px;
+}
+
+.tea-pre-reserva-checklist-modal__close {
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-checklist-patient {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tea-pre-reserva-checklist-patient__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.tea-pre-reserva-checklist-patient__field {
+  padding-bottom: 10px;
+  border-bottom: 2px solid color-mix(in srgb, var(--tea-pre-text) 35%, transparent);
+}
+
+.tea-pre-reserva-checklist-patient__label {
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-checklist-patient__value {
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-checklist-group__header,
+.tea-pre-reserva-checklist-item {
+  background: var(--tea-pre-surface-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(10, 37, 104, 0.06);
+}
+
+.tea-pre-reserva-checklist-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 112px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.tea-pre-reserva-checklist-badge.is-valid {
+  background: #2daf2d;
+  color: #ffffff;
+}
+
+.tea-pre-reserva-checklist-badge.is-invalid {
+  background: #c74848;
+  color: #ffffff;
+}
+
+.tea-pre-reserva-accept-modal {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  box-shadow: var(--tea-pre-shadow);
+}
+
+.tea-pre-reserva-accept-modal__header {
+  padding: 20px 24px 8px;
+}
+
+.tea-pre-reserva-accept-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-accept-modal__body {
+  padding: 8px 24px 24px;
+}
+
+.tea-pre-reserva-accept-modal__close {
+  border-radius: 16px;
+  border: 2px solid #3156cc;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-accept-shell {
+  gap: 18px;
+}
+
+.tea-pre-reserva-accept-hero,
+.tea-pre-reserva-accept-footer {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tea-pre-surface-strong) 92%, transparent) 0%, var(--tea-pre-surface-strong) 100%);
+  border-radius: 18px;
+  border-color: var(--tea-pre-border-strong) !important;
+}
+
+.tea-pre-reserva-accept-hero__counter {
+  min-width: 112px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 40%, var(--tea-pre-surface-strong));
+  border: 1px solid color-mix(in srgb, var(--tea-pre-primary) 18%, transparent);
+  text-align: center;
+}
+
+.tea-pre-reserva-accept-eyebrow {
+  letter-spacing: 0.08em;
+  color: var(--tea-pre-primary);
+}
+
+.tea-pre-reserva-accept-card {
+  background: var(--tea-pre-surface-strong);
+  border-radius: 18px;
+  border: 1px solid var(--tea-pre-border-strong) !important;
+  box-shadow: 0 10px 24px rgba(10, 37, 104, 0.05);
+}
+
+.tea-pre-reserva-accept-card__icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 52%, var(--tea-pre-surface-strong));
+  color: var(--tea-pre-primary);
+  flex-shrink: 0;
+}
+
+.tea-pre-reserva-accept-card__body {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 18%, var(--tea-pre-surface-strong));
+  border: 1px solid color-mix(in srgb, var(--tea-pre-border-strong) 92%, transparent);
+}
+
+.tea-pre-reserva-accept-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-accept-pill--primary {
+  background: color-mix(in srgb, #3d7cf1 12%, var(--tea-pre-surface-strong));
+  color: #2f7de1;
+}
+
+.tea-pre-reserva-accept-pill--success {
+  background: color-mix(in srgb, #18b47f 14%, var(--tea-pre-surface-strong));
+  color: #17a06f;
+}
+
+.tea-pre-reserva-accept-summary {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--tea-pre-surface-strong) 94%, transparent);
+  border-color: var(--tea-pre-border-strong) !important;
+}
+
+.tea-pre-reserva-accept-summary__text {
+  color: var(--tea-pre-text-secondary);
+}
+
+.tea-pre-reserva-accept-select .mantine-Input-input,
+.tea-pre-reserva-accept-select .mantine-Select-input {
+  min-height: 42px;
+  border-radius: 10px;
+  border-color: var(--tea-pre-border-strong);
+  background: color-mix(in srgb, var(--tea-pre-surface-strong) 96%, transparent);
+}
+
+.tea-pre-reserva-accept-select .mantine-Input-input:focus,
+.tea-pre-reserva-accept-select .mantine-Select-input:focus {
+  border-color: color-mix(in srgb, var(--tea-pre-primary) 55%, var(--tea-pre-border-strong));
+}
+
+.tea-pre-reserva-suggestion-modal {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  box-shadow: var(--tea-pre-shadow);
+}
+
+.tea-pre-reserva-suggestion-modal__header {
+  padding: 20px 24px 8px;
+}
+
+.tea-pre-reserva-suggestion-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-suggestion-modal__body {
+  padding: 8px 24px 24px;
+}
+
+.tea-pre-reserva-suggestion-modal__close {
+  border-radius: 16px;
+  border: 2px solid #3156cc;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-suggestion-shell {
+  gap: 18px;
+}
+
+.tea-pre-reserva-suggestion-hero,
+.tea-pre-reserva-suggestion-footer,
+.tea-pre-reserva-suggestion-panel,
+.tea-pre-reserva-suggestion-empty {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tea-pre-surface-strong) 92%, transparent) 0%, var(--tea-pre-surface-strong) 100%);
+  border-color: var(--tea-pre-border-strong) !important;
+  border-radius: 18px;
+}
+
+.tea-pre-reserva-suggestion-hero__eyebrow {
+  letter-spacing: 0.08em;
+  color: var(--tea-pre-primary);
+}
+
+.tea-pre-reserva-suggestion-hero__meta {
+  min-width: 172px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 38%, var(--tea-pre-surface-strong));
+  border: 1px solid color-mix(in srgb, var(--tea-pre-primary) 18%, transparent);
+}
+
+.tea-pre-reserva-suggestion-label {
+  color: var(--tea-pre-primary);
+}
+
+.tea-pre-reserva-suggestion-calendar-scroll {
+  overflow-x: auto;
+}
+
+.tea-pre-reserva-suggestion-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.tea-pre-reserva-suggestion-day {
+  min-height: 154px;
+  border-radius: 16px;
+  border-color: var(--tea-pre-border-strong) !important;
+  background: var(--tea-pre-surface-strong);
+  box-shadow: 0 10px 24px rgba(10, 37, 104, 0.05);
+}
+
+.tea-pre-reserva-suggestion-slot {
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(10, 37, 104, 0.06);
+}
+
+.tea-pre-reserva-suggestion-therapy {
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(10, 37, 104, 0.05);
+}
+
+.tea-pre-reserva-suggestion-therapy__meta {
+  align-items: center;
+}
+
+.tea-pre-reserva-suggestion-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-suggestion-pill--outline {
+  background: color-mix(in srgb, #3d7cf1 10%, var(--tea-pre-surface-strong));
+  color: #2f7de1;
+}
+
+.tea-pre-reserva-suggestion-pill--success {
+  background: color-mix(in srgb, #18b47f 14%, var(--tea-pre-surface-strong));
+  color: #1b9669;
+}
+
+.tea-pre-reserva-suggestion-pill--warning {
+  background: color-mix(in srgb, #f0b400 18%, var(--tea-pre-surface-strong));
+  color: #a77b00;
+}
+
+.tea-pre-reserva-suggestion-pill--neutral {
+  background: color-mix(in srgb, var(--tea-pre-text) 8%, var(--tea-pre-surface-strong));
+  color: var(--tea-pre-text-secondary);
+}
+
+.tea-pre-reserva-suggestion-regenerate {
+  background: color-mix(in srgb, #ff8d2d 10%, var(--tea-pre-surface-strong)) !important;
+  color: #e67300 !important;
+  border: 1px solid color-mix(in srgb, #ff8d2d 26%, transparent) !important;
+  border-radius: 999px !important;
+}
+
+.tea-pre-reserva-manual-modal {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  box-shadow: var(--tea-pre-shadow);
+}
+
+.tea-pre-reserva-manual-modal__header {
+  padding: 20px 24px 8px;
+}
+
+.tea-pre-reserva-manual-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-manual-modal__body {
+  padding: 8px 24px 24px;
+}
+
+.tea-pre-reserva-manual-modal__close {
+  border-radius: 16px;
+  border: 2px solid #3156cc;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-manual-shell {
+  gap: 18px;
+}
+
+.tea-pre-reserva-manual-hero,
+.tea-pre-reserva-manual-toolbar,
+.tea-pre-reserva-manual-grid-card,
+.tea-pre-reserva-manual-footer,
+.tea-pre-reserva-manual-empty {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tea-pre-surface-strong) 92%, transparent) 0%, var(--tea-pre-surface-strong) 100%);
+  border-color: var(--tea-pre-border-strong) !important;
+  border-radius: 18px;
+}
+
+.tea-pre-reserva-manual-hero__eyebrow {
+  letter-spacing: 0.08em;
+  color: var(--tea-pre-primary);
+}
+
+.tea-pre-reserva-manual-hero__meta {
+  min-width: 176px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 38%, var(--tea-pre-surface-strong));
+  border: 1px solid color-mix(in srgb, var(--tea-pre-primary) 18%, transparent);
+}
+
+.tea-pre-reserva-manual-label {
+  color: var(--tea-pre-primary);
+}
+
+.tea-pre-reserva-manual-select .mantine-Input-input,
+.tea-pre-reserva-manual-select .mantine-Select-input {
+  min-height: 44px;
+  border-radius: 12px;
+  border-color: var(--tea-pre-border-strong);
+  background: color-mix(in srgb, var(--tea-pre-surface-strong) 96%, transparent);
+}
+
+.tea-pre-reserva-manual-grid-scroll {
+  overflow-x: auto;
+}
+
+.tea-pre-reserva-manual-grid {
+  display: grid;
+  column-gap: 6px;
+  row-gap: 4px;
+}
+
+.tea-pre-reserva-manual-grid__head,
+.tea-pre-reserva-manual-grid__time {
+  border-radius: 12px;
+  border-color: var(--tea-pre-border-strong) !important;
+  background: color-mix(in srgb, var(--tea-pre-primary-soft) 18%, var(--tea-pre-surface-strong));
+}
+
+.tea-pre-reserva-manual-grid__slot {
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.tea-pre-reserva-manual-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-manual-pill--neutral {
+  background: color-mix(in srgb, var(--tea-pre-text) 10%, var(--tea-pre-surface-strong));
+  color: var(--tea-pre-text-secondary);
+}
+
+.tea-pre-reserva-manual-pill--primary {
+  background: color-mix(in srgb, #3d7cf1 12%, var(--tea-pre-surface-strong));
+  color: #2f7de1;
+}
+
+.tea-pre-reserva-manual-pill--success {
+  background: #31b44b;
+  color: #ffffff;
+}
+
+.tea-pre-reserva-manual-pill--success-soft {
+  background: color-mix(in srgb, #18b47f 14%, var(--tea-pre-surface-strong));
+  color: #1b9669;
+}
+
+.tea-pre-reserva-manual-pill--warning {
+  background: color-mix(in srgb, #f0b400 18%, var(--tea-pre-surface-strong));
+  color: #a77b00;
+}
+
+.tea-pre-reserva-decision-modal {
+  background: var(--tea-pre-surface-strong);
+  border: 1px solid var(--tea-pre-border-strong);
+  box-shadow: var(--tea-pre-shadow);
+}
+
+.tea-pre-reserva-decision-modal__header {
+  padding: 20px 24px 8px;
+}
+
+.tea-pre-reserva-decision-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-decision-modal__body {
+  padding: 8px 24px 24px;
+}
+
+.tea-pre-reserva-decision-modal__close {
+  border-radius: 16px;
+  border: 2px solid #3156cc;
+  color: var(--tea-pre-text);
+}
+
+.tea-pre-reserva-decision-shell {
+  gap: 16px;
+}
+
+.tea-pre-reserva-decision-hero,
+.tea-pre-reserva-decision-footer {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tea-pre-surface-strong) 92%, transparent) 0%, var(--tea-pre-surface-strong) 100%);
+  border-color: var(--tea-pre-border-strong) !important;
+  border-radius: 18px;
+}
+
+.tea-pre-reserva-decision-hero__eyebrow {
+  letter-spacing: 0.08em;
+  color: var(--tea-pre-primary);
+}
+
+@media (max-width: 620px) {
+  .tea-pre-reserva-suggestion-modal__header {
+    padding: 18px 18px 6px;
+  }
+
+  .tea-pre-reserva-suggestion-modal__body {
+    padding: 8px 18px 20px;
+  }
+
+  .tea-pre-reserva-suggestion-hero__meta {
+    min-width: 100%;
+  }
+
+  .tea-pre-reserva-suggestion-therapy__meta {
+    width: 100%;
+  }
+
+  .tea-pre-reserva-manual-modal__header {
+    padding: 18px 18px 6px;
+  }
+
+  .tea-pre-reserva-manual-modal__body {
+    padding: 8px 18px 20px;
+  }
+
+  .tea-pre-reserva-manual-hero__meta {
+    min-width: 100%;
+  }
+
+  .tea-pre-reserva-decision-modal__header {
+    padding: 18px 18px 6px;
+  }
+
+  .tea-pre-reserva-decision-modal__body {
+    padding: 8px 18px 20px;
+  }
+}
+
+@media (max-width: 620px) {
+  .tea-pre-reserva-accept-modal__header {
+    padding: 18px 18px 6px;
+  }
+
+  .tea-pre-reserva-accept-modal__body {
+    padding: 8px 18px 20px;
+  }
+
+  .tea-pre-reserva-accept-hero__counter {
+    min-width: 100%;
+  }
+
+  .tea-pre-reserva-accept-stats {
+    width: 100%;
+  }
+
+  .tea-pre-reserva-accept-pill {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 620px) {
+  .tea-pre-reserva-checklist-patient__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .module-card-dark {
@@ -195,6 +1199,17 @@ body {
   pointer-events: none;
 }
 
+.floating-field__right-section {
+  position: absolute;
+  right: 0;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--mantine-color-dimmed);
+}
+
 /* ensure DatePicker wrapper can mimic floating behavior */
 .floating-field.has-value label,
 .floating-field.is-focused label,
@@ -208,6 +1223,14 @@ body {
 /* make hovering the wrapper give subtle input feedback */
 .floating-field:hover input {
   border-bottom-color: var(--mantine-color-darkBlue-4, #4674ff);
+}
+
+.agenda-date-filter .floating-field input {
+  transform: translateY(-1px);
+}
+
+.agenda-date-filter .floating-field__right-section {
+  bottom: 9px;
 }
 
 /* Floating wrappers for Mantine controls (Select, MultiSelect, DateInput, Textarea) */
@@ -224,11 +1247,22 @@ body {
   border: none;
   border-bottom: 1px solid var(--mantine-color-default-border);
   border-radius: 0;
-  padding: 10px 0 6px 0;
+  padding: 10px 28px 6px 0;
   min-height: 34px;
   background: transparent;
   font-size: 0.875rem;
   color: var(--mantine-color-text);
+}
+
+.floating-mantine-field .mantine-Input-section,
+.floating-mantine-field .mantine-Select-rightSection,
+.floating-mantine-field .mantine-DateInput-rightSection {
+  top: auto;
+  bottom: 8px;
+  transform: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .floating-mantine-field .mantine-Input-input:focus,

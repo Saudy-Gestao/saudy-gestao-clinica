@@ -5,19 +5,15 @@ import {
   Badge,
   Box,
   Button,
-  Center,
   Group,
-  Loader,
   Modal,
   Paper,
-  Select,
+  Skeleton,
   SimpleGrid,
   Stack,
   Switch,
   Table,
   Text,
-  TextInput,
-  Textarea,
   Title,
   useMantineColorScheme,
 } from '@mantine/core';
@@ -26,6 +22,9 @@ import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2 } from 'luci
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 import procedureAnamnesisTemplateService, {
   type AnamnesisQuestionPayload,
   type ProcedureAnamnesisTemplateItem,
@@ -351,71 +350,124 @@ export function CadastroAnamnese() {
           } : undefined}
         >
           <Stack gap="md">
-            <TextInput
-              label="Buscar"
-              placeholder="Nome da anamnese, procedimento ou pergunta..."
+            <FloatingInput
+              label="Buscar anamneses"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder="Nome da anamnese, procedimento ou pergunta..."
             />
 
             {loading ? (
-              <Center py="xl">
-                <Loader />
-              </Center>
+              <Stack gap="sm">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <Paper key={idx} withBorder radius="md" p="md">
+                    <Group justify="space-between" align="flex-start" wrap="nowrap">
+                      <Stack gap={8} style={{ flex: 1 }}>
+                        <Skeleton height={18} width="48%" radius="sm" />
+                        <Skeleton height={14} width="36%" radius="sm" />
+                        <Skeleton height={14} width="62%" radius="sm" />
+                      </Stack>
+                      <Stack gap={8} align="flex-end">
+                        <Skeleton height={24} width={76} radius="xl" />
+                        <Group gap={8}>
+                          <Skeleton height={28} width={28} radius="xl" />
+                          <Skeleton height={28} width={28} radius="xl" />
+                        </Group>
+                      </Stack>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
             ) : filteredItems.length === 0 ? (
-              <Center py="xl">
-                <Text c="dimmed">Nenhuma anamnese cadastrada.</Text>
-              </Center>
+              <Paper withBorder p="xl" ta="center">
+                <Text fw={600}>Nenhuma anamnese cadastrada</Text>
+                <Text c="dimmed" size="sm" mt="xs">
+                  Cadastre perguntas por procedimento para usar no fluxo clínico.
+                </Text>
+              </Paper>
             ) : (
-              <Table.ScrollContainer minWidth={920}>
-                <Table highlightOnHover verticalSpacing="md">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Anamnese</Table.Th>
-                      <Table.Th>Procedimento</Table.Th>
-                      <Table.Th>Perguntas</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Ações</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {filteredItems.map((item) => (
-                      <Table.Tr key={item.id}>
-                        <Table.Td>
-                          <Stack gap={2}>
-                            <Text fw={700}>{item.name}</Text>
-                            <Text size="sm" c="dimmed">{item.description || 'Sem descrição'}</Text>
-                          </Stack>
-                        </Table.Td>
-                        <Table.Td>{item.procedure?.name || 'Procedimento não informado'}</Table.Td>
-                        <Table.Td>
-                          <Stack gap={4}>
-                            <Text fw={600}>{item.questions.length} pergunta(s)</Text>
-                            <Text size="sm" c="dimmed">
-                              {(item.questions || []).slice(0, 2).map((question) => question.label).join(' • ') || 'Sem perguntas'}
-                            </Text>
-                          </Stack>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
-                            {item.isActive ? 'Ativa' : 'Inativa'}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Group gap="xs">
-                            <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)} aria-label="Editar anamnese">
-                              <Pencil size={16} />
-                            </ActionIcon>
-                            <ActionIcon variant="light" color={item.isActive ? 'red' : 'gray'} onClick={() => handleDeactivate(item.id)} aria-label="Desativar anamnese">
-                              <Power size={16} />
-                            </ActionIcon>
-                          </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
+              <>
+                <Box visibleFrom="sm">
+                  <Table.ScrollContainer minWidth={920}>
+                    <Table highlightOnHover verticalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Anamnese</Table.Th>
+                          <Table.Th>Procedimento</Table.Th>
+                          <Table.Th>Perguntas</Table.Th>
+                          <Table.Th>Status</Table.Th>
+                          <Table.Th>Ações</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {filteredItems.map((item) => (
+                          <Table.Tr key={item.id}>
+                            <Table.Td>
+                              <Stack gap={2}>
+                                <Text fw={700}>{item.name}</Text>
+                                <Text size="sm" c="dimmed">{item.description || 'Sem descrição'}</Text>
+                              </Stack>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge variant="light" color="blue">
+                                {item.procedure?.name || 'Procedimento não informado'}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <Stack gap={4}>
+                                <Text fw={600}>{item.questions.length} pergunta(s)</Text>
+                                <Text size="sm" c="dimmed">
+                                  {(item.questions || []).slice(0, 2).map((question) => question.label).join(' • ') || 'Sem perguntas'}
+                                </Text>
+                              </Stack>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
+                                {item.isActive ? 'Ativa' : 'Inativa'}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <Group gap="xs">
+                                <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)} aria-label="Editar anamnese">
+                                  <Pencil size={16} />
+                                </ActionIcon>
+                                <ActionIcon variant="light" color={item.isActive ? 'red' : 'gray'} onClick={() => handleDeactivate(item.id)} aria-label="Desativar anamnese">
+                                  <Power size={16} />
+                                </ActionIcon>
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                </Box>
+                <Stack hiddenFrom="sm" gap="sm">
+                  {filteredItems.map((item) => (
+                    <Paper key={item.id} withBorder radius="md" p="md">
+                      <Group justify="space-between" align="flex-start" wrap="nowrap">
+                        <Stack gap={4} style={{ flex: 1 }}>
+                          <Text fw={700}>{item.name}</Text>
+                          <Text size="sm" c="dimmed">{item.procedure?.name || 'Procedimento não informado'}</Text>
+                          <Text size="sm" c="dimmed">{item.questions.length} pergunta(s)</Text>
+                          {item.description ? <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text> : null}
+                        </Stack>
+                        <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
+                          {item.isActive ? 'Ativa' : 'Inativa'}
+                        </Badge>
+                      </Group>
+                      <Group gap="xs" mt="md">
+                        <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)} aria-label="Editar anamnese">
+                          <Pencil size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="light" color={item.isActive ? 'red' : 'gray'} onClick={() => handleDeactivate(item.id)} aria-label="Desativar anamnese">
+                          <Power size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Paper>
+                  ))}
+                </Stack>
+              </>
             )}
           </Stack>
         </Paper>
@@ -430,19 +482,24 @@ export function CadastroAnamnese() {
         title={editingId ? 'Editar anamnese' : 'Nova anamnese'}
         centered
         size="xl"
+        styles={{
+          body: {
+            paddingTop: 28,
+          },
+        }}
       >
         <Stack gap="md">
-          <SimpleGrid cols={{ base: 1, md: 2 }}>
-            <Select
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+            <FloatingSelect
               label="Procedimento"
-              placeholder="Selecione o procedimento"
               data={procedures}
               value={form.procedureId}
               onChange={(value) => setForm((prev) => ({ ...prev, procedureId: value || '' }))}
               searchable
               required
+              alwaysFloatLabel
             />
-            <TextInput
+            <FloatingInput
               label="Nome da anamnese"
               placeholder="Ex.: Anamnese de ultrassom abdominal"
               value={form.name}
@@ -451,10 +508,11 @@ export function CadastroAnamnese() {
                 setForm((prev) => ({ ...prev, name: value }));
               }}
               required
+              alwaysFloatLabel
             />
           </SimpleGrid>
 
-          <Textarea
+          <FloatingTextarea
             label="Descrição"
             placeholder="Contexto, observações ou instruções de uso da anamnese"
             value={form.description}
@@ -501,7 +559,7 @@ export function CadastroAnamnese() {
                     </ActionIcon>
                   </Group>
 
-                  <TextInput
+                  <FloatingInput
                     label="Pergunta"
                     placeholder="Digite a pergunta"
                     value={question.label}
@@ -513,7 +571,7 @@ export function CadastroAnamnese() {
                   />
 
                   <SimpleGrid cols={{ base: 1, md: 2 }}>
-                    <Select
+                    <FloatingSelect
                       label="Tipo de resposta"
                       data={RESPONSE_TYPE_OPTIONS}
                       value={question.responseType}
@@ -522,7 +580,7 @@ export function CadastroAnamnese() {
                         optionsText: shouldShowOptions(value || 'TEXT') ? question.optionsText : '',
                       })}
                     />
-                    <TextInput
+                    <FloatingInput
                       label="Placeholder"
                       placeholder="Texto de apoio da resposta"
                       value={question.placeholder || ''}
@@ -533,7 +591,7 @@ export function CadastroAnamnese() {
                     />
                   </SimpleGrid>
 
-                  <Textarea
+                  <FloatingTextarea
                     label="Texto de ajuda"
                     placeholder="Orientação adicional para quem vai responder"
                     value={question.helpText || ''}
@@ -554,7 +612,7 @@ export function CadastroAnamnese() {
                   />
 
                   {shouldShowOptions(question.responseType) && (
-                    <Textarea
+                    <FloatingTextarea
                       label="Opções"
                       description="Uma opção por linha"
                       placeholder={'Sim\nNão\nNão sei informar'}

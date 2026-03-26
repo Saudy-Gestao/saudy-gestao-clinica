@@ -61,25 +61,54 @@ export const fetchTeaWeeklyAgenda = async (): Promise<TeaAgendaItem[]> => {
     if (doctorName && roomName) roomByDoctorName.set(doctorName.toLowerCase(), roomName);
   });
 
+  const buildAgendaSignature = (payload: {
+    patientName?: string;
+    doctorName?: string;
+    specialty?: string;
+    date?: string;
+    time?: string;
+  }) => [
+    String(payload.patientName || '').trim().toLowerCase(),
+    String(payload.doctorName || '').trim().toLowerCase(),
+    String(payload.specialty || '').trim().toLowerCase(),
+    String(payload.date || '').trim(),
+    String(payload.time || '').trim(),
+  ].join('|');
+
+  const convertedReservationSignatures = new Set(
+    reservedItems
+      .filter((it: any) => String(it?.status || '').toUpperCase() === 'CONVERTED')
+      .map((it: any) => buildAgendaSignature({
+        patientName: String(it?.patient?.name || ''),
+        doctorName: String(it?.professionalName || ''),
+        specialty: String(it?.procedureName || ''),
+        date: it?.suggestedDate ? dayjs(it.suggestedDate).format('YYYY-MM-DD') : '',
+        time: String(it?.suggestedTime || ''),
+      })),
+  );
+
   const mappedAppointments: TeaAgendaItem[] = rawItems
     .map((it: any) => ({
       id: `appointment-${String(it?.id || '')}`,
-      patientName: String(it?.patientName || it?.patient_name || ''),
-      doctorName: String(it?.doctorName || it?.doctor_name || ''),
-      specialty: String(it?.specialty || it?.procedure || it?.procedureName || ''),
+      patientName: String(it?.patientName || it?.patient_name || it?.patient?.name || it?.pacienteNome || ''),
+      doctorName: String(it?.doctorName || it?.doctor_name || it?.doctor?.name || it?.medicoNome || ''),
+      specialty: String(it?.specialty || it?.procedure || it?.procedureName || it?.procedimento || it?.especialidade || ''),
       roomName: (() => {
         const doctorId = String(it?.doctorId || it?.doctor?.id || '').trim();
-        const doctorName = String(it?.doctorName || it?.doctor_name || '').trim().toLowerCase();
+        const doctorName = String(it?.doctorName || it?.doctor_name || it?.doctor?.name || it?.medicoNome || '').trim().toLowerCase();
         return roomByDoctorId.get(doctorId) || roomByDoctorName.get(doctorName) || '';
       })(),
-      date: String(it?.date || ''),
-      time: String(it?.time || ''),
-      type: String(it?.type || ''),
+      date: String(it?.date || it?.data || ''),
+      time: String(it?.time || it?.hora || ''),
+      type: String(it?.type || it?.tipoConsulta || ''),
       status: String(it?.status || ''),
       source: 'APPOINTMENT' as const,
     }))
     .filter((item) => item.id && item.date && item.time)
-    .filter((item) => String(item.type || '').toUpperCase().includes('TEA'));
+    .filter((item) => (
+      String(item.type || '').toUpperCase().includes('TEA')
+      || convertedReservationSignatures.has(buildAgendaSignature(item))
+    ));
 
   const mappedReservations: TeaAgendaItem[] = reservedItems
     .map((it: any) => ({
@@ -102,8 +131,16 @@ export const fetchTeaWeeklyAgenda = async (): Promise<TeaAgendaItem[]> => {
 
   const reservationStatusesThatOccupy = new Set(['RESERVED', 'PROPOSED', 'PENDING_AUTHORIZATION', 'AUTHORIZED']);
   const occupyingReservations = mappedReservations.filter((item) => reservationStatusesThatOccupy.has(String(item.status || '').toUpperCase()));
+  const dedupedBySignature = new Map<string, TeaAgendaItem>();
+  [...occupyingReservations, ...mappedAppointments].forEach((item) => {
+    const signature = buildAgendaSignature(item);
+    const current = dedupedBySignature.get(signature);
+    if (!current || item.source === 'APPOINTMENT') {
+      dedupedBySignature.set(signature, item);
+    }
+  });
 
-  return [...mappedAppointments, ...occupyingReservations];
+  return Array.from(dedupedBySignature.values());
 };
 
 export const useTeaWeeklyAgendaQuery = () => useQuery({

@@ -7,20 +7,15 @@ import {
   Text,
   Button,
   Paper,
-  Select,
-  MultiSelect,
-  TextInput,
-  Textarea,
   Stack,
   SimpleGrid,
-  NumberInput,
   ActionIcon,
   Modal,
   Radio,
   ThemeIcon,
   useMantineColorScheme,
+  Skeleton,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Plus, Trash2, ClipboardList, Layers3 } from 'lucide-react';
 import dayjs from 'dayjs';
@@ -34,6 +29,12 @@ import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useTeaPitQuery } from '../../hooks/useTeaPitQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingDateInput } from '../common/FloatingDateInput';
+import { FloatingTextarea } from '../common/FloatingTextarea';
+import { FloatingNumberInput } from '../common/FloatingNumberInput';
+import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 
 interface TherapyItem {
   id?: string;
@@ -172,6 +173,9 @@ export function TeaPIT() {
       return acc;
     }, {});
   }, [proceduresData]);
+
+  const loadingPit = Boolean(selectedTeaProfileId) && !pitData && !pitError;
+  const showConfigSkeleton = loadingProfiles || loadingDoctors || loadingProcedures || loadingPit;
 
   useEffect(() => {
     if (!teaProfilesError) return;
@@ -357,13 +361,19 @@ export function TeaPIT() {
       <Header />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
+        <Group mb={18} gap="md" align="flex-start">
+          <ActionIcon
+            variant="default"
+            size={isMobile ? 44 : 52}
+            radius="md"
+            onClick={() => navigate('/tea')}
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={22} />
+          </ActionIcon>
           <Box>
-            <Text fw={800} size="lg" style={{ color: titleColor }}>PIT de Terapias</Text>
-            <Text size="sm" c="dimmed">Plano Integrado de Terapias por paciente TEA</Text>
+            <Text fw={800} size={isMobile ? 'lg' : 'xl'} style={{ color: titleColor }}>PIT de Terapias</Text>
+            <Text size="sm" c="dimmed">Plano integrado de terapias por paciente TEA</Text>
           </Box>
         </Group>
 
@@ -373,60 +383,82 @@ export function TeaPIT() {
             <Text fw={700}>Configuração do PIT</Text>
           </Group>
           <Stack gap="md">
-            <Select
-              label="Paciente TEA"
-              placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
-              data={teaProfileOptions}
-              value={selectedTeaProfileId}
-              onChange={setSelectedTeaProfileId}
-              searchable
-              clearable
-            />
+            {showConfigSkeleton ? (
+              <Stack gap="md">
+                <Skeleton height={56} radius="md" />
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <Skeleton height={56} radius="md" />
+                  <Skeleton height={56} radius="md" />
+                </SimpleGrid>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <Skeleton height={56} radius="md" />
+                  <Skeleton height={56} radius="md" />
+                </SimpleGrid>
+                <Skeleton height={96} radius="md" />
+                <Skeleton height={178} radius="md" />
+              </Stack>
+            ) : (
+              <>
+                <FloatingSelect
+                  label="Paciente TEA"
+                  placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
+                  data={teaProfileOptions}
+                  value={selectedTeaProfileId}
+                  onChange={setSelectedTeaProfileId}
+                  searchable
+                  clearable
+                  nothingFoundMessage="Nenhum paciente TEA encontrado"
+                />
 
-            <Group grow>
-              <TextInput
-                label="Título do PIT"
-                value={title}
-                onChange={(e) => setTitle(e.currentTarget.value)}
-              />
-              <Select
-                label="Status"
-                value={status}
-                onChange={(value) => setStatus(value || 'Ativo')}
-                data={[
-                  { value: 'Ativo', label: 'Ativo' },
-                  { value: 'Em revisão', label: 'Em revisão' },
-                  { value: 'Concluído', label: 'Concluído' },
-                ]}
-              />
-            </Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
+                  <FloatingInput
+                    label="Título do PIT"
+                    value={title}
+                    onChange={(e) => setTitle(e.currentTarget.value)}
+                  />
+                  <FloatingSelect
+                    label="Status"
+                    value={status}
+                    onChange={(value) => setStatus(value || 'Ativo')}
+                    data={[
+                      { value: 'Ativo', label: 'Ativo' },
+                      { value: 'Em revisão', label: 'Em revisão' },
+                      { value: 'Concluído', label: 'Concluído' },
+                    ]}
+                  />
+                </SimpleGrid>
 
-            <Group grow>
-              <DateInput
-                label="Início"
-                value={startDate}
-                onChange={(value) => setStartDate(value || null)}
-                valueFormat="DD/MM/YYYY"
-                locale="pt-br"
-              />
-              <DateInput
-                label="Revisão"
-                value={reviewDate}
-                onChange={(value) => setReviewDate(value || null)}
-                valueFormat="DD/MM/YYYY"
-                locale="pt-br"
-              />
-            </Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
+                  <FloatingDateInput
+                    label="Início"
+                    value={startDate}
+                    onChange={(value) => setStartDate(value || null)}
+                    valueFormat="DD/MM/YYYY"
+                    locale="pt-br"
+                  />
+                  <FloatingDateInput
+                    label="Revisão"
+                    value={reviewDate}
+                    onChange={(value) => setReviewDate(value || null)}
+                    valueFormat="DD/MM/YYYY"
+                    locale="pt-br"
+                  />
+                </SimpleGrid>
 
-            <Textarea
-              label="Observações gerais"
-              minRows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.currentTarget.value)}
-            />
+                <FloatingTextarea
+                  label="Observações gerais"
+                  minRows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.currentTarget.value)}
+                />
+              </>
+            )}
 
             <Group justify="space-between" align="center">
-              <Text fw={600}>Terapias do PIT</Text>
+              <Box>
+                <Text fw={600}>Terapias do PIT</Text>
+                <Text size="sm" c="dimmed">Defina frequência, profissional e preferências de agenda.</Text>
+              </Box>
               <Button size="xs" variant="light" leftSection={<Plus size={14} />} onClick={addTherapy}>Adicionar terapia</Button>
             </Group>
 
@@ -441,7 +473,7 @@ export function TeaPIT() {
 
                   <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="sm" verticalSpacing="sm">
                     <div>
-                      <Select
+                      <FloatingSelect
                         label="Terapia"
                         placeholder={loadingProcedures ? 'Carregando procedimentos...' : 'Selecione um procedimento'}
                         data={procedureOptions}
@@ -470,7 +502,7 @@ export function TeaPIT() {
                     </div>
 
                     <div>
-                      <NumberInput
+                      <FloatingNumberInput
                         label="Freq. semanal"
                         value={therapy.weeklyFrequency}
                         min={1}
@@ -479,7 +511,7 @@ export function TeaPIT() {
                     </div>
 
                     <div>
-                      <NumberInput
+                      <FloatingNumberInput
                         label="Duração (min)"
                         value={therapy.durationMinutes ?? undefined}
                         min={0}
@@ -488,7 +520,7 @@ export function TeaPIT() {
                     </div>
 
                     <div>
-                      <Select
+                      <FloatingSelect
                         label="Profissional"
                         placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
                         data={doctorOptions}
@@ -515,7 +547,7 @@ export function TeaPIT() {
 
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm" verticalSpacing="sm" mt="sm">
                     <div>
-                      <MultiSelect
+                      <FloatingMultiSelect
                         label="Dias preferenciais"
                         data={WEEKDAY_OPTIONS}
                         value={therapy.preferredWeekdays}
@@ -526,7 +558,7 @@ export function TeaPIT() {
                     </div>
 
                     <div>
-                      <MultiSelect
+                      <FloatingMultiSelect
                         label="Turno preferencial"
                         data={SHIFT_OPTIONS}
                         value={therapy.preferredShift}
@@ -539,7 +571,7 @@ export function TeaPIT() {
                   </SimpleGrid>
 
                   <div style={{ marginTop: 8 }}>
-                    <Textarea
+                    <FloatingTextarea
                       label="Observações"
                       minRows={2}
                       value={therapy.notes}

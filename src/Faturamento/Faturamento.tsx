@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, Textarea, NumberInput, Paper, Loader, Popover, Grid } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Popover, Grid, Badge, Skeleton } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, User, ExternalLink, Calendar as CalendarIcon, Pencil } from 'lucide-react';
+import { Plus, ChevronLeft, User, ExternalLink, Calendar as CalendarIcon, Pencil } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../themes/theme';
 import { DatePicker } from '@mantine/dates';
@@ -12,6 +12,10 @@ import { formatDateInput } from '../utils/formatters';
 import ResultModal from '../components/common/ResultModal';
 import { useInvoicesQuery } from '../hooks/useInvoicesQuery';
 import { queryKeys } from '../lib/queryKeys';
+import { FloatingInput } from '../components/common/FloatingInput';
+import { FloatingSelect } from '../components/common/FloatingSelect';
+import { FloatingTextarea } from '../components/common/FloatingTextarea';
+import { FloatingNumberInput } from '../components/common/FloatingNumberInput';
 
 export function Header() {
   const isMobile = useMediaQuery('(max-width: 799px)');
@@ -325,14 +329,12 @@ export function Faturamento() {
         {/* Search and Button Section */}
         <Box mb={isMobile ? 20 : 30}>
           <Group gap="md" align="flex-end">
-            <TextInput
-              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou número..'}
-              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
+            <FloatingInput
+              label="Buscar faturas"
+              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou número...'}
               value={query}
               onChange={(e) => setQuery(e.currentTarget.value)}
-              radius="md"
-              size={isMobile ? 'sm' : 'md'}
-              style={{ flex: 1 }}
+              containerProps={{ style: { flex: 1 } }}
             />
             <Button
               bg={DARK_BLUE}
@@ -350,9 +352,15 @@ export function Faturamento() {
 
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
           {invoicesLoading ? (
-            <Paper style={{ padding: 24, textAlign: 'center' }}>
-              <Loader />
-              <Text mt={8}>Carregando faturas...</Text>
+            <Paper style={{ padding: 24 }}>
+              <Stack gap="sm">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Stack key={index} gap="sm">
+                    <Skeleton height={18} width="28%" radius="xl" />
+                    <Skeleton height={16} width="100%" radius="xl" />
+                  </Stack>
+                ))}
+              </Stack>
             </Paper>
           ) : (
             <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
@@ -402,7 +410,9 @@ export function Faturamento() {
                     )}
 
                     <Table.Td>
-                      <Text size="xs">{r.status}</Text>
+                      <Badge variant="light" color={String(r.status).toLowerCase().includes('paga') || String(r.status).toLowerCase().includes('emitida') ? 'blue' : 'gray'} radius="xl">
+                        {r.status}
+                      </Badge>
                     </Table.Td>
 
                     {!isTablet && (
@@ -469,14 +479,16 @@ export function Faturamento() {
           <Stack gap="md">
             {/* Tipo e Categoria */}
             <Group grow>
-              <Select 
+              <FloatingSelect 
+                label="Tipo"
                 data={[{ value: 'lancamento', label: 'Lançamento' }, { value: 'nota', label: 'Nota Fiscal' }]} 
                 placeholder="Tipo" 
                 value={invoiceData.tipo} 
                 onChange={(val) => setInvoiceData({ ...invoiceData, tipo: val || '' })} 
                 styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
               />
-              <Select 
+              <FloatingSelect 
+                label="Categoria"
                 data={[{ value: 'consulta', label: 'Consulta' }, { value: 'exame', label: 'Exame' }, { value: 'outro', label: 'Outro' }]} 
                 placeholder="Categoria" 
                 value={invoiceData.categoria} 
@@ -486,7 +498,8 @@ export function Faturamento() {
             </Group>
 
             {/* Descrição */}
-            <Textarea 
+            <FloatingTextarea 
+              label="Descrição"
               placeholder="Descrição" 
               value={invoiceData.descricao} 
               onChange={(e) => setInvoiceData({ ...invoiceData, descricao: e.currentTarget.value })} 
@@ -496,7 +509,8 @@ export function Faturamento() {
 
             {/* Valor e Vencimento */}
             <Group grow>
-              <NumberInput 
+              <FloatingNumberInput 
+                label="Valor (R$)"
                 placeholder="Valor (R$)" 
                 value={invoiceData.valor || ''} 
                 min={0} 
@@ -507,7 +521,8 @@ export function Faturamento() {
               />
               <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
                 <Popover.Target>
-                  <TextInput
+                  <FloatingInput
+                    label="Vencimento"
                     placeholder="dd/mm/yyyy"
                     value={dateInput}
                     onChange={(e) => setDateInput(formatDateInput(e.currentTarget.value))}
@@ -525,7 +540,6 @@ export function Faturamento() {
                         <CalendarIcon size={16} />
                       </ActionIcon>
                     }
-                    styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
                   />
                 </Popover.Target>
                 <Popover.Dropdown style={{ padding: 8 }}>
@@ -545,7 +559,8 @@ export function Faturamento() {
               <Grid.Col span={isMobile ? 12 : 6}>
                 <Box>
                   <Text size="sm" fw={500} mb={4}>Desconto (%)</Text>
-                  <NumberInput
+                  <FloatingNumberInput
+                    label="Desconto (%)"
                     placeholder="Desconto (%)"
                     value={invoiceData.desconto ?? 0}
                     min={0}
@@ -561,7 +576,8 @@ export function Faturamento() {
               <Grid.Col span={isMobile ? 12 : 6}>
                 <Box>
                   <Text size="sm" fw={500} mb={4}>Forma de pagamento</Text>
-                  <Select 
+                  <FloatingSelect 
+                    label="Forma de pagamento"
                     data={[{ value: 'dinheiro', label: 'Dinheiro' }, { value: 'cartao', label: 'Cartão' }, { value: 'boleto', label: 'Boleto' }]} 
                     placeholder="Forma de pagamento" 
                     value={invoiceData.formaPagamento} 
@@ -573,19 +589,12 @@ export function Faturamento() {
             </Grid>
 
             {/* Nome */}
-            <TextInput 
+            <FloatingInput 
+              label="Nome"
               placeholder="Nome" 
               value={invoiceData.nome}
               onChange={(e) => setInvoiceData({ ...invoiceData, nome: e.currentTarget.value })}
               disabled={!invoiceData.tipo}
-              styles={{ 
-                input: { 
-                  fontSize: '14px', 
-                  borderColor: '#dee2e6',
-                  backgroundColor: !invoiceData.tipo ? '#f8f9fa' : 'white',
-                  color: !invoiceData.tipo ? '#6c757d' : 'inherit'
-                } 
-              }}
             />
             
             <Text size="xs" c="dimmed" mt="xs">

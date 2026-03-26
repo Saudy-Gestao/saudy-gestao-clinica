@@ -5,22 +5,23 @@ import {
   Box,
   Group,
   Text,
-  TextInput,
   Button,
   Table,
   Modal,
   Stack,
   ActionIcon,
   Switch,
-  Textarea,
-  Center,
-  Loader
+  Badge,
+  Paper,
+  Skeleton
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Plus, Pencil, Trash2 } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 import insuranceService from '../../services/insuranceService';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -251,69 +252,176 @@ export function CadastroConvenio() {
         </Group>
 
         <Box mb={isMobile ? 20 : 30}>
-          <TextInput
-            placeholder={isMobile ? 'Buscar...' : 'Buscar convenio por nome ou codigo...'}
+          <FloatingInput
+            label="Buscar convênios"
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            radius="md"
-            size={isMobile ? 'sm' : 'md'}
+            placeholder={isMobile ? 'Buscar...' : 'Buscar convenio por nome ou codigo...'}
           />
         </Box>
 
         {itemsLoading ? (
-          <Center style={{ padding: 24, gap: 8 }}>
-            <Loader />
-            <Text>Carregando convenios...</Text>
-          </Center>
-        ) : (
-          <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-            <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-              <Table.Thead>
-                <Table.Tr style={{ borderBottom: 'none' }}>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Codigo</Table.Th>}
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Acoes</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filtered.map((it) => (
-                  <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.name}</Text>
-                    </Table.Td>
-                    {!isTablet && (
-                      <Table.Td>
-                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.code || '-'}</Text>
-                      </Table.Td>
-                    )}
-                    {!isTablet && (
-                      <Table.Td>
-                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.isActive ? 'Ativo' : 'Inativo'}</Text>
-                      </Table.Td>
-                    )}
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="subtle" color="gray" onClick={() => openModal(it)}>
-                          <Pencil size={16} />
-                        </ActionIcon>
-                        <ActionIcon
-                          variant="subtle"
-                          color="red"
-                          onClick={() => {
-                            setDeleteTarget(it);
-                            setDeleteModalOpen(true);
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </ActionIcon>
+          isMobile ? (
+            <Stack gap="sm">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <Paper key={idx} withBorder radius="md" p="md">
+                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                    <Stack gap={8} style={{ flex: 1 }}>
+                      <Skeleton height={18} width="56%" radius="sm" />
+                      <Skeleton height={14} width="28%" radius="sm" />
+                    </Stack>
+                    <Stack gap={8} align="flex-end">
+                      <Skeleton height={24} width={76} radius="xl" />
+                      <Group gap={8}>
+                        <Skeleton height={28} width={28} radius="xl" />
+                        <Skeleton height={28} width={28} radius="xl" />
                       </Group>
-                    </Table.Td>
+                    </Stack>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <Table horizontalSpacing="md" verticalSpacing="md">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Nome</Table.Th>
+                    <Table.Th>Código</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Ações</Table.Th>
                   </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <Table.Tr key={idx}>
+                      <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
+                      <Table.Td><Skeleton height={14} width="45%" radius="sm" /></Table.Td>
+                      <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
+                      <Table.Td>
+                        <Group gap={8}>
+                          <Skeleton height={28} width={28} radius="xl" />
+                          <Skeleton height={28} width={28} radius="xl" />
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )
+        ) : (
+          isMobile ? (
+            filtered.length === 0 ? (
+              <Paper withBorder radius="md" p="xl">
+                <Text size="sm" c="dimmed" ta="center">
+                  Nenhum convênio encontrado. Ajuste a busca ou cadastre um novo convênio.
+                </Text>
+              </Paper>
+            ) : (
+              <Stack gap="sm">
+                {filtered.map((it) => (
+                  <Paper key={it.id} withBorder radius="md" p="md">
+                    <Group justify="space-between" align="flex-start" wrap="nowrap">
+                      <Stack gap={4} style={{ flex: 1 }}>
+                        <Text fw={600} size="sm">{it.name}</Text>
+                        <Text size="xs" c="dimmed">{it.code || 'Sem código'}</Text>
+                        {it.subInsurances.length > 0 ? (
+                          <Text size="xs" c="dimmed">{it.subInsurances.length} subconvênio(s)</Text>
+                        ) : null}
+                      </Stack>
+                      <Badge color={it.isActive ? 'green' : 'red'} variant="light" size="sm">
+                        {it.isActive ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </Group>
+                    <Group gap={8} mt="md" wrap="nowrap">
+                      <ActionIcon variant="light" color="blue" onClick={() => openModal(it)}>
+                        <Pencil size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        onClick={() => {
+                          setDeleteTarget(it);
+                          setDeleteModalOpen(true);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Paper>
                 ))}
-              </Table.Tbody>
-            </Table>
-          </Box>
+              </Stack>
+            )
+          ) : (
+            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                <Table.Thead>
+                  <Table.Tr style={{ borderBottom: 'none' }}>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Código</Table.Th>}
+                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filtered.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={4}>
+                        <Text size="sm" c="dimmed" ta="center">
+                          Nenhum convênio encontrado. Ajuste a busca ou cadastre um novo convênio.
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    filtered.map((it) => (
+                      <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                        <Table.Td>
+                          <Stack gap={2}>
+                            <Text fw={600} size="sm">{it.name}</Text>
+                            {it.subInsurances.length > 0 ? (
+                              <Text size="xs" c="dimmed">{it.subInsurances.length} subconvênio(s)</Text>
+                            ) : null}
+                          </Stack>
+                        </Table.Td>
+                        {!isTablet && (
+                          <Table.Td>
+                            <Text size="sm" c={it.code ? 'var(--mantine-color-text)' : 'dimmed'}>
+                              {it.code || 'Sem código'}
+                            </Text>
+                          </Table.Td>
+                        )}
+                        {!isTablet && (
+                          <Table.Td>
+                            <Badge color={it.isActive ? 'green' : 'red'} variant="light" size="sm">
+                              {it.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </Table.Td>
+                        )}
+                        <Table.Td>
+                          <Group gap="xs">
+                            <ActionIcon variant="light" color="blue" onClick={() => openModal(it)}>
+                              <Pencil size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() => {
+                                setDeleteTarget(it);
+                                setDeleteModalOpen(true);
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )
         )}
       </Box>
 
@@ -331,7 +439,7 @@ export function CadastroConvenio() {
       >
         <Stack gap={10}>
           <Box style={{ padding: 8 }}>
-            <TextInput
+            <FloatingInput
               label="Nome do convênio"
               required
               placeholder="Ex: Unimed"
@@ -339,17 +447,18 @@ export function CadastroConvenio() {
               onChange={(e) => handleNameChange(e?.currentTarget?.value ?? '')}
             />
 
-            <TextInput
-              mt="sm"
-              label="Codigo"
-              placeholder="Opcional"
-              value={form.code}
-              onChange={(e) => handleCodeChange(e?.currentTarget?.value ?? '')}
-            />
+            <Box mt="sm">
+              <FloatingInput
+                label="Código"
+                placeholder="Opcional"
+                value={form.code}
+                onChange={(e) => handleCodeChange(e?.currentTarget?.value ?? '')}
+              />
+            </Box>
 
-            <Textarea
+            <FloatingTextarea
               mt="sm"
-              label="Descricao"
+              label="Descrição"
               placeholder="Detalhes do convenio"
               minRows={3}
               value={form.description}
@@ -363,19 +472,20 @@ export function CadastroConvenio() {
               onChange={(e) => handleActiveChange(e?.currentTarget?.checked ?? !form.isActive)}
             />
 
-            <TextInput
-              mt="sm"
-              label="Subconvênio"
-              placeholder="Digite e pressione Enter"
-              value={subInsuranceInput}
-              onChange={(e) => setSubInsuranceInput(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddSubInsurance();
-                }
-              }}
-            />
+            <Box mt="sm">
+              <FloatingInput
+                label="Subconvênio"
+                placeholder="Digite e pressione Enter"
+                value={subInsuranceInput}
+                onChange={(e) => setSubInsuranceInput(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSubInsurance();
+                  }
+                }}
+              />
+            </Box>
             <Group mt={6} gap="xs">
               {form.subInsurances.map((sub) => (
                 <Button

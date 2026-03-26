@@ -9,19 +9,14 @@ import {
   Paper,
   Stack,
   Button,
-  TextInput,
-  Textarea,
   Switch,
-  MultiSelect,
-  Select,
   SimpleGrid,
   Loader,
   Table,
-  Center,
   Tabs,
   Badge,
   Modal,
-  NumberInput,
+  Skeleton,
   useMantineColorScheme
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
@@ -32,6 +27,11 @@ import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import procedureService from '../../services/procedureService';
 import ResultModal from '../common/ResultModal';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
+import { FloatingNumberInput } from '../common/FloatingNumberInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
@@ -581,19 +581,19 @@ export function CadastroProcedimento() {
                   </Text>
                 )}
                 <SectionTitle>Procedimento</SectionTitle>
-                <TextInput
-                  label="Nome do procedimento"
-                  placeholder="Ex: Consulta cardiologica"
-                  value={form.name}
-                  onChange={(e) => handleNameChange(e?.currentTarget?.value ?? '')}
-                  required
-                  mb="md"
-                />
+                <Box mb="md">
+                  <FloatingInput
+                    label="Nome do procedimento"
+                    placeholder="Ex: Consulta cardiologica"
+                    value={form.name}
+                    onChange={(e) => handleNameChange(e?.currentTarget?.value ?? '')}
+                    required
+                  />
+                </Box>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <Select
+                  <FloatingSelect
                     label="Tipo do procedimento"
-                    placeholder="Selecione o tipo"
                     data={[
                       { value: 'CONSULTA', label: 'Consulta' },
                       { value: 'EXAME', label: 'Exame' },
@@ -605,7 +605,7 @@ export function CadastroProcedimento() {
                     }))}
                     allowDeselect={false}
                   />
-                  <NumberInput
+                  <FloatingNumberInput
                     label="Duração (minutos)"
                     placeholder="Ex: 50"
                     value={form.durationMinutes ?? undefined}
@@ -615,9 +615,9 @@ export function CadastroProcedimento() {
                   />
                 </SimpleGrid>
 
-                <Textarea
+                <FloatingTextarea
                   mt="md"
-                  label="Descricao"
+                  label="Descrição"
                   placeholder="Descreva o procedimento"
                   minRows={3}
                   value={form.description}
@@ -648,9 +648,8 @@ export function CadastroProcedimento() {
                 </Group>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <MultiSelect
+                  <FloatingMultiSelect
                     label="Modalidades"
-                    placeholder="Selecione as modalidades"
                     data={modalityOptions}
                     value={form.modalities}
                     onChange={(values) => setForm((prev) => ({ ...prev, modalities: values }))}
@@ -660,9 +659,8 @@ export function CadastroProcedimento() {
                 </SimpleGrid>
 
                 <SectionTitle>Medicos vinculados</SectionTitle>
-                <MultiSelect
+                <FloatingMultiSelect
                   label="Selecione os médicos"
-                  placeholder={loadingDoctors ? 'Carregando médicos' : 'Selecione um ou mais médicos'}
                   data={doctorOptions}
                   value={form.doctorIds}
                   onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
@@ -675,9 +673,8 @@ export function CadastroProcedimento() {
 
                 <SectionTitle>Materiais vinculados</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="md">
-                  <Select
+                  <FloatingSelect
                     label="Material"
-                    placeholder={loadingMaterials ? 'Carregando materiais...' : 'Selecione um material'}
                     data={materialOptions}
                     value={selectedMaterialId}
                     onChange={setSelectedMaterialId}
@@ -686,7 +683,7 @@ export function CadastroProcedimento() {
                     nothingFoundMessage="Nenhum material"
                     rightSection={loadingMaterials ? <Loader size={16} /> : undefined}
                   />
-                  <NumberInput
+                  <FloatingNumberInput
                     label="Quantidade por sessão"
                     placeholder="Ex: 1"
                     min={1}
@@ -768,120 +765,250 @@ export function CadastroProcedimento() {
               <Paper p="lg">
                 <Group justify="space-between" mb="md" wrap="wrap">
                   <SectionTitle>Procedimentos cadastrados</SectionTitle>
-                  <TextInput
-                    placeholder="Buscar por nome"
+                  <FloatingInput
+                    label="Buscar procedimentos"
                     value={procedureQuery}
                     onChange={(e) => setProcedureQuery(e.currentTarget.value)}
-                    w={isMobile ? '100%' : 280}
+                    containerProps={{ w: isMobile ? '100%' : 320 }}
                   />
                 </Group>
 
                 {proceduresLoading ? (
-                  <Center style={{ padding: 16, gap: 8 }}>
-                    <Loader size={18} />
-                    <Text size="sm">Carregando procedimentos...</Text>
-                  </Center>
-                ) : (
-                  <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                    <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-                      <Table.Thead>
-                        <Table.Tr style={{ borderBottom: 'none' }}>
-                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidades</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Materiais</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {filteredProcedures.length === 0 ? (
-                            <Table.Tr>
-                            <Table.Td colSpan={9}>
-                              <Text size="sm" c="dimmed" ta="center">Nenhum procedimento encontrado</Text>
-                            </Table.Td>
+                  isMobile ? (
+                    <Stack gap="sm">
+                      {Array.from({ length: 4 }).map((_, idx) => (
+                        <Paper key={idx} withBorder radius="md" p="md">
+                          <Group justify="space-between" align="flex-start" wrap="nowrap">
+                            <Stack gap={8} style={{ flex: 1 }}>
+                              <Skeleton height={18} width="56%" radius="sm" />
+                              <Skeleton height={14} width="34%" radius="sm" />
+                              <Skeleton height={14} width="42%" radius="sm" />
+                            </Stack>
+                            <Stack gap={8} align="flex-end">
+                              <Skeleton height={24} width={84} radius="xl" />
+                              <Group gap={8}>
+                                <Skeleton height={28} width={28} radius="xl" />
+                                <Skeleton height={28} width={28} radius="xl" />
+                              </Group>
+                            </Stack>
+                          </Group>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                      <Table horizontalSpacing="md" verticalSpacing="md">
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Nome</Table.Th>
+                            <Table.Th>Tipo</Table.Th>
+                            <Table.Th>Convênio</Table.Th>
+                            <Table.Th>Modalidades</Table.Th>
+                            <Table.Th>Médicos</Table.Th>
+                            <Table.Th>Materiais</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th>Ações</Table.Th>
                           </Table.Tr>
-                        ) : (
-                          filteredProcedures.map((item) => (
-                            <Table.Tr 
-                              key={item.id} 
-                              style={{ 
-                                borderBottom: '1px solid #e9ecef',
-                                  backgroundColor: item.isActive
-                                    ? 'transparent'
-                                    : (colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5')
-                              }}
-                            >
-                              <Table.Td>
-                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.name}</Text>
-                              </Table.Td>
-                              {!isTablet && (
-                                <Table.Td>
-                                  <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
-                                    {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
-                                  </Badge>
-                                </Table.Td>
-                              )}
-                              {!isTablet && (
-                                <Table.Td>
-                                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.acceptsInsurance ? 'Sim' : 'Não'}</Text>
-                                </Table.Td>
-                              )}
-                              {!isTablet && (
-                                <Table.Td>
-                                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.modalities.length ? item.modalities.join(', ') : '-'}</Text>
-                                </Table.Td>
-                              )}
-                              {!isTablet && (
-                                <Table.Td>
-                                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.doctorsCount}</Text>
-                                </Table.Td>
-                              )}
-                              {!isTablet && (
-                                <Table.Td>
-                                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.materialsCount}</Text>
-                                </Table.Td>
-                              )}
-                              {!isTablet && (
-                                <Table.Td>
-                                  <Badge
-                                    color={item.isActive ? 'green' : 'red'}
-                                    variant="light"
-                                    size="sm"
-                                  >
-                                    {item.isActive ? 'Ativo' : 'Inativo'}
-                                  </Badge>
-                                </Table.Td>
-                              )}
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <Table.Tr key={idx}>
+                              <Table.Td><Skeleton height={16} width="72%" radius="sm" /></Table.Td>
+                              <Table.Td><Skeleton height={24} width={82} radius="xl" /></Table.Td>
+                              <Table.Td><Skeleton height={14} width="45%" radius="sm" /></Table.Td>
+                              <Table.Td><Skeleton height={14} width="70%" radius="sm" /></Table.Td>
+                              <Table.Td><Skeleton height={14} width="24%" radius="sm" /></Table.Td>
+                              <Table.Td><Skeleton height={14} width="24%" radius="sm" /></Table.Td>
+                              <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
                               <Table.Td>
                                 <Group gap={6} wrap="nowrap">
-                                  <ActionIcon
-                                    variant="subtle"
-                                    style={{ color: item.isActive ? 'var(--mantine-color-text)' : '#adb5bd' }}
-                                    onClick={() => item.isActive && handleEditProcedure(item.id)}
-                                    title={item.isActive ? "Editar" : "Ative o procedimento para editar"}
-                                    disabled={!item.isActive}
-                                  >
-                                    <Pencil size={16} />
-                                  </ActionIcon>
-                                  <ActionIcon
-                                    variant="subtle"
-                                    color={item.isActive ? 'orange' : 'green'}
-                                    onClick={() => handleToggleActive(item)}
-                                    title={item.isActive ? 'Desativar' : 'Ativar'}
-                                  >
-                                    <Power size={16} />
-                                  </ActionIcon>
+                                  <Skeleton height={28} width={28} radius="xl" />
+                                  <Skeleton height={28} width={28} radius="xl" />
                                 </Group>
                               </Table.Td>
                             </Table.Tr>
-                          ))
-                        )}
-                      </Table.Tbody>
-                    </Table>
-                  </Box>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Box>
+                  )
+                ) : (
+                  isMobile ? (
+                    filteredProcedures.length === 0 ? (
+                      <Paper withBorder radius="md" p="xl">
+                        <Text size="sm" c="dimmed" ta="center">
+                          Nenhum procedimento encontrado. Ajuste a busca ou cadastre um novo procedimento.
+                        </Text>
+                      </Paper>
+                    ) : (
+                      <Stack gap="sm">
+                        {filteredProcedures.map((item) => (
+                          <Paper
+                            key={item.id}
+                            withBorder
+                            radius="md"
+                            p="md"
+                            style={{
+                              backgroundColor: item.isActive
+                                ? 'transparent'
+                                : (colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5'),
+                            }}
+                          >
+                            <Group justify="space-between" align="flex-start" wrap="nowrap">
+                              <Stack gap={4} style={{ flex: 1 }}>
+                                <Text fw={600} size="sm">{item.name}</Text>
+                                <Group gap="xs">
+                                  <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
+                                    {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                  </Badge>
+                                  <Badge color={item.acceptsInsurance ? 'teal' : 'gray'} variant="light" size="sm">
+                                    {item.acceptsInsurance ? 'Aceita convênio' : 'Particular'}
+                                  </Badge>
+                                </Group>
+                                <Text size="xs" c="dimmed">
+                                  {item.modalities.length ? item.modalities.join(', ') : 'Sem modalidades'} • {item.doctorsCount} médico(s) • {item.materialsCount} material(is)
+                                </Text>
+                              </Stack>
+                              <Badge color={item.isActive ? 'green' : 'red'} variant="light" size="sm">
+                                {item.isActive ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            </Group>
+                            <Group gap={8} mt="md" wrap="nowrap">
+                              <ActionIcon
+                                variant="light"
+                                color="blue"
+                                style={{ color: item.isActive ? undefined : '#adb5bd' }}
+                                onClick={() => item.isActive && handleEditProcedure(item.id)}
+                                title={item.isActive ? 'Editar' : 'Ative o procedimento para editar'}
+                                disabled={!item.isActive}
+                              >
+                                <Pencil size={16} />
+                              </ActionIcon>
+                              <ActionIcon
+                                variant="light"
+                                color={item.isActive ? 'orange' : 'green'}
+                                onClick={() => handleToggleActive(item)}
+                                title={item.isActive ? 'Desativar' : 'Ativar'}
+                              >
+                                <Power size={16} />
+                              </ActionIcon>
+                            </Group>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    )
+                  ) : (
+                    <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                      <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                        <Table.Thead>
+                          <Table.Tr style={{ borderBottom: 'none' }}>
+                            <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidades</Table.Th>}
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Materiais</Table.Th>}
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                            <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {filteredProcedures.length === 0 ? (
+                            <Table.Tr>
+                              <Table.Td colSpan={9}>
+                                <Text size="sm" c="dimmed" ta="center">
+                                  Nenhum procedimento encontrado. Ajuste a busca ou cadastre um novo procedimento.
+                                </Text>
+                              </Table.Td>
+                            </Table.Tr>
+                          ) : (
+                            filteredProcedures.map((item) => (
+                              <Table.Tr
+                                key={item.id}
+                                style={{
+                                  borderBottom: '1px solid #e9ecef',
+                                  backgroundColor: item.isActive
+                                    ? 'transparent'
+                                    : (colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5')
+                                }}
+                              >
+                                <Table.Td>
+                                  <Stack gap={2}>
+                                    <Text fw={600} size="sm">{item.name}</Text>
+                                    <Text size="xs" c="dimmed">
+                                      {item.modalities.length ? item.modalities.join(', ') : 'Sem modalidades'}
+                                    </Text>
+                                  </Stack>
+                                </Table.Td>
+                                {!isTablet && (
+                                  <Table.Td>
+                                    <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
+                                      {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                    </Badge>
+                                  </Table.Td>
+                                )}
+                                {!isTablet && (
+                                  <Table.Td>
+                                    <Badge color={item.acceptsInsurance ? 'teal' : 'gray'} variant="light" size="sm">
+                                      {item.acceptsInsurance ? 'Aceita convênio' : 'Particular'}
+                                    </Badge>
+                                  </Table.Td>
+                                )}
+                                {!isTablet && (
+                                  <Table.Td>
+                                    <Text size="sm">{item.modalities.length ? item.modalities.join(', ') : '-'}</Text>
+                                  </Table.Td>
+                                )}
+                                {!isTablet && (
+                                  <Table.Td>
+                                    <Text size="sm">{item.doctorsCount}</Text>
+                                  </Table.Td>
+                                )}
+                                {!isTablet && (
+                                  <Table.Td>
+                                    <Text size="sm">{item.materialsCount}</Text>
+                                  </Table.Td>
+                                )}
+                                {!isTablet && (
+                                  <Table.Td>
+                                    <Badge
+                                      color={item.isActive ? 'green' : 'red'}
+                                      variant="light"
+                                      size="sm"
+                                    >
+                                      {item.isActive ? 'Ativo' : 'Inativo'}
+                                    </Badge>
+                                  </Table.Td>
+                                )}
+                                <Table.Td>
+                                  <Group gap={6} wrap="nowrap">
+                                    <ActionIcon
+                                      variant="light"
+                                      color="blue"
+                                      style={{ color: item.isActive ? undefined : '#adb5bd' }}
+                                      onClick={() => item.isActive && handleEditProcedure(item.id)}
+                                      title={item.isActive ? 'Editar' : 'Ative o procedimento para editar'}
+                                      disabled={!item.isActive}
+                                    >
+                                      <Pencil size={16} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      variant="light"
+                                      color={item.isActive ? 'orange' : 'green'}
+                                      onClick={() => handleToggleActive(item)}
+                                      title={item.isActive ? 'Desativar' : 'Ativar'}
+                                    >
+                                      <Power size={16} />
+                                    </ActionIcon>
+                                  </Group>
+                                </Table.Td>
+                              </Table.Tr>
+                            ))
+                          )}
+                        </Table.Tbody>
+                      </Table>
+                    </Box>
+                  )
                 )}
               </Paper>
             </Tabs.Panel>
@@ -897,9 +1024,8 @@ export function CadastroProcedimento() {
         centered
       >
         <Stack gap="md">
-          <MultiSelect
+          <FloatingMultiSelect
             label="Convênios aceitos"
-            placeholder={loadingInsurances ? 'Carregando convênios...' : 'Selecione os convênios'}
             data={insuranceOptions}
             value={form.acceptedInsurances}
             onChange={(values) => {
@@ -912,10 +1038,9 @@ export function CadastroProcedimento() {
           />
 
           {form.acceptedInsurances.filter((insurance) => Array.isArray(subInsuranceOptions[insurance]) && subInsuranceOptions[insurance].length > 0).map((insurance) => (
-            <MultiSelect
+            <FloatingMultiSelect
               key={insurance}
               label={`Sub-convênios de ${insurance}`}
-              placeholder={`Selecione os sub-convênios de ${insurance}`}
               data={subInsuranceOptions[insurance] || []}
               value={form.acceptedSubInsurances[insurance] || []}
               onChange={(values) => setForm((prev) => ({
@@ -931,7 +1056,7 @@ export function CadastroProcedimento() {
           ))}
 
           <Group gap="xs" align="flex-end">
-            <TextInput
+            <FloatingInput
               label="Outro convênio?"
               placeholder="Digite um convênio customizado"
               value={customInsuranceInput}

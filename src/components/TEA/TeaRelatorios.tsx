@@ -7,16 +7,15 @@ import {
   Text,
   Button,
   Paper,
-  Select,
   Stack,
-  Loader,
   SimpleGrid,
   Badge,
   Divider,
   ThemeIcon,
+  ActionIcon,
+  Skeleton,
   useMantineColorScheme,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, BarChart3 } from 'lucide-react';
@@ -27,6 +26,8 @@ import { formatCPF } from '../../utils/formatters';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaReportQuery } from '../../hooks/useTeaReportQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingDateInput } from '../common/FloatingDateInput';
+import { FloatingSelect } from '../common/FloatingSelect';
 
 type TeaProfileItem = {
   id: string;
@@ -138,10 +139,16 @@ export function TeaRelatorios() {
       <Header />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
+        <Group mb={14} gap="md" align="flex-start">
+          <ActionIcon
+            variant="default"
+            size={isMobile ? 44 : 52}
+            radius="md"
+            onClick={() => navigate('/tea')}
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={22} />
+          </ActionIcon>
           <Box>
             <Text fw={800} size="lg" style={{ color: titleColor }}>Relatórios</Text>
             <Text size="sm" c="dimmed">Consolidado clínico por paciente TEA</Text>
@@ -154,8 +161,8 @@ export function TeaRelatorios() {
             <Text fw={700}>Indicadores e consolidados TEA</Text>
           </Group>
           <Stack gap="md">
-            <Group grow>
-              <Select
+            <Group grow align="flex-start">
+              <FloatingSelect
                 label="Paciente TEA"
                 placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
                 data={teaProfileOptions}
@@ -164,7 +171,7 @@ export function TeaRelatorios() {
                 searchable
                 clearable
               />
-              <DateInput
+              <FloatingDateInput
                 label="Início do período"
                 value={startDate}
                 onChange={(value) => setStartDate(value || null)}
@@ -172,7 +179,7 @@ export function TeaRelatorios() {
                 locale="pt-br"
                 clearable
               />
-              <DateInput
+              <FloatingDateInput
                 label="Fim do período"
                 value={endDate}
                 onChange={(value) => setEndDate(value || null)}
@@ -192,7 +199,20 @@ export function TeaRelatorios() {
             </Group>
 
             {loadingReport ? (
-              <Group justify="center"><Loader size="sm" /></Group>
+              <Stack gap="sm">
+                <Skeleton height={54} radius="md" />
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <Paper key={index} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: cardBg }}>
+                      <Skeleton height={12} width="44%" mb={8} radius="xl" />
+                      <Skeleton height={28} width="26%" mb={8} radius="xl" />
+                      <Skeleton height={10} width="62%" radius="xl" />
+                    </Paper>
+                  ))}
+                </SimpleGrid>
+                <Skeleton height={120} radius="md" />
+                <Skeleton height={140} radius="md" />
+              </Stack>
             ) : !selectedTeaProfileId ? (
               <Text size="sm" c="dimmed">Selecione um paciente para visualizar o relatório.</Text>
             ) : !reportData ? (

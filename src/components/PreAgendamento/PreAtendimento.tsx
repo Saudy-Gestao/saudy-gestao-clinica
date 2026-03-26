@@ -5,7 +5,6 @@ import {
   Box,
   Group,
   Text,
-  TextInput,
   Button,
   Table,
   Modal,
@@ -19,6 +18,7 @@ import {
   Divider,
   NumberInput,
   Paper,
+  Skeleton,
   SimpleGrid,
   ThemeIcon,
   useMantineColorScheme,
@@ -218,6 +218,14 @@ export function PreAtendimento() {
     const convenio = (patient?.convenio || '').trim().toLowerCase();
     return !convenio || convenio === 'particular';
   }
+
+  const getReceptionStatusColor = (status?: string) => {
+    const normalized = String(status || '').trim();
+    if (normalized === RECEPTION_IN_PROGRESS_STATUS) return 'blue';
+    if (normalized === RECEPTION_CHECKLIST_STATUS) return 'violet';
+    if (normalized === RECEPTION_DONE_STATUS) return 'green';
+    return 'gray';
+  };
 
   const hasValidPreAttendanceId = (value?: string | null) => {
     const normalized = String(value || '').trim();
@@ -597,6 +605,25 @@ export function PreAtendimento() {
     const totemValue = patient.totem !== undefined ? String(patient.totem) : '';
     return patient.nomeCompleto.toLowerCase().includes(q) || totemValue.includes(searchValue);
   });
+
+  const receptionQueueLoading = receptionQueueQuery.isLoading && patients.length === 0;
+
+  const renderReceptionAction = (patient: Patient) => {
+    const isChecklistInProgress = (patient.status || '').trim() === RECEPTION_CHECKLIST_STATUS;
+
+    return (
+      <Button
+        size="xs"
+        variant={isChecklistInProgress ? 'filled' : 'light'}
+        color={isChecklistInProgress ? 'violet' : 'blue'}
+        leftSection={<ClipboardCheck size={14} />}
+        onClick={() => handleStartChecklist(patient)}
+        loading={checklistLoading && checklistPreAttendanceId === patient.id}
+      >
+        {isChecklistInProgress ? 'Continuar checklist' : 'Iniciar checklist'}
+      </Button>
+    );
+  };
 
   const handleAddPatient = async () => {
     if (!novoPaciente.nomeCompleto || !novoPaciente.cpf) {
@@ -1097,38 +1124,78 @@ export function PreAtendimento() {
         </Group>
       </Table.Td>
       <Table.Td>
-        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
-          {patient.agenda || '-'}
-        </Text>
+        <Stack gap={2}>
+          <Text size="xs" fw={600} style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
+            {getAgendaSummary(patient.agenda).horario} • {getAgendaSummary(patient.agenda).procedimento}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {extractDoctorNameFromAgenda(patient.agenda) || patient.doctorName || 'Profissional não informado'}
+          </Text>
+        </Stack>
       </Table.Td>
       <Table.Td>
-        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
+        <Badge variant="outline" radius="xl" color={isPrivateCare(patient) ? 'gray' : 'blue'}>
           {patient.convenio || 'Particular'}
-        </Text>
+        </Badge>
       </Table.Td>
       <Table.Td>
-        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }} c="#495057">
+        <Badge variant="light" color={getReceptionStatusColor(patient.status)} radius="xl">
           {patient.status || '-'}
-        </Text>
+        </Badge>
       </Table.Td>
       <Table.Td>
         <Group gap={4} justify="flex-end" align="center">
-          {ACTIVE_RECEPTION_STATUSES.includes(patient.status || '') && (
-            <Button
-              size="xs"
-              variant="light"
-              color="blue"
-              leftSection={<ClipboardCheck size={14} />}
-              onClick={() => handleStartChecklist(patient)}
-              loading={checklistLoading && checklistPreAttendanceId === patient.id}
-            >
-              {(patient.status || '').trim() === RECEPTION_CHECKLIST_STATUS ? 'Continuar checklist' : 'Iniciar checklist'}
-            </Button>
-          )}
+          {ACTIVE_RECEPTION_STATUSES.includes(patient.status || '') && renderReceptionAction(patient)}
         </Group>
       </Table.Td>
     </Table.Tr>
   ));
+
+  const mobileCards = filteredPatients.map((patient) => {
+    const agendaSummary = getAgendaSummary(patient.agenda);
+    const doctorSummary = extractDoctorNameFromAgenda(patient.agenda) || patient.doctorName || 'Profissional não informado';
+
+    return (
+      <Paper key={patient.id} p="md" withBorder radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+        <Stack gap="sm">
+          <Group justify="space-between" align="flex-start">
+            <Group gap="sm" align="flex-start">
+              <Box
+                bg={DARK_BLUE}
+                w={36}
+                h={36}
+                style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <Text c="white" fw={600} size="sm">
+                  {patient.nomeCompleto.charAt(0).toUpperCase()}
+                </Text>
+              </Box>
+              <Box>
+                <Text fw={600} size="sm">{patient.nomeCompleto}</Text>
+                <Text size="xs" c="dimmed">CPF: {patient.cpf || 'Não informado'}</Text>
+              </Box>
+            </Group>
+            <Badge variant="light" color={getReceptionStatusColor(patient.status)} radius="xl">
+              {patient.status || '-'}
+            </Badge>
+          </Group>
+
+          <Box>
+            <Text size="xs" c="dimmed" fw={600}>Agendamento</Text>
+            <Text size="sm" fw={500}>{agendaSummary.horario} • {agendaSummary.procedimento}</Text>
+            <Text size="xs" c="dimmed">{doctorSummary}</Text>
+          </Box>
+
+          <Group justify="space-between" align="center">
+            <Badge variant="outline" radius="xl" color={isPrivateCare(patient) ? 'gray' : 'blue'}>
+              {patient.convenio || 'Particular'}
+            </Badge>
+            {ACTIVE_RECEPTION_STATUSES.includes(patient.status || '') ? renderReceptionAction(patient) : null}
+          </Group>
+        </Stack>
+      </Paper>
+    );
+  });
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
@@ -1153,33 +1220,121 @@ export function PreAtendimento() {
         {/* Search Section */}
         <Box mb={isMobile ? 20 : 30}>
           <Group gap="md" align="flex-end">
-            <TextInput
+            <FloatingInput
+              label="Buscar"
+              alwaysFloatLabel
               placeholder={isMobile ? "Buscar..." : "Buscar paciente por nome ou CPF..."}
-              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
               value={searchValue}
               onChange={(e) => setSearchValue(e.currentTarget.value)}
-              radius="md"
-              size={isMobile ? "sm" : "md"}
-              style={{ flex: 1 }}
+              rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
+              containerProps={{ style: { flex: 1, minHeight: 64 } }}
             />
           </Group>
         </Box>
 
         {/* Patients Table */}
-        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-          <Table horizontalSpacing={isMobile ? "sm" : "md"} verticalSpacing={isMobile ? "sm" : "md"}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: 'none' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Paciente</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>{rows.length > 0 ? rows : <Table.Tr><Table.Td colSpan={5}><Text ta="center" c="dimmed">Nenhum paciente em atendimento na recepção</Text></Table.Td></Table.Tr>}</Table.Tbody>
-          </Table>
-        </Box>
+        {receptionQueueLoading ? (
+          isMobile ? (
+            <Stack gap="sm">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Paper key={index} p="md" withBorder radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                  <Stack gap="sm">
+                    <Group justify="space-between" align="flex-start">
+                      <Group gap="sm" align="flex-start">
+                        <Skeleton height={36} width={36} radius="xl" />
+                        <Stack gap={6}>
+                          <Skeleton height={14} width={140} radius="xl" />
+                          <Skeleton height={10} width={100} radius="xl" />
+                        </Stack>
+                      </Group>
+                      <Skeleton height={24} width={120} radius="xl" />
+                    </Group>
+                    <Skeleton height={12} width="70%" radius="xl" />
+                    <Skeleton height={12} width="45%" radius="xl" />
+                    <Group justify="space-between" align="center">
+                      <Skeleton height={24} width={90} radius="xl" />
+                      <Skeleton height={32} width={138} radius="md" />
+                    </Group>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <Table horizontalSpacing="md" verticalSpacing="md">
+                <Table.Thead>
+                  <Table.Tr style={{ borderBottom: 'none' }}>
+                    <Table.Th>Paciente</Table.Th>
+                    <Table.Th>Agendamento</Table.Th>
+                    <Table.Th>Convênio</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Table.Tr key={index}>
+                      <Table.Td>
+                        <Group gap="sm">
+                          <Skeleton height={32} width={32} radius="xl" />
+                          <Stack gap={6}>
+                            <Skeleton height={14} width={140} radius="xl" />
+                            <Skeleton height={10} width={100} radius="xl" />
+                          </Stack>
+                        </Group>
+                      </Table.Td>
+                      <Table.Td><Skeleton height={14} width={180} radius="xl" /></Table.Td>
+                      <Table.Td><Skeleton height={24} width={90} radius="xl" /></Table.Td>
+                      <Table.Td><Skeleton height={24} width={150} radius="xl" /></Table.Td>
+                      <Table.Td>
+                        <Group justify="flex-end">
+                          <Skeleton height={30} width={128} radius="md" />
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )
+        ) : isMobile ? (
+          mobileCards.length > 0 ? (
+            <Stack gap="sm">{mobileCards}</Stack>
+          ) : (
+            <Paper withBorder radius="md" p="xl" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Text ta="center" fw={600}>Fila da recepção vazia</Text>
+              <Text ta="center" c="dimmed" size="sm" mt={4}>
+                Assim que um paciente for chamado do check-in, ele aparecerá aqui para conferência e checklist.
+              </Text>
+            </Paper>
+          )
+        ) : (
+          <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <Table horizontalSpacing={isMobile ? "sm" : "md"} verticalSpacing={isMobile ? "sm" : "md"}>
+              <Table.Thead>
+                <Table.Tr style={{ borderBottom: 'none' }}>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Paciente</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>{rows.length > 0 ? rows : (
+                <Table.Tr>
+                  <Table.Td colSpan={5}>
+                    <Box py="xl">
+                      <Text ta="center" fw={600}>Fila da recepção vazia</Text>
+                      <Text ta="center" c="dimmed" size="sm" mt={4}>
+                        Assim que um paciente for chamado do check-in, ele aparecerá aqui para conferência e checklist.
+                      </Text>
+                    </Box>
+                  </Table.Td>
+                </Table.Tr>
+              )}</Table.Tbody>
+            </Table>
+          </Box>
+        )}
       </Box>
 
       {/* Modal - Novo Paciente */}

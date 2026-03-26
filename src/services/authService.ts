@@ -17,6 +17,25 @@ class AuthService {
     }
   }
 
+  private async storeAuthenticatedUser(user: User) {
+    localStorage.setItem('user', JSON.stringify(user));
+    this.emitAuthChanged();
+  }
+
+  private async hydrateAndStoreAuthenticatedUser(user: User) {
+    if (!user?.id) {
+      await this.storeAuthenticatedUser(user);
+      return;
+    }
+
+    try {
+      const response = await api.get(`/auth/users/${user.id}`);
+      await this.storeAuthenticatedUser(response.data || user);
+    } catch {
+      await this.storeAuthenticatedUser(user);
+    }
+  }
+
   /**
    * Login do usuário
    */
@@ -25,8 +44,7 @@ class AuthService {
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      this.emitAuthChanged();
+      await this.hydrateAndStoreAuthenticatedUser(response.data.user);
     }
     
     return response.data;
@@ -40,8 +58,7 @@ class AuthService {
 
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      this.emitAuthChanged();
+      await this.hydrateAndStoreAuthenticatedUser(response.data.user);
     }
 
     return response.data;
@@ -55,8 +72,7 @@ class AuthService {
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      this.emitAuthChanged();
+      await this.hydrateAndStoreAuthenticatedUser(response.data.user);
     }
     
     return response.data;
@@ -70,8 +86,7 @@ class AuthService {
     
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      this.emitAuthChanged();
+      await this.hydrateAndStoreAuthenticatedUser(response.data.user);
     }
     
     return response.data;
@@ -123,8 +138,7 @@ class AuthService {
 
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      this.emitAuthChanged();
+      await this.hydrateAndStoreAuthenticatedUser(response.data.user);
     }
 
     return response.data;
