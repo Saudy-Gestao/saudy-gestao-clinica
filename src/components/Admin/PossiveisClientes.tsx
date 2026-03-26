@@ -109,9 +109,10 @@ export function PossiveisClientes() {
   };
 
   const openWhatsApp = (lead: LeadItem) => {
-    const phone = normalizePhone(lead.phone);
-    if (!phone) return;
-    window.open(`https://wa.me/${phone}`, '_blank', 'noopener,noreferrer');
+    const rawPhone = normalizePhone(lead.phone);
+    if (!rawPhone) return;
+    const phone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+    window.open(`https://api.whatsapp.com/send/?phone=${encodeURIComponent(phone)}&text=&type=phone_number&app_absent=0`, '_blank', 'noopener,noreferrer');
   };
 
   return (
