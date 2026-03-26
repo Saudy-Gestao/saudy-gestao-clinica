@@ -9,6 +9,7 @@ import {
   Table,
   Modal,
   Stack,
+  TextInput,
   Textarea,
   Select,
   ActionIcon,
@@ -41,6 +42,7 @@ import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useRece
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import type { ChangeEvent } from 'react';
 
 interface Patient extends NovoPatiente {
   id: string;
@@ -1790,12 +1792,12 @@ export function PreAtendimento() {
                         <TextInput
                           label="Nome completo"
                           value={checklistPatient?.nomeCompleto || ''}
-                          onChange={(event) => updateChecklistPatientField('nomeCompleto', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('nomeCompleto', event.currentTarget.value)}
                         />
                         <TextInput
                           label="Convênio"
                           value={checklistPatient?.convenio || 'Particular'}
-                          onChange={(event) => updateChecklistPatientField('convenio', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('convenio', event.currentTarget.value)}
                         />
                       </SimpleGrid>
 
@@ -1804,14 +1806,14 @@ export function PreAtendimento() {
                           <TextInput
                             label="CPF"
                             value={formatCPF(checklistPatient?.cpf || '')}
-                            onChange={(event) => updateChecklistPatientField('cpf', onlyDigits(event.currentTarget.value))}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('cpf', onlyDigits(event.currentTarget.value))}
                           />
                         </Grid.Col>
                         <Grid.Col span={isMobile ? 12 : 3}>
                           <TextInput
                             label="Data de nascimento"
                             value={checklistPatient?.dataNascimento || ''}
-                            onChange={(event) => updateChecklistPatientField('dataNascimento', formatDateInput(event.currentTarget.value))}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('dataNascimento', formatDateInput(event.currentTarget.value))}
                           />
                         </Grid.Col>
                         <Grid.Col span={isMobile ? 12 : 2}>
@@ -1830,14 +1832,14 @@ export function PreAtendimento() {
                           <TextInput
                             label="Telefone"
                             value={formatPhone(checklistPatient?.telefone || '')}
-                            onChange={(event) => updateChecklistPatientField('telefone', onlyDigits(event.currentTarget.value))}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('telefone', onlyDigits(event.currentTarget.value))}
                           />
                         </Grid.Col>
                         <Grid.Col span={isMobile ? 12 : 2}>
                           <TextInput
                             label="E-mail"
                             value={checklistPatient?.email || ''}
-                            onChange={(event) => updateChecklistPatientField('email', event.currentTarget.value)}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('email', event.currentTarget.value)}
                           />
                         </Grid.Col>
                       </Grid>
@@ -1845,7 +1847,7 @@ export function PreAtendimento() {
                       <TextInput
                         label="Endereço"
                         value={checklistPatient?.endereco || ''}
-                        onChange={(event) => updateChecklistPatientField('endereco', event.currentTarget.value)}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('endereco', event.currentTarget.value)}
                       />
 
                       <Divider />
@@ -1854,13 +1856,13 @@ export function PreAtendimento() {
                         <TextInput
                           label="Convênio do cadastro"
                           value={checklistPatient?.convenio || 'Particular'}
-                          onChange={(event) => updateChecklistPatientField('convenio', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('convenio', event.currentTarget.value)}
                         />
                         <TextInput
                           label="Status da autorização"
                           value={checklistPatient?.statusAutorizacao || ''}
                           placeholder="Sem autorização prévia"
-                          onChange={(event) => updateChecklistPatientField('statusAutorizacao', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('statusAutorizacao', event.currentTarget.value)}
                         />
                       </SimpleGrid>
 
@@ -1868,22 +1870,22 @@ export function PreAtendimento() {
                         <TextInput
                           label="Validade"
                           value={checklistPatient?.validadeConvenio || ''}
-                          onChange={(event) => updateChecklistPatientField('validadeConvenio', formatDateInput(event.currentTarget.value))}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('validadeConvenio', formatDateInput(event.currentTarget.value))}
                         />
                         <TextInput
                           label="Horário"
                           value={normalizeComparableText(getAgendaSummary(checklistPatient?.agenda).horario) === 'nao informado' ? '' : getAgendaSummary(checklistPatient?.agenda).horario}
-                          onChange={(event) => updateChecklistAgendaPart('horario', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistAgendaPart('horario', event.currentTarget.value)}
                         />
                         <TextInput
                           label="Procedimento"
                           value={normalizeComparableText(getAgendaSummary(checklistPatient?.agenda).procedimento) === 'nao informado' ? '' : getAgendaSummary(checklistPatient?.agenda).procedimento}
-                          onChange={(event) => updateChecklistAgendaPart('procedimento', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistAgendaPart('procedimento', event.currentTarget.value)}
                         />
                         <TextInput
                           label="Profissional"
                           value={extractDoctorNameFromAgenda(checklistPatient?.agenda) || checklistPatient?.doctorName || ''}
-                          onChange={(event) => updateChecklistAgendaPart('profissional', event.currentTarget.value)}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistAgendaPart('profissional', event.currentTarget.value)}
                         />
                       </SimpleGrid>
 

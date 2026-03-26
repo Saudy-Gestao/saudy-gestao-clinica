@@ -49,7 +49,7 @@ import teaProfileService from '../../services/teaProfileService';
 import convenioAuthorizationService from '../../services/convenioAuthorizationService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 import { useTeaPendingReservationsQuery } from '../../hooks/useTeaPendingReservationsQuery';
-import { useTeaReservationTimelineQuery, type TeaTimelineEventItem } from '../../hooks/useTeaReservationTimelineQuery';
+import { useTeaReservationTimelineQuery } from '../../hooks/useTeaReservationTimelineQuery';
 import { useTeaReservationChecklistQuery, type TeaConversionChecklistItem } from '../../hooks/useTeaReservationChecklistQuery';
 import { useTeaManualGridQuery, type TeaManualGridDay, type TeaManualGridSlot } from '../../hooks/useTeaManualGridQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -72,6 +72,11 @@ const PERSISTED_RESERVATION_SLOT_STATUSES: TeaPreReservationStatus[] = [
   'AUTHORIZED',
   'CONVERTED',
 ];
+
+const EMPTY_PENDING_ITEMS: any[] = [];
+const EMPTY_TIMELINE_EVENTS: any[] = [];
+const EMPTY_CHECKLIST_ITEMS: TeaConversionChecklistItem[] = [];
+const EMPTY_MANUAL_GRID_BY_THERAPY_ID: Record<string, { days: TeaManualGridDay[] }> = {};
 
 const WEEKDAY_COLUMNS: Array<{ label: string; offset: number }> = [
   { label: 'Seg', offset: 0 },
@@ -591,8 +596,8 @@ export function TeaPreReserva() {
           .some((slot) => slot.date === selected.date && slot.time === selected.time);
         if (isExistingEditableSlot) return true;
 
-        const day = grid.days.find((item) => item.date === selected.date);
-        const slot = day?.slots?.find((item) => item.time === selected.time);
+        const day = grid.days.find((item: TeaManualGridDay) => item.date === selected.date);
+        const slot = day?.slots?.find((item: TeaManualGridSlot) => item.time === selected.time);
         return Boolean(slot && !slot.occupied && slot.selectable);
       });
 
@@ -629,14 +634,14 @@ export function TeaPreReserva() {
   const checklistCanConvertByProcedure = useMemo(() => {
     const byProcedure = new Map<string, boolean>();
     Array.from(new Set(
-      checklistItems.map((item) => item.procedureName || 'Procedimento nÃ£o definido'),
-    )).forEach((procedure) => {
+      checklistItems.map((item: TeaConversionChecklistItem) => item.procedureName || 'Procedimento não definido'),
+    )).forEach((procedure: string) => {
       const procedureItems = checklistItems.filter(
-        (item) => (item.procedureName || 'Procedimento não definido') === procedure,
+        (item: TeaConversionChecklistItem) => (item.procedureName || 'Procedimento não definido') === procedure,
       );
       byProcedure.set(
         procedure,
-        procedureItems.length > 0 && procedureItems.every((item) => item.valid),
+        procedureItems.length > 0 && procedureItems.every((item: TeaConversionChecklistItem) => item.valid),
       );
     });
     return byProcedure;
@@ -3783,7 +3788,7 @@ export function TeaPreReserva() {
           ) : timelineEvents.length === 0 ? (
             <Text size="sm" c="dimmed">Sem eventos registrados para esta pré-reserva.</Text>
           ) : (
-            timelineEvents.map((event) => (
+            timelineEvents.map((event: any) => (
               <Paper key={event.id} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                 <Stack gap={4}>
                   <Group justify="space-between" wrap="wrap">
@@ -4030,21 +4035,21 @@ export function TeaPreReserva() {
               </Box>
               {(() => {
                 const groupedItems = Array.from(
-                  checklistItems.reduce((acc, item: TeaConversionChecklistItem) => {
+                  checklistItems.reduce<Map<string, TeaConversionChecklistItem[]>>((acc, item: TeaConversionChecklistItem) => {
                     const procedure = item.procedureName || 'Procedimento não definido';
                     if (!acc.has(procedure)) acc.set(procedure, []);
                     acc.get(procedure)?.push(item);
                     return acc;
                   }, new Map<string, TeaConversionChecklistItem[]>()),
-                );
+                ) as Array<[string, TeaConversionChecklistItem[]]>;
                 if (groupedItems.length === 0) {
                   return <Text size="sm" c="dimmed">Sem itens de checklist para este PIT.</Text>;
                 }
 
                 return (
                   <Stack gap="md">
-                    {groupedItems.map(([procedure, procedureItems]) => {
-                      const pendingCount = procedureItems.filter((item) => !item.valid).length;
+                    {groupedItems.map(([procedure, procedureItems]: [string, TeaConversionChecklistItem[]]) => {
+                      const pendingCount = procedureItems.filter((item: TeaConversionChecklistItem) => !item.valid).length;
                       return (
                         <Stack key={procedure} gap="sm" className="tea-pre-reserva-checklist-group">
                           <Paper p="sm" withBorder className="tea-pre-reserva-checklist-group__header">
@@ -4059,7 +4064,7 @@ export function TeaPreReserva() {
                               </Text>
                             </Group>
                           </Paper>
-                          {procedureItems.map((item) => (
+                          {procedureItems.map((item: TeaConversionChecklistItem) => (
                             <Paper
                               key={item.key}
                               p="sm"

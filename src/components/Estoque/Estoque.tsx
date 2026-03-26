@@ -43,7 +43,7 @@ export function Estoque() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const {
-    data: inventoryItems,
+    data: inventoryItemsData,
     isLoading: itemsLoading,
     error: inventoryError,
   } = useInventoryItemsQuery();
