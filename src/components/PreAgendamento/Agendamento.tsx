@@ -2257,7 +2257,7 @@ export function Agendamento() {
               <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
                 <FloatingSelect
                   label="Tipo do convênio*"
-                  placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio'}
+                  placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
                   value={insuranceSelectValue}
                   onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenio: value || PARTICULAR_INSURANCE_LABEL })}
