@@ -99,6 +99,8 @@ interface ProcedureMeta {
   durationMinutes?: number | null;
   doctorIds: string[];
   doctorNames: string[];
+  acceptsInsurance: boolean;
+  acceptedInsurances: string[];
 }
 
 interface SuggestedProcedureSchedule {
@@ -169,6 +171,25 @@ const resolvePatientInsuranceName = (patient: any): string => {
     ?? '',
   ).trim();
   return insuranceName || PARTICULAR_INSURANCE_LABEL;
+};
+
+const resolvePatientInsuranceValidity = (patient: any): string => {
+  const rawValue =
+    patient?.healthInsuranceValidity
+    ?? patient?.healthInsuranceExpiry
+    ?? patient?.healthInsuranceValidUntil
+    ?? patient?.convenioValidUntil
+    ?? patient?.validadeConvenio
+    ?? patient?.insuranceValidity
+    ?? '';
+
+  const normalized = String(rawValue || '').trim();
+  if (!normalized) return '';
+
+  const parsed = dayjs(normalized);
+  if (!parsed.isValid()) return normalized;
+
+  return parsed.format('MM/YY');
 };
 
 const patientHasRegisteredInsurance = (patient: any): boolean => {
@@ -243,7 +264,7 @@ const sortAgendamentosByDateTime = (items: Agendamento[]): Agendamento[] => {
   return [...items].sort((a, b) => {
     const aStamp = dayjs(`${a.data}T${a.hora || '00:00'}:00`).valueOf();
     const bStamp = dayjs(`${b.data}T${b.hora || '00:00'}:00`).valueOf();
-    return bStamp - aStamp;
+    return aStamp - bStamp;
   });
 };
 
@@ -283,6 +304,22 @@ const normalizeComparableText = (value?: string | null): string => {
 
 const normalizeProcedureAppointmentType = (value?: string | null): 'CONSULTA' | 'EXAME' => {
   return String(value || '').trim().toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA';
+};
+
+const isParticularInsurance = (value?: string | null): boolean => {
+  return normalizeComparableText(value) === normalizeComparableText(PARTICULAR_INSURANCE_LABEL);
+};
+
+const matchesDoctorToProcedure = (doctorSpecialties: string[], procedureName: string): boolean => {
+  const normalizedProcedure = normalizeComparableText(procedureName);
+  if (!normalizedProcedure) return false;
+
+  return doctorSpecialties
+    .flatMap((specialty) => String(specialty || '')
+      .split(/[;,/|]/)
+      .map(normalizeComparableText)
+      .filter(Boolean))
+    .some((specialty) => specialty === normalizedProcedure);
 };
 
 const getBranchWeekdayLabel = (date: Date): string => {
@@ -695,7 +732,7 @@ export function Agendamento() {
     const options = list.map((p: any) => {
       const id = String(p.id ?? p.patientId ?? '');
       const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
-      const label = name ? `${name}${p.cpf ? ` • ${formatCPF(p.cpf)}` : ''}` : 'Paciente';
+      const label = name || 'Paciente';
       return { value: id || label, label };
     });
 
@@ -800,6 +837,10 @@ export function Agendamento() {
         doctorNames: linkedDoctors
           .map((doctor: any) => String(doctor?.doctorName || doctor?.name || '').trim())
           .filter(Boolean),
+        acceptsInsurance: Boolean(item.acceptsInsurance),
+        acceptedInsurances: Array.isArray(item.acceptedInsurances)
+          ? item.acceptedInsurances.map((insurance: any) => String(insurance || '').trim()).filter(Boolean)
+          : [],
       };
       return acc;
     }, {});
@@ -831,6 +872,45 @@ export function Agendamento() {
 
     return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesStatus;
   });
+
+  const getInsuranceIncompatibleProcedures = (insuranceName: string, procedureNames: string[]): string[] => {
+    if (isParticularInsurance(insuranceName)) return [];
+
+    const normalizedInsurance = normalizeComparableText(insuranceName);
+
+    return procedureNames.filter((procedureName) => {
+      const meta = procedureMetaByName[procedureName];
+      if (!meta) return false;
+      if (!meta.acceptsInsurance) return true;
+
+      const acceptedInsurances = (meta.acceptedInsurances || []).map(normalizeComparableText);
+      if (acceptedInsurances.length === 0) return true;
+
+      return !acceptedInsurances.includes(normalizedInsurance);
+    });
+  };
+
+  const handleProcedureSelectionChange = (values: string[]) => {
+    setSelectedSpecialties(values);
+
+    if (!canEditInsuranceFields) return;
+
+    const incompatibleProcedures = getInsuranceIncompatibleProcedures(
+      novoAgendamento.convenio || PARTICULAR_INSURANCE_LABEL,
+      values,
+    );
+
+    if (incompatibleProcedures.length === 0) return;
+
+    const proceduresLabel = incompatibleProcedures.join(', ');
+    showNotification({
+      title: 'Convênio incompatível',
+      message: incompatibleProcedures.length === 1
+        ? `O procedimento ${proceduresLabel} não é contemplado pelo convênio do paciente.`
+        : `Os procedimentos ${proceduresLabel} não são contemplados pelo convênio do paciente.`,
+      color: 'red',
+    });
+  };
 
   const handleEditAgendamento = (agendamento: Agendamento) => {
     const appointmentDate = agendamento.data ? new Date(`${agendamento.data}T00:00:00`) : null;
@@ -933,6 +1013,21 @@ export function Agendamento() {
       convenio: resolvePatientInsuranceName(p),
     }));
   };
+
+  useEffect(() => {
+    if (!selectedPatientId || isManualPatientFlow) return;
+
+    const patient = patientById[selectedPatientId];
+    if (!patient) return;
+
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      pacienteId: String(patient.id ?? patient.patientId ?? selectedPatientId),
+      pacienteNome: patient.name || patient.fullName || patient.patientName || prev.pacienteNome || '',
+      pacienteCPF: patient.cpf || prev.pacienteCPF || '',
+      convenio: resolvePatientInsuranceName(patient),
+    }));
+  }, [selectedPatientId, patientById, isManualPatientFlow]);
 
   const handleEnableManualPatientFlow = () => {
     setIsManualPatientFlow(true);
@@ -1042,7 +1137,7 @@ export function Agendamento() {
 
       setPatientById((prev) => ({ ...prev, [createdId]: nextPatient }));
       setPatientOptions((prev) => {
-        const label = `${nextPatient.name}${nextPatient.cpf ? ` • ${formatCPF(nextPatient.cpf)}` : ''}`;
+        const label = nextPatient.name || 'Paciente';
         if (prev.some((item) => item.value === createdId)) return prev;
         return [...prev, { value: createdId, label }].sort((a, b) => a.label.localeCompare(b.label));
       });
@@ -1097,6 +1192,22 @@ export function Agendamento() {
     }
     if (isEditing && isMultiProcedureFlow && hasSelectedSuggestedSchedules) {
       showNotification({ title: 'Edição em lote', message: 'A edição com múltiplos procedimentos ainda não está disponível.', color: 'yellow' });
+      return;
+    }
+
+    const incompatibleProcedures = getInsuranceIncompatibleProcedures(
+      novoAgendamento.convenio || PARTICULAR_INSURANCE_LABEL,
+      selectedSpecialties,
+    );
+    if (incompatibleProcedures.length > 0) {
+      const proceduresLabel = incompatibleProcedures.join(', ');
+      showNotification({
+        title: 'ConvÃªnio incompatÃ­vel',
+        message: incompatibleProcedures.length === 1
+          ? `O procedimento ${proceduresLabel} nÃ£o Ã© coberto pelo convÃªnio selecionado.`
+          : `Os procedimentos ${proceduresLabel} nÃ£o sÃ£o cobertos pelo convÃªnio selecionado.`,
+        color: 'red',
+      });
       return;
     }
 
@@ -1405,9 +1516,7 @@ export function Agendamento() {
       }
 
       if (doctorSpecialties.length === 0) return false;
-      return doctorSpecialties.some((doctorSpecialty) =>
-        doctorSpecialty.includes(normalizedSelected) || normalizedSelected.includes(doctorSpecialty),
-      );
+      return matchesDoctorToProcedure(doctorSpecialties, normalizedSelected);
     });
   });
   const schedulerDoctors = (() => {
@@ -1429,6 +1538,11 @@ export function Agendamento() {
   const selectedDayStatusSummary = getAppointmentStatusSummary(selectedDayAppointments);
   
   const selectedPatientCpfDigits = onlyDigits(novoAgendamento.pacienteCPF || pendingPatient.cpf);
+  const canEditInsuranceFields = Boolean(
+    selectedPatientId
+    || String(pendingPatient.name || '').trim()
+    || String(novoAgendamento.pacienteNome || '').trim(),
+  );
   const safeSuggestedOptions = Array.isArray(suggestedOptions) ? suggestedOptions : [];
   const selectedSuggestedOption = safeSuggestedOptions.find((option) => option.id === selectedSuggestedOptionId) || null;
   const selectedSuggestedSchedules = selectedSuggestedOption?.items || [];
@@ -1447,11 +1561,19 @@ export function Agendamento() {
     ? String(selectedPatientRecord?.healthInsuranceNumber || selectedPatientRecord?.insuranceCardNumber || '')
     : NOT_APPLICABLE_LABEL;
   const selectedPatientInsuranceValidity = selectedPatientInsuranceHasRegisteredPlan
-    ? (selectedPatientRecord?.healthInsuranceValidity ? dayjs(selectedPatientRecord.healthInsuranceValidity).format('MM/YY') : '')
+    ? resolvePatientInsuranceValidity(selectedPatientRecord)
     : NOT_APPLICABLE_LABEL;
   const selectedPatientInsuranceStatus = selectedPatientInsuranceHasRegisteredPlan
     ? 'Ativo'
     : PARTICULAR_STATUS_LABEL;
+  const insuranceSelectData = canEditInsuranceFields ? insuranceOptions : [];
+  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : '';
+  const insuranceSelectPlaceholder = !canEditInsuranceFields
+    ? 'Selecione um paciente primeiro'
+    : (insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio');
+  const insuranceCardNumberValue = canEditInsuranceFields ? selectedPatientInsuranceNumber : '';
+  const insuranceValidityValue = canEditInsuranceFields ? selectedPatientInsuranceValidity : '';
+  const insuranceStatusValue = canEditInsuranceFields ? selectedPatientInsuranceStatus : '';
   const hasAnySelectedSchedule = Boolean(
     novoAgendamento.hora
     || manualProcedureSelections.length
@@ -1690,9 +1812,7 @@ export function Agendamento() {
           );
         }
 
-        return doctorSpecialties.some((doctorSpecialty) =>
-          doctorSpecialty.includes(normalizedSelected) || normalizedSelected.includes(doctorSpecialty),
-        );
+        return matchesDoctorToProcedure(doctorSpecialties, normalizedSelected);
       })
       .map((option) => option.value);
   };
@@ -1743,13 +1863,18 @@ export function Agendamento() {
         return sameDoctorConflict || samePatientConflict;
       });
 
-    const scoreAssigned = (assigned: Assigned, date: Date) => {
+    const getAssignedWaitMinutes = (assigned: Assigned) => {
       const ordered = [...assigned].sort((a, b) => a.start - b.start);
-      const waitScore = ordered.reduce((score, item, index) => {
+      return ordered.reduce((score, item, index) => {
         if (index === 0) return score;
         const previous = ordered[index - 1];
         return score + Math.max(0, item.start - previous.end);
       }, 0);
+    };
+
+    const scoreAssigned = (assigned: Assigned, date: Date) => {
+      const ordered = [...assigned].sort((a, b) => a.start - b.start);
+      const waitScore = getAssignedWaitMinutes(assigned);
 
       if (anchorEndMinute === null) return waitScore;
 
@@ -1792,12 +1917,16 @@ export function Agendamento() {
         (a, b) => (candidatesByProcedure[a]?.length || 0) - (candidatesByProcedure[b]?.length || 0),
       );
 
-      const foundOptions: Array<{ assigned: Assigned; score: number }> = [];
+      const foundOptions: Array<{ assigned: Assigned; score: number; waitMinutes: number }> = [];
 
       const dfs = (index: number, assigned: Assigned) => {
         if (index >= procedureOrder.length) {
           const currentScore = scoreAssigned(assigned, date);
-          foundOptions.push({ assigned: [...assigned], score: currentScore });
+          foundOptions.push({
+            assigned: [...assigned],
+            score: currentScore,
+            waitMinutes: getAssignedWaitMinutes(assigned),
+          });
           return;
         }
 
@@ -1844,7 +1973,7 @@ export function Agendamento() {
 
           return {
             id: `${dayjs(date).format('YYYYMMDD')}-${index}`,
-            totalWaitMinutes: option.score,
+            totalWaitMinutes: option.waitMinutes,
             items: [anchorSelection.procedure, ...remainingProcedureNames].map((procedureName) => ({
               procedure: procedureName,
               doctorName: byProcedure[procedureName].doctorName,
@@ -2254,9 +2383,9 @@ export function Agendamento() {
               <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
                 <FloatingSelect
                   label="Tipo do convênio*"
-                  placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio'}
-                  data={insuranceOptions}
-                  value={novoAgendamento.convenio}
+                  placeholder={insuranceSelectPlaceholder}
+                  data={insuranceSelectData}
+                  value={insuranceSelectValue}
                   onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenio: value || PARTICULAR_INSURANCE_LABEL })}
                   searchable
                   clearable
@@ -2265,17 +2394,17 @@ export function Agendamento() {
                 />
                 <FloatingInput
                   label="Número da carteirinha"
-                  value={selectedPatientInsuranceNumber}
+                  value={insuranceCardNumberValue}
                   readOnly
                 />
                 <FloatingInput
                   label="Data de validade"
-                  value={selectedPatientInsuranceValidity}
+                  value={insuranceValidityValue}
                   readOnly
                 />
                 <FloatingInput
                   label="Status"
-                  value={selectedPatientInsuranceStatus}
+                  value={insuranceStatusValue}
                   readOnly
                 />
               </SimpleGrid>
@@ -2287,7 +2416,7 @@ export function Agendamento() {
                   placeholder={proceduresLoading ? 'Carregando procedimentos...' : 'Selecione os procedimentos'}
                   data={procedureOptions}
                   value={selectedSpecialties}
-                  onChange={setSelectedSpecialties}
+                  onChange={handleProcedureSelectionChange}
                   searchable
                   clearable
                   disabled={proceduresLoading}

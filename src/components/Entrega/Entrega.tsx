@@ -30,6 +30,9 @@ interface DeliveryRow {
   dataHoraEntrega?: string;
 }
 
+const EMPTY_DELIVERIES: any[] = [];
+const EMPTY_PATIENTS: any[] = [];
+
 export function Entrega() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -44,15 +47,23 @@ export function Entrega() {
   const [deliverToCpf, setDeliverToCpf] = useState('');
   const [delivering, setDelivering] = useState(false);
   const {
-    data: deliveries = [],
+    data: deliveriesData,
     isLoading: rowsLoading,
     error: deliveriesError,
   } = useDeliveriesQuery();
   const {
-    data: patients = [],
+    data: patientsData,
     isLoading: patientsLoading,
     error: patientsError,
   } = usePatientsAdminQuery();
+  const deliveries = Array.isArray(deliveriesData) ? deliveriesData : EMPTY_DELIVERIES;
+  const patients = Array.isArray(patientsData)
+    ? patientsData
+    : (Array.isArray((patientsData as any)?.items)
+      ? (patientsData as any).items
+      : (Array.isArray((patientsData as any)?.data)
+        ? (patientsData as any).data
+        : EMPTY_PATIENTS));
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 

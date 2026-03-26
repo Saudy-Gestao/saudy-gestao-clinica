@@ -30,6 +30,8 @@ interface StockItem {
   status?: string;
 }
 
+const EMPTY_INVENTORY_ITEMS: any[] = [];
+
 // SAMPLE_ITEMS removed — items are now fetched from backend (/inventory/).
 
 export function Estoque() {
@@ -45,6 +47,7 @@ export function Estoque() {
     isLoading: itemsLoading,
     error: inventoryError,
   } = useInventoryItemsQuery();
+  const inventoryItems = Array.isArray(inventoryItemsData) ? inventoryItemsData : EMPTY_INVENTORY_ITEMS;
 
   // Saving & success modal states
   const [savingItem, setSavingItem] = useState(false);

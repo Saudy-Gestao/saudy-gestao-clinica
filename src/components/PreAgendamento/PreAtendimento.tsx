@@ -20,6 +20,7 @@ import {
   Paper,
   Skeleton,
   SimpleGrid,
+  Grid,
   ThemeIcon,
   useMantineColorScheme,
 } from '@mantine/core';
@@ -27,7 +28,6 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Search, ChevronLeft, Lock, ClipboardCheck, Camera, Upload, Wallet, CreditCard, QrCode, Eye } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
-import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
 import { FacialCapture } from '../common/FacialCapture';
 import preAttendanceService from '../../services/preAttendanceService';
@@ -151,7 +151,6 @@ export function PreAtendimento() {
   const [checklistData, setChecklistData] = useState({
     dadosConferidos: false,
     contatoConferido: false,
-    autorizacaoConferida: false,
     guiaNumero: '',
     atendimentoParticular: false,
     pagamentoRealizado: false,
@@ -232,7 +231,7 @@ export function PreAtendimento() {
     return Boolean(normalized) && !normalized.startsWith('tmp-');
   };
 
-  const canEditPayment = checklistData.atendimentoParticular || isPrivateCare(checklistPatient);
+  const canEditPayment = checklistData.atendimentoParticular;
   const invalidateReceptionQueue = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.receptionQueue });
   };
@@ -240,7 +239,7 @@ export function PreAtendimento() {
   const extractDoctorNameFromAgenda = (agenda?: string | null) => {
     const value = String(agenda || '').trim();
     if (!value) return '';
-    const parts = value.split('•').map((item) => item.trim()).filter(Boolean);
+    const parts = value.split('Ã¢â‚¬Â¢').map((item) => item.trim()).filter(Boolean);
     if (parts.length === 0) return '';
     return parts[parts.length - 1];
   };
@@ -261,7 +260,6 @@ export function PreAtendimento() {
     setChecklistData({
       dadosConferidos: false,
       contatoConferido: false,
-      autorizacaoConferida: false,
       guiaNumero: '',
       atendimentoParticular: false,
       pagamentoRealizado: false,
@@ -274,9 +272,9 @@ export function PreAtendimento() {
 
   const canCompleteChecklist = () => {
     const basicChecks = checklistData.dadosConferidos && checklistData.contatoConferido;
-    const authorizationChecks = checklistData.atendimentoParticular || isPrivateCare(checklistPatient)
+    const authorizationChecks = checklistData.atendimentoParticular
       ? checklistData.pagamentoRealizado && checklistData.valorPagamento > 0 && checklistData.formaPagamento.trim().length > 0
-      : checklistData.autorizacaoConferida && checklistData.guiaNumero.trim().length > 0;
+      : checklistData.guiaNumero.trim().length > 0;
 
     return basicChecks && authorizationChecks && checklistData.agendaConferida && facialValidationVerified;
   };
@@ -360,7 +358,7 @@ export function PreAtendimento() {
       };
     }
 
-    const parts = value.split('•').map((item) => item.trim()).filter(Boolean);
+    const parts = value.split(' • ').map((item) => item.trim()).filter(Boolean);
     return {
       horario: parts[0] || value,
       procedimento: parts[1] || value,
@@ -370,6 +368,58 @@ export function PreAtendimento() {
   const getChecklistAppointmentDate = (patient: Patient | null) => {
     const rawDate = (patient as any)?.appointmentDate || (patient as any)?.date || (patient as any)?.scheduledDate;
     return formatDateDisplay(rawDate) || 'Não informada';
+  };
+
+  const normalizeComparableText = (value?: string | null): string => {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+  };
+
+  const parseDisplayDateToApi = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    const match = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return undefined;
+    return `${match[3]}-${match[2]}-${match[1]}`;
+  };
+
+  const normalizeChecklistGenderForApi = (value?: string | null) => {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (!normalized) return undefined;
+    if (normalized === 'M' || normalized === 'MASCULINO' || normalized === 'MALE') return 'MALE';
+    if (normalized === 'F' || normalized === 'FEMININO' || normalized === 'FEMALE') return 'FEMALE';
+    if (normalized === 'O' || normalized === 'OUTRO' || normalized === 'OTHER') return 'OTHER';
+    return undefined;
+  };
+
+  const updateChecklistPatientField = <K extends keyof Patient>(field: K, value: Patient[K]) => {
+    setChecklistPatient((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const updateChecklistAgendaPart = (part: 'horario' | 'procedimento' | 'profissional', value: string) => {
+    setChecklistPatient((prev) => {
+      if (!prev) return prev;
+
+      const summary = getAgendaSummary(prev.agenda);
+      const currentHorario = normalizeComparableText(summary.horario) === 'nao informado' ? '' : summary.horario;
+      const currentProcedimento = normalizeComparableText(summary.procedimento) === 'nao informado' ? '' : summary.procedimento;
+      const currentProfissional = extractDoctorNameFromAgenda(prev.agenda) || prev.doctorName || '';
+
+      const nextHorario = part === 'horario' ? value : currentHorario;
+      const nextProcedimento = part === 'procedimento' ? value : currentProcedimento;
+      const nextProfissional = part === 'profissional' ? value : currentProfissional;
+
+      return {
+        ...prev,
+        agenda: [nextHorario, nextProcedimento, nextProfissional]
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+          .join(' • '),
+        doctorName: nextProfissional || prev.doctorName,
+      };
+    });
   };
 
   const loadReceptionPatients = async () => {
@@ -833,7 +883,7 @@ export function PreAtendimento() {
         };
       }
     } catch {
-      // Mantém os dados já disponíveis no pre-attendance se o fetch detalhado falhar.
+      // Mantém os dados já disponíveis no pré-atendimento se o carregamento detalhado falhar.
     }
 
     setPatients((prev) => prev.map((item) => (
@@ -844,7 +894,7 @@ export function PreAtendimento() {
     setChecklistData((prev) => ({
       ...prev,
       atendimentoParticular: isPrivateCare(enrichedPatient),
-      guiaNumero: enrichedPatient.numCarteira || prev.guiaNumero || '',
+      guiaNumero: isPrivateCare(enrichedPatient) ? '' : (enrichedPatient.numCarteira || prev.guiaNumero || ''),
       valorPagamento: prev.valorPagamento || 0,
       formaPagamento: prev.formaPagamento || '',
     }));
@@ -933,8 +983,10 @@ export function PreAtendimento() {
     try {
       setChecklistLoading(true);
       let generatedInvoice: any = null;
+      const checklistPatientBirthDate = parseDisplayDateToApi(checklistPatient.dataNascimento);
+      const checklistPatientGender = normalizeChecklistGenderForApi(checklistPatient.sexo);
 
-      if (checklistData.atendimentoParticular || isPrivateCare(checklistPatient)) {
+      if (checklistData.atendimentoParticular) {
         generatedInvoice = await invoiceService.createInvoice({
           patientName: checklistPatient.nomeCompleto,
           dueDate: new Date().toLocaleDateString('en-CA'),
@@ -945,13 +997,43 @@ export function PreAtendimento() {
         });
       }
 
+      if (checklistPatient.patientId) {
+        await patientService.updatePatient(checklistPatient.patientId, {
+          name: checklistPatient.nomeCompleto || undefined,
+          cpf: onlyDigits(checklistPatient.cpf || '') || undefined,
+          birthDate: checklistPatientBirthDate,
+          gender: checklistPatientGender,
+          phone: checklistPatient.telefone || undefined,
+          cellphone: checklistPatient.telefone || undefined,
+          email: checklistPatient.email || undefined,
+          address: checklistPatient.endereco || undefined,
+          hasHealthInsurance: !isPrivateCare(checklistPatient),
+          healthInsuranceName: checklistPatient.convenio || undefined,
+          healthInsuranceNumber: checklistPatient.numCarteira || undefined,
+          healthInsuranceExpiry: parseDisplayDateToApi(checklistPatient.validadeConvenio),
+        });
+      }
+
       const updated = await preAttendanceService.update(checklistPreAttendanceId, {
         status: RECEPTION_DONE_STATUS,
         checklistCompletedAt: new Date().toISOString(),
+        fullName: checklistPatient.nomeCompleto || undefined,
+        cpf: onlyDigits(checklistPatient.cpf || '') || undefined,
+        birthDate: checklistPatientBirthDate,
+        gender: checklistPatientGender,
+        phone: checklistPatient.telefone || undefined,
+        email: checklistPatient.email || undefined,
+        address: checklistPatient.endereco || undefined,
+        convenio: checklistData.atendimentoParticular
+          ? 'Particular'
+          : (checklistPatient.convenio || undefined),
+        convenioValidUntil: parseDisplayDateToApi(checklistPatient.validadeConvenio),
         convenioStatus: checklistData.atendimentoParticular
           ? 'Pagamento realizado'
-          : (checklistData.autorizacaoConferida ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
+          : (checklistData.guiaNumero.trim().length > 0 ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
         convenioNumber: checklistData.guiaNumero || checklistPatient.numCarteira || undefined,
+        agenda: checklistPatient.agenda || undefined,
+        doctorName: checklistPatient.doctorName || extractDoctorNameFromAgenda(checklistPatient.agenda) || undefined,
         finalFacialValidationAt: facialValidationVerified ? new Date().toISOString() : undefined,
         finalFacialValidationStatus: facialValidationVerified ? 'VALIDADO' : 'PENDENTE',
         finalFacialValidationTrust: facialValidationTrust ?? undefined,
@@ -961,7 +1043,7 @@ export function PreAtendimento() {
           checklistPatient.observacoes,
           checklistData.observacoes,
           generatedInvoice?.number ? `Fatura gerada: ${generatedInvoice.number}` : '',
-        ].filter(Boolean).join(' • ') || undefined,
+        ].filter(Boolean).join(' Ã¢â‚¬Â¢ ') || undefined,
       });
 
       await consultationService.create({
@@ -969,12 +1051,12 @@ export function PreAtendimento() {
         appointmentId: checklistPatient.appointmentId || undefined,
         doctorId: checklistPatient.doctorId || undefined,
         doctorName: checklistPatient.doctorName || extractDoctorNameFromAgenda(checklistPatient.agenda) || undefined,
-        convenio: checklistData.atendimentoParticular || isPrivateCare(checklistPatient)
+        convenio: checklistData.atendimentoParticular
           ? 'Particular'
           : (checklistPatient.convenio || undefined),
         convenioStatus: checklistData.atendimentoParticular
           ? 'Pagamento realizado'
-          : (checklistData.autorizacaoConferida ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
+          : (checklistData.guiaNumero.trim().length > 0 ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
         scheduledFor: checklistPatient.agenda || undefined,
         queueType: 'Fila clínica',
         agenda: checklistPatient.agenda || undefined,
@@ -1199,21 +1281,14 @@ export function PreAtendimento() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        {/* Breadcrumb/Back Button */}
         <Group mb={isMobile ? 20 : 30}>
           <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
             <ChevronLeft size={28} />
           </ActionIcon>
           <Box>
-            <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-              Autorização e Recepção
-            </Text>
-            <Text size="sm" c="dimmed">
-              Pacientes chamados para atendimento na recepção
-            </Text>
+            <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Autorização e Recepção</Text>
+            <Text size="sm" c="dimmed">Pacientes chamados para atendimento na recepção</Text>
           </Box>
         </Group>
 
@@ -1570,7 +1645,7 @@ export function PreAtendimento() {
                   }
                 />
                 <FloatingInput
-                  label="Temp (°C)"
+                  label="Temp (Ã‚Â°C)"
                   value={novoPaciente.temperatura}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, temperatura: e.currentTarget.value })
@@ -1686,65 +1761,15 @@ export function PreAtendimento() {
           setChecklistOpen(false);
           resetChecklist();
         }}
-        title={null}
-        size={isMobile ? '100%' : '80rem'}
-        centered
+        title="Checklist de recepção"
+        size={isMobile ? "100%" : isTablet ? "95%" : "xl"}
+        centered={!isMobile}
         fullScreen={isMobile}
-        overlayProps={{
-          backgroundOpacity: isDarkMode ? 0.58 : 0,
-          blur: isDarkMode ? 2 : 0,
-        }}
-        styles={{
-          content: {
-            background: 'var(--mantine-color-body)',
-            color: 'var(--mantine-color-text)',
-          },
-          body: {
-            background: 'var(--mantine-color-body)',
-            color: 'var(--mantine-color-text)',
-            padding: isMobile ? 16 : 24,
-          },
-          header: {
-            display: 'none',
-          },
-        }}
+        closeButtonProps={{ 'aria-label': 'Fechar checklist' }}
       >
         <Stack gap="xl">
-          <Group align="center" gap="md" wrap="nowrap">
-            <ActionIcon
-              variant="default"
-              size={isMobile ? 'lg' : 'xl'}
-              onClick={() => {
-                setChecklistOpen(false);
-                resetChecklist();
-              }}
-            >
-              <ChevronLeft size={18} />
-            </ActionIcon>
-            <Box>
-              <Text fw={700} size={isMobile ? 'lg' : 'xl'}>Checklist de recepção</Text>
-              <Text size="sm" style={checklistMutedBlueStyle}>Pré-atendimento</Text>
-            </Box>
-          </Group>
-
           {checklistPatient && (
-            <Box
-              style={{
-                position: 'relative',
-                paddingLeft: isMobile ? 42 : 50,
-              }}
-            >
-              <Box
-                style={{
-                  position: 'absolute',
-                  top: 34,
-                  bottom: 12,
-                  left: isMobile ? 14 : 15,
-                  width: 1,
-                  backgroundColor: 'var(--mantine-color-default-border)',
-                }}
-              />
-
+            <Box>
               <Stack gap="xl">
                 <Box style={{ position: 'relative' }}>
                   <ThemeIcon
@@ -1761,62 +1786,108 @@ export function PreAtendimento() {
 
                   <Paper withBorder radius="md" p={isMobile ? 'sm' : 'md'} mt="md" shadow="xs" style={checklistCardStyle}>
                     <Stack gap="md">
-                      <Group justify="space-between" align="flex-start" wrap="wrap">
-                        <Text fw={500} size={isMobile ? 'lg' : 'xl'}>{checklistPatient.nomeCompleto}</Text>
-                        <Text fw={500} size={isMobile ? 'md' : 'lg'}>{checklistPatient.convenio || 'Particular'}</Text>
-                      </Group>
-
-                      <SimpleGrid cols={isMobile ? 2 : 5} spacing="md" verticalSpacing="xs">
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>CPF:</Text>
-                          <Text style={checklistFieldValueStyle}>{formatCPF(checklistPatient.cpf) || 'Não informado'}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Data de nascimento:</Text>
-                          <Text style={checklistFieldValueStyle}>{checklistPatient.dataNascimento || 'Não informado'}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Sexo:</Text>
-                          <Text style={checklistFieldValueStyle}>{checklistPatient.sexo || 'Não informado'}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Telefone:</Text>
-                          <Text style={checklistFieldValueStyle}>{checklistPatient.telefone || 'Não informado'}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>E-mail:</Text>
-                          <Text style={checklistFieldValueStyle}>{checklistPatient.email || 'Não informado'}</Text>
-                        </Box>
+                      <SimpleGrid cols={isMobile ? 1 : 2} spacing="md">
+                        <TextInput
+                          label="Nome completo"
+                          value={checklistPatient?.nomeCompleto || ''}
+                          onChange={(event) => updateChecklistPatientField('nomeCompleto', event.currentTarget.value)}
+                        />
+                        <TextInput
+                          label="Convênio"
+                          value={checklistPatient?.convenio || 'Particular'}
+                          onChange={(event) => updateChecklistPatientField('convenio', event.currentTarget.value)}
+                        />
                       </SimpleGrid>
+
+                      <Grid gutter="md">
+                        <Grid.Col span={isMobile ? 12 : 3}>
+                          <TextInput
+                            label="CPF"
+                            value={formatCPF(checklistPatient?.cpf || '')}
+                            onChange={(event) => updateChecklistPatientField('cpf', onlyDigits(event.currentTarget.value))}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={isMobile ? 12 : 3}>
+                          <TextInput
+                            label="Data de nascimento"
+                            value={checklistPatient?.dataNascimento || ''}
+                            onChange={(event) => updateChecklistPatientField('dataNascimento', formatDateInput(event.currentTarget.value))}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={isMobile ? 12 : 2}>
+                          <Select
+                            label="Sexo"
+                            data={[
+                              { value: 'M', label: 'Masculino' },
+                              { value: 'F', label: 'Feminino' },
+                              { value: 'O', label: 'Outro' },
+                            ]}
+                            value={checklistPatient?.sexo || ''}
+                            onChange={(value) => updateChecklistPatientField('sexo', value || '')}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={isMobile ? 12 : 2}>
+                          <TextInput
+                            label="Telefone"
+                            value={formatPhone(checklistPatient?.telefone || '')}
+                            onChange={(event) => updateChecklistPatientField('telefone', onlyDigits(event.currentTarget.value))}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={isMobile ? 12 : 2}>
+                          <TextInput
+                            label="E-mail"
+                            value={checklistPatient?.email || ''}
+                            onChange={(event) => updateChecklistPatientField('email', event.currentTarget.value)}
+                          />
+                        </Grid.Col>
+                      </Grid>
+
+                      <TextInput
+                        label="Endereço"
+                        value={checklistPatient?.endereco || ''}
+                        onChange={(event) => updateChecklistPatientField('endereco', event.currentTarget.value)}
+                      />
 
                       <Divider />
 
-                      <Group justify="space-between" align="flex-start" wrap="wrap">
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Convênio do cadastro</Text>
-                          <Text fw={600} size={isMobile ? 'lg' : 'xl'} lh={1.2}>{checklistPatient.convenio || 'Particular'}</Text>
-                        </Box>
-                        <Text fw={500}>{checklistPatient.statusAutorizacao || 'Sem autorização Prévia'}</Text>
-                      </Group>
-
-                      <SimpleGrid cols={isMobile ? 2 : 4} spacing="md" verticalSpacing="xs">
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Validade:</Text>
-                          <Text style={checklistFieldValueStyle}>{checklistPatient.validadeConvenio || 'Não informada'}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Horário:</Text>
-                          <Text style={checklistFieldValueStyle}>{getAgendaSummary(checklistPatient.agenda).horario}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Procedimento:</Text>
-                          <Text style={checklistFieldValueStyle}>{getAgendaSummary(checklistPatient.agenda).procedimento}</Text>
-                        </Box>
-                        <Box>
-                          <Text style={checklistFieldLabelStyle}>Profissional:</Text>
-                          <Text style={checklistFieldValueStyle}>{extractDoctorNameFromAgenda(checklistPatient.agenda) || checklistPatient.doctorName || 'Não informado'}</Text>
-                        </Box>
+                      <SimpleGrid cols={isMobile ? 1 : 2} spacing="md">
+                        <TextInput
+                          label="Convênio do cadastro"
+                          value={checklistPatient?.convenio || 'Particular'}
+                          onChange={(event) => updateChecklistPatientField('convenio', event.currentTarget.value)}
+                        />
+                        <TextInput
+                          label="Status da autorização"
+                          value={checklistPatient?.statusAutorizacao || ''}
+                          placeholder="Sem autorização prévia"
+                          onChange={(event) => updateChecklistPatientField('statusAutorizacao', event.currentTarget.value)}
+                        />
                       </SimpleGrid>
+
+                      <SimpleGrid cols={isMobile ? 1 : 4} spacing="md" verticalSpacing="xs">
+                        <TextInput
+                          label="Validade"
+                          value={checklistPatient?.validadeConvenio || ''}
+                          onChange={(event) => updateChecklistPatientField('validadeConvenio', formatDateInput(event.currentTarget.value))}
+                        />
+                        <TextInput
+                          label="Horário"
+                          value={normalizeComparableText(getAgendaSummary(checklistPatient?.agenda).horario) === 'nao informado' ? '' : getAgendaSummary(checklistPatient?.agenda).horario}
+                          onChange={(event) => updateChecklistAgendaPart('horario', event.currentTarget.value)}
+                        />
+                        <TextInput
+                          label="Procedimento"
+                          value={normalizeComparableText(getAgendaSummary(checklistPatient?.agenda).procedimento) === 'nao informado' ? '' : getAgendaSummary(checklistPatient?.agenda).procedimento}
+                          onChange={(event) => updateChecklistAgendaPart('procedimento', event.currentTarget.value)}
+                        />
+                        <TextInput
+                          label="Profissional"
+                          value={extractDoctorNameFromAgenda(checklistPatient?.agenda) || checklistPatient?.doctorName || ''}
+                          onChange={(event) => updateChecklistAgendaPart('profissional', event.currentTarget.value)}
+                        />
+                      </SimpleGrid>
+
+                      <Divider />
 
                       <Divider />
 
@@ -1845,16 +1916,22 @@ export function PreAtendimento() {
                           checked={checklistData.atendimentoParticular}
                           onChange={(event) => {
                             const checked = event.currentTarget.checked;
-                            setChecklistData((prev) => ({ ...prev, atendimentoParticular: checked }));
+                            setChecklistData((prev) => ({
+                              ...prev,
+                              atendimentoParticular: checked,
+                              guiaNumero: checked ? '' : prev.guiaNumero,
+                              pagamentoRealizado: checked ? prev.pagamentoRealizado : false,
+                              valorPagamento: checked ? prev.valorPagamento : 0,
+                              formaPagamento: checked ? prev.formaPagamento : '',
+                            }));
                           }}
                         />
                         <Checkbox
                           label="Autorização do convênio conferida"
-                          checked={checklistData.autorizacaoConferida}
-                          disabled={checklistData.atendimentoParticular || isPrivateCare(checklistPatient)}
+                          style={{ display: 'none' }}
+                          checked={false}
                           onChange={(event) => {
-                            const checked = event.currentTarget.checked;
-                            setChecklistData((prev) => ({ ...prev, autorizacaoConferida: checked }));
+                            void event;
                           }}
                         />
                       </Group>
@@ -1863,7 +1940,7 @@ export function PreAtendimento() {
                         <FloatingInput
                           label="Número da Guia"
                           value={checklistData.guiaNumero}
-                          disabled={checklistData.atendimentoParticular || isPrivateCare(checklistPatient)}
+                          disabled={checklistData.atendimentoParticular}
                           onChange={(event) => {
                             const value = event.currentTarget.value;
                             setChecklistData((prev) => ({ ...prev, guiaNumero: value }));
@@ -1878,7 +1955,7 @@ export function PreAtendimento() {
                           variant="default"
                           fullWidth
                           loading={checklistAttachmentUploading}
-                          disabled={!checklistPatient.appointmentId}
+                          disabled={!checklistPatient?.appointmentId}
                           style={checklistUploadBoxStyle}
                           leftSection={<Upload size={18} />}
                         >
@@ -1964,6 +2041,7 @@ export function PreAtendimento() {
                             key={option.value}
                             variant="default"
                             leftSection={<Icon size={18} />}
+                            disabled={!canEditPayment}
                             style={paymentChoiceStyle(selected)}
                             onClick={() => {
                               if (!canEditPayment) return;
@@ -2007,15 +2085,15 @@ export function PreAtendimento() {
                       <SimpleGrid cols={isMobile ? 2 : 3} spacing="lg" verticalSpacing="md">
                         <Box>
                           <Text style={checklistFieldLabelStyle}>Nome completo</Text>
-                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{checklistPatient.nomeCompleto}</Text>
+                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{checklistPatient?.nomeCompleto || ''}</Text>
                         </Box>
                         <Box>
                           <Text style={checklistFieldLabelStyle}>Convênio</Text>
-                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{checklistPatient.convenio || 'Particular'}</Text>
+                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{checklistPatient?.convenio || 'Particular'}</Text>
                         </Box>
                         <Box>
                           <Text style={checklistFieldLabelStyle}>Procedimento</Text>
-                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{getAgendaSummary(checklistPatient.agenda).procedimento}</Text>
+                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{getAgendaSummary(checklistPatient?.agenda).procedimento}</Text>
                         </Box>
                         <Box>
                           <Text style={checklistFieldLabelStyle}>Data</Text>
@@ -2023,7 +2101,7 @@ export function PreAtendimento() {
                         </Box>
                         <Box>
                           <Text style={checklistFieldLabelStyle}>Horário</Text>
-                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{getAgendaSummary(checklistPatient.agenda).horario}</Text>
+                          <Text style={{ ...checklistFieldValueStyle, ...checklistUnderlineStyle }}>{getAgendaSummary(checklistPatient?.agenda).horario}</Text>
                         </Box>
                         <Box>
                           <Text style={checklistFieldLabelStyle}>Profissional Respons.</Text>
