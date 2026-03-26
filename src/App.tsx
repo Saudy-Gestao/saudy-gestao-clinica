@@ -14,6 +14,7 @@ import { EsqueciSenha } from './components/Auth/EsqueciSenha';
 import { Adm } from './components/Auth/Adm';
 import { AdmRegister } from './components/Auth/AdmRegister';
 import { AdminHub } from './components/Admin/AdminHub';
+import { PossiveisClientes } from './components/Admin/PossiveisClientes';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
@@ -59,7 +60,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
   const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
-  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente'];
+  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {
     return <Navigate to="/dashboard" replace />;
@@ -114,6 +115,10 @@ function App() {
           <Route 
             path="/adm-hub"
             element={<ProtectedRoute><AdminHub /></ProtectedRoute>}
+          />
+          <Route
+            path="/possiveis-clientes"
+            element={<ProtectedRoute><PossiveisClientes /></ProtectedRoute>}
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
