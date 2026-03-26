@@ -12,11 +12,15 @@ import {
   Title,
   PasswordInput,
   Paper,
+  SimpleGrid,
+  ThemeIcon,
 } from '@mantine/core';
+import { ArrowLeft, Building2, ShieldCheck, Waypoints } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import companyService from '../../services/companyService';
 import { isValidEmail, normalizeEmail } from '../../utils/formatters';
+import { Header } from '../Header/Header';
 
 const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
 const BRANCH_QUOTAS_STORAGE_KEY = 'settings:branch-create-quotas';
@@ -51,6 +55,8 @@ function generatePassword(length = 12) {
 export function CadastroCliente() {
   const navigate = useNavigate();
   const location = useLocation();
+  const from = (location as unknown as { state?: { from?: string } })?.state?.from;
+  const isFromAdmHub = from === 'adm-hub';
 
   const [active, setActive] = useState(0);
 
@@ -168,8 +174,7 @@ export function CadastroCliente() {
         showNotification({ title: 'Senha gerada', message: `Senha: ${plainPassword}`, color: 'blue' });
       }
 
-      const from = (location as unknown as { state?: { from?: string } })?.state?.from;
-      if (from === 'adm-hub') {
+      if (isFromAdmHub) {
         navigate('/adm-hub');
       } else {
         navigate('/dashboard');
@@ -185,11 +190,74 @@ export function CadastroCliente() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Box p="xl" mx="auto" maw={900}>
-        <Title order={3} fw={600} style={{ color: 'var(--mantine-color-text)', marginBottom: 18 }}>Cadastrar cliente</Title>
+      <Header />
+      <Box p="xl" mx="auto" maw={1180}>
+        <Stack gap="lg">
+          <Group justify="space-between" align="flex-start">
+            <Stack gap="xs">
+              <Group gap="xs">
+                {isFromAdmHub && (
+                  <Button variant="subtle" leftSection={<ArrowLeft size={16} />} onClick={() => navigate('/adm-hub')}>
+                    Voltar para o ADM
+                  </Button>
+                )}
+              </Group>
+              <Title order={2} fw={600} style={{ color: 'var(--mantine-color-text)' }}>
+                Módulo de Cadastro de Cliente
+              </Title>
+              <Text c="dimmed" maw={720}>
+                Cadastre uma nova empresa com usuário administrador inicial e definição de expansão por filiais,
+                mantendo o fluxo administrativo separado da operação clínica.
+              </Text>
+            </Stack>
+          </Group>
 
-        <Paper p="md" withBorder radius="md">
-          <Stepper active={active} onStepClick={setActive}>
+          <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
+            <Paper p="lg" withBorder radius="lg">
+              <Group align="flex-start" wrap="nowrap">
+                <ThemeIcon size={42} radius="md" color="darkBlue" variant="light">
+                  <ShieldCheck size={20} />
+                </ThemeIcon>
+                <Box>
+                  <Text fw={600}>Administrador inicial</Text>
+                  <Text size="sm" c="dimmed">
+                    Criamos o primeiro acesso da empresa com senha gerada no fluxo.
+                  </Text>
+                </Box>
+              </Group>
+            </Paper>
+
+            <Paper p="lg" withBorder radius="lg">
+              <Group align="flex-start" wrap="nowrap">
+                <ThemeIcon size={42} radius="md" color="darkBlue" variant="light">
+                  <Building2 size={20} />
+                </ThemeIcon>
+                <Box>
+                  <Text fw={600}>Estrutura da empresa</Text>
+                  <Text size="sm" c="dimmed">
+                    Defina dados principais da matriz para seguir com configurações internas depois.
+                  </Text>
+                </Box>
+              </Group>
+            </Paper>
+
+            <Paper p="lg" withBorder radius="lg">
+              <Group align="flex-start" wrap="nowrap">
+                <ThemeIcon size={42} radius="md" color="darkBlue" variant="light">
+                  <Waypoints size={20} />
+                </ThemeIcon>
+                <Box>
+                  <Text fw={600}>Expansão controlada</Text>
+                  <Text size="sm" c="dimmed">
+                    A matriz nasce no cadastro e o limite de filiais adicionais fica pré-configurado.
+                  </Text>
+                </Box>
+              </Group>
+            </Paper>
+          </SimpleGrid>
+
+          <Paper p="xl" withBorder radius="lg">
+            <Stepper active={active} onStepClick={setActive}>
             <Stepper.Step description="Informações do cliente">
               <Stack>
                 <TextInput label="Nome do administrador" value={adminName} onChange={(e: ChangeEvent<HTMLInputElement>) => setAdminName(e.currentTarget.value)} />
@@ -232,17 +300,29 @@ export function CadastroCliente() {
             <Stepper.Completed>
               <Text>Revisão final. Clique em <b>Cadastrar</b> para finalizar.</Text>
             </Stepper.Completed>
-          </Stepper>
+            </Stepper>
 
-          <Group mt="md" justify="flex-end">
-            <Button variant="default" onClick={handleBack} disabled={active === 0}>Voltar</Button>
-            {active < 2 ? (
-              <Button onClick={handleNext} bg={DARK_BLUE}>Próximo</Button>
-            ) : (
-              <Button onClick={handleSubmit} bg={DARK_BLUE} loading={submitting}>Cadastrar</Button>
-            )}
-          </Group>
-        </Paper>
+            <Group mt="xl" justify="space-between">
+              <Text size="sm" c="dimmed">
+                Fluxo administrativo com 3 etapas: acesso, empresa e quantidade de filiais adicionais.
+              </Text>
+              <Group>
+                <Button variant="default" onClick={handleBack} disabled={active === 0}>
+                  Voltar
+                </Button>
+                {active < 2 ? (
+                  <Button onClick={handleNext} bg={DARK_BLUE}>
+                    Próximo
+                  </Button>
+                ) : (
+                  <Button onClick={handleSubmit} bg={DARK_BLUE} loading={submitting}>
+                    Cadastrar
+                  </Button>
+                )}
+              </Group>
+            </Group>
+          </Paper>
+        </Stack>
       </Box>
     </Box>
   );

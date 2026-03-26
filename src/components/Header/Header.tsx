@@ -18,6 +18,9 @@ type ModuleDefinition = ModuleUsageItem & {
 };
 
 const MODULES: ModuleDefinition[] = [
+  { key: 'adm-hub', label: 'ADM Hub', route: '/adm-hub', prefixes: ['/adm-hub'] },
+  { key: 'adm-leads', label: 'Possíveis Clientes', route: '/possiveis-clientes', prefixes: ['/possiveis-clientes'] },
+  { key: 'adm-clientes', label: 'Cadastro de Cliente', route: '/cadastro-cliente', prefixes: ['/cadastro-cliente'] },
   { key: 'pre-atendimento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
   { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },
@@ -56,7 +59,10 @@ export function Header() {
     () => String((currentUser as any)?.id || (currentUser as any)?.email || 'anonymous'),
     [currentUser],
   );
+  const isAdmHubOnly = Boolean((currentUser as any)?.isAdmHubOnly);
+  const homeRoute = isAdmHubOnly ? '/adm-hub' : '/dashboard';
   const unitLabel = useMemo(() => {
+    if ((currentUser as any)?.isAdmHubOnly) return 'ADM Hub';
     const branch = (currentUser as any)?.branch || (currentUser as any)?.sector?.branch;
     return String(branch?.tradeName || branch?.name || 'Unidade não definida');
   }, [currentUser]);
@@ -131,7 +137,7 @@ export function Header() {
     <Box bg={DARK_BLUE} c="white" py="md" px="xl">
       <Group justify="space-between" wrap="nowrap">
         <Group
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(homeRoute)}
           style={{ cursor: 'pointer' }}
         >
           <Box bg="white" w={40} h={40} style={{ borderRadius: 8, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
