@@ -3152,7 +3152,7 @@ export function TeaPreReserva() {
                 onClick={async () => {
                   if (!suggestionModalContext) return;
                   setAcceptSuggestionDecisionOpened(false);
-                  await handleAcceptSuggestions(suggestionModalContext, { targetStatus: 'RESERVED' });
+                  await handleAcceptSuggestions(suggestionModalContext, { targetStatus: 'PENDING_AUTHORIZATION' });
                 }}
                 loading={!!suggestionModalContext?.groupKey && updatingId === suggestionModalContext.groupKey}
                 disabled={!suggestionModalContext}
@@ -3754,7 +3754,7 @@ export function TeaPreReserva() {
               variant="light"
               color="indigo"
               onClick={async () => {
-                await handleSubmitManualReservation('RESERVED');
+                await handleSubmitManualReservation('PENDING_AUTHORIZATION');
               }}
               loading={manualSaving}
               disabled={!manualReservationDecisionState || manualSaving}
