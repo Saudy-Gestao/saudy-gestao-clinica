@@ -100,6 +100,8 @@ export default {
       suggestedDate: string;
       suggestedTime: string;
       durationMinutes?: number | null;
+      professionalDoctorId?: string | null;
+      professionalName?: string | null;
     }>;
   }) {
     const res = await api.post('/care/tea-pre-reservations/accept-group', payload);

@@ -161,6 +161,13 @@ type GroupTherapyContext = {
   durationMinutes?: number | null;
 };
 
+type SuggestedSlot = {
+  date: string;
+  time: string;
+  professionalDoctorId?: string | null;
+  professionalName?: string | null;
+};
+
 type SuggestionFallbackLevel =
   | 'preferred_day_and_shift'
   | 'nearest_day_same_shift'
@@ -435,7 +442,7 @@ export function TeaPreReserva() {
   const [search, setSearch] = useState('');
   const [badgeFilter, setBadgeFilter] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [suggestionsByTherapyId, setSuggestionsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
+  const [suggestionsByTherapyId, setSuggestionsByTherapyId] = useState<Record<string, SuggestedSlot[]>>({});
   const [suggestionFallbackByTherapyId, setSuggestionFallbackByTherapyId] = useState<Record<string, SuggestionFallbackLevel>>({});
   const [loadingSuggestionsId, setLoadingSuggestionsId] = useState<string | null>(null);
   const recurringUntilYearEnd = dayjs().endOf('year');
@@ -581,7 +588,7 @@ export function TeaPreReserva() {
   const [manualSaving, setManualSaving] = useState(false);
   const [manualAcceptDecisionOpened, setManualAcceptDecisionOpened] = useState(false);
   const [manualReservationDecisionState, setManualReservationDecisionState] = useState<ManualReservationDecisionState | null>(null);
-  const [manualSelectedSlots, setManualSelectedSlots] = useState<Array<{ date: string; time: string }>>([]);
+  const [manualSelectedSlotsByTherapyId, setManualSelectedSlotsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [manualEditableExistingSlotsByTherapyId, setManualEditableExistingSlotsByTherapyId] = useState<Record<string, Array<{ date: string; time: string }>>>({});
   const [triedSlotsByTherapyId, setTriedSlotsByTherapyId] = useState<Record<string, string[]>>({});
   const [weeklyValidationByTherapyId, setWeeklyValidationByTherapyId] = useState<Record<string, {
@@ -641,29 +648,38 @@ export function TeaPreReserva() {
   const manualGridByTherapyId = manualGridByTherapyIdData ?? EMPTY_MANUAL_GRID_BY_THERAPY_ID;
   useEffect(() => {
     if (!manualSelectedTherapyId) {
-      setManualSelectedSlots((prev) => (prev.length > 0 ? [] : prev));
       return;
     }
 
     const grid = manualGridByTherapyId[manualSelectedTherapyId];
     if (!grid?.days?.length) return;
 
-    setManualSelectedSlots((prev) => {
-      const next = prev.filter((selected) => {
+    setManualSelectedSlotsByTherapyId((prev) => {
+      const currentSelections = prev[manualSelectedTherapyId] || [];
+      if (currentSelections.length === 0) return prev;
+
+      let changed = false;
+
+      const nextSelections = currentSelections.filter((selected) => {
         const isExistingEditableSlot = (manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || [])
           .some((slot) => slot.date === selected.date && slot.time === selected.time);
         if (isExistingEditableSlot) return true;
 
         const day = grid.days.find((item: TeaManualGridDay) => item.date === selected.date);
         const slot = day?.slots?.find((item: TeaManualGridSlot) => item.time === selected.time);
-        return Boolean(slot && !slot.occupied && slot.selectable);
+        const keep = Boolean(slot && !slot.occupied && slot.selectable);
+        if (!keep) changed = true;
+        return keep;
       });
 
-      if (next.length === prev.length && next.every((item, index) => item.date === prev[index]?.date && item.time === prev[index]?.time)) {
+      if (!changed && nextSelections.length === currentSelections.length) {
         return prev;
       }
 
-      return next;
+      return {
+        ...prev,
+        [manualSelectedTherapyId]: nextSelections,
+      };
     });
   }, [manualEditableExistingSlotsByTherapyId, manualGridByTherapyId, manualSelectedTherapyId]);
   useEffect(() => {
@@ -1732,7 +1748,7 @@ export function TeaPreReserva() {
         time: slot.time,
         pitTherapyId: therapy.pitTherapyId,
         procedureName: therapy.procedureName,
-        professionalName: therapy.professionalName,
+        professionalName: slot.professionalName || therapy.professionalName || 'Profissional conforme disponibilidade',
       }));
     });
   }, [suggestionsByTherapyId, suggestionModalContext]);
@@ -1824,13 +1840,36 @@ export function TeaPreReserva() {
     if (!manualContext) return [];
     return manualContext.therapies.map((therapy) => ({
       value: therapy.pitTherapyId,
-      label: `${therapy.procedureName} • ${therapy.professionalName}`,
+      label: `${therapy.procedureName} • ${therapy.professionalName}${(manualSelectedSlotsByTherapyId[therapy.pitTherapyId] || []).length > 0 ? ` • ${(manualSelectedSlotsByTherapyId[therapy.pitTherapyId] || []).length} selecionada(s)` : ''}`,
     }));
-  }, [manualContext]);
+  }, [manualContext, manualSelectedSlotsByTherapyId]);
 
   const manualSelectedTherapy = useMemo(
     () => manualContext?.therapies.find((therapy) => therapy.pitTherapyId === manualSelectedTherapyId) || null,
     [manualContext, manualSelectedTherapyId],
+  );
+
+  const manualSelectedSlots = useMemo(
+    () => (manualSelectedTherapyId ? (manualSelectedSlotsByTherapyId[manualSelectedTherapyId] || []) : []),
+    [manualSelectedSlotsByTherapyId, manualSelectedTherapyId],
+  );
+
+  const manualSelectionsFromOtherTherapies = useMemo(
+    () => Object.entries(manualSelectedSlotsByTherapyId)
+      .filter(([therapyId]) => therapyId !== manualSelectedTherapyId)
+      .flatMap(([therapyId, slots]) => {
+        const durationMinutes = Math.max(
+          1,
+          Number(manualContext?.therapies.find((therapy) => therapy.pitTherapyId === therapyId)?.durationMinutes || 30),
+        );
+
+        return slots.map((slot) => ({
+          date: slot.date,
+          time: slot.time,
+          durationMinutes,
+        }));
+      }),
+    [manualContext?.therapies, manualSelectedSlotsByTherapyId, manualSelectedTherapyId],
   );
 
   const manualSelectedGrid = useMemo(
@@ -2051,7 +2090,7 @@ export function TeaPreReserva() {
     setManualWeekStart(dayjs().startOf('week').add(1, 'day').format('YYYY-MM-DD'));
     setManualSelectedTherapyId(firstTherapyId);
     setManualEditableExistingSlotsByTherapyId(existingSlotsByTherapy);
-    setManualSelectedSlots([]);
+    setManualSelectedSlotsByTherapyId({});
     setManualModalOpened(true);
   };
 
@@ -2155,7 +2194,7 @@ export function TeaPreReserva() {
 
       setManualModalOpened(false);
       setManualReservationDecisionState(null);
-      setManualSelectedSlots([]);
+      setManualSelectedSlotsByTherapyId({});
       await refreshPending();
     } catch (err: any) {
       showNotification({
@@ -2293,10 +2332,10 @@ export function TeaPreReserva() {
     setLoadingSuggestionsId(context.groupKey);
     try {
       const pickBestSuggestions = (
-        rawList: Array<{ date: string; time: string }>,
+        rawList: SuggestedSlot[],
         targetCount: number,
         therapy: GroupTherapyContext,
-      ): { list: Array<{ date: string; time: string }>; fallbackLevel: SuggestionFallbackLevel } => {
+      ): { list: SuggestedSlot[]; fallbackLevel: SuggestionFallbackLevel } => {
         if (targetCount <= 0) {
           return { list: [], fallbackLevel: 'preferred_day_and_shift' };
         }
@@ -2329,17 +2368,17 @@ export function TeaPreReserva() {
           return false;
         };
 
-        const getWeekdayPreferenceScore = (slot: { date: string; time: string }) => {
+        const getWeekdayPreferenceScore = (slot: SuggestedSlot) => {
           if (preferredWeekdaySet.size === 0) return 1;
           return preferredWeekdaySet.has(dayjs(slot.date).day()) ? 2 : 0;
         };
 
-        const getShiftPreferenceScore = (slot: { date: string; time: string }) => {
+        const getShiftPreferenceScore = (slot: SuggestedSlot) => {
           if (shiftTokenSet.size === 0) return 1;
           return isShiftMatch(slot.time) ? 2 : 0;
         };
 
-        const sortByPreference = (a: { date: string; time: string }, b: { date: string; time: string }) => {
+        const sortByPreference = (a: SuggestedSlot, b: SuggestedSlot) => {
           const weekdayScoreDiff = getWeekdayPreferenceScore(b) - getWeekdayPreferenceScore(a);
           if (weekdayScoreDiff !== 0) return weekdayScoreDiff;
 
@@ -2352,7 +2391,7 @@ export function TeaPreReserva() {
         };
 
         const fullPool = [...unique].sort(sortByPreference);
-        const slotsByWeekStart = new Map<string, Array<{ date: string; time: string }>>();
+        const slotsByWeekStart = new Map<string, SuggestedSlot[]>();
 
         fullPool.forEach((slot) => {
           const weekday = dayjs(slot.date).day();
@@ -2394,7 +2433,7 @@ export function TeaPreReserva() {
           })[0];
         const baseWeekStart = preferredWeek?.weekStart || sortedWeekStarts[0];
         const pool = (baseWeekStart ? (slotsByWeekStart.get(baseWeekStart) || []) : fullPool).slice().sort(sortByPreference);
-        const nearestPreferredWeekdayDistance = (slot: { date: string; time: string }) => {
+        const nearestPreferredWeekdayDistance = (slot: SuggestedSlot) => {
           if (preferredWeekdaySet.size === 0) return 0;
           const weekday = dayjs(slot.date).day();
           const distances = Array.from(preferredWeekdaySet).map((preferredWeekday) => {
@@ -2404,12 +2443,12 @@ export function TeaPreReserva() {
           return distances.length ? Math.min(...distances) : 7;
         };
 
-        const selectFromPool = (candidatePool: Array<{ date: string; time: string }>) => {
-          const selected: Array<{ date: string; time: string }> = [];
+        const selectFromPool = (candidatePool: SuggestedSlot[]) => {
+          const selected: SuggestedSlot[] = [];
           const usedSignatures = new Set<string>();
           const usedDates = new Set<string>();
 
-          const slotsByWeekday = new Map<number, Array<{ date: string; time: string }>>();
+          const slotsByWeekday = new Map<number, SuggestedSlot[]>();
           candidatePool.forEach((slot) => {
             const weekday = dayjs(slot.date).day();
             const list = slotsByWeekday.get(weekday) || [];
@@ -2484,7 +2523,8 @@ export function TeaPreReserva() {
       };
 
       const reservedDoctorSlots = new Map<string, Array<{ date: string; time: string; durationMinutes: number }>>();
-      const results: Array<{ pitTherapyId: string; list: Array<{ date: string; time: string }>; fallbackLevel: SuggestionFallbackLevel }> = [];
+      const reservedPatientSlots: Array<{ date: string; time: string; durationMinutes: number }> = [];
+      const results: Array<{ pitTherapyId: string; list: SuggestedSlot[]; fallbackLevel: SuggestionFallbackLevel }> = [];
 
       for (const therapy of context.therapies) {
           const weeklyFrequency = Math.max(1, Number(therapy.weeklyFrequency) || 1);
@@ -2516,6 +2556,13 @@ export function TeaPreReserva() {
               list: existingList,
               fallbackLevel: 'existing_slots',
             });
+            reservedPatientSlots.push(
+              ...existingList.map((slot) => ({
+                date: slot.date,
+                time: slot.time,
+                durationMinutes: Math.max(1, Number(therapy.durationMinutes || 30)),
+              })),
+            );
             continue;
           }
 
@@ -2526,16 +2573,21 @@ export function TeaPreReserva() {
             ...previousTried,
             ...existingSignatures,
           ]));
-          const doctorReservationKey = String(therapy.professionalName || '').trim().toLowerCase();
-          const doctorReservedSlots = reservedDoctorSlots.get(doctorReservationKey) || [];
           const data: any = await teaPreReservationService.getSuggestions(therapy.pitTherapyId, {
             daysAhead: options?.daysAhead || 90,
             limit: suggestionLimit,
             exclude,
           });
 
-          const rawList: Array<{ date: string; time: string }> = Array.isArray(data?.items) ? data.items : [];
-          const sortedList: Array<{ date: string; time: string }> = rawList
+          const rawList: SuggestedSlot[] = Array.isArray(data?.items)
+            ? data.items.map((item: any) => ({
+              date: String(item?.date || ''),
+              time: String(item?.time || ''),
+              professionalDoctorId: item?.doctorId ? String(item.doctorId) : null,
+              professionalName: item?.doctorName ? String(item.doctorName) : null,
+            }))
+            : [];
+          const sortedList: SuggestedSlot[] = rawList
             .sort((a, b) => {
               const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
               if (dateDiff !== 0) return dateDiff;
@@ -2543,31 +2595,58 @@ export function TeaPreReserva() {
             });
           const pickedSuggestions = pickBestSuggestions(sortedList, missingWeeklySlots, therapy);
           const list = pickedSuggestions.list
-            .filter((slot) => !doctorReservedSlots.some((reservedSlot) => (
-              doSlotsOverlap(
-                {
-                  date: slot.date,
-                  time: slot.time,
-                  durationMinutes: therapy.durationMinutes || 30,
-                },
-                reservedSlot,
-              )
-            )));
+            .filter((slot) => {
+              const patientHasConflict = reservedPatientSlots.some((reservedSlot) => (
+                doSlotsOverlap(
+                  {
+                    date: slot.date,
+                    time: slot.time,
+                    durationMinutes: therapy.durationMinutes || 30,
+                  },
+                  reservedSlot,
+                )
+              ));
+              if (patientHasConflict) return false;
 
-          if (doctorReservationKey) {
+              const doctorReservationKey = String(slot.professionalName || '').trim().toLowerCase();
+              const doctorReservedSlots = reservedDoctorSlots.get(doctorReservationKey) || [];
+              return !doctorReservedSlots.some((reservedSlot) => (
+                doSlotsOverlap(
+                  {
+                    date: slot.date,
+                    time: slot.time,
+                    durationMinutes: therapy.durationMinutes || 30,
+                  },
+                  reservedSlot,
+                )
+              ));
+            });
+
+          list.forEach((slot) => {
+            const doctorReservationKey = String(slot.professionalName || '').trim().toLowerCase();
+            if (!doctorReservationKey) return;
+
             const currentReserved = reservedDoctorSlots.get(doctorReservationKey) || [];
             reservedDoctorSlots.set(
               doctorReservationKey,
               [
                 ...currentReserved,
-                ...list.map((slot) => ({
+                {
                   date: slot.date,
                   time: slot.time,
                   durationMinutes: Math.max(1, Number(therapy.durationMinutes || 30)),
-                })),
+                },
               ],
             );
-          }
+          });
+
+          reservedPatientSlots.push(
+            ...list.map((slot) => ({
+              date: slot.date,
+              time: slot.time,
+              durationMinutes: Math.max(1, Number(therapy.durationMinutes || 30)),
+            })),
+          );
 
           results.push({
             pitTherapyId: therapy.pitTherapyId,
@@ -2576,7 +2655,7 @@ export function TeaPreReserva() {
           });
         }
 
-      const nextByTherapyId: Record<string, Array<{ date: string; time: string }>> = {};
+      const nextByTherapyId: Record<string, SuggestedSlot[]> = {};
       const nextFallbackByTherapyId: Record<string, SuggestionFallbackLevel> = {};
       results.forEach((result) => {
         nextByTherapyId[result.pitTherapyId] = result.list.filter(
@@ -2812,6 +2891,8 @@ export function TeaPreReserva() {
           suggestedDate: slot.date,
           suggestedTime: slot.time,
           durationMinutes: entry.therapy.durationMinutes || null,
+          professionalDoctorId: slot.professionalDoctorId || null,
+          professionalName: slot.professionalName || null,
         }))
       ));
       const weeks = getWeeksUntilYearEnd(payloadItems[0]?.suggestedDate);
@@ -3523,7 +3604,6 @@ export function TeaPreReserva() {
                 value={manualSelectedTherapyId}
                 onChange={(value) => {
                   setManualSelectedTherapyId(value);
-                  setManualSelectedSlots([]);
                 }}
               />
             </Group>
@@ -3572,22 +3652,34 @@ export function TeaPreReserva() {
                         // Keep only covered slots blocked; free the exact end boundary slot.
                         return currentMinutes > startMinutes && currentMinutes < endMinutes;
                       });
+                      const isBlockedByOtherTherapySelection = manualSelectionsFromOtherTherapies.some((selected) => (
+                        doSlotsOverlap(
+                          {
+                            date: day.date,
+                            time,
+                            durationMinutes: selectedDurationMinutes,
+                          },
+                          selected,
+                        )
+                      ));
                       const isExistingEditableSlot = !!manualSelectedTherapyId && (
                         manualEditableExistingSlotsByTherapyId[manualSelectedTherapyId] || []
                       ).some((selected) => selected.date === day.date && selected.time === time);
                       const canToggleExistingSlot = isExistingEditableSlot;
-                      const effectiveSelectable = ((!isOccupied && isSelectable) || canToggleExistingSlot) && !isBlockedBySelectedSession;
+                      const effectiveSelectable = ((!isOccupied && isSelectable) || canToggleExistingSlot)
+                        && !isBlockedBySelectedSession
+                        && !isBlockedByOtherTherapySelection;
                       const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
                       const canAddNewSelection = !reachedWeeklyLimit || isSelected;
                       const isFree = !isOccupied && effectiveSelectable && day.enabled;
                       const isUnavailable = !isOccupied && !isSelectable;
-                      const isBlocked = !isOccupied && isBlockedBySelectedSession;
+                      const isBlocked = !isOccupied && (isBlockedBySelectedSession || isBlockedByOtherTherapySelection);
                       const stateLabel = isSelected
                         ? 'Selecionado'
                         : isOccupied
                           ? 'Ocupado'
                           : isBlocked
-                            ? 'Bloqueado pela sessão selecionada'
+                            ? (isBlockedByOtherTherapySelection ? 'Bloqueado por outra terapia selecionada' : 'Bloqueado pela sessão selecionada')
                           : isFree
                             ? 'Livre'
                             : 'Indisponível';
@@ -3660,29 +3752,38 @@ export function TeaPreReserva() {
                               return;
                             }
 
-                            setManualSelectedSlots((prev) => {
+                            setManualSelectedSlotsByTherapyId((prev) => {
+                              if (!manualSelectedTherapyId) return prev;
+
+                              const currentSelections = prev[manualSelectedTherapyId] || [];
                               const toSignature = (slotItem: { date: string; time: string }) => `${slotItem.date}#${slotItem.time}`;
                               const anchorSlot = { date: day.date, time };
                               const anchorSignature = toSignature(anchorSlot);
-                              const prevSignatureSet = new Set(prev.map(toSignature));
+                              const prevSignatureSet = new Set(currentSelections.map(toSignature));
 
-                              const coveredAnchor = prev.find((slotItem) => (
+                              const coveredAnchor = currentSelections.find((slotItem) => (
                                 slotItem.date === day.date
                                 && isSlotCoveredBySession(day.slots, slotItem.time, time, selectedDurationMinutes)
                               ));
                               if (coveredAnchor) {
                                 const coveredAnchorSignature = toSignature(coveredAnchor);
-                                return prev.filter((slotItem) => toSignature(slotItem) !== coveredAnchorSignature);
+                                return {
+                                  ...prev,
+                                  [manualSelectedTherapyId]: currentSelections.filter((slotItem) => toSignature(slotItem) !== coveredAnchorSignature),
+                                };
                               }
 
                               // Toggle behavior: clicking an already selected start slot removes it.
                               if (prevSignatureSet.has(anchorSignature)) {
-                                return prev.filter((slotItem) => toSignature(slotItem) !== anchorSignature);
+                                return {
+                                  ...prev,
+                                  [manualSelectedTherapyId]: currentSelections.filter((slotItem) => toSignature(slotItem) !== anchorSignature),
+                                };
                               }
 
                               const anchorStartMinutes = timeToMinutes(anchorSlot.time);
                               const anchorEndMinutes = anchorStartMinutes + selectedDurationMinutes;
-                              const hasOverlap = prev.some((slotItem) => {
+                              const hasOverlap = currentSelections.some((slotItem) => {
                                 if (slotItem.date !== anchorSlot.date) return false;
                                 const existingStartMinutes = timeToMinutes(slotItem.time);
                                 const existingEndMinutes = existingStartMinutes + selectedDurationMinutes;
@@ -3698,7 +3799,7 @@ export function TeaPreReserva() {
                                 return prev;
                               }
 
-                              const merged = [...prev, anchorSlot];
+                              const merged = [...currentSelections, anchorSlot];
 
                               const normalizedMerged = merged.sort((a, b) => {
                                 const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
@@ -3717,7 +3818,10 @@ export function TeaPreReserva() {
                                 return prev;
                               }
 
-                              return normalizedMerged;
+                              return {
+                                ...prev,
+                                [manualSelectedTherapyId]: normalizedMerged,
+                              };
                             });
                           }}
                           style={{
@@ -3768,7 +3872,13 @@ export function TeaPreReserva() {
               <Group gap="xs">
                 <Button
                   className={getTeaActionButtonClass('secondary')}
-                  onClick={() => setManualSelectedSlots([])}
+                  onClick={() => {
+                    if (!manualSelectedTherapyId) return;
+                    setManualSelectedSlotsByTherapyId((prev) => ({
+                      ...prev,
+                      [manualSelectedTherapyId]: [],
+                    }));
+                  }}
                   disabled={manualSelectedSlots.length === 0 || manualSaving}
                 >
                   Limpar seleção
