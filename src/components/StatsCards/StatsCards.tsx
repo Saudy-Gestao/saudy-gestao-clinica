@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Paper, SimpleGrid, Text, Loader, Center, useMantineColorScheme } from '@mantine/core';
+import { Paper, SimpleGrid, Text, Skeleton, useMantineColorScheme, Stack } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import dayjs from 'dayjs';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
@@ -65,9 +65,25 @@ export function StatsCards() {
 
   if (loading) {
     return (
-      <Center h={200} mb={40}>
-        <Loader size="lg" />
-      </Center>
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg" mb={40}>
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Paper
+            key={index}
+            p="lg"
+            withBorder
+            shadow="none"
+            style={colorScheme === 'dark' ? {
+              backgroundColor: 'transparent',
+              borderColor: 'var(--mantine-color-default-border)',
+            } : undefined}
+          >
+            <Stack gap="sm">
+              <Skeleton height={14} width="45%" radius="xl" />
+              <Skeleton height={42} width="30%" radius="md" />
+            </Stack>
+          </Paper>
+        ))}
+      </SimpleGrid>
     );
   }
 

@@ -1,7 +1,6 @@
-import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme } from '@mantine/core';
+import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme, Skeleton, Stack } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import userService from '../../services/userService';
+import { useEffect, useMemo } from 'react';
 import {
   UserPlus,
   Calendar,
@@ -22,17 +21,23 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
+import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
-  const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
+  const { data: currentUser, isLoading, isFetching, refetch } = useCurrentUserProfileQuery();
 
-  const extractModulesFromAccesses = (accesses: any[]) => {
+  const extractAllowedModules = (user: any) => {
     const modules: string[] = [];
+    const accesses = Array.isArray(user?.accesses)
+      ? user.accesses
+      : Array.isArray(user?.access)
+        ? user.access
+        : [];
 
-    (accesses || []).forEach((access: any) => {
+    accesses.forEach((access: any) => {
       (access.modules || []).forEach((module: any) => {
         if (module?.name && !modules.includes(module.name)) {
           modules.push(module.name);
@@ -40,86 +45,92 @@ export function WorkflowSections() {
       });
     });
 
+    (Array.isArray(user?.modules) ? user.modules : []).forEach((module: any) => {
+      const moduleName = typeof module === 'string' ? module : module?.name;
+      if (moduleName && !modules.includes(moduleName)) {
+        modules.push(moduleName);
+      }
+    });
+
     return modules;
   };
 
-  const fetchUserModules = async () => {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      setAllowedModules([]);
-      return;
-    }
+  const allowedModules = useMemo(
+    () => extractAllowedModules(currentUser),
+    [currentUser],
+  );
 
-    try {
-      const user = JSON.parse(userStr);
-      if (!user?.id) {
-        setAllowedModules([]);
-        return;
-      }
-
-      const freshUser = await userService.getUser(user.id);
-      localStorage.setItem('user', JSON.stringify(freshUser));
-      setAllowedModules(extractModulesFromAccesses(freshUser.accesses || []));
-    } catch (error) {
-      try {
-        const cachedUser = JSON.parse(userStr);
-        setAllowedModules(extractModulesFromAccesses(cachedUser.accesses || []));
-      } catch {
-        setAllowedModules([]);
-      }
-    }
-  };
+  const hasResolvedAccessData = useMemo(() => {
+    const user = currentUser as any;
+    return Array.isArray(user?.accesses) || Array.isArray(user?.access) || Array.isArray(user?.modules);
+  }, [currentUser]);
 
   useEffect(() => {
-    fetchUserModules();
+    if (currentUser) {
+      localStorage.setItem('user', JSON.stringify(currentUser));
+    }
+  }, [currentUser]);
 
+  useEffect(() => {
     const onUserUpdated = () => {
-      fetchUserModules();
+      refetch();
     };
 
+    window.addEventListener('auth:changed', onUserUpdated);
     window.addEventListener('auth:user-updated', onUserUpdated);
 
     return () => {
+      window.removeEventListener('auth:changed', onUserUpdated);
       window.removeEventListener('auth:user-updated', onUserUpdated);
     };
-  }, []);
+  }, [refetch]);
 
   const sections = [
     {
-      title: 'Fluxo do Paciente',
+      title: 'Jornada do Paciente',
       items: [
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
         { icon: CalendarCheck, label: 'Pré-agendamento', desc: 'Pré-autorização e documentos', route: '/pre-agendamento', moduleName: 'pre-agendamento' },
-        { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Recepção e cadastro', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
+        { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Check-in, checklist e recepção', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
       ]
     },
     {
-      title: 'Suporte Clínico',
+      title: 'Operação Clínica',
       items: [
         { icon: Stethoscope, label: 'Consulta', desc: 'Atendimento médico', route: '/consulta', moduleName: 'consulta' },
         { icon: ClipboardCheck, label: 'Execução de Exames', desc: 'Triagem e andamento do exame', route: '/execucao-exames', moduleName: 'execucao-exames' },
         { icon: FileText, label: 'Laudo por Exame', desc: 'Fila com editor de laudo', route: '/laudo-exames', moduleName: 'laudo' },
-        { icon: FileText, label: 'Configurações de Laudo', desc: 'Padrões e frases', route: '/laudo-configuracoes', moduleName: 'laudo' },
         { icon: ShieldCheck, label: 'Autorização Convênio', desc: 'Autorizações pendentes', route: '/autorizacao-convenio', moduleName: 'autorizacao-convenio' },
         { icon: Brain, label: 'Módulo TEA', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
       ]
     },
     {
-      title: 'Administrativo',
+      title: 'Cadastros Clínicos',
+      items: [
+        { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente', moduleName: 'cadastro-paciente' },
+        { icon: UserPlus, label: 'Cadastro de Médico', desc: 'Registro de médicos', route: '/cadastro-medico', moduleName: 'cadastro-medico' },
+        { icon: ClipboardList, label: 'Cadastro de Procedimentos', desc: 'Procedimentos e modalidades', route: '/cadastro-procedimento', moduleName: 'cadastro-procedimento' },
+        { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio', moduleName: 'cadastro-convenio' },
+        { icon: Warehouse, label: 'Cadastro de Salas', desc: 'Salas por filial', route: '/cadastro-sala', moduleName: 'cadastro-sala' },
+        { icon: ScanLine, label: 'Cadastro de Equipamentos', desc: 'Modalidades e DICOM', route: '/cadastro-equipamento', moduleName: 'cadastro-equipamento' },
+        { icon: ClipboardPenLine, label: 'Cadastro de Anamnese', desc: 'Perguntas por procedimento', route: '/cadastro-anamnese', moduleName: 'cadastro-anamnese' },
+        { icon: ClipboardCheck, label: 'Cadastro de Enfermagem', desc: 'Triagens por procedimento', route: '/cadastro-enfermagem', moduleName: 'cadastro-enfermagem' },
+        { icon: FileText, label: 'Configurações de Laudo', desc: 'Padrões, frases e parâmetros', route: '/laudo-configuracoes', moduleName: 'laudo' },
+      ]
+    },
+    {
+      title: 'Gestão e Apoio',
       items: [
         { icon: Package, label: 'Entrega', desc: 'Controle de entregas', route: '/entrega', moduleName: 'entrega' },
         { icon: Warehouse, label: 'Estoque', desc: 'Materiais e insumos', route: '/estoque', moduleName: 'estoque' },
         { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira', route: '/financeiro', moduleName: 'financeiro' },
         { icon: DollarSign, label: 'Faturamento', desc: 'Cobranças e NFs', route: '/faturamento', moduleName: 'faturamento' },
-        { icon: MessageCircle, label: 'WhatsApp', desc: 'Notificações e configurações', route: '/whatsapp', moduleName: 'whatsapp-config' },
-        { icon: UserPlus, label: 'Cadastro de Médico', desc: 'Registro de médicos', route: '/cadastro-medico', moduleName: 'cadastro-medico' },
-        { icon: ClipboardList, label: 'Cadastro de Procedimentos', desc: 'Procedimentos e modalidades', route: '/cadastro-procedimento', moduleName: 'cadastro-procedimento' },
-        { icon: FileText, label: 'Cadastro de Convênio', desc: 'Convênios aceitos', route: '/cadastro-convenio', moduleName: 'cadastro-convenio' },
-        { icon: UserPlus, label: 'Cadastro de Paciente', desc: 'Registro de pacientes', route: '/cadastro-paciente', moduleName: 'cadastro-paciente' },
-        { icon: Warehouse, label: 'Cadastro de Salas', desc: 'Salas por filial', route: '/cadastro-sala', moduleName: 'cadastro-sala' },
-        { icon: ScanLine, label: 'Cadastro de Equipamentos', desc: 'Modalidades e DICOM', route: '/cadastro-equipamento', moduleName: 'cadastro-equipamento' },
-        { icon: ClipboardPenLine, label: 'Cadastro de Anamnese', desc: 'Perguntas por procedimento', route: '/cadastro-anamnese', moduleName: 'cadastro-anamnese' },
-        { icon: ClipboardCheck, label: 'Cadastro de Enfermagem', desc: 'Triagens por procedimento', route: '/cadastro-enfermagem', moduleName: 'cadastro-enfermagem' },
+      ]
+    },
+    {
+      title: 'Comunicação',
+      items: [
+        { icon: MessageCircle, label: 'WhatsApp', desc: 'Mensagens, templates e configuração', route: '/whatsapp', moduleName: 'whatsapp-config' },
       ]
     }
   ];
@@ -134,7 +145,41 @@ export function WorkflowSections() {
 
   return (
     <>
-      {allowedModules.length === 0 ? (
+      {(isLoading && !currentUser) || (isFetching && !hasResolvedAccessData) ? (
+        <Box py="xl">
+          <Stack gap="xl">
+            {Array.from({ length: 3 }).map((_, sectionIndex) => (
+              <Box key={sectionIndex}>
+                <Skeleton height={22} width={180} radius="xl" mb="md" />
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+                  {Array.from({ length: 4 }).map((__, cardIndex) => (
+                    <Paper
+                      key={cardIndex}
+                      p="xs"
+                      withBorder
+                      style={{
+                        borderColor: 'var(--mantine-color-default-border)',
+                        minHeight: 60,
+                      }}
+                    >
+                      <Group justify="space-between" align="flex-start">
+                        <Group gap="xs" align="flex-start">
+                          <Skeleton height={32} width={32} radius="md" />
+                          <Box>
+                            <Skeleton height={14} width={120} radius="xl" mb={6} />
+                            <Skeleton height={11} width={90} radius="xl" />
+                          </Box>
+                        </Group>
+                        <Skeleton height={14} width={14} radius="xl" />
+                      </Group>
+                    </Paper>
+                  ))}
+                </SimpleGrid>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      ) : allowedModules.length === 0 ? (
         <Box p="xl" style={{ textAlign: 'center' }}>
           <Text size="lg" c="dimmed" mb="xs">
             🔒 Você ainda não possui acessos configurados

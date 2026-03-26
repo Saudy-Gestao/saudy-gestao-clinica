@@ -1,9 +1,9 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, Popover, ActionIcon, Select, Textarea, Paper, Loader, Menu, Switch } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, Popover, ActionIcon, Paper, Menu, Switch, Skeleton, Badge } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, Calendar as CalendarIcon, MoreVertical, Settings } from 'lucide-react';
+import { Plus, ChevronLeft, Calendar as CalendarIcon, MoreVertical, Settings } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -15,6 +15,9 @@ import { formatDateInput, isValidCPF } from '../../utils/formatters';
 import { useDeliveriesQuery } from '../../hooks/useDeliveriesQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 
 interface DeliveryRow {
   id: string;
@@ -117,21 +120,31 @@ export function Entrega() {
     });
   }, [deliveriesError, patientsError]);
 
-  const patientOptions = useMemo(() => patients.map((p: any) => {
+  const patientsList = useMemo<any[]>(() => {
+    if (Array.isArray(patients)) return patients;
+    if (Array.isArray((patients as any)?.patients)) return (patients as any).patients;
+    if (Array.isArray((patients as any)?.items)) return (patients as any).items;
+    if (Array.isArray((patients as any)?.results)) return (patients as any).results;
+    if (Array.isArray((patients as any)?.data?.patients)) return (patients as any).data.patients;
+    if (Array.isArray((patients as any)?.data)) return (patients as any).data;
+    return [];
+  }, [patients]);
+
+  const patientOptions = useMemo(() => patientsList.map((p: any) => {
     const id = String(p.id ?? p.patientId ?? '');
     const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
     const label = name || 'Paciente';
     return { value: id || label, label };
-  }), [patients]);
+  }), [patientsList]);
 
   const patientById = useMemo<Record<string, any>>(() => {
     const byId: Record<string, any> = {};
-    patients.forEach((p: any) => {
+    patientsList.forEach((p: any) => {
       const id = String(p.id ?? p.patientId ?? '');
       if (id) byId[id] = p;
     });
     return byId;
-  }, [patients]);
+  }, [patientsList]);
 
   const formatDate = (d: Date | null) => {
     if (!d) return '';
@@ -431,14 +444,12 @@ export function Entrega() {
         {/* Search and Button Section */}
         <Box mb={isMobile ? 20 : 30}>
           <Group gap="md" align="flex-end">
-            <TextInput
-              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente..'}
-              leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
+            <FloatingInput
+              label="Buscar entregas"
+              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente...'}
               value={query}
               onChange={(e) => setQuery(e.currentTarget.value)}
-              radius="md"
-              size={isMobile ? 'sm' : 'md'}
-              style={{ flex: 1 }}
+              containerProps={{ style: { flex: 1 } }}
             />
             <Button
               bg={DARK_BLUE}
@@ -456,10 +467,16 @@ export function Entrega() {
 
         <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
           {rowsLoading ? (
-            <Paper style={{ padding: 24, textAlign: 'center' }}>
-              <Loader />
-              <Text mt={8}>Carregando entregas...</Text>
-            </Paper>
+            <Stack p="md" gap="sm">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Paper key={index} withBorder radius="md" p="md">
+                  <Stack gap="sm">
+                    <Skeleton height={20} width="35%" radius="xl" />
+                    <Skeleton height={16} width="20%" radius="xl" />
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
           ) : (
             <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
               <Table.Thead>
@@ -476,7 +493,7 @@ export function Entrega() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filtered.map((r) => (
+                {filtered.length > 0 ? filtered.map((r) => (
                   <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                     <Table.Td>
                       <Group gap={isMobile ? 'xs' : 'sm'}>
@@ -508,7 +525,9 @@ export function Entrega() {
                     )}
 
                     <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{formatStatus(r.status)}</Text>
+                      <Badge variant="light" color={String(r.status).toUpperCase().includes('ENTREGUE') ? 'green' : 'blue'} radius="xl">
+                        {formatStatus(r.status)}
+                      </Badge>
                     </Table.Td>
 
                     {!isTablet && (
@@ -547,7 +566,18 @@ export function Entrega() {
                       </Menu>
                     </Table.Td>
                   </Table.Tr>
-                ))}
+                )) : (
+                  <Table.Tr>
+                    <Table.Td colSpan={isTablet ? 4 : 8}>
+                      <Stack align="center" py="xl" gap={6}>
+                        <Text fw={600}>Nenhuma entrega encontrada</Text>
+                        <Text c="dimmed" size="sm" ta="center">
+                          Registre uma nova entrega ou ajuste a busca para localizar um item.
+                        </Text>
+                      </Stack>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
               </Table.Tbody>
             </Table>
           )}
@@ -570,9 +600,8 @@ export function Entrega() {
           <Box style={{ padding: 8 }}>
 
             <Box style={{ marginBottom: 8 }}>
-              <Select
+              <FloatingSelect
                 label="Paciente"
-                wrapperProps={{ 'data-required': true }}
                 data={patientOptions}
                 placeholder={patientsLoading ? 'Carregando pacientes...' : 'Paciente'}
                 value={form.paciente}
@@ -587,9 +616,8 @@ export function Entrega() {
             </Box>
 
             <Box style={{ marginBottom: 8 }}>
-              <Select
+              <FloatingSelect
                 label="Tipo de documento"
-                wrapperProps={{ 'data-required': true }}
                 data={[{ value: 'laudo', label: 'Laudo' }, { value: 'exame', label: 'Exame' }, { value: 'relatorio', label: 'Relatório' }, { value: 'outro', label: 'Outro' }]}
                 placeholder="Tipo de documento"
                 value={form.tipoDocumento}
@@ -603,7 +631,8 @@ export function Entrega() {
               <Text size="sm" mb={6}>Data disponível</Text>
               <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
                 <Popover.Target>
-                  <TextInput
+                  <FloatingInput
+                    label="Data disponível"
                     placeholder="dd/mm/yyyy"
                     value={dateInput}
                     onChange={(e) => {
@@ -619,6 +648,7 @@ export function Entrega() {
                       </ActionIcon>
                     }
                     error={fieldErrors.dataDisponivel}
+                    alwaysFloatLabel
                   />
                 </Popover.Target>
                 <Popover.Dropdown style={{ padding: 8 }}>
@@ -628,7 +658,7 @@ export function Entrega() {
             </Box>
 
             <Box style={{ marginBottom: 8 }}>
-              <Textarea placeholder="Descrição/Conteúdo" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.currentTarget.value })} minRows={3} />
+              <FloatingTextarea label="Descrição" placeholder="Descrição/Conteúdo" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.currentTarget.value })} minRows={3} />
             </Box>
 
             <Group justify="flex-end" mt={8}>
@@ -657,7 +687,8 @@ export function Entrega() {
             <Text fw={600} mb={8}>{deliverTarget?.nomeCompleto || '-'}</Text>
 
             <Box style={{ marginBottom: 8 }}>
-              <TextInput
+              <FloatingInput
+                label="Nome de quem recebeu"
                 placeholder="Nome de quem recebeu"
                 value={deliverToName}
                 onChange={(e) => setDeliverToName(e.currentTarget.value)}
@@ -665,7 +696,8 @@ export function Entrega() {
             </Box>
 
             <Box style={{ marginBottom: 8 }}>
-              <TextInput
+              <FloatingInput
+                label="CPF de quem recebeu"
                 placeholder="CPF de quem recebeu"
                 value={deliverToCpf}
                 onChange={(e) => setDeliverToCpf(e.currentTarget.value)}

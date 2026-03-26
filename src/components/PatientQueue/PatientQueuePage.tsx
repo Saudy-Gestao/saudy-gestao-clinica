@@ -1,5 +1,5 @@
-import { Box, Group, Stack, Text, ActionIcon } from '@mantine/core';
-import { ArrowLeft } from 'lucide-react';
+import { Box, Group, Text, ActionIcon } from '@mantine/core';
+import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { PatientQueue } from './PatientQueue';
@@ -12,24 +12,18 @@ export function PatientQueuePage() {
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         <Group mb={30} justify="space-between" align="center">
-          <Group gap="lg" align="center">
-            <ActionIcon
-              size={56}
-              radius="md"
-              variant="light"
-              color="blue"
-              onClick={() => navigate('/dashboard')}
-            >
-              <ArrowLeft size={28} />
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ChevronLeft size={28} />
             </ActionIcon>
-            <Stack gap={2}>
-              <Text size="2rem" fw={700} c="white">
+            <Box>
+              <Text fw={600} size="lg" c="var(--mantine-color-text)">
                 Fila de Atendimento
               </Text>
-              <Text c="#8fa6dc" size="lg">
+              <Text size="sm" c="dimmed">
                 Visualização completa dos pacientes aguardando chamada na recepção.
               </Text>
-            </Stack>
+            </Box>
           </Group>
         </Group>
 

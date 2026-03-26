@@ -6,9 +6,6 @@ import {
   Group,
   Text,
   Button,
-  Select,
-  TextInput,
-  Textarea,
   Stack,
   Checkbox,
   Paper,
@@ -16,17 +13,19 @@ import {
   Divider,
   Transition,
   ActionIcon,
-  Loader,
   Badge,
   SimpleGrid,
+  Skeleton,
   useMantineColorScheme,
+  Modal,
+  Tabs,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { DateInput } from '@mantine/dates';
 import { ChevronLeft, Brain, Pencil, Search, Plus, Trash2, ClipboardList, Activity, BarChart3, Users } from 'lucide-react';
 import dayjs from 'dayjs';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
+import { TeaHome } from './TeaHome';
 import teaProfileService from '../../services/teaProfileService';
 import { DARK_BLUE } from '../../themes/theme';
 import { onlyDigits, formatCPF, isValidCPF, isValidEmail, normalizeEmail, parseApiDateToLocalDate } from '../../utils/formatters';
@@ -36,6 +35,10 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaPlansQuery } from '../../hooks/useTeaPlansQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
+import { FloatingDateInput } from '../common/FloatingDateInput';
 
 type Gender = 'MALE' | 'FEMALE' | 'OTHER' | '';
 export type TeaSubmodule = 'cadastro' | 'pacientes' | 'plano' | 'evolucao' | 'relatorios';
@@ -138,31 +141,6 @@ function mapGender(value: any): Gender {
   return '';
 }
 
-function formatBirthDateInput(value: string): string {
-  const digits = onlyDigits(value).slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-}
-
-function parseBirthDateInput(value: string): Date | null {
-  const parts = value.split('/');
-  if (parts.length !== 3) return null;
-
-  const day = Number(parts[0]);
-  const month = Number(parts[1]);
-  const year = Number(parts[2]);
-  if (!Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year)) return null;
-
-  const date = new Date(year, month - 1, day);
-  const isValid =
-    date.getFullYear() === year
-    && date.getMonth() === month - 1
-    && date.getDate() === day;
-
-  return isValid ? date : null;
-}
-
 export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -189,7 +167,6 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const activeModuleBorder = colorScheme === 'dark' ? '#3a5392' : 'var(--mantine-color-indigo-6)';
 
   const [form, setForm] = useState<TeaForm>(INITIAL_FORM);
-  const [birthDateInput, setBirthDateInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [teaSearch, setTeaSearch] = useState('');
@@ -197,6 +174,9 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState<PlanForm>(INITIAL_PLAN_FORM);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [cadastroModalOpened, setCadastroModalOpened] = useState(Boolean(forcedSubmodule === 'cadastro'));
+  const [cadastroTab, setCadastroTab] = useState<string>('patient');
+  const [profileTeaEnabled, setProfileTeaEnabled] = useState(false);
 
   const { data: patientsData, isLoading: patientsLoading, error: patientsError } = usePatientsAdminQuery();
   const { data: doctorsData, isLoading: loadingDoctors, error: doctorsError } = useDoctorsAdminQuery();
@@ -270,8 +250,10 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   );
 
   useEffect(() => {
-    setBirthDateInput(form.birthDate ? dayjs(form.birthDate).format('DD/MM/YYYY') : '');
-  }, [form.birthDate]);
+    if (activeSubmodule === 'cadastro') {
+      setCadastroModalOpened(true);
+    }
+  }, [activeSubmodule]);
   const doctorOptions = useMemo(() => {
     const list: any[] = Array.isArray(doctorsData)
       ? doctorsData
@@ -392,6 +374,11 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   }, [forcedSubmodule]);
 
   useEffect(() => {
+    if (isStandaloneSubmodule) {
+      setEnteredShell(true);
+      setEnteredForm(true);
+      return;
+    }
     const shellDelay = isFromModuleHub ? 120 : 40;
     const formDelay = isFromModuleHub ? 320 : 180;
     const shellTimer = window.setTimeout(() => setEnteredShell(true), shellDelay);
@@ -400,7 +387,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       window.clearTimeout(shellTimer);
       window.clearTimeout(formTimer);
     };
-  }, [isFromModuleHub]);
+  }, [isFromModuleHub, isStandaloneSubmodule]);
 
   const handleSelectPatient = (value: string | null) => {
     setSelectedPatientId(value);
@@ -421,6 +408,19 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       healthInsuranceName: String(p.healthInsuranceName || '').trim() || PARTICULAR_INSURANCE_VALUE,
       healthInsuranceNumber: String(p.healthInsuranceNumber || ''),
     }));
+  };
+
+  const handleCloseCadastroModal = () => {
+    setCadastroModalOpened(false);
+    navigate('/tea');
+  };
+
+  const handleProfileCheckboxChange = (checked: boolean) => {
+    setProfileTeaEnabled(checked);
+    setForm((prev) => ({ ...prev, isActive: checked }));
+    if (!checked) {
+      setCadastroTab('patient');
+    }
   };
 
   const handleSave = async () => {
@@ -470,7 +470,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
           healthInsuranceName: normalizedInsuranceName || undefined,
           healthInsuranceNumber: isParticular ? undefined : (form.healthInsuranceNumber.trim() || undefined),
         },
-        tea: {
+        tea: profileTeaEnabled || selectedTeaProfileId ? {
           supportLevel: form.supportLevel || undefined,
           communicationProfile: form.communicationProfile || undefined,
           sensoryProfile: form.sensoryProfile || undefined,
@@ -483,7 +483,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
           familyGuidance: form.familyGuidance || undefined,
           schoolNotes: form.schoolNotes || undefined,
           isActive: form.isActive,
-        },
+        } : undefined,
       };
 
       const saved: any = await teaProfileService.upsert(payload);
@@ -506,6 +506,9 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         queryClient.invalidateQueries({ queryKey: queryKeys.patientsAdmin }),
         queryClient.invalidateQueries({ queryKey: queryKeys.teaProfiles }),
       ]);
+
+      setCadastroModalOpened(false);
+      navigate('/tea');
     } catch (err: any) {
       const details = err?.response?.data?.fields
         ? Object.values(err.response.data.fields).join(' | ')
@@ -526,6 +529,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
     setSelectedPatientId(patientId || item?.patientId || patient?.id || null);
     setSelectedTeaProfileId(teaProfileId || item?.id || null);
+    setProfileTeaEnabled(true);
     setForm({
       patientName: String(patient.name || ''),
       patientCpf: String(patient.cpf || ''),
@@ -550,6 +554,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   useEffect(() => {
     if (!locationState?.prefillTeaProfile) return;
     applyTeaProfileToForm(locationState.prefillTeaProfile, locationState.prefillPatientId, locationState.prefillTeaProfileId);
+    setCadastroTab('profile');
   }, [locationState?.prefillTeaProfile, locationState?.prefillPatientId, locationState?.prefillTeaProfileId]);
 
   const handleEditTeaProfile = (row: TeaProfileRow) => {
@@ -598,7 +603,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   }> = [
     {
       key: 'cadastro',
-      label: 'Cadastro TEA',
+      label: 'Vincular Paciente',
       description: 'Paciente base + perfil TEA',
       icon: Brain,
       enabled: true,
@@ -632,6 +637,191 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       enabled: false,
     },
   ];
+
+  const cadastroModal = (
+    <Modal
+      opened={cadastroModalOpened}
+      onClose={handleCloseCadastroModal}
+      title="Conversão de Pacientes"
+      size={900}
+      centered
+      styles={{ body: { paddingTop: 24 } }}
+    >
+      <Tabs value={cadastroTab} onChange={(value) => setCadastroTab(value || 'patient')}>
+        <Tabs.List>
+          <Tabs.Tab value="patient">Dados do Paciente</Tabs.Tab>
+          <Tabs.Tab value="profile" disabled={!profileTeaEnabled}>Perfil TEA</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="patient" pt="md">
+          <Stack gap="md">
+            <FloatingSelect
+              label="Nome"
+              placeholder={patientsLoading ? 'Carregando pacientes...' : 'Buscar paciente por nome/CPF'}
+              data={patientOptions}
+              value={selectedPatientId}
+              onChange={handleSelectPatient}
+              searchable
+              clearable
+              disabled={patientsLoading}
+              nothingFoundMessage="Nenhum paciente encontrado"
+              alwaysFloatLabel
+            />
+
+            <Group grow align="flex-start">
+              <FloatingInput
+                label="CPF"
+                placeholder="XXX.XXX.XXX-XX"
+                value={form.patientCpf}
+                onChange={(e) => setTeaField('patientCpf', formatCPF(onlyDigits(e.currentTarget.value).slice(0, 11)))}
+                alwaysFloatLabel
+              />
+              <FloatingDateInput
+                label="Data de nascimento"
+                value={form.birthDate}
+                onChange={(value) => setTeaField('birthDate', value)}
+                valueFormat="DD/MM/YYYY"
+                placeholder="dd/mm/aaaa"
+              />
+            </Group>
+
+            <Group grow align="flex-start">
+              <FloatingSelect
+                label="Gênero"
+                value={form.gender}
+                onChange={(value) => setForm((prev) => ({ ...prev, gender: (value as Gender) || '' }))}
+                data={[
+                  { value: 'MALE', label: 'Masculino' },
+                  { value: 'FEMALE', label: 'Feminino' },
+                  { value: 'OTHER', label: 'Outro' },
+                ]}
+                alwaysFloatLabel
+              />
+              <FloatingInput
+                label="Celular"
+                placeholder="(xx) xxxxx-xxxx"
+                value={form.cellphone}
+                onChange={(e) => setTeaField('cellphone', e.currentTarget.value)}
+                alwaysFloatLabel
+              />
+            </Group>
+
+            <FloatingSelect
+              label="Status"
+              value={form.isActive ? 'Em avaliação' : 'Inativo'}
+              data={[
+                { value: 'Em avaliação', label: 'Em avaliação' },
+                { value: 'Inativo', label: 'Inativo' },
+              ]}
+              onChange={(value) => setTeaField('isActive', value !== 'Inativo')}
+              alwaysFloatLabel
+            />
+
+            <Divider label="Responsável" labelPosition="left" />
+            <Group grow align="flex-start">
+              <FloatingInput label="Nome do Responsável" placeholder="Nome do responsável" alwaysFloatLabel />
+              <FloatingInput
+                label="E-mail"
+                placeholder="xxxxxx@xxxxx.xxx"
+                value={form.email}
+                onChange={(e) => setTeaField('email', e.currentTarget.value)}
+                alwaysFloatLabel
+              />
+            </Group>
+            <Group grow align="flex-start">
+              <FloatingInput label="Telefone" placeholder="(xx) xxxxx-xxxx" alwaysFloatLabel />
+              <Box />
+            </Group>
+
+            <Divider label="Convênio" labelPosition="left" />
+            <Group grow align="flex-start">
+              <FloatingSelect
+                label="Convênio"
+                placeholder={loadingInsurances ? 'Carregando convênios...' : 'Selecione'}
+                clearable={false}
+                data={insuranceSelectOptions}
+                value={form.healthInsuranceName}
+                onChange={(value) => {
+                  const nextValue = value || PARTICULAR_INSURANCE_VALUE;
+                  setTeaField('healthInsuranceName', nextValue);
+                  if (nextValue === PARTICULAR_INSURANCE_VALUE) {
+                    setTeaField('healthInsuranceNumber', '');
+                  }
+                }}
+                disabled={loadingInsurances}
+                alwaysFloatLabel
+              />
+              <FloatingInput
+                label="Número do Convênio"
+                value={form.healthInsuranceNumber}
+                disabled={form.healthInsuranceName === PARTICULAR_INSURANCE_VALUE}
+                onChange={(e) => setTeaField('healthInsuranceNumber', e.currentTarget.value)}
+                alwaysFloatLabel
+              />
+            </Group>
+
+            <Checkbox
+              label="Perfil TEA"
+              checked={profileTeaEnabled}
+              onChange={(e) => handleProfileCheckboxChange(e.currentTarget.checked)}
+            />
+
+            <Group justify="flex-end">
+              <Button variant="default" onClick={handleCloseCadastroModal}>Cancelar</Button>
+              <Button variant="light" color="indigo" disabled={!profileTeaEnabled} onClick={() => setCadastroTab('profile')}>
+                Continuar
+              </Button>
+              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>
+                Salvar
+              </Button>
+            </Group>
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="profile" pt="md">
+          <Stack gap="md">
+            <FloatingSelect
+              label="Nível de Suporte TEA"
+              placeholder="Selecione"
+              value={form.supportLevel}
+              onChange={(value) => setForm((prev) => ({ ...prev, supportLevel: value || '' }))}
+              data={[
+                { value: 'Nível 1', label: 'Nível 1 (necessita de apoio)' },
+                { value: 'Nível 2', label: 'Nível 2 (apoio substancial)' },
+                { value: 'Nível 3', label: 'Nível 3 (apoio muito substancial)' },
+              ]}
+              clearable
+              alwaysFloatLabel
+            />
+
+            <FloatingTextarea label="Perfil de Comunicação" minRows={2} value={form.communicationProfile} onChange={(e) => setTeaField('communicationProfile', e.currentTarget.value)} />
+            <FloatingTextarea label="Perfil Sensorial" minRows={2} value={form.sensoryProfile} onChange={(e) => setTeaField('sensoryProfile', e.currentTarget.value)} />
+            <FloatingTextarea label="Comportamentos Observados" minRows={2} value={form.behaviorNotes} onChange={(e) => setTeaField('behaviorNotes', e.currentTarget.value)} />
+            <FloatingInput label="Comorbidades (separadas por vírgula)" value={form.comorbiditiesInput} onChange={(e) => setTeaField('comorbiditiesInput', e.currentTarget.value)} alwaysFloatLabel />
+            <FloatingTextarea label="Objetivos Terapêuticos" minRows={2} value={form.therapeuticGoals} onChange={(e) => setTeaField('therapeuticGoals', e.currentTarget.value)} />
+            <FloatingTextarea label="Orientações para Família" minRows={2} value={form.familyGuidance} onChange={(e) => setTeaField('familyGuidance', e.currentTarget.value)} />
+            <FloatingTextarea label="Anotações Escola" minRows={2} value={form.schoolNotes} onChange={(e) => setTeaField('schoolNotes', e.currentTarget.value)} />
+
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setCadastroTab('patient')}>Cancelar</Button>
+              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving || !profileTeaEnabled}>
+                Salvar
+              </Button>
+            </Group>
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
+    </Modal>
+  );
+
+  if (forcedSubmodule === 'cadastro') {
+    return (
+      <>
+        <TeaHome />
+        {cadastroModal}
+      </>
+    );
+  }
 
   const handleCreatePlan = async () => {
     if (!selectedTeaProfileId) {
@@ -704,292 +894,132 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         <Transition mounted={enteredShell} transition={isFromModuleHub ? 'pop' : 'fade-up'} duration={isFromModuleHub ? 300 : 240} timingFunction="ease">
           {(styles) => (
             <Box style={styles}>
-              <Paper
-                p="md"
-                mb="md"
-                bg={shellBg}
-                style={{
-                  border: `1px solid ${cardBorder}`,
-                  borderRadius: 12,
-                }}
-              >
-                {!isStandaloneSubmodule && <Text size="xs" c="dimmed" mb="xs">Submódulos TEA</Text>}
-                {!isStandaloneSubmodule && <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="xs">
-                  {submodules.map((module) => {
-                    const Icon = module.icon;
-                    const active = activeSubmodule === module.key;
-                    return (
-                      <Paper
-                        key={module.key}
-                        p="xs"
-                        withBorder
-                        className={colorScheme === 'dark' ? 'module-card-dark' : undefined}
-                        style={{
-                          cursor: module.enabled ? 'pointer' : 'not-allowed',
-                          opacity: module.enabled ? 1 : 0.6,
-                          borderColor: active ? activeModuleBorder : 'var(--mantine-color-default-border)',
-                          background: active ? activeModuleBg : undefined,
-                        }}
-                        onClick={() => {
-                          if (!module.enabled) return;
-                          setActiveSubmodule(module.key);
-                        }}
-                      >
-                        <Group gap={8} wrap="nowrap" align="flex-start">
-                          <ThemeIcon size="sm" variant={active ? 'filled' : 'light'} color="indigo">
-                            <Icon size={12} />
-                          </ThemeIcon>
-                          <Box>
-                            <Text size="xs" fw={600}>{module.label}</Text>
-                            <Text size="10px" c="dimmed" lh={1.2}>{module.description}</Text>
-                          </Box>
-                        </Group>
-                      </Paper>
-                    );
-                  })}
-                </SimpleGrid>}
-              </Paper>
+              {!isStandaloneSubmodule && (
+                <Paper
+                  p="md"
+                  mb="md"
+                  bg={shellBg}
+                  style={{
+                    border: `1px solid ${cardBorder}`,
+                    borderRadius: 12,
+                  }}
+                >
+                  <Text size="xs" c="dimmed" mb="xs">Submódulos TEA</Text>
+                  <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="xs">
+                    {submodules.map((module) => {
+                      const Icon = module.icon;
+                      const active = activeSubmodule === module.key;
+                      return (
+                        <Paper
+                          key={module.key}
+                          p="xs"
+                          withBorder
+                          className={colorScheme === 'dark' ? 'module-card-dark' : undefined}
+                          style={{
+                            cursor: module.enabled ? 'pointer' : 'not-allowed',
+                            opacity: module.enabled ? 1 : 0.6,
+                            borderColor: active ? activeModuleBorder : 'var(--mantine-color-default-border)',
+                            background: active ? activeModuleBg : undefined,
+                          }}
+                          onClick={() => {
+                            if (!module.enabled) return;
+                            setActiveSubmodule(module.key);
+                          }}
+                        >
+                          <Group gap={8} wrap="nowrap" align="flex-start">
+                            <ThemeIcon size="sm" variant={active ? 'filled' : 'light'} color="indigo">
+                              <Icon size={12} />
+                            </ThemeIcon>
+                            <Box>
+                              <Text size="xs" fw={600}>{module.label}</Text>
+                              <Text size="10px" c="dimmed" lh={1.2}>{module.description}</Text>
+                            </Box>
+                          </Group>
+                        </Paper>
+                      );
+                    })}
+                  </SimpleGrid>
+                </Paper>
+              )}
               <Transition mounted={enteredForm} transition="fade" duration={isFromModuleHub ? 280 : 220} timingFunction="ease">
                 {(formStyles) => (
         <Stack gap="md" p="md" bg={cardBg} style={{ border: `1px solid ${cardBorder}`, borderRadius: 12, ...formStyles }}>
           {activeSubmodule === 'cadastro' ? (
             <>
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Text fw={700}>Cadastro TEA</Text>
-            <Badge variant="light" color="indigo">Submódulo ativo</Badge>
-          </Group>
-
-          <Select
-            label="Paciente existente"
-            placeholder={patientsLoading ? 'Carregando pacientes...' : 'Buscar paciente por nome/CPF'}
-            data={patientOptions}
-            value={selectedPatientId}
-            onChange={handleSelectPatient}
-            searchable
-            clearable
-            disabled={patientsLoading}
-            nothingFoundMessage="Nenhum paciente encontrado"
-          />
-
-          <Group grow>
-            <TextInput
-              label="Nome do paciente"
-              value={form.patientName}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setTeaField('patientName', value);
-              }}
-            />
-            <TextInput
-              label="CPF"
-              value={form.patientCpf}
-              onChange={(e) => {
-                const value = formatCPF(onlyDigits(e.currentTarget.value).slice(0, 11));
-                setTeaField('patientCpf', value);
-              }}
-            />
-          </Group>
-
-          <Group grow>
-            <TextInput
-              label="Data de nascimento"
-              placeholder="DD/MM/AAAA"
-              value={birthDateInput}
-              maxLength={10}
-              onChange={(e) => {
-                const masked = formatBirthDateInput(e.currentTarget.value);
-                setBirthDateInput(masked);
-
-                if (masked.length < 10) {
-                  setTeaField('birthDate', null);
-                  return;
-                }
-
-                setTeaField('birthDate', parseBirthDateInput(masked));
-              }}
-            />
-            <Select
-              label="Gênero"
-              value={form.gender}
-              onChange={(value) => setForm((prev) => ({ ...prev, gender: (value as Gender) || '' }))}
-              data={[
-                { value: 'MALE', label: 'Masculino' },
-                { value: 'FEMALE', label: 'Feminino' },
-                { value: 'OTHER', label: 'Outro' },
-              ]}
-            />
-            <TextInput
-              label="Celular"
-              value={form.cellphone}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setTeaField('cellphone', value);
-              }}
-            />
-          </Group>
-
-          <Group grow>
-            <TextInput
-              label="E-mail"
-              value={form.email}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setTeaField('email', value);
-              }}
-            />
-            <Select
-              label="Convênio"
-              placeholder={loadingInsurances ? 'Carregando convênios...' : 'Selecione'}
-              clearable={false}
-              data={insuranceSelectOptions}
-              value={form.healthInsuranceName}
-              onChange={(value) => {
-                const nextValue = value || PARTICULAR_INSURANCE_VALUE;
-                setTeaField('healthInsuranceName', nextValue);
-                if (nextValue === PARTICULAR_INSURANCE_VALUE) {
-                  setTeaField('healthInsuranceNumber', '');
-                }
-              }}
-              disabled={loadingInsurances}
-            />
-            <TextInput
-              label="Nº Convênio"
-              value={form.healthInsuranceNumber}
-              disabled={form.healthInsuranceName === PARTICULAR_INSURANCE_VALUE}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setTeaField('healthInsuranceNumber', value);
-              }}
-            />
-          </Group>
-
-          <Select
-            label="Nível de suporte TEA"
-            placeholder="Selecione"
-            value={form.supportLevel}
-            onChange={(value) => setForm((prev) => ({ ...prev, supportLevel: value || '' }))}
-            data={[
-              { value: 'Nível 1', label: 'Nível 1 (necessita apoio)' },
-              { value: 'Nível 2', label: 'Nível 2 (apoio substancial)' },
-              { value: 'Nível 3', label: 'Nível 3 (apoio muito substancial)' },
-            ]}
-            clearable
-          />
-
-          <Textarea
-            label="Perfil de comunicação"
-            minRows={2}
-            value={form.communicationProfile}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('communicationProfile', value);
-            }}
-          />
-
-          <Textarea
-            label="Perfil sensorial"
-            minRows={2}
-            value={form.sensoryProfile}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('sensoryProfile', value);
-            }}
-          />
-
-          <Textarea
-            label="Comportamentos observados"
-            minRows={2}
-            value={form.behaviorNotes}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('behaviorNotes', value);
-            }}
-          />
-
-          <TextInput
-            label="Comorbidades (separadas por vírgula)"
-            value={form.comorbiditiesInput}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('comorbiditiesInput', value);
-            }}
-          />
-
-          <Textarea
-            label="Objetivos terapêuticos"
-            minRows={2}
-            value={form.therapeuticGoals}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('therapeuticGoals', value);
-            }}
-          />
-
-          <Textarea
-            label="Orientações para família"
-            minRows={2}
-            value={form.familyGuidance}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('familyGuidance', value);
-            }}
-          />
-
-          <Textarea
-            label="Anotações escola"
-            minRows={2}
-            value={form.schoolNotes}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTeaField('schoolNotes', value);
-            }}
-          />
-
-          <Checkbox
-            label="Perfil TEA ativo"
-            checked={form.isActive}
-            onChange={(e) => {
-              const value = e.currentTarget.checked;
-              setTeaField('isActive', value);
-            }}
-          />
-
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setForm(INITIAL_FORM)}>Limpar</Button>
-            <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>Salvar dados TEA</Button>
-          </Group>
+              <Group justify="space-between" align="center" wrap="wrap">
+                <Box>
+                  <Text fw={700}>Vincular Paciente</Text>
+                  <Text size="sm" c="dimmed">Converta um paciente base para o fluxo TEA em um modal guiado.</Text>
+                </Box>
+                <Button bg={DARK_BLUE} leftSection={<Plus size={16} />} onClick={() => setCadastroModalOpened(true)}>
+                  Vincular paciente
+                </Button>
+              </Group>
+              {cadastroModal}
             </>
           ) : activeSubmodule === 'pacientes' ? (
             <>
               <Group justify="space-between" align="center" wrap="wrap">
-                <Text fw={700}>Pacientes TEA cadastrados</Text>
-                <Badge variant="light" color="indigo">Submódulo ativo</Badge>
+                <Box>
+                  <Text fw={700}>Pacientes TEA</Text>
+                  <Text size="sm" c="dimmed">Lista e edição dos pacientes vinculados ao módulo TEA.</Text>
+                </Box>
               </Group>
 
-              <TextInput
-                leftSection={<Search size={14} />}
-                placeholder="Buscar por nome ou CPF"
+              <FloatingInput
+                label="Buscar paciente"
+                rightSection={<Search size={14} />}
                 value={teaSearch}
                 onChange={(e) => setTeaSearch(e.currentTarget.value)}
-                style={{ maxWidth: isMobile ? '100%' : 360 }}
+                placeholder="Nome ou CPF"
+                alwaysFloatLabel
+                containerProps={{ maw: isMobile ? '100%' : 360 }}
               />
 
                   {teaLoading ? (
-                <Group justify="center" py="md"><Loader size="sm" /></Group>
+                <Stack gap="xs">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <Paper key={index} p="sm" withBorder radius="md">
+                      <Group justify="space-between" align="center" wrap="nowrap">
+                        <Box style={{ flex: 1 }}>
+                          <Skeleton height={16} width="28%" mb={8} radius="xl" />
+                          <Skeleton height={12} width="42%" radius="xl" />
+                        </Box>
+                        <Group gap="xs" wrap="nowrap">
+                          <Skeleton height={32} width={32} radius="md" />
+                          <Skeleton height={32} width={32} radius="md" />
+                        </Group>
+                      </Group>
+                    </Paper>
+                  ))}
+                </Stack>
               ) : teaItems.length === 0 ? (
-                <Text size="sm" c="dimmed">Nenhum paciente TEA encontrado.</Text>
+                <Paper withBorder radius="md" p="xl">
+                  <Stack gap={6} align="center">
+                    <Text fw={600}>Nenhum paciente TEA encontrado</Text>
+                    <Text size="sm" c="dimmed" ta="center">
+                      Ajuste a busca ou vincule um novo paciente ao módulo TEA.
+                    </Text>
+                  </Stack>
+                </Paper>
               ) : (
                 <Stack gap="xs">
                   {teaItems.map((item) => (
                     <Paper key={item.id} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                      <Group justify="space-between" align="center" wrap="nowrap">
-                        <Box>
+                      <Group justify="space-between" align={isMobile ? 'flex-start' : 'center'} wrap={isMobile ? 'wrap' : 'nowrap'}>
+                        <Box style={{ flex: 1 }}>
                           <Text fw={600}>{item.patientName || 'Paciente sem nome'}</Text>
-                          <Text size="xs" c="dimmed">
-                            {item.patientCpf ? formatCPF(item.patientCpf) : 'CPF não informado'}
-                            {item.supportLevel ? ` • ${item.supportLevel}` : ''}
-                            {item.isActive ? ' • Ativo' : ' • Inativo'}
-                          </Text>
+                          <Group gap={8} mt={4} wrap="wrap">
+                            <Text size="xs" c="dimmed">
+                              {item.patientCpf ? formatCPF(item.patientCpf) : 'CPF não informado'}
+                            </Text>
+                            {item.supportLevel ? (
+                              <Badge variant="light" color="indigo" size="sm">{item.supportLevel}</Badge>
+                            ) : null}
+                            <Badge variant="light" color={item.isActive ? 'green' : 'gray'} size="sm">
+                              {item.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </Group>
                         </Box>
                         <Group gap="xs" wrap="nowrap">
                           <ActionIcon
@@ -1018,7 +1048,15 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                   <Text fw={600}>Planos terapêuticos do paciente selecionado</Text>
 
                   {plansLoading ? (
-                    <Group justify="center" py="md"><Loader size="sm" /></Group>
+                    <Stack gap="xs" py="xs">
+                      {Array.from({ length: 2 }).map((_, index) => (
+                        <Paper key={index} p="sm" withBorder radius="md">
+                          <Skeleton height={16} width="28%" mb={10} radius="xl" />
+                          <Skeleton height={12} width="52%" mb={8} radius="xl" />
+                          <Skeleton height={10} width="72%" radius="xl" />
+                        </Paper>
+                      ))}
+                    </Stack>
                   ) : plans.length === 0 ? (
                     <Text size="sm" c="dimmed">Nenhum plano terapêutico cadastrado para este paciente.</Text>
                   ) : (
@@ -1051,10 +1089,9 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
             <>
               <Group justify="space-between" align="center" wrap="wrap">
                 <Text fw={700}>Plano Terapêutico</Text>
-                <Badge variant="light" color="indigo">Submódulo ativo</Badge>
               </Group>
 
-              <Select
+              <FloatingSelect
                 label="Paciente TEA"
                 placeholder={teaLoading ? 'Carregando pacientes TEA...' : 'Selecione um paciente TEA'}
                 data={teaProfileOptions}
@@ -1080,17 +1117,16 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                     <Badge variant="light" color="indigo">Perfil TEA ativo</Badge>
                   </Group>
 
-                  <Group grow>
-                    <TextInput
+                  <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" verticalSpacing="md">
+                    <FloatingInput
                       label="Título"
-                      placeholder="Ex.: Desenvolver comunicação funcional"
                       value={planForm.title}
                       onChange={(e) => {
                         const value = e.currentTarget.value;
                         setPlanField('title', value);
                       }}
                     />
-                    <Select
+                    <FloatingSelect
                       label="Prioridade"
                       value={planForm.priority}
                       onChange={(value) => setPlanForm((prev) => ({ ...prev, priority: value || 'Média' }))}
@@ -1100,7 +1136,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                         { value: 'Alta', label: 'Alta' },
                       ]}
                     />
-                    <Select
+                    <FloatingSelect
                       label="Status"
                       value={planForm.status}
                       onChange={(value) => setPlanForm((prev) => ({ ...prev, status: value || 'Ativo' }))}
@@ -1110,10 +1146,10 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                         { value: 'Concluído', label: 'Concluído' },
                       ]}
                     />
-                  </Group>
+                  </SimpleGrid>
 
-                  <Group grow>
-                    <Select
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
+                    <FloatingSelect
                       label="Profissional responsável"
                       placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
                       data={doctorOptions}
@@ -1131,17 +1167,16 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                       clearable
                       nothingFoundMessage="Nenhum médico encontrado"
                     />
-                    <DateInput
+                    <FloatingDateInput
                       label="Prazo alvo"
-                      placeholder="Selecione"
                       value={planForm.targetDate}
                       onChange={(value) => setPlanForm((prev) => ({ ...prev, targetDate: value || null }))}
                       valueFormat="DD/MM/YYYY"
                       locale="pt-br"
                     />
-                  </Group>
+                  </SimpleGrid>
 
-                  <Textarea
+                  <FloatingTextarea
                     label="Objetivo clínico"
                     minRows={2}
                     value={planForm.objective}
@@ -1151,7 +1186,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                     }}
                   />
 
-                  <Textarea
+                  <FloatingTextarea
                     label="Observações"
                     minRows={2}
                     value={planForm.notes}

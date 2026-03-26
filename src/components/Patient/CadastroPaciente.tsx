@@ -6,8 +6,6 @@ import {
   Group,
   Text,
   Button,
-  Select,
-  Textarea,
   TextInput,
   Switch,
   SimpleGrid,
@@ -21,6 +19,7 @@ import {
   Tabs,
   Table,
   Loader,
+  Skeleton,
   Badge,
   Image
 } from '@mantine/core';
@@ -40,6 +39,10 @@ import branchSettingsService from '../../services/branchSettingsService';
 import ResultModal from '../common/ResultModal';
 import { FacialCapture } from '../common/FacialCapture';
 import { FacialInstructionsModal } from '../common/FacialInstructionsModal';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingDateInput } from '../common/FloatingDateInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 import { findExistingCpf } from '../../utils/cpfRegistry';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -966,8 +969,8 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); clearFieldError('name'); }} error={fieldErrors.name} required />
-                  <TextInput
+                  <FloatingInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); clearFieldError('name'); }} error={fieldErrors.name} required />
+                  <FloatingInput
                     label="CPF"
                     value={formatCPF(form.cpf)}
                     onChange={(e) => {
@@ -990,15 +993,15 @@ export function CadastroPaciente() {
                     required
                     error={fieldErrors.cpf}
                   />
-                  <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
+                  <FloatingInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
                     <Popover.Target>
-                      <TextInput
+                      <FloatingDateInput
                         label="Data de nascimento"
                         placeholder="dd/mm/aaaa"
-                        value={birthDateInput}
-                        onChange={(e) => setBirthDateInput(formatDateInput(e.currentTarget.value))}
+                        value={form.birthDate}
+                        valueFormat="DD/MM/YYYY"
                         onBlur={() => {
                           if (!birthDateInput) {
                             setForm({ ...form, birthDate: null });
@@ -1023,6 +1026,22 @@ export function CadastroPaciente() {
                         }
                         onClick={() => setDatePopoverOpened(true)}
                         style={{ cursor: 'text' }}
+                        onChange={(value) => {
+                          if (value instanceof Date && !Number.isNaN(value.getTime())) {
+                            setBirthDateInput(formatDate(value));
+                            setForm({ ...form, birthDate: value });
+                            clearFieldError('birthDate');
+                            return;
+                          }
+
+                          if (typeof value === 'string') {
+                            const formatted = formatDateInput(value);
+                            setBirthDateInput(formatted);
+                            if (!formatted) {
+                              setForm({ ...form, birthDate: null });
+                            }
+                          }
+                        }}
                       />
                     </Popover.Target>
                     <Popover.Dropdown>
@@ -1038,9 +1057,8 @@ export function CadastroPaciente() {
                     </Popover.Dropdown>
                   </Popover>
 
-                  <Select
+                  <FloatingSelect
                     label="Gênero"
-                    placeholder="Selecione"
                     data={genderOptions}
                     value={form.gender}
                     onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); clearFieldError('gender'); }}
@@ -1048,19 +1066,18 @@ export function CadastroPaciente() {
                     required
                   />
 
-                  <Select
+                  <FloatingSelect
                     label="Estado civil"
-                    placeholder="Selecione"
                     data={maritalOptions}
                     value={form.maritalStatus}
                     onChange={(v) => setForm({ ...form, maritalStatus: (v as MaritalStatus) || '' })}
                   />
 
-                  <TextInput label="Ocupação/Profissão" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.currentTarget.value })} />
+                  <FloatingInput label="Ocupação/Profissão" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.currentTarget.value })} />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} error={fieldErrors.email} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
-                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} error={fieldErrors.cellphone} required />
+                  <FloatingInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} error={fieldErrors.email} />
+                  <FloatingInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
+                  <FloatingInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} error={fieldErrors.cellphone} required />
                 </SimpleGrid>
 
                 {/* Seção de Reconhecimento Facial */}
@@ -1118,9 +1135,9 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Contato de Emergência / Responsáveis</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome contato" value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.currentTarget.value })} />
-                  <TextInput label="Telefone contato" value={formatPhone(form.emergencyContactPhone)} onChange={(e) => { setForm({ ...form, emergencyContactPhone: onlyDigits(e.currentTarget.value) }); clearFieldError('emergencyContactPhone'); }} error={fieldErrors.emergencyContactPhone} />
-                  <TextInput label="Parentesco" value={form.emergencyContactRelationship} onChange={(e) => setForm({ ...form, emergencyContactRelationship: e.currentTarget.value })} />
+                  <FloatingInput label="Nome contato" value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.currentTarget.value })} />
+                  <FloatingInput label="Telefone contato" value={formatPhone(form.emergencyContactPhone)} onChange={(e) => { setForm({ ...form, emergencyContactPhone: onlyDigits(e.currentTarget.value) }); clearFieldError('emergencyContactPhone'); }} error={fieldErrors.emergencyContactPhone} />
+                  <FloatingInput label="Parentesco" value={form.emergencyContactRelationship} onChange={(e) => setForm({ ...form, emergencyContactRelationship: e.currentTarget.value })} />
                 </SimpleGrid>
 
                 <Group align="center" mt="md" mb="sm" gap="sm">
@@ -1131,10 +1148,10 @@ export function CadastroPaciente() {
                 {form.hasGuardian && (
                   <Box style={{ border: '1px solid #e9ecef', borderRadius: 8, padding: 12 }}>
                     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                      <TextInput label="Nome do responsável" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.currentTarget.value })} />
-                      <TextInput label="CPF do responsável" value={formatCPF(form.guardianCpf)} onChange={(e) => { setForm({ ...form, guardianCpf: onlyDigits(e.currentTarget.value) }); clearFieldError('guardianCpf'); }} maxLength={14} error={fieldErrors.guardianCpf} />
-                      <TextInput label="Telefone do responsável" value={formatPhone(form.guardianPhone)} onChange={(e) => { setForm({ ...form, guardianPhone: onlyDigits(e.currentTarget.value) }); clearFieldError('guardianPhone'); }} maxLength={15} error={fieldErrors.guardianPhone} />
-                      <TextInput label="Parentesco" value={form.guardianRelationship} onChange={(e) => setForm({ ...form, guardianRelationship: e.currentTarget.value })} />
+                      <FloatingInput label="Nome do responsável" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.currentTarget.value })} />
+                      <FloatingInput label="CPF do responsável" value={formatCPF(form.guardianCpf)} onChange={(e) => { setForm({ ...form, guardianCpf: onlyDigits(e.currentTarget.value) }); clearFieldError('guardianCpf'); }} maxLength={14} error={fieldErrors.guardianCpf} />
+                      <FloatingInput label="Telefone do responsável" value={formatPhone(form.guardianPhone)} onChange={(e) => { setForm({ ...form, guardianPhone: onlyDigits(e.currentTarget.value) }); clearFieldError('guardianPhone'); }} maxLength={15} error={fieldErrors.guardianPhone} />
+                      <FloatingInput label="Parentesco" value={form.guardianRelationship} onChange={(e) => setForm({ ...form, guardianRelationship: e.currentTarget.value })} />
                     </SimpleGrid>
                   </Box>
                 )}
@@ -1163,9 +1180,8 @@ export function CadastroPaciente() {
                 {form.hasHealthInsurance && (
                   <Box style={{ border: '1px solid #e9ecef', borderRadius: 8, padding: 12 }}>
                     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                      <Select
+                      <FloatingSelect
                         label="Convênio"
-                        placeholder={insurancesLoading ? 'Carregando convênios...' : 'Selecione um convênio'}
                         data={insuranceOptions}
                         value={form.healthInsuranceName}
                         onChange={(value) => { setForm({ ...form, healthInsuranceName: value || '' }); clearFieldError('healthInsuranceName'); }}
@@ -1175,7 +1191,7 @@ export function CadastroPaciente() {
                         nothingFoundMessage="Nenhum convênio encontrado"
                         error={fieldErrors.healthInsuranceName}
                       />
-                      <TextInput label="Número do convênio" value={form.healthInsuranceNumber} onChange={(e) => setForm({ ...form, healthInsuranceNumber: e.currentTarget.value })} />
+                      <FloatingInput label="Número do convênio" value={form.healthInsuranceNumber} onChange={(e) => setForm({ ...form, healthInsuranceNumber: e.currentTarget.value })} />
 
                       <Popover position="bottom-start" withArrow>
                         <Popover.Target>
@@ -1223,9 +1239,9 @@ export function CadastroPaciente() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Saúde</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <Select label="Tipo sanguíneo" placeholder="Selecione" data={bloodTypes} value={form.bloodType} onChange={(v) => setForm({ ...form, bloodType: (v as BloodType) || '' })} />
+                  <FloatingSelect label="Tipo sanguíneo" data={bloodTypes} value={form.bloodType} onChange={(v) => setForm({ ...form, bloodType: (v as BloodType) || '' })} />
 
-                  <TextInput
+                  <FloatingInput
                     label="Alergias"
                     placeholder="Separe por vírgula"
                     value={allergiesInput}
@@ -1233,7 +1249,7 @@ export function CadastroPaciente() {
                     onBlur={() => setForm({ ...form, allergies: allergiesInput.split(',').map(s => s.trim()).filter(Boolean) })}
                   />
 
-                  <TextInput
+                  <FloatingInput
                     label="Doenças crônicas"
                     placeholder="Separe por vírgula"
                     value={chronicInput}
@@ -1241,7 +1257,7 @@ export function CadastroPaciente() {
                     onBlur={() => setForm({ ...form, chronicConditions: chronicInput.split(',').map(s => s.trim()).filter(Boolean) })}
                   />
 
-                  <TextInput
+                  <FloatingInput
                     label="Medicamentos em uso"
                     placeholder="Separe por vírgula"
                     value={medsInput}
@@ -1249,13 +1265,13 @@ export function CadastroPaciente() {
                     onBlur={() => setForm({ ...form, currentMedications: medsInput.split(',').map(s => s.trim()).filter(Boolean) })}
                   />
                 </SimpleGrid>
-                <Textarea label="Observações" placeholder="Observações clínicas" value={form.observations} onChange={(e) => setForm({ ...form, observations: e.currentTarget.value })} minRows={3} mt="md" />
+                <FloatingTextarea label="Observações" placeholder="Observações clínicas" value={form.observations} onChange={(e) => setForm({ ...form, observations: e.currentTarget.value })} minRows={3} mt="md" />
               </Paper>
 
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <TextInput
+                  <FloatingInput
                     label="CEP"
                     value={formatCEP(form.zipCode)}
                     onChange={(e) => {
@@ -1269,13 +1285,13 @@ export function CadastroPaciente() {
                     error={fieldErrors.zipCode}
                     rightSection={zipLoading ? <Loader size={16} /> : undefined}
                   />
-                  <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} />
-                  <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
-                  <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
+                  <FloatingInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} />
+                  <FloatingInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
+                  <FloatingInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
 
-                  <TextInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
-                  <TextInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
-                  <Select label="Estado" data={statesOptions} value={form.state} onChange={(v) => setForm({ ...form, state: v || '' })} />
+                  <FloatingInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
+                  <FloatingInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
+                  <FloatingSelect label="Estado" data={statesOptions} value={form.state} onChange={(v) => setForm({ ...form, state: v || '' })} />
                 </SimpleGrid>
               </Paper>
 
@@ -1292,20 +1308,165 @@ export function CadastroPaciente() {
             <Paper p="md" withBorder radius="md">
               <Group justify="space-between" mb="md" wrap="wrap">
                 <SectionTitle>Pacientes cadastrados</SectionTitle>
-                <TextInput
+                <FloatingInput
+                  label="Buscar pacientes"
                   placeholder="Buscar por nome"
                   value={patientQuery}
                   onChange={(e) => setPatientQuery(e.currentTarget.value)}
-                  w={isMobile ? '100%' : 280}
+                  containerProps={{ w: isMobile ? '100%' : 280 }}
                 />
               </Group>
 
               {patientsLoading ? (
-                <Center style={{ padding: 16, gap: 8 }}>
-                  <Loader size={18} />
-                  <Text size="sm">Carregando pacientes...</Text>
-                </Center>
+                isMobile ? (
+                  <Stack gap="sm">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <Paper key={`patient-card-skeleton-${index}`} withBorder radius="md" p="md">
+                        <Stack gap={10}>
+                          <Skeleton height={18} width="62%" radius="sm" />
+                          <Skeleton height={12} width="46%" radius="sm" />
+                          <Group gap="xs">
+                            <Skeleton height={24} width={84} radius="xl" />
+                            <Skeleton height={24} width={70} radius="xl" />
+                          </Group>
+                          <Group gap={8}>
+                            <Skeleton height={30} width={30} radius="sm" />
+                            <Skeleton height={30} width={30} radius="sm" />
+                            <Skeleton height={30} width={30} radius="sm" />
+                            <Skeleton height={30} width={30} radius="sm" />
+                          </Group>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                      <Table.Thead>
+                        <Table.Tr style={{ borderBottom: 'none' }}>
+                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CPF</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Contato</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {Array.from({ length: 5 }).map((_, index) => (
+                          <Table.Tr key={`patient-skeleton-${index}`} style={{ borderBottom: '1px solid #e9ecef' }}>
+                            <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
+                            {!isTablet && <Table.Td><Skeleton height={16} width="65%" radius="sm" /></Table.Td>}
+                            {!isTablet && <Table.Td><Skeleton height={16} width="60%" radius="sm" /></Table.Td>}
+                            {!isTablet && <Table.Td><Skeleton height={24} width={82} radius="xl" /></Table.Td>}
+                            {!isTablet && <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>}
+                            <Table.Td>
+                              <Group gap={6} wrap="nowrap">
+                                <Skeleton height={28} width={28} radius="sm" />
+                                <Skeleton height={28} width={28} radius="sm" />
+                                <Skeleton height={28} width={28} radius="sm" />
+                                <Skeleton height={28} width={28} radius="sm" />
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                )
               ) : (
+                isMobile ? (
+                  filteredPatients.length === 0 ? (
+                    <Paper withBorder radius="md" p="xl">
+                      <Stack align="center" gap={6}>
+                        <Text fw={600} size="sm">Nenhum paciente encontrado</Text>
+                        <Text size="sm" c="dimmed" ta="center">Ajuste a busca ou cadastre um novo paciente.</Text>
+                      </Stack>
+                    </Paper>
+                  ) : (
+                    <Stack gap="sm">
+                      {filteredPatients.map((item) => (
+                        <Paper key={item.id} withBorder radius="md" p="md">
+                          <Stack gap={10}>
+                            <Stack gap={2}>
+                              <Text fw={700} size="md">{item.name}</Text>
+                              <Text size="sm" c="dimmed">CPF: {item.cpf ? formatCPF(item.cpf) : '-'}</Text>
+                              <Text size="sm" c="dimmed">Contato: {item.phone ? formatPhone(item.phone) : '-'}</Text>
+                            </Stack>
+                            <Group gap="xs">
+                              <Badge variant="outline" color="blue">
+                                {item.insuranceName || 'Sem convênio'}
+                              </Badge>
+                              <Badge
+                                color={item.raw?.isActive ? 'green' : 'red'}
+                                variant="light"
+                                size="sm"
+                              >
+                                {item.raw?.isActive ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            </Group>
+                            <Group gap={6} wrap="nowrap">
+                              <ActionIcon
+                                variant="subtle"
+                                style={{ color: 'var(--mantine-color-text)' }}
+                                onClick={() => {
+                                  setSelectedPatient(item);
+                                  setDetailsOpen(true);
+                                }}
+                              >
+                                <Eye size={16} />
+                              </ActionIcon>
+                              { (teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || '']) && (
+                                <ActionIcon
+                                  variant="subtle"
+                                  title="Abrir PIT desse paciente"
+                                  style={{ color: 'var(--mantine-color-text)' }}
+                                  onClick={() => {
+                                    const profId = teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || ''];
+                                    navigate('/tea/pit', { state: { teaProfileId: profId } });
+                                  }}
+                                >
+                                  <ClipboardList size={16} />
+                                </ActionIcon>
+                              )}
+                              <ActionIcon
+                                variant="subtle"
+                                style={{ color: 'var(--mantine-color-text)' }}
+                                onClick={() => {
+                                  setSelectedPatient(item);
+                                  setEditingPatientId(item.id);
+                                  populateFormFromPatient(item.raw);
+                                  setFacialImage(null);
+                                  setActiveTab('cadastro');
+                                }}
+                              >
+                                <Pencil size={16} />
+                              </ActionIcon>
+                              <ActionIcon
+                                variant="subtle"
+                                color={item.raw?.isActive ? 'orange' : 'green'}
+                                onClick={() => handleToggleActive(item)}
+                                title={item.raw?.isActive ? 'Desativar' : 'Ativar'}
+                              >
+                                <Power size={16} />
+                              </ActionIcon>
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                onClick={() => {
+                                  setDeleteTarget(item);
+                                  setDeleteConfirmOpen(true);
+                                }}
+                              >
+                                <Trash size={16} />
+                              </ActionIcon>
+                            </Group>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  )
+                ) : (
                 <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                   <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                     <Table.Thead>
@@ -1322,28 +1483,33 @@ export function CadastroPaciente() {
                       {filteredPatients.length === 0 ? (
                         <Table.Tr>
                           <Table.Td colSpan={6}>
-                            <Text size="sm" c="dimmed" ta="center">Nenhum paciente encontrado</Text>
+                            <Stack align="center" py="lg" gap={6}>
+                              <Text fw={600} size="sm">Nenhum paciente encontrado</Text>
+                              <Text size="sm" c="dimmed" ta="center">Ajuste a busca ou cadastre um novo paciente.</Text>
+                            </Stack>
                           </Table.Td>
                         </Table.Tr>
                       ) : (
                         filteredPatients.map((item) => (
                           <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                             <Table.Td>
-                              <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.name}</Text>
+                              <Text fw={600} size="sm">{item.name}</Text>
                             </Table.Td>
                             {!isTablet && (
                               <Table.Td>
-                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.cpf ? formatCPF(item.cpf) : '-'}</Text>
+                                <Text size="sm" c="dimmed">{item.cpf ? formatCPF(item.cpf) : '-'}</Text>
                               </Table.Td>
                             )}
                             {!isTablet && (
                               <Table.Td>
-                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.phone ? formatPhone(item.phone) : '-'}</Text>
+                                <Text size="sm" c="dimmed">{item.phone ? formatPhone(item.phone) : '-'}</Text>
                               </Table.Td>
                             )}
                             {!isTablet && (
                               <Table.Td>
-                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.insuranceName || '-'}</Text>
+                                <Badge variant="outline" color="blue">
+                                  {item.insuranceName || 'Sem convênio'}
+                                </Badge>
                               </Table.Td>
                             )}
                             {!isTablet && (
@@ -1358,7 +1524,7 @@ export function CadastroPaciente() {
                               </Table.Td>
                             )}
                             <Table.Td>
-                              <Group gap={6} wrap="nowrap">
+                              <Group gap={4} wrap="nowrap">
                                 <ActionIcon
                                   variant="subtle"
                                   style={{ color: 'var(--mantine-color-text)' }}
@@ -1422,6 +1588,7 @@ export function CadastroPaciente() {
                     </Table.Tbody>
                   </Table>
                 </Box>
+                )
               )}
             </Paper>
           </Tabs.Panel>

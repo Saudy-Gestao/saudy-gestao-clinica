@@ -1,22 +1,22 @@
-import { Box, Text, Textarea, type BoxProps, type TextareaProps } from '@mantine/core';
+import { Box, NumberInput, Text, type BoxProps, type NumberInputProps } from '@mantine/core';
 import type { ReactNode } from 'react';
 
-interface FloatingTextareaProps extends TextareaProps {
+interface FloatingNumberInputProps extends NumberInputProps {
   label: ReactNode;
   containerProps?: BoxProps;
 }
 
-export function FloatingTextarea({ label, containerProps, value, error, ...props }: FloatingTextareaProps) {
-  const hasValue = value !== null && value !== undefined && String(value).trim().length > 0;
+export function FloatingNumberInput({ label, containerProps, value, error, ...props }: FloatingNumberInputProps) {
+  const hasValue = value !== null && value !== undefined && value !== '';
 
   return (
     <Box w="100%" {...containerProps}>
       <Box
-        className={`floating-mantine-field floating-mantine-field--textarea ${hasValue ? 'has-value' : ''}`}
+        className={`floating-mantine-field ${hasValue ? 'has-value' : ''}`}
         w="100%"
         style={{ borderColor: error ? '#fa5252' : undefined }}
       >
-        <Textarea
+        <NumberInput
           {...props}
           value={value}
           error={undefined}

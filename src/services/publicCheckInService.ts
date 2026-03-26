@@ -1,8 +1,17 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './getApiBaseUrl';
+import publicCheckInSessionService from './publicCheckInSessionService';
 
 const publicApi = axios.create({
   baseURL: getApiBaseUrl(),
+});
+
+publicApi.interceptors.request.use((config) => {
+  const token = publicCheckInSessionService.getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export interface PublicCheckInPayload {
@@ -18,6 +27,7 @@ export interface PublicBranchInfo {
   id: string;
   tradeName: string;
   phone?: string | null;
+  publicCheckInEnabled: boolean;
 }
 
 export interface PublicCheckInAppointment {

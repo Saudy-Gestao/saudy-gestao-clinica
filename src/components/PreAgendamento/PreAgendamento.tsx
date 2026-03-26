@@ -6,11 +6,10 @@ import {
   Box,
   Button,
   Group,
-  Loader,
   Modal,
   Paper,
-  Select,
   SegmentedControl,
+  Skeleton,
   Stack,
   Table,
   Text,
@@ -22,6 +21,8 @@ import { ChevronLeft, Copy, ExternalLink, Link as LinkIcon, ShieldCheck } from '
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
 import preSchedulingService, { type PreSchedulingItem, type PreSchedulingStatus } from '../../services/preSchedulingService';
 import { formatCPF } from '../../utils/formatters';
 import { usePreSchedulingsQuery } from '../../hooks/usePreSchedulingsQuery';
@@ -48,6 +49,88 @@ const STATUS_COLOR: Record<PreSchedulingStatus, string> = {
 };
 
 const statusOptions = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }));
+
+function PreSchedulingTableSkeleton() {
+  return (
+    <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+      <Table verticalSpacing="sm" horizontalSpacing="md">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Paciente</Table.Th>
+            <Table.Th>Agendamento</Table.Th>
+            <Table.Th>Médico</Table.Th>
+            <Table.Th>Convênio</Table.Th>
+            <Table.Th>Status</Table.Th>
+            <Table.Th>Docs</Table.Th>
+            <Table.Th>Ações</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Table.Tr key={index}>
+              <Table.Td>
+                <Stack gap={6}>
+                  <Skeleton height={14} width={140} radius="xl" />
+                  <Skeleton height={10} width={90} radius="xl" />
+                </Stack>
+              </Table.Td>
+              <Table.Td><Skeleton height={14} width={180} radius="xl" /></Table.Td>
+              <Table.Td><Skeleton height={14} width={110} radius="xl" /></Table.Td>
+              <Table.Td><Skeleton height={14} width={90} radius="xl" /></Table.Td>
+              <Table.Td><Skeleton height={24} width={110} radius="xl" /></Table.Td>
+              <Table.Td><Skeleton height={24} width={84} radius="xl" /></Table.Td>
+              <Table.Td>
+                <Group gap="xs" wrap="nowrap">
+                  <Skeleton height={30} width={104} radius="md" />
+                  <Skeleton height={30} width={96} radius="md" />
+                  <Skeleton height={30} width={96} radius="md" />
+                </Group>
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Box>
+  );
+}
+
+function ReviewModalSkeleton() {
+  return (
+    <Stack gap="xs">
+      <Paper p="sm" withBorder>
+        <Stack gap={8}>
+          <Skeleton height={18} width={120} radius="xl" />
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Paper key={index} p="xs" withBorder>
+              <Stack gap={6}>
+                <Skeleton height={14} width={110} radius="xl" />
+                <Skeleton height={12} width="70%" radius="xl" />
+                <Skeleton height={10} width={100} radius="xl" />
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      </Paper>
+      <Paper p="sm" withBorder>
+        <Stack gap={8}>
+          <Group justify="space-between">
+            <Skeleton height={18} width={90} radius="xl" />
+            <Skeleton height={24} width={90} radius="xl" />
+          </Group>
+          <Skeleton height={12} width={160} radius="xl" />
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Paper key={index} p="xs" withBorder>
+              <Stack gap={6}>
+                <Skeleton height={14} width="55%" radius="xl" />
+                <Skeleton height={12} width="80%" radius="xl" />
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      </Paper>
+    </Stack>
+  );
+}
 
 export function PreAgendamento() {
   const navigate = useNavigate();
@@ -314,23 +397,28 @@ export function PreAgendamento() {
               </Text>
             </Group>
 
-            <Group grow>
-              <TextInput
+            <Group grow align="flex-end">
+              <FloatingInput
+                label="Buscar"
+                alwaysFloatLabel
                 placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
                 value={search}
                 onChange={(e) => setSearch(e.currentTarget.value)}
+                containerProps={{ style: { minHeight: 64 } }}
               />
-              <Select
-                placeholder="Filtrar status"
+              <FloatingSelect
+                label="Status"
+                alwaysFloatLabel
                 data={statusOptions}
                 clearable
                 value={statusFilter}
                 onChange={setStatusFilter}
+                containerProps={{ style: { minHeight: 64 } }}
               />
             </Group>
 
-            {loading ? (
-              <Group justify="center" py="lg"><Loader size="sm" /></Group>
+            {loading && items.length === 0 ? (
+              <PreSchedulingTableSkeleton />
             ) : (
               <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
                 <Table verticalSpacing="sm" horizontalSpacing="md">
@@ -499,7 +587,7 @@ export function PreAgendamento() {
           </Text>
 
           {reviewLoading ? (
-            <Group justify="center" py="md"><Loader size="sm" /></Group>
+            <ReviewModalSkeleton />
           ) : (
             <Stack gap="xs">
               <Paper p="sm" withBorder>

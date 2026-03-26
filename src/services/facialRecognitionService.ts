@@ -1,4 +1,5 @@
 import axios from 'axios';
+import publicCheckInSessionService from './publicCheckInSessionService';
 
 // API de reconhecimento facial separada
 const faceApi = axios.create({
@@ -11,7 +12,7 @@ faceApi.interceptors.request.use(
     if ((config as any).skipAuth) {
       return config;
     }
-    const token = localStorage.getItem('token');
+    const token = publicCheckInSessionService.getToken() || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

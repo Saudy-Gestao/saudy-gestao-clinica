@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Select, NumberInput, Center, Loader } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Badge, Paper, Skeleton } from '@mantine/core';
 import inventoryService from '../../services/inventoryService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, Plus, ChevronLeft, X, Pencil } from 'lucide-react';
+import { Plus, ChevronLeft, X, Pencil } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
-import { DatePickerInput } from '@mantine/dates';
 import ResultModal from '../common/ResultModal';
 import { FloatingInput } from '../common/FloatingInput';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingNumberInput } from '../common/FloatingNumberInput';
+import { FloatingDateInput } from '../common/FloatingDateInput';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -41,7 +43,7 @@ export function Estoque() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const {
-    data: inventoryItemsData,
+    data: inventoryItems,
     isLoading: itemsLoading,
     error: inventoryError,
   } = useInventoryItemsQuery();
@@ -115,6 +117,8 @@ export function Estoque() {
     return date;
   };
   useEffect(() => {
+    if (!inventoryItems) return;
+
     const mapped: StockItem[] = inventoryItems.map((it: any) => ({
       id: String(it.id),
       codigo: it.code || '',
@@ -379,7 +383,7 @@ export function Estoque() {
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Group mb={isMobile ? 20 : 24} justify="space-between" align="flex-start" wrap="wrap">
           <Group align="center">
             <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
               <ChevronLeft size={28} />
@@ -394,38 +398,40 @@ export function Estoque() {
             </Box>
           </Group>
 
-          <Group>
-            <Select
-              data={[{ value: 'all', label: 'Todas as categorias' }, ...categoriesOptions]}
-              value={category || 'all'}
-              onChange={(val) => setCategory(val || '')}
-              placeholder="Todas as categorias"
-              style={{ width: 220 }}
-            />
-            <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => openCadastrar()} size={isMobile ? 'sm' : 'md'}>
-              Novo item
-            </Button>
-          </Group>
+          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => openCadastrar()} size={isMobile ? 'sm' : 'md'}>
+            Novo item
+          </Button>
         </Group>
 
-        {/* Search */}
-        <Box mb={isMobile ? 20 : 30}>
-          <TextInput
+        <Group mb={isMobile ? 20 : 30} align="flex-end" wrap="wrap" grow>
+          <FloatingInput
+            label="Buscar itens"
             placeholder={isMobile ? 'Buscar...' : 'Buscar item por nome ou código...'}
-            leftSection={<Search size={16} color="var(--mantine-color-dimmed)" />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            radius="md"
-            size={isMobile ? 'sm' : 'md'}
-            style={{ flex: 1 }}
+            containerProps={{ style: { flex: isMobile ? '1 1 100%' : '1 1 360px' } }}
           />
-        </Box>
+          <FloatingSelect
+            data={[{ value: 'all', label: 'Todas as categorias' }, ...categoriesOptions]}
+            value={category || 'all'}
+            onChange={(val) => setCategory(val || '')}
+            label="Categoria"
+            placeholder="Todas as categorias"
+            containerProps={{ style: { flex: isMobile ? '1 1 100%' : '0 0 280px' } }}
+          />
+        </Group>
 
         {itemsLoading ? (
-          <Center style={{ padding: 24, gap: 8 }}>
-            <Loader />
-            <Text>Carregando itens...</Text>
-          </Center>
+          <Stack gap="sm">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Paper key={index} withBorder radius="md" p="md">
+                <Stack gap="sm">
+                  <Skeleton height={20} width="30%" radius="xl" />
+                  <Skeleton height={16} width="100%" radius="xl" />
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
         ) : (
           <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
             <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
@@ -445,7 +451,7 @@ export function Estoque() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filtered.map((it) => (
+                {filtered.length > 0 ? filtered.map((it) => (
                   <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                     <Table.Td>
                       <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.codigo}</Text>
@@ -493,13 +499,15 @@ export function Estoque() {
 
                 {!isTablet && (
                   <Table.Td>
-                    <Text size="xs">{formatCategory(it.categoria)}</Text>
+                    <Badge variant="light" color="blue" radius="xl">{formatCategory(it.categoria)}</Badge>
                   </Table.Td>
                 )}
 
                 {!isTablet && (
                   <Table.Td>
-                    <Text size="xs">{formatStatus(it.status)}</Text>
+                    <Badge variant="light" color={String(it.status).toUpperCase() === 'LOW' ? 'yellow' : String(it.status).toUpperCase() === 'OUT_OF_STOCK' ? 'red' : 'green'} radius="xl">
+                      {formatStatus(it.status)}
+                    </Badge>
                   </Table.Td>
                 )}
                 <Table.Td>
@@ -512,9 +520,20 @@ export function Estoque() {
                   >
                     <Pencil size={16} />
                   </ActionIcon>
-                </Table.Td>
+                  </Table.Td>
                 </Table.Tr>
-              ))}
+              )) : (
+                <Table.Tr>
+                  <Table.Td colSpan={isTablet ? 5 : 11}>
+                    <Stack align="center" py="xl" gap={6}>
+                      <Text fw={600}>Nenhum item encontrado</Text>
+                      <Text c="dimmed" size="sm" ta="center">
+                        Cadastre um novo item ou ajuste os filtros para localizar materiais no estoque.
+                      </Text>
+                    </Stack>
+                  </Table.Td>
+                </Table.Tr>
+              )}
             </Table.Tbody>
             </Table>
             </Box>
@@ -535,9 +554,7 @@ export function Estoque() {
       >
         <Stack gap={10}>
           <Box style={{ padding: 8 }}>
-            <Text size="sm" fw={600} mb={8}>{editingId ? 'Editar item' : 'Cadastrar item'}</Text>
-
-              <FloatingInput
+            <FloatingInput
               containerProps={{ style: { marginBottom: 8 } }}
               label={<><span>Nome do item</span><span style={{ color: '#fa5252' }}> *</span></>}
               value={form.nome}
@@ -547,7 +564,7 @@ export function Estoque() {
 
             <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 8 }}>
               <Box>
-                <Box className="line-field">
+                <Box style={{ marginBottom: 8 }}>
                   <FloatingInput
                     label={<><span>Código</span><span style={{ color: '#fa5252' }}> *</span></>}
                     value={form.codigo}
@@ -556,36 +573,35 @@ export function Estoque() {
                   />
                 </Box>
 
-                <Box className="line-field">
-                  <Select variant="unstyled" data={[{ value: 'un', label: 'un' }, { value: 'cx', label: 'cx' }, { value: 'ml', label: 'ml' }]} value={form.unidade} onChange={(v) => setForm({ ...form, unidade: v || '' })} placeholder="Unidade" />
+                <Box style={{ marginBottom: 8 }}>
+                  <FloatingSelect data={[{ value: 'un', label: 'un' }, { value: 'cx', label: 'cx' }, { value: 'ml', label: 'ml' }]} value={form.unidade} onChange={(v) => setForm({ ...form, unidade: v || '' })} label="Unidade" placeholder="Unidade" />
                 </Box>
 
-                <Box className="line-field">
-                  <NumberInput variant="unstyled" value={form.minimo ?? undefined} onChange={(val) => setForm({ ...form, minimo: normalizeNumber(val) })} placeholder="Quant. Mín." min={0} />
+                <Box style={{ marginBottom: 8 }}>
+                  <FloatingNumberInput value={form.minimo ?? undefined} onChange={(val) => setForm({ ...form, minimo: normalizeNumber(val) })} label="Quant. mín." placeholder="Quant. mín." min={0} />
                 </Box>
 
-                <Box style={{ marginBottom: 8, borderBottom: '1px solid #dee2e6', paddingBottom: 6 }}>
-                      <NumberInput variant="unstyled" value={form.precoUnitario ?? undefined} onChange={(val) => setForm({ ...form, precoUnitario: normalizeNumber(val) })} placeholder="Preço Unitário" min={0} step={0.01} />
-                    </Box>
+                <Box style={{ marginBottom: 8 }}>
+                  <FloatingNumberInput value={form.precoUnitario ?? undefined} onChange={(val) => setForm({ ...form, precoUnitario: normalizeNumber(val) })} label="Preço unitário" placeholder="Preço unitário" min={0} step={0.01} />
+                </Box>
               </Box>
 
               <Box>
-                <Box className="line-field">
-                  <Select variant="unstyled" data={categoriesOptions} value={form.categoria} onChange={(v) => setForm({ ...form, categoria: v || '' })} placeholder="Categoria" />
+                <Box style={{ marginBottom: 8 }}>
+                  <FloatingSelect data={categoriesOptions} value={form.categoria} onChange={(v) => setForm({ ...form, categoria: v || '' })} label="Categoria" placeholder="Categoria" />
                 </Box>
 
-                <Box className="line-field">
-                  <NumberInput variant="unstyled" value={form.quantidade ?? undefined} onChange={(val) => setForm({ ...form, quantidade: normalizeNumber(val) })} placeholder="Quantidade atual" min={0} />
+                <Box style={{ marginBottom: 8 }}>
+                  <FloatingNumberInput value={form.quantidade ?? undefined} onChange={(val) => setForm({ ...form, quantidade: normalizeNumber(val) })} label="Quantidade atual" placeholder="Quantidade atual" min={0} />
                 </Box>
 
-                <Box className="line-field">
-                  <NumberInput variant="unstyled" value={form.maximo ?? undefined} onChange={(val) => setForm({ ...form, maximo: normalizeNumber(val) })} placeholder="Quant. Máx." min={0} />
+                <Box style={{ marginBottom: 8 }}>
+                  <FloatingNumberInput value={form.maximo ?? undefined} onChange={(val) => setForm({ ...form, maximo: normalizeNumber(val) })} label="Quant. máx." placeholder="Quant. máx." min={0} />
                 </Box>
 
-                <Box style={{ marginBottom: 8, borderBottom: '1px solid #dee2e6', paddingBottom: 6, position: 'relative' }}>
-                  <DatePickerInput
-                    aria-label="Validade"
-                    placeholder="Validade"
+                <Box style={{ marginBottom: 8, position: 'relative' }}>
+                  <FloatingDateInput
+                    label={<><span>Validade</span><span style={{ color: '#fa5252' }}> *</span></>}
                     value={form.validade}
                     onChange={(val) => {
                       const date = val ?? null; // keep null when cleared
@@ -595,15 +611,27 @@ export function Estoque() {
                     }}
                     valueFormat="DD/MM/YYYY"
                     clearable={false}
-                    rightSection={form.validade ? (
-                      <ActionIcon size="sm" variant="subtle" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); e.preventDefault(); setForm({ ...form, validade: null }); setDateInput(''); setFieldErrors((prev) => { const { expiryDate, ...rest } = prev; return rest; }); }} title="Limpar data"><X size={12} /></ActionIcon>
-                    ) : undefined}
-                    styles={{ input: { border: 'none', padding: '10px 44px 6px 0', fontSize: '0.875rem' } }} />
-                  {/* placeholder asterisk (red) — visible only when field is empty to mimic placeholder) */}
-                  {!form.validade && (
-                    <span className="placeholder-asterisk" aria-hidden>*</span>
-                  )}
-
+                  />
+                  {form.validade ? (
+                    <ActionIcon
+                      size="sm"
+                      variant="subtle"
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setForm({ ...form, validade: null });
+                        setDateInput('');
+                        setFieldErrors((prev) => {
+                          const { expiryDate, ...rest } = prev;
+                          return rest;
+                        });
+                      }}
+                      title="Limpar data"
+                      style={{ position: 'absolute', right: 28, bottom: 10 }}
+                    >
+                      <X size={12} />
+                    </ActionIcon>
+                  ) : null}
                   {fieldErrors.expiryDate && (
                     <Text size="xs" c="red" mt={6}>{fieldErrors.expiryDate}</Text>
                   )}

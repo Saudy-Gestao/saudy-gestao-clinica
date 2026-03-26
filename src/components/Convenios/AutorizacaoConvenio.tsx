@@ -7,23 +7,23 @@ import {
   Box,
   Button,
   Group,
-  Loader,
-  MultiSelect,
   Paper,
+  Skeleton,
   Select,
   Stack,
   Table,
   Text,
-  TextInput,
   Modal,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, RefreshCcw, ShieldCheck, Upload } from 'lucide-react';
+import { ChevronLeft, ShieldCheck, Upload } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import convenioAuthorizationService, {
   type ConvenioAuthorizationAttachment,
   type ConvenioAuthorizationSourceType,
@@ -122,6 +122,8 @@ export function AutorizacaoConvenio() {
       return acc;
     }, { pending: 0, authorized: 0, denied: 0 });
   }, [filteredItems]);
+
+  const tableLoading = loading && items.length === 0;
 
   useEffect(() => {
     if (!error) return;
@@ -327,16 +329,6 @@ export function AutorizacaoConvenio() {
               <Text size="sm" c="dimmed">Central de autorização de Agendamentos e TEA</Text>
             </Box>
           </Group>
-
-          <Button
-            variant="light"
-            color="indigo"
-            leftSection={<RefreshCcw size={16} />}
-            onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.convenioAuthorizations })}
-            loading={loading}
-          >
-            Atualizar
-          </Button>
         </Group>
 
         <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
@@ -347,16 +339,16 @@ export function AutorizacaoConvenio() {
               <Badge color="red" variant="light">Negados: {summary.denied}</Badge>
             </Group>
 
-            <TextInput
+            <FloatingInput
+              label="Buscar autorizações"
               placeholder="Buscar por paciente, CPF, procedimento, médico ou sala"
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}
             />
 
             <Group grow>
-              <MultiSelect
+              <FloatingMultiSelect
                 label="Origem"
-                placeholder="Filtrar origem"
                 data={[
                   { value: 'APPOINTMENT', label: 'Agendamento' },
                   { value: 'TEA', label: 'Pré-reserva TEA' },
@@ -365,17 +357,15 @@ export function AutorizacaoConvenio() {
                 onChange={(value) => setSourceFilter(value as ConvenioAuthorizationSourceType[])}
                 clearable
               />
-              <MultiSelect
+              <FloatingMultiSelect
                 label="Status"
-                placeholder="Filtrar status"
                 data={STATUS_OPTIONS}
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value as ConvenioAuthorizationStatus[])}
                 clearable
               />
-              <MultiSelect
+              <FloatingMultiSelect
                 label="Convênio"
-                placeholder="Filtrar convênio"
                 data={insuranceTypeOptions}
                 value={insuranceTypeFilter}
                 onChange={(value) => setInsuranceTypeFilter(value as string[])}
@@ -383,31 +373,50 @@ export function AutorizacaoConvenio() {
               />
             </Group>
 
-            {loading ? (
-              <Group justify="center" py="lg"><Loader size="sm" /></Group>
-            ) : (
-              <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }}>
+            <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }}>
                 <Table verticalSpacing="sm" horizontalSpacing="md">
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>Origem</Table.Th>
                       <Table.Th>Paciente</Table.Th>
-                      <Table.Th>Convênio</Table.Th>
+                      <Table.Th style={{ width: 132 }}>Convênio</Table.Th>
                       <Table.Th>Procedimento</Table.Th>
                       <Table.Th>Médico</Table.Th>
                       <Table.Th>Sala</Table.Th>
-                      <Table.Th>Lote TEA</Table.Th>
                       <Table.Th>Data/Hora</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Ação</Table.Th>
-                      <Table.Th>Anexo</Table.Th>
+                      <Table.Th style={{ width: 124 }}>Status</Table.Th>
+                      <Table.Th style={{ width: 148 }}>Ação</Table.Th>
+                      <Table.Th style={{ width: 116 }}>Anexo</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {filteredItems.length === 0 ? (
+                    {tableLoading ? (
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <Table.Tr key={`authorization-skeleton-${index}`}>
+                          <Table.Td><Skeleton height={24} width={100} radius="xl" /></Table.Td>
+                          <Table.Td>
+                            <Stack gap={6}>
+                              <Skeleton height={16} width="60%" radius="sm" />
+                              <Skeleton height={12} width="40%" radius="sm" />
+                            </Stack>
+                          </Table.Td>
+                          <Table.Td><Skeleton height={24} width={90} radius="xl" /></Table.Td>
+                          <Table.Td><Skeleton height={16} width="75%" radius="sm" /></Table.Td>
+                          <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
+                          <Table.Td><Skeleton height={16} width="80%" radius="sm" /></Table.Td>
+                          <Table.Td><Skeleton height={16} width="65%" radius="sm" /></Table.Td>
+                          <Table.Td><Skeleton height={24} width={95} radius="xl" /></Table.Td>
+                          <Table.Td><Skeleton height={30} width={130} radius="sm" /></Table.Td>
+                          <Table.Td><Skeleton height={32} width={118} radius="sm" /></Table.Td>
+                        </Table.Tr>
+                      ))
+                    ) : filteredItems.length === 0 ? (
                       <Table.Tr>
-                        <Table.Td colSpan={11}>
-                          <Text size="sm" c="dimmed" ta="center" py="md">Nenhuma autorização encontrada</Text>
+                        <Table.Td colSpan={10}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhuma autorização encontrada</Text>
+                            <Text size="sm" c="dimmed">Ajuste os filtros ou aguarde novos pedidos entrarem na fila de autorização.</Text>
+                          </Stack>
                         </Table.Td>
                       </Table.Tr>
                     ) : (
@@ -427,40 +436,53 @@ export function AutorizacaoConvenio() {
                                 {item.patientCpf && <Text size="xs" c="dimmed">{item.patientCpf}</Text>}
                               </Stack>
                             </Table.Td>
-                            <Table.Td>
+                            <Table.Td style={{ width: 132 }}>
                               <Badge
                                 variant="light"
                                 color={resolvedInsuranceName.toLowerCase() === 'particular' ? 'gray' : 'blue'}
+                                styles={{
+                                  root: { whiteSpace: 'nowrap' },
+                                  label: { whiteSpace: 'nowrap' },
+                                }}
                               >
                                 {resolvedInsuranceName}
                               </Badge>
                             </Table.Td>
                             <Table.Td><Text size="sm">{item.procedureName || '-'}</Text></Table.Td>
                             <Table.Td><Text size="sm">{item.doctorName || '-'}</Text></Table.Td>
-                            <Table.Td><Text size="sm">{item.roomName || '-'}</Text></Table.Td>
                             <Table.Td>
-                              {item.sourceType === 'TEA' && (
-                                <Text size="xs" c="dimmed">
-                                  {item.sessionsCount || 0} sessão(ões) no lote
-                                </Text>
-                              )}
+                              <Text size="sm" lineClamp={2}>{item.roomName || '-'}</Text>
                             </Table.Td>
                             <Table.Td>
                               {item.sourceType === 'TEA' ? (
-                                <Text size="sm" c="dimmed">Recorrência semanal (lote)</Text>
+                                <Stack gap={0}>
+                                  <Text size="sm">Recorrência semanal</Text>
+                                  <Text size="xs" c="dimmed">{item.sessionsCount || 0} sessão(ões) no lote</Text>
+                                </Stack>
                               ) : (
-                                <Text size="sm">
-                                  {item.date ? dayjs(item.date).format('DD/MM/YYYY') : '-'}
-                                  {item.time ? ` • ${item.time}` : ''}
-                                </Text>
+                                <Stack gap={0}>
+                                  <Text size="sm">
+                                    {item.date ? dayjs(item.date).format('DD/MM/YYYY') : '-'}
+                                  </Text>
+                                  <Text size="xs" c="dimmed">
+                                    {item.time || 'Sem horário'}
+                                  </Text>
+                                </Stack>
                               )}
                             </Table.Td>
-                            <Table.Td>
-                              <Badge color={STATUS_COLOR[item.status as ConvenioAuthorizationStatus]} variant="light">
+                            <Table.Td style={{ width: 124 }}>
+                              <Badge
+                                color={STATUS_COLOR[item.status as ConvenioAuthorizationStatus]}
+                                variant="light"
+                                styles={{
+                                  root: { whiteSpace: 'nowrap' },
+                                  label: { whiteSpace: 'nowrap' },
+                                }}
+                              >
                                 {STATUS_OPTIONS.find((opt) => opt.value === item.status)?.label || item.status}
                               </Badge>
                             </Table.Td>
-                            <Table.Td>
+                            <Table.Td style={{ width: 148 }}>
                               <Select
                                 size="xs"
                                 placeholder="Alterar"
@@ -472,9 +494,15 @@ export function AutorizacaoConvenio() {
                                 }}
                                 disabled={updatingKey === rowKey}
                                 leftSection={<ShieldCheck size={14} />}
+                                styles={{
+                                  input: {
+                                    minWidth: 132,
+                                    width: 132,
+                                  },
+                                }}
                               />
                             </Table.Td>
-                            <Table.Td>
+                            <Table.Td style={{ width: 116 }}>
                               <Stack gap={4}>
                                 <Button
                                   component="label"
@@ -483,8 +511,18 @@ export function AutorizacaoConvenio() {
                                   color="indigo"
                                   leftSection={<Upload size={14} />}
                                   disabled={updatingKey === rowKey}
+                                  styles={{
+                                    root: {
+                                      minWidth: 96,
+                                      width: 96,
+                                      paddingInline: 8,
+                                    },
+                                    label: {
+                                      fontSize: 12,
+                                    },
+                                  }}
                                 >
-                                  Enviar documento
+                                  Anexar
                                   <input
                                     type="file"
                                     hidden
@@ -523,7 +561,6 @@ export function AutorizacaoConvenio() {
                   </Table.Tbody>
                 </Table>
               </Box>
-            )}
           </Stack>
         </Paper>
       </Box>

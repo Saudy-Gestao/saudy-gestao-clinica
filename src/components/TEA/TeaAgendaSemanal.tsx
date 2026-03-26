@@ -7,10 +7,9 @@ import {
   Button,
   Paper,
   Stack,
-  Loader,
   Badge,
-  TextInput,
-  MultiSelect,
+  Skeleton,
+  ActionIcon,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -19,6 +18,8 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { Header } from '../Header/Header';
 import { useTeaWeeklyAgendaQuery, type TeaAgendaItem } from '../../hooks/useTeaWeeklyAgendaQuery';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 
 const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -177,10 +178,16 @@ export function TeaAgendaSemanal() {
       <Header />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
+        <Group mb={18} gap="md" align="flex-start">
+          <ActionIcon
+            variant="default"
+            size={isMobile ? 44 : 52}
+            radius="md"
+            onClick={() => navigate('/tea')}
+            aria-label="Voltar"
+          >
+            <ChevronLeft size={22} />
+          </ActionIcon>
           <Box>
             <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Agenda semanal TEA</Text>
             <Text size="sm" c="dimmed">Visão macro dos agendamentos de todos os pacientes</Text>
@@ -224,15 +231,17 @@ export function TeaAgendaSemanal() {
               </Text>
             </Group>
 
-            <TextInput
-              leftSection={<Search size={14} />}
-              placeholder="Buscar por paciente, terapia, médico ou horário"
+            <FloatingInput
+              label="Buscar agenda"
+              rightSection={<Search size={14} />}
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}
+              placeholder="Buscar por paciente, terapia, médico ou horário"
+              alwaysFloatLabel
             />
 
-            <Group grow>
-              <MultiSelect
+            <Group grow align="flex-start">
+              <FloatingMultiSelect
                 label="Procedimento"
                 placeholder="Filtrar por procedimento"
                 data={procedureOptions}
@@ -242,7 +251,7 @@ export function TeaAgendaSemanal() {
                 clearable
                 nothingFoundMessage="Nenhum procedimento"
               />
-              <MultiSelect
+              <FloatingMultiSelect
                 label="Médico"
                 placeholder="Filtrar por médico"
                 data={doctorOptions}
@@ -252,7 +261,7 @@ export function TeaAgendaSemanal() {
                 clearable
                 nothingFoundMessage="Nenhum médico"
               />
-              <MultiSelect
+              <FloatingMultiSelect
                 label="Sala"
                 placeholder="Filtrar por sala"
                 data={roomOptions}
@@ -265,7 +274,27 @@ export function TeaAgendaSemanal() {
             </Group>
 
             {loading ? (
-              <Group justify="center"><Loader size="sm" /></Group>
+              <Box
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, minmax(0, 1fr))',
+                  gap: 10,
+                }}
+              >
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <Paper key={index} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                    <Stack gap={8}>
+                      <Group justify="space-between" align="center" wrap="nowrap">
+                        <Skeleton height={14} width="48%" radius="xl" />
+                        <Skeleton height={20} width={24} radius="xl" />
+                      </Group>
+                      <Skeleton height={12} width="70%" radius="xl" />
+                      <Skeleton height={12} width="60%" radius="xl" />
+                      <Skeleton height={20} width="52%" radius="xl" />
+                    </Stack>
+                  </Paper>
+                ))}
+              </Box>
             ) : (
               <Box
                 style={{

@@ -6,6 +6,21 @@ export interface BranchSettings {
   requireFacialForReportDelivery: boolean;
   requireFacialForPatientRegistration: boolean;
   noShowToleranceMinutes: number;
+  publicCheckInEnabled: boolean;
+  publicCheckInLastEnabledAt?: string | null;
+  publicCheckInLastEnabledByUserId?: string | null;
+  publicCheckInLastEnabledByName?: string | null;
+  publicCheckInLastDisabledAt?: string | null;
+  publicCheckInLastDisabledByUserId?: string | null;
+  publicCheckInLastDisabledByName?: string | null;
+  publicCheckInAuditTrail?: Array<{
+    id: string;
+    branchId: string;
+    action: 'ENABLED' | 'DISABLED' | string;
+    performedByUserId?: string | null;
+    performedByName?: string | null;
+    createdAt: string;
+  }>;
 }
 
 const branchSettingsService = {

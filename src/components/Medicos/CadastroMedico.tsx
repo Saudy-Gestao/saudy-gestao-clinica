@@ -6,10 +6,6 @@ import {
   Group,
   Text,
   Button,
-  Select,
-  Textarea,
-  TextInput,
-  MultiSelect,
   SimpleGrid,
   Stack,
   Paper,
@@ -17,10 +13,10 @@ import {
   Popover,
   ActionIcon,
   Modal,
-  Center,
   Tabs,
   Table,
   Loader,
+  Skeleton,
   Badge
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -30,6 +26,11 @@ import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
+import { FloatingDateInput } from '../common/FloatingDateInput';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 import doctorService from '../../services/doctorService';
 import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
@@ -707,8 +708,8 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); clearFieldError('nome'); }} error={fieldErrors.nome} required />
-                  <TextInput
+                  <FloatingInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); clearFieldError('nome'); }} error={fieldErrors.nome} required />
+                  <FloatingInput
                     label="CPF"
                     value={formatCPF(form.cpf)}
                     onChange={(e) => {
@@ -731,15 +732,15 @@ export function CadastroMedico() {
                     error={fieldErrors.cpf}
                     required
                   />
-                  <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
+                  <FloatingInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
                     <Popover.Target>
-                      <TextInput
+                      <FloatingDateInput
                         label="Data de nascimento"
                         placeholder="dd/mm/aaaa"
-                        value={birthDateInput}
-                        onChange={(e) => setBirthDateInput(formatDateInput(e.currentTarget.value))}
+                        value={form.birthDate}
+                        valueFormat="DD/MM/YYYY"
                         onBlur={() => {
                           if (!birthDateInput) {
                             setForm({ ...form, birthDate: null });
@@ -763,6 +764,22 @@ export function CadastroMedico() {
                         onClick={() => setDatePopoverOpened(true)}
                         style={{ cursor: 'text' }}
                         error={fieldErrors.birthDate}
+                        onChange={(value) => {
+                          if (value instanceof Date && !Number.isNaN(value.getTime())) {
+                            setBirthDateInput(formatDate(value));
+                            setForm({ ...form, birthDate: value });
+                            clearFieldError('birthDate');
+                            return;
+                          }
+
+                          if (typeof value === 'string') {
+                            const formatted = formatDateInput(value);
+                            setBirthDateInput(formatted);
+                            if (!formatted) {
+                              setForm({ ...form, birthDate: null });
+                            }
+                          }
+                        }}
                       />
                     </Popover.Target>
                     <Popover.Dropdown>
@@ -778,9 +795,8 @@ export function CadastroMedico() {
                     </Popover.Dropdown>
                   </Popover>
 
-                  <Select
+                  <FloatingSelect
                     label="Gênero"
-                    placeholder="Selecione"
                     data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
                     value={form.gender}
                     onChange={(v) => { setForm({ ...form, gender: (v as Gender) || '' }); clearFieldError('gender'); }}
@@ -788,9 +804,9 @@ export function CadastroMedico() {
                     required
                   />
 
-                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
-                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
-                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} required error={fieldErrors.cellphone} />
+                  <FloatingInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
+                  <FloatingInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
+                  <FloatingInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} required error={fieldErrors.cellphone} />
                 </SimpleGrid>
               </Paper>
 
@@ -798,34 +814,31 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Profissionais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
-                  <Select
+                  <FloatingInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
+                  <FloatingSelect
                     label="UF do CRM"
-                    placeholder="Selecione"
                     data={statesOptions}
                     value={form.crmState}
                     onChange={(v) => { setForm({ ...form, crmState: v || '' }); clearFieldError('crmState'); }}
                     required
                     error={fieldErrors.crmState}
                   />
-                  <Select
+                  <FloatingSelect
                     label="Especialidade principal"
-                    placeholder="Escolha uma"
                     data={specialtyOptions}
                     value={form.specialty}
                     onChange={(v) => { setForm({ ...form, specialty: v || '' }); clearFieldError('specialty'); }}
                     error={fieldErrors.specialty}
                     required
                   />
-                  <MultiSelect
+                  <FloatingMultiSelect
                     label="Outras especialidades"
-                    placeholder="Adicionar"
                     data={specialtyOptions}
                     value={form.specialties}
                     onChange={(v) => setForm({ ...form, specialties: v })}
                   />
                 </SimpleGrid>
-                <Textarea
+                <FloatingTextarea
                   label="Biografia"
                   placeholder="Breve descrição profissional"
                   value={form.biography}
@@ -839,7 +852,7 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <TextInput
+                  <FloatingInput
                     label="CEP"
                     value={formatCEP(form.zipCode)}
                     onChange={(e) => {
@@ -852,16 +865,15 @@ export function CadastroMedico() {
                     style={{ gridColumn: 'span 1' }}
                     rightSection={zipLoading ? <Loader size={16} /> : undefined}
                   />
-                  <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
-                  <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
+                  <FloatingInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
+                  <FloatingInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
                 </SimpleGrid>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" mt="md">
-                  <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
-                  <TextInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
-                  <TextInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
-                  <Select
+                  <FloatingInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
+                  <FloatingInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
+                  <FloatingInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
+                  <FloatingSelect
                     label="Estado"
-                    placeholder="UF"
                     data={statesOptions}
                     value={form.state}
                     onChange={(v) => setForm({ ...form, state: v || '' })}
@@ -891,9 +903,8 @@ export function CadastroMedico() {
                         </ActionIcon>
                       </Group>
                       <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" mb="md">
-                        <MultiSelect
+                        <FloatingMultiSelect
                           label="Dias de trabalho"
-                          placeholder="Selecione os dias"
                           data={daysOptions}
                           value={schedule.days}
                           onChange={(v) => {
@@ -902,7 +913,7 @@ export function CadastroMedico() {
                             setForm({ ...form, workingSchedules: updated });
                           }}
                         />
-                        <TextInput
+                        <FloatingInput
                           label="Horário início"
                           placeholder="08:00"
                           value={schedule.hoursStart}
@@ -912,7 +923,7 @@ export function CadastroMedico() {
                             setForm({ ...form, workingSchedules: updated });
                           }}
                         />
-                        <TextInput
+                        <FloatingInput
                           label="Horário fim"
                           placeholder="18:00"
                           value={schedule.hoursEnd}
@@ -956,120 +967,252 @@ export function CadastroMedico() {
             <Paper p="md" withBorder radius="md">
               <Group justify="space-between" mb="md" wrap="wrap">
                 <SectionTitle>Médicos cadastrados</SectionTitle>
-                <TextInput
-                  placeholder="Buscar por nome"
+                <FloatingInput
+                  label="Buscar médicos"
                   value={doctorQuery}
                   onChange={(e) => setDoctorQuery(e.currentTarget.value)}
-                  w={isMobile ? '100%' : 280}
+                  containerProps={{ w: isMobile ? '100%' : 320 }}
                 />
               </Group>
 
               {doctorsLoading ? (
-                <Center style={{ padding: 16, gap: 8 }}>
-                  <Loader size={18} />
-                  <Text size="sm">Carregando médicos...</Text>
-                </Center>
-              ) : (
-                <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                  <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-                    <Table.Thead>
-                      <Table.Tr style={{ borderBottom: 'none' }}>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CRM</Table.Th>}
-                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Especialidade</Table.Th>}
-                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {filteredDoctors.length === 0 ? (
+                isMobile ? (
+                  <Stack gap="sm">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                      <Paper key={idx} withBorder radius="md" p="md">
+                        <Group justify="space-between" align="flex-start" wrap="nowrap">
+                          <Stack gap={8} style={{ flex: 1 }}>
+                            <Skeleton height={18} width="52%" radius="sm" />
+                            <Skeleton height={14} width="38%" radius="sm" />
+                            <Skeleton height={14} width="46%" radius="sm" />
+                          </Stack>
+                          <Stack gap={8} align="flex-end">
+                            <Skeleton height={24} width={82} radius="xl" />
+                            <Group gap={8}>
+                              <Skeleton height={28} width={28} radius="xl" />
+                              <Skeleton height={28} width={28} radius="xl" />
+                              <Skeleton height={28} width={28} radius="xl" />
+                            </Group>
+                          </Stack>
+                        </Group>
+                      </Paper>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <Table horizontalSpacing="md" verticalSpacing="md">
+                      <Table.Thead>
                         <Table.Tr>
-                          <Table.Td colSpan={5}>
-                            <Text size="sm" c="dimmed" ta="center">Nenhum médico encontrado</Text>
-                          </Table.Td>
+                          <Table.Th>Nome</Table.Th>
+                          <Table.Th>CRM</Table.Th>
+                          <Table.Th>Especialidade</Table.Th>
+                          <Table.Th>Status</Table.Th>
+                          <Table.Th>Ações</Table.Th>
                         </Table.Tr>
-                      ) : (
-                        filteredDoctors.map((item) => (
-                          <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                            <Table.Td>
-                              <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.name}</Text>
-                            </Table.Td>
-                            {!isTablet && (
-                              <Table.Td>
-                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
-                                  {item.crm ? `${item.crm}${item.crmState ? `/${item.crmState}` : ''}` : '-'}
-                                </Text>
-                              </Table.Td>
-                            )}
-                            {!isTablet && (
-                              <Table.Td>
-                                <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{item.specialty || '-'}</Text>
-                              </Table.Td>
-                            )}
-                            {!isTablet && (
-                              <Table.Td>
-                                <Badge
-                                  color={item.isActive ? 'green' : 'red'}
-                                  variant="light"
-                                  size="sm"
-                                >
-                                  {item.isActive ? 'Ativo' : 'Inativo'}
-                                </Badge>
-                              </Table.Td>
-                            )}
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                          <Table.Tr key={idx}>
+                            <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
+                            <Table.Td><Skeleton height={16} width="60%" radius="sm" /></Table.Td>
+                            <Table.Td><Skeleton height={16} width="72%" radius="sm" /></Table.Td>
+                            <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
                             <Table.Td>
                               <Group gap={6} wrap="nowrap">
-                                <ActionIcon
-                                  variant="subtle"
-                                  style={{ color: 'var(--mantine-color-text)' }}
-                                  onClick={() => {
-                                    setSelectedDoctor(item);
-                                    setDetailsOpen(true);
-                                  }}
-                                  title="Visualizar"
-                                >
-                                  <Eye size={16} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  style={{ color: 'var(--mantine-color-text)' }}
-                                  onClick={() => {
-                                    setSelectedDoctor(item);
-                                    setEditingDoctorId(item.id);
-                                    populateFormFromDoctor(item.raw);
-                                    setActiveTab('cadastro');
-                                  }}
-                                  title="Editar"
-                                >
-                                  <Pencil size={16} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color={item.isActive ? 'orange' : 'green'}
-                                  onClick={() => handleToggleActive(item)}
-                                  title={item.isActive ? 'Desativar' : 'Ativar'}
-                                >
-                                  <Power size={16} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={() => {
-                                    setDeleteTarget(item);
-                                    setDeleteConfirmOpen(true);
-                                  }}
-                                  title="Excluir"
-                                >
-                                  <Trash size={16} />
-                                </ActionIcon>
+                                <Skeleton height={28} width={28} radius="xl" />
+                                <Skeleton height={28} width={28} radius="xl" />
+                                <Skeleton height={28} width={28} radius="xl" />
+                                <Skeleton height={28} width={28} radius="xl" />
                               </Group>
                             </Table.Td>
                           </Table.Tr>
-                        ))
-                      )}
-                    </Table.Tbody>
-                  </Table>
-                </Box>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                )
+              ) : (
+                isMobile ? (
+                  filteredDoctors.length === 0 ? (
+                    <Paper withBorder radius="md" p="xl">
+                      <Text size="sm" c="dimmed" ta="center">
+                        Nenhum médico encontrado. Ajuste a busca ou cadastre um novo médico.
+                      </Text>
+                    </Paper>
+                  ) : (
+                    <Stack gap="sm">
+                      {filteredDoctors.map((item) => (
+                        <Paper key={item.id} withBorder radius="md" p="md">
+                          <Group justify="space-between" align="flex-start" wrap="nowrap">
+                            <Stack gap={4} style={{ flex: 1 }}>
+                              <Text fw={600} size="sm">{item.name}</Text>
+                              <Text size="xs" c="dimmed">
+                                {item.crm ? `${item.crm}${item.crmState ? `/${item.crmState}` : ''}` : 'CRM não informado'}
+                              </Text>
+                              <Text size="xs" c="dimmed">{item.specialty || 'Especialidade não informada'}</Text>
+                            </Stack>
+                            <Badge color={item.isActive ? 'green' : 'red'} variant="light" size="sm">
+                              {item.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </Group>
+                          <Group gap={8} mt="md" wrap="nowrap">
+                            <ActionIcon
+                              variant="light"
+                              color="gray"
+                              onClick={() => {
+                                setSelectedDoctor(item);
+                                setDetailsOpen(true);
+                              }}
+                              title="Visualizar"
+                            >
+                              <Eye size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="blue"
+                              onClick={() => {
+                                setSelectedDoctor(item);
+                                setEditingDoctorId(item.id);
+                                populateFormFromDoctor(item.raw);
+                                setActiveTab('cadastro');
+                              }}
+                              title="Editar"
+                            >
+                              <Pencil size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color={item.isActive ? 'orange' : 'green'}
+                              onClick={() => handleToggleActive(item)}
+                              title={item.isActive ? 'Desativar' : 'Ativar'}
+                            >
+                              <Power size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() => {
+                                setDeleteTarget(item);
+                                setDeleteConfirmOpen(true);
+                              }}
+                              title="Excluir"
+                            >
+                              <Trash size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  )
+                ) : (
+                  <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                      <Table.Thead>
+                        <Table.Tr style={{ borderBottom: 'none' }}>
+                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CRM</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Especialidade</Table.Th>}
+                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
+                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {filteredDoctors.length === 0 ? (
+                          <Table.Tr>
+                            <Table.Td colSpan={5}>
+                              <Text size="sm" c="dimmed" ta="center">
+                                Nenhum médico encontrado. Ajuste a busca ou cadastre um novo médico.
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ) : (
+                          filteredDoctors.map((item) => (
+                            <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                              <Table.Td>
+                                <Stack gap={2}>
+                                  <Text fw={600} size="sm">{item.name}</Text>
+                                  <Text size="xs" c="dimmed">
+                                    {item.crm ? `${item.crm}${item.crmState ? `/${item.crmState}` : ''}` : 'CRM não informado'}
+                                  </Text>
+                                </Stack>
+                              </Table.Td>
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Text size="sm">{item.crm ? `${item.crm}${item.crmState ? `/${item.crmState}` : ''}` : '-'}</Text>
+                                </Table.Td>
+                              )}
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Text size="sm" c={item.specialty ? 'var(--mantine-color-text)' : 'dimmed'}>
+                                    {item.specialty || 'Especialidade não informada'}
+                                  </Text>
+                                </Table.Td>
+                              )}
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Badge
+                                    color={item.isActive ? 'green' : 'red'}
+                                    variant="light"
+                                    size="sm"
+                                  >
+                                    {item.isActive ? 'Ativo' : 'Inativo'}
+                                  </Badge>
+                                </Table.Td>
+                              )}
+                              <Table.Td>
+                                <Group gap={6} wrap="nowrap">
+                                  <ActionIcon
+                                    variant="light"
+                                    color="gray"
+                                    onClick={() => {
+                                      setSelectedDoctor(item);
+                                      setDetailsOpen(true);
+                                    }}
+                                    title="Visualizar"
+                                  >
+                                    <Eye size={16} />
+                                  </ActionIcon>
+                                  <ActionIcon
+                                    variant="light"
+                                    color="blue"
+                                    onClick={() => {
+                                      setSelectedDoctor(item);
+                                      setEditingDoctorId(item.id);
+                                      populateFormFromDoctor(item.raw);
+                                      setActiveTab('cadastro');
+                                    }}
+                                    title="Editar"
+                                  >
+                                    <Pencil size={16} />
+                                  </ActionIcon>
+                                  <ActionIcon
+                                    variant="light"
+                                    color={item.isActive ? 'orange' : 'green'}
+                                    onClick={() => handleToggleActive(item)}
+                                    title={item.isActive ? 'Desativar' : 'Ativar'}
+                                  >
+                                    <Power size={16} />
+                                  </ActionIcon>
+                                  <ActionIcon
+                                    variant="light"
+                                    color="red"
+                                    onClick={() => {
+                                      setDeleteTarget(item);
+                                      setDeleteConfirmOpen(true);
+                                    }}
+                                    title="Excluir"
+                                  >
+                                    <Trash size={16} />
+                                  </ActionIcon>
+                                </Group>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))
+                        )}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                )
               )}
             </Paper>
           </Tabs.Panel>

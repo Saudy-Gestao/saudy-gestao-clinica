@@ -4,12 +4,8 @@ import {
   Paper,
   Tabs,
   Box,
-  TextInput,
   Button,
   Switch,
-  NumberInput,
-  Textarea,
-  Select,
   Table,
   Badge,
   Group,
@@ -22,6 +18,7 @@ import {
   Modal,
   Code,
   Card,
+  Skeleton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -40,6 +37,10 @@ import {
 import whatsappService from '../../services/whatsappService';
 import { useWhatsAppPageDataQuery } from '../../hooks/useWhatsAppPageDataQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingNumberInput } from '../common/FloatingNumberInput';
+import { FloatingTextarea } from '../common/FloatingTextarea';
+import { FloatingSelect } from '../common/FloatingSelect';
 
 interface TemplateFormValues {
   type: string;
@@ -357,7 +358,14 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             </Alert>
 
             <Stack gap="md">
-              {templates.map((template) => (
+              {isFetching && templates.length === 0 ? Array.from({ length: 3 }).map((_, index) => (
+                <Card key={index} shadow="sm" padding="lg" withBorder>
+                  <Stack gap="sm">
+                    <Skeleton height={20} width="40%" radius="xl" />
+                    <Skeleton height={16} width="80%" radius="xl" />
+                  </Stack>
+                </Card>
+              )) : templates.map((template) => (
                 <Card key={template.id} shadow="sm" padding="lg" withBorder>
                   <Group justify="space-between" mb="xs">
                     <div>
@@ -451,7 +459,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                   onChange={(e) => setNotificationForm(prev => ({ ...prev, sendConfirmationEnabled: e.target.checked }))}
                 />
 
-                <NumberInput
+                <FloatingNumberInput
                   label="Horas antes do agendamento"
                   description="Quantas horas antes do agendamento enviar a confirmação"
                   min={1}
@@ -470,7 +478,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                   onChange={(e) => setNotificationForm(prev => ({ ...prev, sendReminderEnabled: e.target.checked }))}
                 />
 
-                <NumberInput
+                <FloatingNumberInput
                   label="Horas antes do agendamento"
                   description="Quantas horas antes do agendamento enviar o lembrete"
                   min={1}
@@ -558,7 +566,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       >
         <form onSubmit={handleSaveTemplate}>
           <Stack gap="md">
-            <Select
+            <FloatingSelect
               label="Tipo de Mensagem"
               required
               data={[
@@ -571,7 +579,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               onChange={(value) => setTemplateForm(prev => ({ ...prev, type: value as any }))}
             />
 
-            <TextInput
+            <FloatingInput
               label="Nome do Template"
               placeholder="Ex: Confirmação Padrão"
               required
@@ -579,13 +587,15 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
             />
 
-            <TextInput
+            <FloatingInput
               label="Nome do Template (Gupshup/Meta HSM)"
               placeholder="Ex: confirmacao_agendamento"
-              description="Nome exato do template aprovado no painel Gupshup. Quando preenchido, o envio usa HSM (funciona sem o paciente ter iniciado contato)."
               value={templateForm.hsmTemplateName}
               onChange={(e) => setTemplateForm(prev => ({ ...prev, hsmTemplateName: e.target.value }))}
             />
+            <Text size="xs" c="dimmed" mt={-8}>
+              Nome exato do template aprovado no painel Gupshup. Quando preenchido, o envio usa HSM.
+            </Text>
 
             <div>
               <Text size="sm" fw={500} mb={4}>Variáveis Disponíveis</Text>
@@ -604,7 +614,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               </Group>
             </div>
 
-            <Textarea
+            <FloatingTextarea
               label="Mensagem"
               placeholder="Digite a mensagem..."
               required

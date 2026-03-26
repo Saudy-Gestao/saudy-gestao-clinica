@@ -10,6 +10,7 @@ import {
   Group,
   Modal,
   Paper,
+  Skeleton,
   Stack,
   Table,
   Text,
@@ -34,6 +35,7 @@ import reportAddendumService from '../../services/reportAddendumService';
 import { useReportExamsPageDataQuery } from '../../hooks/useReportExamsPageDataQuery';
 import { useReportPreviousReportsQuery } from '../../hooks/useReportPreviousReportsQuery';
 import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQuery';
+import { FloatingInput } from '../common/FloatingInput';
 
 type ExamStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type ExamPriority = 'normal' | 'urgente';
@@ -316,6 +318,16 @@ const statusLabel: Record<ExamStatus, string> = {
   finalizado: 'Finalizado',
 };
 
+const priorityLabel: Record<ExamPriority, string> = {
+  normal: 'Normal',
+  urgente: 'Urgente',
+};
+
+const priorityColor: Record<ExamPriority, string> = {
+  normal: 'gray',
+  urgente: 'red',
+};
+
 const REPORT_PLACEHOLDERS = [
   { key: '{{paciente_nome}}', label: 'Nome do paciente' },
   { key: '{{cpf}}', label: 'CPF' },
@@ -394,7 +406,7 @@ export function LaudoExames() {
   const [finalizePassword, setFinalizePassword] = useState('');
   const [finalizeTarget, setFinalizeTarget] = useState<'laudo' | 'adendo' | null>(null);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
-  const { data: reportPageData, error: reportPageError } = useReportExamsPageDataQuery();
+  const { data: reportPageData, error: reportPageError, isLoading: reportPageLoading } = useReportExamsPageDataQuery();
   const { data: previousReportsData = [] } = useReportPreviousReportsQuery(selectedExamId ? (examRows.find((exam) => exam.id === selectedExamId)?.cpf || null) : null);
   const selectedExamReportId = useMemo(() => {
     const exam = examRows.find((item) => item.id === selectedExamId);
@@ -766,6 +778,8 @@ export function LaudoExames() {
       );
     });
   }, [examRows, query]);
+
+  const listLoading = reportPageLoading && examRows.length === 0;
 
   const filteredTemplates = useMemo(() => {
     if (!selectedExam) return templates;
@@ -1546,21 +1560,13 @@ export function LaudoExames() {
         </Group>
 
         <Group gap="md" align="end" mb="md">
-          <TextInput
-            placeholder={isMobile ? 'Buscar...' : 'Buscar por paciente ou exame...'}
-            leftSection={<Search size={16} color={isDark ? '#7d92c6' : '#999'} />}
+          <FloatingInput
+            label="Buscar exames"
+            placeholder={isMobile ? 'Buscar...' : 'Buscar por paciente, exame ou solicitante'}
+            rightSection={<Search size={16} color={isDark ? '#7d92c6' : '#999'} />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            radius="md"
-            size={isMobile ? 'sm' : 'md'}
             style={{ flex: 1 }}
-            styles={isDark ? {
-              input: {
-                backgroundColor: 'transparent',
-                borderColor,
-                color: 'var(--mantine-color-text)',
-              },
-            } : undefined}
           />
         </Group>
 
@@ -1583,7 +1589,55 @@ export function LaudoExames() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredRows.map((exam) => {
+                  {listLoading ? Array.from({ length: 5 }).map((_, index) => (
+                    <Table.Tr key={`laudo-skeleton-${index}`}>
+                      <Table.Td>
+                        <Stack gap={8}>
+                          <Skeleton height={16} width="58%" radius="sm" />
+                          <Skeleton height={12} width="38%" radius="sm" />
+                        </Stack>
+                      </Table.Td>
+                      {!isTablet && (
+                        <Table.Td>
+                          <Stack gap={8}>
+                            <Skeleton height={16} width="70%" radius="sm" />
+                            <Skeleton height={12} width="45%" radius="sm" />
+                          </Stack>
+                        </Table.Td>
+                      )}
+                      {!isTablet && <Table.Td><Skeleton height={16} width="65%" radius="sm" /></Table.Td>}
+                      {!isTablet && (
+                        <Table.Td>
+                          <Group gap={6}>
+                            <Skeleton height={22} width={28} radius="xl" />
+                            <Skeleton height={22} width={28} radius="xl" />
+                          </Group>
+                        </Table.Td>
+                      )}
+                      <Table.Td><Skeleton height={24} width={110} radius="xl" /></Table.Td>
+                      <Table.Td><Skeleton height={24} width={90} radius="xl" /></Table.Td>
+                      <Table.Td>
+                        <Group gap={6}>
+                          <Skeleton height={28} width={28} radius="sm" />
+                          <Skeleton height={28} width={28} radius="sm" />
+                          <Skeleton height={28} width={28} radius="sm" />
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  )) : filteredRows.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={isTablet ? 4 : 7}>
+                        <Stack align="center" py="xl" gap={6}>
+                          <Text fw={600} size="sm">
+                            Nenhum exame encontrado
+                          </Text>
+                          <Text size="sm" c="dimmed">
+                            Ajuste a busca ou aguarde novos exames entrarem na fila de laudo.
+                          </Text>
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : filteredRows.map((exam) => {
                     return (
                     <Table.Tr
                       key={exam.id}
@@ -1597,14 +1651,34 @@ export function LaudoExames() {
                             {exam.patientName}
                           </Text>
                           <Text size="xs" c="dimmed">
-                            {exam.scheduledAt}
+                            CPF: {exam.cpf || 'Não informado'}
                           </Text>
                         </Stack>
                       </Table.Td>
 
-                      {!isTablet && <Table.Td>{exam.examType}</Table.Td>}
+                      {!isTablet && (
+                        <Table.Td>
+                          <Stack gap={0}>
+                            <Text fw={500} size="sm">
+                              {exam.examType}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              {exam.scheduledAt || 'Data não informada'}
+                            </Text>
+                          </Stack>
+                        </Table.Td>
+                      )}
 
-                      {!isTablet && <Table.Td>{exam.requestingDoctor}</Table.Td>}
+                      {!isTablet && (
+                        <Table.Td>
+                          <Stack gap={0}>
+                            <Text size="sm">{exam.requestingDoctor || '-'}</Text>
+                            <Text size="xs" c="dimmed">
+                              Laudante: {exam.assignedTo || '-'}
+                            </Text>
+                          </Stack>
+                        </Table.Td>
+                      )}
 
                       {!isTablet && (
                         <Table.Td>
@@ -1626,8 +1700,8 @@ export function LaudoExames() {
                       </Table.Td>
 
                       <Table.Td>
-                        <Badge color={exam.priority === 'urgente' ? 'red' : 'gray'} variant="light">
-                          {exam.priority === 'urgente' ? 'Urgente' : 'Normal'}
+                        <Badge color={priorityColor[exam.priority]} variant="light">
+                          {priorityLabel[exam.priority]}
                         </Badge>
                       </Table.Td>
 

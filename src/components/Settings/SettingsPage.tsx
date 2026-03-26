@@ -20,6 +20,8 @@ import {
   useMantineColorScheme,
   Switch,
   NumberInput,
+  TextInput,
+  SimpleGrid,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -37,6 +39,9 @@ import {
   ChevronLeft,
   Settings,
   MessageCircle,
+  Copy,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -150,6 +155,17 @@ const getStoredBranchQuotas = () => {
   } catch {
     return {} as Record<string, { allowedCreates: number; initialBranchCount: number }>;
   }
+};
+
+const formatAuditDateTime = (value?: string | null) => {
+  if (!value) return 'Ainda não registrado';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Ainda não registrado';
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
 };
 
 export function SettingsPage() {
@@ -978,6 +994,55 @@ export function SettingsPage() {
     }
   };
 
+  const handleTogglePublicCheckIn = async (enabled: boolean) => {
+    if (!selectedBranchForSettings) return;
+    setSavingBranchSettings(true);
+    try {
+      const updated = await branchSettingsService.updateBranchSettings(
+        selectedBranchForSettings,
+        { publicCheckInEnabled: enabled }
+      );
+      setBranchSettings(updated);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.settingsBranchSettings, selectedBranchForSettings] });
+      notifications.show({
+        title: enabled ? 'Check-in ligado' : 'Check-in desligado',
+        message: enabled
+          ? 'O totem desta filial já pode ser usado com login.'
+          : 'O totem desta filial foi desligado com sucesso.',
+        color: 'green',
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.error || 'Erro ao atualizar o check-in público',
+        color: 'red',
+      });
+    } finally {
+      setSavingBranchSettings(false);
+    }
+  };
+
+  const handleCopyPublicCheckInUrl = async () => {
+    if (!selectedBranchForSettings || typeof window === 'undefined') return;
+
+    const checkInUrl = `${window.location.origin}/check-in/${selectedBranchForSettings}`;
+
+    try {
+      await navigator.clipboard.writeText(checkInUrl);
+      notifications.show({
+        title: 'URL copiada',
+        message: 'A URL pronta do check-in foi copiada para a área de transferência.',
+        color: 'green',
+      });
+    } catch {
+      notifications.show({
+        title: 'Não foi possível copiar',
+        message: checkInUrl,
+        color: 'yellow',
+      });
+    }
+  };
+
   useEffect(() => {
     if (!selectedBranchForSettings) {
       setBranchSettings(null);
@@ -1763,6 +1828,115 @@ export function SettingsPage() {
                                                         Salvar tolerância
                                                     </Button>
                                                 </Group>
+                                            </Stack>
+                                        </Paper>
+
+                                        <Paper
+                                            p="lg"
+                                            radius="md"
+                                            withBorder
+                                            style={{
+                                                borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                                background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                            }}
+                                        >
+                                            <Stack gap="md">
+                                                <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                                    <Box style={{ flex: 1 }}>
+                                                        <Text fw={600} size="sm" mb={4}>
+                                                            Check-in da Filial
+                                                        </Text>
+                                                        <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                            Controle se o totem desta filial está ligado, audite quem ativou ou desligou e copie a URL pronta para uso.
+                                                        </Text>
+                                                    </Box>
+                                                    <Switch
+                                                        checked={branchSettings?.publicCheckInEnabled || false}
+                                                        onChange={(event) => handleTogglePublicCheckIn(event.currentTarget.checked)}
+                                                        disabled={savingBranchSettings}
+                                                        size="lg"
+                                                        color={DARK_BLUE}
+                                                        onLabel={<Power size={14} />}
+                                                        offLabel={<PowerOff size={14} />}
+                                                    />
+                                                </Group>
+
+                                                <Group align="end" wrap="wrap">
+                                                    <TextInput
+                                                        label="URL pronta do check-in"
+                                                        value={selectedBranchForSettings && typeof window !== 'undefined'
+                                                            ? `${window.location.origin}/check-in/${selectedBranchForSettings}`
+                                                            : ''}
+                                                        readOnly
+                                                        styles={{
+                                                            label: { marginBottom: 8, fontWeight: 500 },
+                                                        }}
+                                                        style={{ flex: 1, minWidth: 320 }}
+                                                    />
+                                                    <Button
+                                                        leftSection={<Copy size={16} />}
+                                                        variant="light"
+                                                        onClick={handleCopyPublicCheckInUrl}
+                                                        disabled={!selectedBranchForSettings}
+                                                    >
+                                                        Copiar URL
+                                                    </Button>
+                                                </Group>
+
+                                                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                                                    <Paper p="md" withBorder radius="md" bg={isDark ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-gray-0)'}>
+                                                        <Stack gap={4}>
+                                                            <Text size="xs" c="dimmed">Última ativação</Text>
+                                                            <Text fw={600} size="sm">
+                                                                {branchSettings?.publicCheckInLastEnabledByName || 'Ainda não ativado'}
+                                                            </Text>
+                                                            <Text size="xs" c="dimmed">
+                                                                {formatAuditDateTime(branchSettings?.publicCheckInLastEnabledAt)}
+                                                            </Text>
+                                                        </Stack>
+                                                    </Paper>
+
+                                                    <Paper p="md" withBorder radius="md" bg={isDark ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-gray-0)'}>
+                                                        <Stack gap={4}>
+                                                            <Text size="xs" c="dimmed">Último desligamento</Text>
+                                                            <Text fw={600} size="sm">
+                                                                {branchSettings?.publicCheckInLastDisabledByName || 'Ainda não desligado'}
+                                                            </Text>
+                                                            <Text size="xs" c="dimmed">
+                                                                {formatAuditDateTime(branchSettings?.publicCheckInLastDisabledAt)}
+                                                            </Text>
+                                                        </Stack>
+                                                    </Paper>
+                                                </SimpleGrid>
+
+                                                <Box>
+                                                    <Text fw={600} size="sm" mb={8}>
+                                                        Auditoria recente do check-in
+                                                    </Text>
+                                                    <Stack gap="xs">
+                                                        {(branchSettings?.publicCheckInAuditTrail || []).length > 0 ? (
+                                                            (branchSettings?.publicCheckInAuditTrail || []).map((entry) => (
+                                                                <Group key={entry.id} justify="space-between" wrap="nowrap">
+                                                                    <Group gap="xs" wrap="nowrap">
+                                                                        <Badge color={entry.action === 'ENABLED' ? 'green' : 'red'} variant="light">
+                                                                            {entry.action === 'ENABLED' ? 'Ligado' : 'Desligado'}
+                                                                        </Badge>
+                                                                        <Text size="sm">
+                                                                            {entry.performedByName || 'Usuário não identificado'}
+                                                                        </Text>
+                                                                    </Group>
+                                                                    <Text size="xs" c="dimmed">
+                                                                        {formatAuditDateTime(entry.createdAt)}
+                                                                    </Text>
+                                                                </Group>
+                                                            ))
+                                                        ) : (
+                                                            <Text size="sm" c="dimmed">
+                                                                Ainda não há registros de ativação ou desligamento para esta filial.
+                                                            </Text>
+                                                        )}
+                                                    </Stack>
+                                                </Box>
                                             </Stack>
                                         </Paper>
 

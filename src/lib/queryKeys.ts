@@ -46,6 +46,7 @@ export const queryKeys = {
   teaManualGrid: ['tea-manual-grid'] as const,
   patientQueue: ['patient-queue'] as const,
   patientSummary: ['patient-summary'] as const,
+  currentUserProfile: ['current-user-profile'] as const,
   publicBranchInfo: ['public-branch-info'] as const,
   publicPreSchedulingMeta: ['public-pre-scheduling-meta'] as const,
   whatsappPageData: ['whatsapp-page-data'] as const,

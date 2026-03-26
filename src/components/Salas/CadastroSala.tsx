@@ -5,17 +5,14 @@ import {
   ActionIcon,
   Box,
   Button,
-  Center,
+  Badge,
   Group,
-  Loader,
   Modal,
-  MultiSelect,
-  Select,
+  Paper,
+  Skeleton,
   Stack,
   Table,
   Text,
-  TextInput,
-  Textarea,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -25,6 +22,10 @@ import { DARK_BLUE } from '../../themes/theme';
 import sectorService from '../../services/sectorService';
 import doctorService from '../../services/doctorService';
 import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
+import { FloatingInput } from '../common/FloatingInput';
+import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
+import { FloatingSelect } from '../common/FloatingSelect';
+import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
@@ -86,7 +87,6 @@ export function CadastroSala() {
   const [items, setItems] = useState<SalaRow[]>([]);
   const [doctorOptions, setDoctorOptions] = useState<DoctorOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -214,10 +214,6 @@ export function CadastroSala() {
       .filter((sector: SalaRow) => sector.id && sector.branchId === selectedBranchId);
     setItems(mapped);
   }, [roomsQuery.data, selectedBranchId]);
-
-  useEffect(() => {
-    setLoadingDoctors(doctorsQuery.isFetching);
-  }, [doctorsQuery.isFetching]);
 
   useEffect(() => {
     if (!doctorsQuery.error) return;
@@ -407,9 +403,8 @@ export function CadastroSala() {
         </Group>
 
         <Group mb={isMobile ? 16 : 24} grow align="flex-end">
-          <Select
+          <FloatingSelect
             label="Filial"
-            placeholder={loadingBranches ? 'Carregando filiais...' : 'Selecione a filial'}
             value={selectedBranchId}
             onChange={setSelectedBranchId}
             data={branches.map((branch) => ({ value: branch.id, label: branch.label }))}
@@ -417,7 +412,7 @@ export function CadastroSala() {
             searchable
             nothingFoundMessage="Nenhuma filial encontrada"
           />
-          <TextInput
+          <FloatingInput
             label="Buscar sala"
             placeholder="Buscar por nome ou descrição..."
             value={query}
@@ -426,38 +421,84 @@ export function CadastroSala() {
         </Group>
 
         {loading ? (
-          <Center style={{ padding: 24, gap: 8 }}>
-            <Loader />
-            <Text>Carregando salas...</Text>
-          </Center>
+          isMobile ? (
+            <Stack gap="sm">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <Paper key={idx} withBorder radius="md" p="md">
+                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                    <Stack gap={8} style={{ flex: 1 }}>
+                      <Skeleton height={18} width="52%" radius="sm" />
+                      <Skeleton height={14} width="42%" radius="sm" />
+                      <Skeleton height={14} width="58%" radius="sm" />
+                    </Stack>
+                    <Group gap={8}>
+                      <Skeleton height={28} width={28} radius="xl" />
+                      <Skeleton height={28} width={28} radius="xl" />
+                    </Group>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <Table horizontalSpacing="md" verticalSpacing="md">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Nome da sala</Table.Th>
+                    <Table.Th>Médicos vinculados</Table.Th>
+                    <Table.Th>Descrição</Table.Th>
+                    <Table.Th>Filial</Table.Th>
+                    <Table.Th>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <Table.Tr key={idx}>
+                      <Table.Td><Skeleton height={16} width="58%" radius="sm" /></Table.Td>
+                      <Table.Td><Skeleton height={14} width="70%" radius="sm" /></Table.Td>
+                      <Table.Td><Skeleton height={14} width="62%" radius="sm" /></Table.Td>
+                      <Table.Td><Skeleton height={14} width="48%" radius="sm" /></Table.Td>
+                      <Table.Td>
+                        <Group gap={8} justify="flex-end">
+                          <Skeleton height={28} width={28} radius="xl" />
+                          <Skeleton height={28} width={28} radius="xl" />
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )
         ) : (
-          <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-            <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: 'none' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
-                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos vinculados</Table.Th>}
-                {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+          isMobile ? (
+            filteredItems.length === 0 ? (
+              <Paper withBorder radius="md" p="xl">
+                <Text c="dimmed" ta="center">
+                  Nenhuma sala encontrada para esta filial.
+                </Text>
+              </Paper>
+            ) : (
+              <Stack gap="sm">
                 {filteredItems.map((item) => (
-                  <Table.Tr key={item.id}>
-                    <Table.Td>
-                      <Text fw={600}>{item.name}</Text>
-                    </Table.Td>
-                    {!isMobile && <Table.Td><Text c="dimmed">{(item.doctorNames || []).length > 0 ? item.doctorNames?.join(', ') : '-'}</Text></Table.Td>}
-                    {!isMobile && <Table.Td><Text c="dimmed">{item.description || '-'}</Text></Table.Td>}
-                    {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
-                    <Table.Td>
-                      <Group gap="xs" justify="flex-end">
-                        <ActionIcon variant="subtle" color="blue" onClick={() => openModal(item)} aria-label="Editar sala">
+                  <Paper key={item.id} withBorder radius="md" p="md">
+                    <Group justify="space-between" align="flex-start" wrap="nowrap">
+                      <Stack gap={4} style={{ flex: 1 }}>
+                        <Text fw={600}>{item.name}</Text>
+                        <Text size="sm" c="dimmed">{branchLabelById[item.branchId] || '-'}</Text>
+                        <Text size="sm" c="dimmed">
+                          {(item.doctorNames || []).length > 0 ? `${item.doctorNames?.length} médico(s) vinculados` : 'Sem médicos vinculados'}
+                        </Text>
+                        {item.description ? (
+                          <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text>
+                        ) : null}
+                      </Stack>
+                      <Group gap={8}>
+                        <ActionIcon variant="light" color="blue" onClick={() => openModal(item)} aria-label="Editar sala">
                           <Pencil size={16} />
                         </ActionIcon>
                         <ActionIcon
-                          variant="subtle"
+                          variant="light"
                           color="red"
                           onClick={() => {
                             setDeleteTarget(item);
@@ -468,19 +509,80 @@ export function CadastroSala() {
                           <Trash2 size={16} />
                         </ActionIcon>
                       </Group>
-                    </Table.Td>
-                  </Table.Tr>
+                    </Group>
+                  </Paper>
                 ))}
-                {filteredItems.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                      <Text c="dimmed" py="md">Nenhuma sala encontrada para esta filial</Text>
-                    </Table.Td>
+              </Stack>
+            )
+          ) : (
+            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                <Table.Thead>
+                  <Table.Tr style={{ borderBottom: 'none' }}>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
+                    {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos vinculados</Table.Th>}
+                    {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
+                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
                   </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Box>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filteredItems.map((item) => (
+                    <Table.Tr key={item.id}>
+                      <Table.Td>
+                        <Text fw={600}>{item.name}</Text>
+                      </Table.Td>
+                      {!isMobile && (
+                        <Table.Td>
+                          {(item.doctorNames || []).length > 0 ? (
+                            <Group gap={6}>
+                              {(item.doctorNames || []).slice(0, 2).map((doctorName) => (
+                                <Badge key={doctorName} variant="light" color="blue" size="sm">
+                                  {doctorName}
+                                </Badge>
+                              ))}
+                              {(item.doctorNames || []).length > 2 ? (
+                                <Text size="xs" c="dimmed">+{(item.doctorNames || []).length - 2}</Text>
+                              ) : null}
+                            </Group>
+                          ) : (
+                            <Text c="dimmed">-</Text>
+                          )}
+                        </Table.Td>
+                      )}
+                      {!isMobile && <Table.Td><Text c="dimmed" lineClamp={2}>{item.description || '-'}</Text></Table.Td>}
+                      {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
+                      <Table.Td>
+                        <Group gap="xs" justify="flex-end">
+                          <ActionIcon variant="light" color="blue" onClick={() => openModal(item)} aria-label="Editar sala">
+                            <Pencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="light"
+                            color="red"
+                            onClick={() => {
+                              setDeleteTarget(item);
+                              setDeleteModalOpen(true);
+                            }}
+                            aria-label="Excluir sala"
+                          >
+                            <Trash2 size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                  {filteredItems.length === 0 && (
+                    <Table.Tr>
+                      <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
+                        <Text c="dimmed" py="md">Nenhuma sala encontrada para esta filial.</Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )
         )}
       </Box>
 
@@ -491,9 +593,8 @@ export function CadastroSala() {
         centered
       >
         <Stack>
-          <Select
+          <FloatingSelect
             label="Filial"
-            placeholder="Selecione a filial"
             value={form.branchId}
             onChange={(value) => setForm((prev) => ({ ...prev, branchId: value || '' }))}
             data={branches.map((branch) => ({ value: branch.id, label: branch.label }))}
@@ -501,7 +602,7 @@ export function CadastroSala() {
             nothingFoundMessage="Nenhuma filial encontrada"
             required
           />
-          <TextInput
+          <FloatingInput
             label="Nome da sala"
             placeholder="Ex.: Sala 01"
             value={form.name}
@@ -511,9 +612,8 @@ export function CadastroSala() {
             }}
             required
           />
-          <MultiSelect
+          <FloatingMultiSelect
             label="Médicos vinculados"
-            placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um ou mais médicos'}
             value={form.doctorIds}
             onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
             data={availableDoctorOptions}
@@ -521,7 +621,7 @@ export function CadastroSala() {
             clearable
             nothingFoundMessage="Nenhum médico encontrado para esta filial"
           />
-          <Textarea
+          <FloatingTextarea
             label="Descrição"
             placeholder="Informações adicionais da sala"
             minRows={3}
