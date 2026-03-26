@@ -151,7 +151,6 @@ export function PreAtendimento() {
   const [checklistData, setChecklistData] = useState({
     dadosConferidos: false,
     contatoConferido: false,
-    autorizacaoConferida: false,
     guiaNumero: '',
     atendimentoParticular: false,
     pagamentoRealizado: false,
@@ -224,7 +223,7 @@ export function PreAtendimento() {
     return Boolean(normalized) && !normalized.startsWith('tmp-');
   };
 
-  const canEditPayment = checklistData.atendimentoParticular || isPrivateCare(checklistPatient);
+  const canEditPayment = checklistData.atendimentoParticular;
   const invalidateReceptionQueue = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.receptionQueue });
   };
@@ -253,7 +252,6 @@ export function PreAtendimento() {
     setChecklistData({
       dadosConferidos: false,
       contatoConferido: false,
-      autorizacaoConferida: false,
       guiaNumero: '',
       atendimentoParticular: false,
       pagamentoRealizado: false,
@@ -266,9 +264,9 @@ export function PreAtendimento() {
 
   const canCompleteChecklist = () => {
     const basicChecks = checklistData.dadosConferidos && checklistData.contatoConferido;
-    const authorizationChecks = checklistData.atendimentoParticular || isPrivateCare(checklistPatient)
+    const authorizationChecks = checklistData.atendimentoParticular
       ? checklistData.pagamentoRealizado && checklistData.valorPagamento > 0 && checklistData.formaPagamento.trim().length > 0
-      : checklistData.autorizacaoConferida && checklistData.guiaNumero.trim().length > 0;
+      : checklistData.guiaNumero.trim().length > 0;
 
     return basicChecks && authorizationChecks && checklistData.agendaConferida && facialValidationVerified;
   };
@@ -869,7 +867,7 @@ export function PreAtendimento() {
     setChecklistData((prev) => ({
       ...prev,
       atendimentoParticular: isPrivateCare(enrichedPatient),
-      guiaNumero: enrichedPatient.numCarteira || prev.guiaNumero || '',
+      guiaNumero: isPrivateCare(enrichedPatient) ? '' : (enrichedPatient.numCarteira || prev.guiaNumero || ''),
       valorPagamento: prev.valorPagamento || 0,
       formaPagamento: prev.formaPagamento || '',
     }));
@@ -961,7 +959,7 @@ export function PreAtendimento() {
       const checklistPatientBirthDate = parseDisplayDateToApi(checklistPatient.dataNascimento);
       const checklistPatientGender = normalizeChecklistGenderForApi(checklistPatient.sexo);
 
-      if (checklistData.atendimentoParticular || isPrivateCare(checklistPatient)) {
+      if (checklistData.atendimentoParticular) {
         generatedInvoice = await invoiceService.createInvoice({
           patientName: checklistPatient.nomeCompleto,
           dueDate: new Date().toLocaleDateString('en-CA'),
@@ -999,13 +997,13 @@ export function PreAtendimento() {
         phone: checklistPatient.telefone || undefined,
         email: checklistPatient.email || undefined,
         address: checklistPatient.endereco || undefined,
-        convenio: checklistData.atendimentoParticular || isPrivateCare(checklistPatient)
+        convenio: checklistData.atendimentoParticular
           ? 'Particular'
           : (checklistPatient.convenio || undefined),
         convenioValidUntil: parseDisplayDateToApi(checklistPatient.validadeConvenio),
         convenioStatus: checklistData.atendimentoParticular
           ? 'Pagamento realizado'
-          : (checklistData.autorizacaoConferida ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
+          : (checklistData.guiaNumero.trim().length > 0 ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
         convenioNumber: checklistData.guiaNumero || checklistPatient.numCarteira || undefined,
         agenda: checklistPatient.agenda || undefined,
         doctorName: checklistPatient.doctorName || extractDoctorNameFromAgenda(checklistPatient.agenda) || undefined,
@@ -1026,12 +1024,12 @@ export function PreAtendimento() {
         appointmentId: checklistPatient.appointmentId || undefined,
         doctorId: checklistPatient.doctorId || undefined,
         doctorName: checklistPatient.doctorName || extractDoctorNameFromAgenda(checklistPatient.agenda) || undefined,
-        convenio: checklistData.atendimentoParticular || isPrivateCare(checklistPatient)
+        convenio: checklistData.atendimentoParticular
           ? 'Particular'
           : (checklistPatient.convenio || undefined),
         convenioStatus: checklistData.atendimentoParticular
           ? 'Pagamento realizado'
-          : (checklistData.autorizacaoConferida ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
+          : (checklistData.guiaNumero.trim().length > 0 ? 'Autorizado' : checklistPatient.statusAutorizacao || undefined),
         scheduledFor: checklistPatient.agenda || undefined,
         queueType: 'Fila clínica',
         agenda: checklistPatient.agenda || undefined,
@@ -1763,15 +1761,22 @@ export function PreAtendimento() {
                           checked={checklistData.atendimentoParticular}
                           onChange={(event) => {
                             const checked = event.currentTarget.checked;
-                            setChecklistData((prev) => ({ ...prev, atendimentoParticular: checked }));
+                            setChecklistData((prev) => ({
+                              ...prev,
+                              atendimentoParticular: checked,
+                              guiaNumero: checked ? '' : prev.guiaNumero,
+                              pagamentoRealizado: checked ? prev.pagamentoRealizado : false,
+                              valorPagamento: checked ? prev.valorPagamento : 0,
+                              formaPagamento: checked ? prev.formaPagamento : '',
+                            }));
                           }}
                         />
                         <Checkbox
                           label="Autorização do convênio conferida"
-                          checked={checklistData.autorizacaoConferida}
+                          style={{ display: 'none' }}
+                          checked={false}
                           onChange={(event) => {
-                            const checked = event.currentTarget.checked;
-                            setChecklistData((prev) => ({ ...prev, autorizacaoConferida: checked }));
+                            void event;
                           }}
                         />
                       </Group>
@@ -1780,6 +1785,7 @@ export function PreAtendimento() {
                         <FloatingInput
                           label="Número da Guia"
                           value={checklistData.guiaNumero}
+                          disabled={checklistData.atendimentoParticular}
                           onChange={(event) => {
                             const value = event.currentTarget.value;
                             setChecklistData((prev) => ({ ...prev, guiaNumero: value }));
@@ -1880,6 +1886,7 @@ export function PreAtendimento() {
                             key={option.value}
                             variant="default"
                             leftSection={<Icon size={18} />}
+                            disabled={!canEditPayment}
                             style={paymentChoiceStyle(selected)}
                             onClick={() => {
                               if (!canEditPayment) return;
