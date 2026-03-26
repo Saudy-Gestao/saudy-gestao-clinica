@@ -210,7 +210,7 @@ const sortAgendamentosByDateTime = (items: Agendamento[]): Agendamento[] => {
   return [...items].sort((a, b) => {
     const aStamp = dayjs(`${a.data}T${a.hora || '00:00'}:00`).valueOf();
     const bStamp = dayjs(`${b.data}T${b.hora || '00:00'}:00`).valueOf();
-    return bStamp - aStamp;
+    return aStamp - bStamp;
   });
 };
 
