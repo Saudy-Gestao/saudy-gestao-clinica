@@ -413,15 +413,6 @@ export function TeaPIT() {
     }
 
     const therapiesToSave = therapies.filter((t) => t.procedureId.trim() !== '' || t.therapyType.trim() !== '');
-    const therapyWithoutProfessional = therapiesToSave.find((t) => !String(t.professionalDoctorId || '').trim());
-    if (therapyWithoutProfessional) {
-      showNotification({
-        title: 'Profissional obrigatório',
-        message: 'Selecione um profissional para todas as terapias antes de seguir para a pré-reserva.',
-        color: 'red',
-      });
-      return;
-    }
 
     setSaving(true);
     try {
@@ -566,7 +557,7 @@ export function TeaPIT() {
             <Group justify="space-between" align="center">
               <Box>
                 <Text fw={600}>Terapias do PIT</Text>
-                <Text size="sm" c="dimmed">Defina frequência, profissional e preferências de agenda.</Text>
+                <Text size="sm" c="dimmed">Defina frequência, profissional opcional e preferências de agenda.</Text>
               </Box>
               <Button size="xs" variant="light" leftSection={<Plus size={14} />} onClick={addTherapy}>Adicionar terapia</Button>
             </Group>
@@ -630,8 +621,8 @@ export function TeaPIT() {
 
                     <div>
                       <FloatingSelect
-                        label="Profissional"
-                        placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
+                        label="Profissional (opcional)"
+                        placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico se desejar'}
                         data={doctorOptions}
                         value={therapy.professionalDoctorId}
                         onChange={(value) => {

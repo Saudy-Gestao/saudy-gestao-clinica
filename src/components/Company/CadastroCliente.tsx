@@ -14,6 +14,7 @@ import {
   Paper,
   SimpleGrid,
   ThemeIcon,
+  Radio,
 } from '@mantine/core';
 import { ArrowLeft, Building2, ShieldCheck, Waypoints } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
@@ -59,6 +60,9 @@ export function CadastroCliente() {
   const isFromAdmHub = from === 'adm-hub';
 
   const [active, setActive] = useState(0);
+
+  // Novo: seleção de módulos
+  const [modulo, setModulo] = useState<'padrao' | 'tea' | 'apenas-tea'>('padrao');
 
   // Step 1 - Client (admin user)
   const [adminName, setAdminName] = useState('');
@@ -148,6 +152,7 @@ export function CadastroCliente() {
           address: address.trim() || undefined,
         },
         branchesCount: additionalBranchesAllowed,
+        modulo: modulo,
       };
 
       const result = await companyService.createCompany(payload);
@@ -169,7 +174,7 @@ export function CadastroCliente() {
       }
 
       showNotification({ title: 'Sucesso', message: 'Cliente cadastrado com sucesso', color: 'green' });
-      // Important: show the generated password to the admin so they can share it once
+      // Importante: mostrar a senha gerada para o admin
       if (plainPassword) {
         showNotification({ title: 'Senha gerada', message: `Senha: ${plainPassword}`, color: 'blue' });
       }
@@ -189,7 +194,7 @@ export function CadastroCliente() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--mantine-color-body)" style={{ mdminHeight: '100vh' }}>
       <Header />
       <Box p="xl" mx="auto" maw={1180}>
         <Stack gap="lg">
@@ -276,7 +281,19 @@ export function CadastroCliente() {
                   <Button onClick={handleGeneratePassword}>Gerar senha</Button>
                 </Group>
 
-                <Text size="sm" c="dimmed">A senha e gerada automaticamente (nao editavel) e hashada no cadastro. O nome do administrador e apenas informativo.</Text>
+                <Text size="sm" c="dimmed">A senha é gerada automaticamente (não editável) e hashada no cadastro. O nome do administrador é apenas informativo.</Text>
+
+                {/* Seleção de módulo */}
+                <Radio.Group
+                  label="Selecione o módulo que o cliente irá utilizar:"
+                  value={modulo}
+                  onChange={(value) => setModulo(value as 'padrao' | 'tea' | 'apenas-tea')}
+                  mt="md"
+                >
+                  <Radio mt="md" value="padrao" label="Sistema padrão" description="Tudo do sistema, exceto parte TEA." />
+                  <Radio mt="xs" value="tea" label="Módulo TEA" description="Tudo do sistema, inclusive a parte TEA." />
+                  <Radio mt="xs" value="apenas-tea" label="Apenas módulo TEA" description="Somente a parte TEA." />
+                </Radio.Group>
               </Stack>
             </Stepper.Step>
 
