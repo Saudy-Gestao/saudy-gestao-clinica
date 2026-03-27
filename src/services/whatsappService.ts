@@ -15,7 +15,12 @@ export interface WhatsAppConfig {
 export interface WhatsAppMessageTemplate {
   id: string;
   branchId: string;
-  type: 'APPOINTMENT_CREATED' | 'APPOINTMENT_CONFIRMATION' | 'APPOINTMENT_REMINDER' | 'APPOINTMENT_CANCELED';
+  type:
+    | 'APPOINTMENT_CREATED'
+    | 'APPOINTMENT_CONFIRMATION'
+    | 'NO_SHOW'
+    | 'CONFIRMATION_REPLY_CONFIRMED'
+    | 'CONFIRMATION_REPLY_RESCHEDULE';
   name: string;
   message: string;
   hsmTemplateName?: string | null;
@@ -108,6 +113,11 @@ export default {
 
   async syncHsmStatus(): Promise<{ synced: number; updated: number; gupshupTemplates: Record<string, { status: string; id: string | null }> }> {
     const res = await api.post('/care/whatsapp/templates/sync-hsm', {});
+    return res.data;
+  },
+
+  async loadDefaultTemplates(): Promise<{ success: boolean; created: number; updated: number; total: number }> {
+    const res = await api.post('/care/whatsapp/templates/load-defaults', {});
     return res.data;
   },
 

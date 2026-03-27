@@ -33,6 +33,7 @@ import {
   IconInfoCircle,
   IconRefresh,
   IconDeviceFloppy,
+  IconSparkles,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
 import { useWhatsAppPageDataQuery } from '../../hooks/useWhatsAppPageDataQuery';
@@ -54,8 +55,6 @@ interface NotificationFormValues {
   sendOnAppointmentCreated: boolean;
   sendConfirmationEnabled: boolean;
   confirmationHoursBefore: number;
-  sendReminderEnabled: boolean;
-  reminderHoursBefore: number;
 }
 
 interface WhatsAppConfigProps {
@@ -63,12 +62,29 @@ interface WhatsAppConfigProps {
 }
 
 export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
+  const templateTypeLabels: Record<string, string> = {
+    APPOINTMENT_CREATED: 'Resumo de Agendamento',
+    APPOINTMENT_CONFIRMATION: 'Confirmação de Agendamento',
+    NO_SHOW: 'Falta',
+    CONFIRMATION_REPLY_CONFIRMED: 'Resposta: Confirmado',
+    CONFIRMATION_REPLY_RESCHEDULE: 'Resposta: Reagendar',
+  };
+
+  const templateTypeHsmNames: Record<string, string> = {
+    APPOINTMENT_CREATED: 'resumo_agendamento',
+    APPOINTMENT_CONFIRMATION: 'confirmacao_agendamento',
+    NO_SHOW: 'falta_agendamento',
+    CONFIRMATION_REPLY_CONFIRMED: 'resposta_confirmado',
+    CONFIRMATION_REPLY_RESCHEDULE: 'resposta_reagendar',
+  };
+
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<{ id: string; name: string } | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [showAlert, setShowAlert] = useState(true);
   const { data, error, isFetching } = useWhatsAppPageDataQuery();
   const templates = data?.templates || [];
@@ -88,8 +104,6 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     sendOnAppointmentCreated: true,
     sendConfirmationEnabled: true,
     confirmationHoursBefore: 24,
-    sendReminderEnabled: false,
-    reminderHoursBefore: 2,
   });
 
   useEffect(() => {
@@ -98,8 +112,6 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       sendOnAppointmentCreated: data.notificationConfig.sendOnAppointmentCreated,
       sendConfirmationEnabled: data.notificationConfig.sendConfirmationEnabled,
       confirmationHoursBefore: data.notificationConfig.confirmationHoursBefore,
-      sendReminderEnabled: data.notificationConfig.sendReminderEnabled,
-      reminderHoursBefore: data.notificationConfig.reminderHoursBefore,
     });
   }, [data?.notificationConfig]);
 
@@ -123,6 +135,18 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         color: 'red',
       });
     }
+  };
+
+  const getDefaultTemplateForm = (type: string): TemplateFormValues => {
+    const existingTemplate = templates.find((template) => template.type === type);
+
+    return {
+      type,
+      name: existingTemplate?.name || templateTypeLabels[type] || '',
+      message: existingTemplate?.message || '',
+      hsmTemplateName: existingTemplate?.hsmTemplateName || templateTypeHsmNames[type] || '',
+      isActive: existingTemplate?.isActive ?? true,
+    };
   };
 
   const handleSaveNotificationConfig = async (e: React.FormEvent) => {
@@ -179,13 +203,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       }
 
       setShowTemplateModal(false);
-      setTemplateForm({
-        type: 'APPOINTMENT_CREATED',
-        name: '',
-        message: '',
-        hsmTemplateName: '',
-        isActive: true,
-      });
+      setTemplateForm(getDefaultTemplateForm('APPOINTMENT_CREATED'));
+      setIsEditingTemplate(false);
       await refreshPageData();
     } catch (error: any) {
       notifications.show({
@@ -239,23 +258,42 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     }
   };
 
+  const handleLoadDefaults = async () => {
+    setLoading(true);
+    try {
+      const result = await whatsappService.loadDefaultTemplates();
+      const created = Number(result?.created ?? 0);
+      const updated = Number(result?.updated ?? 0);
+      notifications.show({
+        title: 'Templates carregados',
+        message: `${created} criado(s) e ${updated} atualizado(s) para esta filial.`,
+        color: 'green',
+      });
+      await refreshPageData();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.error || 'Erro ao carregar templates padrão',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openTemplateModal = (template?: any) => {
     if (template) {
+      setIsEditingTemplate(true);
       setTemplateForm({
         type: template.type,
         name: template.name,
         message: template.message,
-        hsmTemplateName: template.hsmTemplateName || '',
+        hsmTemplateName: template.hsmTemplateName || templateTypeHsmNames[template.type] || '',
         isActive: template.isActive,
       });
     } else {
-      setTemplateForm({
-        type: 'APPOINTMENT_CREATED',
-        name: '',
-        message: '',
-        hsmTemplateName: '',
-        isActive: true,
-      });
+      setIsEditingTemplate(false);
+      setTemplateForm(getDefaultTemplateForm('APPOINTMENT_CREATED'));
     }
     setShowTemplateModal(true);
   };
@@ -268,13 +306,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   };
 
   const getMessageTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      APPOINTMENT_CREATED: 'Agendamento Criado',
-      APPOINTMENT_CONFIRMATION: 'Confirmação de Agendamento',
-      APPOINTMENT_REMINDER: 'Lembrete de Agendamento',
-      APPOINTMENT_CANCELED: 'Agendamento Cancelado',
-    };
-    return labels[type] || type;
+    return templateTypeLabels[type] || type;
   };
 
   const getStatusBadge = (status: string) => {
@@ -336,6 +368,14 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             <Group justify="space-between" mb="md">
               <Title order={4}>Templates de Mensagens</Title>
               <Group gap="xs">
+                <Button
+                  variant="light"
+                  leftSection={<IconSparkles size={16} />}
+                  onClick={handleLoadDefaults}
+                  loading={loading}
+                >
+                  Carregar templates padrão
+                </Button>
                 <Button
                   variant="light"
                   leftSection={<IconRefresh size={16} />}
@@ -469,25 +509,6 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                   disabled={!notificationForm.sendConfirmationEnabled}
                 />
 
-                <Divider label="Lembrete de agendamento" mt="md" />
-                
-                <Switch
-                  label="Enviar lembrete de agendamento"
-                  description="Envia um lembrete próximo ao horário do agendamento"
-                  checked={notificationForm.sendReminderEnabled}
-                  onChange={(e) => setNotificationForm(prev => ({ ...prev, sendReminderEnabled: e.target.checked }))}
-                />
-
-                <FloatingNumberInput
-                  label="Horas antes do agendamento"
-                  description="Quantas horas antes do agendamento enviar o lembrete"
-                  min={1}
-                  max={72}
-                  value={notificationForm.reminderHoursBefore}
-                  onChange={(value) => setNotificationForm(prev => ({ ...prev, reminderHoursBefore: Number(value) }))}
-                  disabled={!notificationForm.sendReminderEnabled}
-                />
-
                 <Divider my="md" />
 
                 <Button
@@ -570,13 +591,21 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               label="Tipo de Mensagem"
               required
               data={[
-                { value: 'APPOINTMENT_CREATED', label: 'Agendamento Criado' },
+                { value: 'APPOINTMENT_CREATED', label: 'Resumo de Agendamento' },
                 { value: 'APPOINTMENT_CONFIRMATION', label: 'Confirmação' },
-                { value: 'APPOINTMENT_REMINDER', label: 'Lembrete' },
-                { value: 'APPOINTMENT_CANCELED', label: 'Cancelamento' },
+                { value: 'NO_SHOW', label: 'Falta' },
+                { value: 'CONFIRMATION_REPLY_CONFIRMED', label: 'Resposta: Confirmado' },
+                { value: 'CONFIRMATION_REPLY_RESCHEDULE', label: 'Resposta: Reagendar' },
               ]}
               value={templateForm.type}
-              onChange={(value) => setTemplateForm(prev => ({ ...prev, type: value as any }))}
+              onChange={(value) => {
+                if (!value) return;
+                if (!isEditingTemplate) {
+                  setTemplateForm(getDefaultTemplateForm(value));
+                  return;
+                }
+                setTemplateForm(prev => ({ ...prev, type: value as any }));
+              }}
             />
 
             <FloatingInput
