@@ -385,6 +385,19 @@ const formatDateForApi = (value: Date | null): string => {
 
 const onlyDigits = (value?: string | null): string => String(value || '').replace(/\D/g, '');
 const addDays = (date: Date, amount: number): Date => dayjs(date).add(amount, 'day').toDate();
+const getTodayStart = (): Date => dayjs().startOf('day').toDate();
+const isPastCalendarDate = (date: Date): boolean => dayjs(date).isBefore(dayjs(), 'day');
+const isPastTimeForDate = (date: Date, time?: string | null): boolean => {
+  if (isPastCalendarDate(date)) return true;
+  if (!dayjs(date).isSame(dayjs(), 'day')) return false;
+
+  const slotMinute = parseTimeToMinutes(time);
+  if (slotMinute === null) return false;
+
+  const now = dayjs();
+  const currentMinute = (now.hour() * 60) + now.minute();
+  return slotMinute <= currentMinute;
+};
 
 export function Agendamento() {
   const navigate = useNavigate();
@@ -540,6 +553,10 @@ export function Agendamento() {
     normalizeProcedureAppointmentType(value) === 'EXAME' ? 'Exame' : 'Consulta'
   );
 
+  const isTeaReturnAppointment = (value?: string | null) => (
+    String(value || '').trim().toUpperCase() === 'RETORNO TEA'
+  );
+
   const deriveAppointmentType = (
     procedureNames: string[],
     fallbackValue?: string | null,
@@ -658,7 +675,13 @@ export function Agendamento() {
 
   useEffect(() => {
     const list = Array.isArray(appointmentsQuery.data) ? appointmentsQuery.data : [];
-    setAgendamentos(sortAgendamentosByDateTime(list.map(mapApiToAgendamento)));
+    setAgendamentos(
+      sortAgendamentosByDateTime(
+        list
+          .map(mapApiToAgendamento)
+          .filter((item) => !isTeaReturnAppointment(item.tipoConsulta)),
+      ),
+    );
   }, [appointmentsQuery.data]);
 
   useEffect(() => {
@@ -1616,6 +1639,7 @@ export function Agendamento() {
   const manualRangesForGrid = manualProcedureSelections
     .filter((item) => dayjs(item.date).isSame(schedulingDate, 'day'))
     .map((item, index) => ({
+      date: item.date,
       doctorName: item.doctorName,
       startMinute: parseTimeToMinutes(item.time) || 0,
       endMinute: (parseTimeToMinutes(item.time) || 0) + item.durationMinutes,
@@ -1630,6 +1654,7 @@ export function Agendamento() {
           const startMinute = parseTimeToMinutes(item.time);
           if (startMinute === null) return null;
           return {
+            date: item.date,
             doctorName: item.doctorName,
             startMinute,
             endMinute: startMinute + item.durationMinutes,
@@ -1638,6 +1663,7 @@ export function Agendamento() {
           };
         })
         .filter(Boolean) as Array<{
+          date: Date;
           doctorName: string;
           startMinute: number;
           endMinute: number;
@@ -1717,6 +1743,8 @@ export function Agendamento() {
     date: Date = schedulingDate,
     ignoreAppointmentId?: string | null,
   ) => {
+    if (isPastTimeForDate(date, slot)) return false;
+
     const slotStartMinute = parseTimeToMinutes(slot);
     if (slotStartMinute === null) return false;
 
@@ -1832,6 +1860,65 @@ export function Agendamento() {
           };
         })
         .sort((a, b) => (a.minute - b.minute));
+  const getProfessionalOptionsForSlot = (time: string, date: Date, procedureName?: string): typeof flattenedScheduleSlots => {
+    const normalizedProcedure = String(procedureName || '').trim();
+    const candidateDoctors = novoAgendamento.profissional
+      ? [novoAgendamento.profissional]
+      : normalizedProcedure
+        ? getCompatibleDoctorsForProcedure(normalizedProcedure)
+        : filteredDoctorOptions.map((option) => option.value);
+
+    return Array.from(new Set(candidateDoctors))
+      .filter(Boolean)
+      .filter((doctor) => {
+        const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
+        if (!doctorSlots.includes(time)) return false;
+
+        if (normalizedProcedure) {
+          return getSelectableProceduresForSlot(doctor, time, date).includes(normalizedProcedure)
+            && slotSupportsDuration(doctor, time, getProcedureDuration(normalizedProcedure), date, editingAgendamentoId);
+        }
+
+        return isMultiProcedureFlow
+          ? getSelectableProceduresForSlot(doctor, time, date).length > 0
+          : slotSupportsProcedureDuration(doctor, time, date);
+      })
+      .map((doctor) => {
+        const slotStartMinute = parseTimeToMinutes(time) || 0;
+        const matchingManualRange = manualRangesForGrid.find((item) =>
+          item.doctorName === doctor
+          && dayjs(item.date).isSame(date, 'day')
+          && slotStartMinute >= item.startMinute
+          && slotStartMinute < item.endMinute,
+        ) || null;
+        const matchingSuggestedRange = suggestedRangesForGrid.find((item) =>
+          item.doctorName === doctor
+          && dayjs(item.date).isSame(date, 'day')
+          && slotStartMinute >= item.startMinute
+          && slotStartMinute < item.endMinute,
+        ) || null;
+
+        return {
+          key: `${doctor}-${time}`,
+          doctor,
+          slot: time,
+          isSelected: false,
+          isAnchorStart: Boolean(matchingManualRange && matchingManualRange.time === time),
+          anchorProcedure: matchingManualRange?.procedure || '',
+          isPrimaryAnchor: Boolean(matchingManualRange?.isPrimary),
+          isCoveredByAnchorRange: Boolean(matchingManualRange && matchingManualRange.time !== time),
+          isSuggestedStart: Boolean(matchingSuggestedRange && matchingSuggestedRange.time === time),
+          suggestedProcedure: matchingSuggestedRange?.procedure || '',
+          isCoveredBySuggestedRange: Boolean(matchingSuggestedRange && matchingSuggestedRange.time !== time),
+          isCoveredBySelectedRange: false,
+          isOccupied: false,
+          isTooShort: false,
+          schedulableProcedures: getSchedulableProceduresForSlot(doctor, time, date),
+          minute: slotStartMinute,
+        };
+      })
+      .sort((a, b) => a.doctor.localeCompare(b.doctor));
+  };
   const dateHasAvailability = (date: Date) => {
     return schedulerDoctors.some((doctor) => {
       const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
@@ -2224,12 +2311,13 @@ export function Agendamento() {
     setActiveSchedulePeriod(resolveTurnoFromTime(pendingAnchorSlot.time) || 'Manhã');
   };
   const goToSchedulingDate = (date: Date) => {
-    setViewedDate(date);
+    const normalizedDate = isPastCalendarDate(date) ? getTodayStart() : date;
+    setViewedDate(normalizedDate);
     setNovoAgendamento((prev) => ({
       ...prev,
-      data: date,
-      hora: prev.data && dayjs(prev.data).isSame(dayjs(date), 'day') ? prev.hora : '',
-      profissional: prev.data && dayjs(prev.data).isSame(dayjs(date), 'day') ? prev.profissional : '',
+      data: normalizedDate,
+      hora: prev.data && dayjs(prev.data).isSame(dayjs(normalizedDate), 'day') ? prev.hora : '',
+      profissional: prev.data && dayjs(prev.data).isSame(dayjs(normalizedDate), 'day') ? prev.profissional : '',
     }));
   };
   const goToNextAvailableDate = () => {
@@ -2499,11 +2587,15 @@ export function Agendamento() {
                   placeholder="Selecione a data"
                   value={novoAgendamento.data}
                   onChange={(value) => {
-                    const nextDate = value ? new Date(value) : null;
+                    const rawDate = value ? new Date(value) : null;
+                    const nextDate = rawDate
+                      ? (isPastCalendarDate(rawDate) ? getTodayStart() : rawDate)
+                      : null;
                     setNovoAgendamento({ ...novoAgendamento, data: nextDate });
                     setDataHoraFiltro(nextDate);
                     if (nextDate) setViewedDate(nextDate);
                   }}
+                  minDate={getTodayStart()}
                   rightSection={<Calendar size={16} />}
                   valueFormat="DD/MM/YYYY"
                   locale="pt-br"
@@ -2556,7 +2648,12 @@ export function Agendamento() {
               />
 
               <Group gap="sm" wrap="wrap">
-                <ActionIcon variant="light" onClick={() => goToSchedulingDate(addDays(schedulingDate, -1))} aria-label="Dia anterior">
+                <ActionIcon
+                  variant="light"
+                  onClick={() => goToSchedulingDate(addDays(schedulingDate, -1))}
+                  aria-label="Dia anterior"
+                  disabled={dayjs(schedulingDate).isSame(dayjs(), 'day') || isPastCalendarDate(schedulingDate)}
+                >
                   <ChevronLeft size={16} />
                 </ActionIcon>
                 <Group
@@ -2880,7 +2977,13 @@ export function Agendamento() {
                       <Text size="sm" c="dimmed">
                         Profissionais com disponibilidade às {pendingProfessionalSlot?.time || '--:--'}.
                       </Text>
-                      {(pendingProfessionalSlot ? (scheduleSlotsByTime[pendingProfessionalSlot.time] || []) : []).map((slotItem) => (
+                      {(pendingProfessionalSlot
+                        ? getProfessionalOptionsForSlot(
+                            pendingProfessionalSlot.time,
+                            pendingProfessionalSlot.date,
+                            pendingProfessionalSlot.procedure,
+                          )
+                        : []).map((slotItem) => (
                         <Button
                           key={`${slotItem.doctor}-${slotItem.slot}`}
                           variant="light"
@@ -2904,6 +3007,15 @@ export function Agendamento() {
                           {slotItem.doctor}
                         </Button>
                       ))}
+                      {pendingProfessionalSlot && getProfessionalOptionsForSlot(
+                        pendingProfessionalSlot.time,
+                        pendingProfessionalSlot.date,
+                        pendingProfessionalSlot.procedure,
+                      ).length === 0 && (
+                        <Text size="sm" c="dimmed">
+                          Nenhum profissional compatível com este procedimento está disponível nesse horário.
+                        </Text>
+                      )}
                     </Stack>
                   </Modal>
 

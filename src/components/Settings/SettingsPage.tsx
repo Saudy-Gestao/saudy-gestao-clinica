@@ -275,6 +275,7 @@ export function SettingsPage() {
   const [selectedBranchForSettings, setSelectedBranchForSettings] = useState<string | null>(null);
   const [branchSettings, setBranchSettings] = useState<BranchSettings | null>(null);
   const [savingBranchSettings, setSavingBranchSettings] = useState(false);
+  const [publicCheckInAuditModalOpen, setPublicCheckInAuditModalOpen] = useState(false);
   const {
     data: companiesData = [],
     isLoading: loadingCompanies,
@@ -313,6 +314,8 @@ export function SettingsPage() {
     data: accessesData = [],
     error: accessesError,
   } = useSettingsAccessesQuery();
+  const publicCheckInAuditTrail = branchSettings?.publicCheckInAuditTrail || [];
+  const recentPublicCheckInAuditTrail = publicCheckInAuditTrail.slice(0, 5);
 
   const openDeleteConfirm = (title: string, message: string, action: () => Promise<void>) => {
     setDeleteConfirmTitle(title);
@@ -1926,12 +1929,23 @@ export function SettingsPage() {
                                                 </SimpleGrid>
 
                                                 <Box>
-                                                    <Text fw={600} size="sm" mb={8}>
-                                                        Auditoria recente do check-in
-                                                    </Text>
+                                                    <Group justify="space-between" align="center" mb={8}>
+                                                        <Text fw={600} size="sm">
+                                                            Auditoria recente do check-in
+                                                        </Text>
+                                                        {publicCheckInAuditTrail.length > 5 && (
+                                                            <Button
+                                                                variant="subtle"
+                                                                size="compact-sm"
+                                                                onClick={() => setPublicCheckInAuditModalOpen(true)}
+                                                            >
+                                                                Ver mais
+                                                            </Button>
+                                                        )}
+                                                    </Group>
                                                     <Stack gap="xs">
-                                                        {(branchSettings?.publicCheckInAuditTrail || []).length > 0 ? (
-                                                            (branchSettings?.publicCheckInAuditTrail || []).map((entry) => (
+                                                        {recentPublicCheckInAuditTrail.length > 0 ? (
+                                                            recentPublicCheckInAuditTrail.map((entry) => (
                                                                 <Group key={entry.id} justify="space-between" wrap="nowrap">
                                                                     <Group gap="xs" wrap="nowrap">
                                                                         <Badge color={entry.action === 'ENABLED' ? 'green' : 'red'} variant="light">
@@ -1955,6 +1969,46 @@ export function SettingsPage() {
                                                 </Box>
                                             </Stack>
                                         </Paper>
+
+                                        <Modal
+                                            opened={publicCheckInAuditModalOpen}
+                                            onClose={() => setPublicCheckInAuditModalOpen(false)}
+                                            title="Histórico completo do check-in"
+                                            centered
+                                            size="lg"
+                                        >
+                                            <Stack gap="sm" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 }}>
+                                                {publicCheckInAuditTrail.length > 0 ? (
+                                                    publicCheckInAuditTrail.map((entry) => (
+                                                        <Paper
+                                                            key={entry.id}
+                                                            p="sm"
+                                                            withBorder
+                                                            radius="md"
+                                                            bg={isDark ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-gray-0)'}
+                                                        >
+                                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                                                <Group gap="xs" wrap="nowrap">
+                                                                    <Badge color={entry.action === 'ENABLED' ? 'green' : 'red'} variant="light">
+                                                                        {entry.action === 'ENABLED' ? 'Ligado' : 'Desligado'}
+                                                                    </Badge>
+                                                                    <Text size="sm">
+                                                                        {entry.performedByName || 'Usuário não identificado'}
+                                                                    </Text>
+                                                                </Group>
+                                                                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                                                                    {formatAuditDateTime(entry.createdAt)}
+                                                                </Text>
+                                                            </Group>
+                                                        </Paper>
+                                                    ))
+                                                ) : (
+                                                    <Text size="sm" c="dimmed">
+                                                        Ainda não há registros de ativação ou desligamento para esta filial.
+                                                    </Text>
+                                                )}
+                                            </Stack>
+                                        </Modal>
 
                                         <Paper
                                             p="lg"

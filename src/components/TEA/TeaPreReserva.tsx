@@ -512,6 +512,44 @@ export function TeaPreReserva() {
       .join(' | ');
   };
 
+  const getPersistedSlotsFromReservation = (item: any): Array<{ date: string; time: string }> => {
+    const slots: Array<{ date: string; time: string }> = [];
+
+    const appendSlot = (dateRaw: string, timeRaw: string) => {
+      const suggestedDate = normalizeDateToIso(dateRaw);
+      const suggestedTime = String(timeRaw || '').trim();
+      if (!suggestedDate || !suggestedTime) return;
+
+      const signature = `${suggestedDate}#${suggestedTime}`;
+      const alreadyExists = slots.some((slot) => `${slot.date}#${slot.time}` === signature);
+      if (!alreadyExists) {
+        slots.push({ date: suggestedDate, time: suggestedTime });
+      }
+    };
+
+    const weeklyPatternSlots = Array.isArray(item?.weeklySlotPattern)
+      ? item.weeklySlotPattern
+      : [];
+
+    weeklyPatternSlots.forEach((patternSlot: any) => {
+      appendSlot(
+        String(patternSlot?.date || patternSlot?.suggestedDate || ''),
+        String(patternSlot?.time || patternSlot?.suggestedTime || ''),
+      );
+    });
+
+    appendSlot(
+      String(item?.slotSuggestion?.suggestedDate || item?.suggestedDate || ''),
+      String(item?.slotSuggestion?.suggestedTime || item?.suggestedTime || ''),
+    );
+
+    return slots.sort((a, b) => {
+      const aStamp = dayjs(`${a.date}T${a.time}:00`).valueOf();
+      const bStamp = dayjs(`${b.date}T${b.time}:00`).valueOf();
+      return aStamp - bStamp;
+    });
+  };
+
   const buildRecurringPreviewDates = (sourceDates: string[] = [], count = 5) => {
     const uniqueSortedDates = Array.from(
       new Set(
@@ -971,6 +1009,13 @@ export function TeaPreReserva() {
       : secondMilestoneReached
         ? 'Reservado'
         : 'Reserva';
+    const thirdLabel = (
+      progress.stage === 'AGENDADO_PARCIAL'
+      || progress.stage === 'AGENDADO_COMPLETO'
+      || progress.authorizedCount > 0
+    )
+      ? 'Autorizado'
+      : 'Autorização';
     const fillPercent = (() => {
       switch (progress.stage) {
         case 'RESERVADO_PARCIAL':
@@ -992,7 +1037,7 @@ export function TeaPreReserva() {
     const milestones = [
       { label: 'PIT Gerado', active: true, align: 'left' as const },
       { label: secondLabel, active: fillPercent >= 33.333, align: 'center' as const },
-      { label: 'Autorização', active: fillPercent >= 66.666, align: 'center' as const },
+      { label: thirdLabel, active: fillPercent >= 66.666, align: 'center' as const },
       { label: 'Agendado', active: fillPercent >= 100, align: 'right' as const },
     ];
     const labelPositions = ['0%', '33.333%', '66.666%', '100%'];
@@ -1509,6 +1554,14 @@ export function TeaPreReserva() {
               const reservationCardKey = `reservation-${group.groupKey}-${String(item.preReservationId || itemTherapyId || 'unknown')}`;
               const isReservationCardCollapsed = Boolean(collapsedTherapyCards[reservationCardKey]);
               const itemWeeklyTarget = Math.max(1, Number(item?.preferences?.weeklyFrequency || 1));
+              const persistedReservedSlots = getPersistedSlotsFromReservation(item);
+              const shouldShowPersistedReservedSlots = (
+                ['PENDING_AUTHORIZATION', 'AUTHORIZED', 'CONVERTED'].includes(String(item?.status || ''))
+                && persistedReservedSlots.length > 0
+              );
+              const scheduleSummaryLabel = shouldShowPersistedReservedSlots
+                ? formatScheduledSlotsSummary(persistedReservedSlots)
+                : formatWeekdaySummary(item?.preferences?.weekdays);
 
               return (
               <Paper key={String(item.preReservationId)} p="xs" withBorder className="tea-pre-reserva-subcard" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
@@ -1549,6 +1602,11 @@ export function TeaPreReserva() {
                         Reserva aprovada e aguardando retorno da autorização.
                       </Text>
                     )}
+                    {shouldShowPersistedReservedSlots && (
+                      <Text size="xs" mt={6} c="dimmed">
+                        Horários reservados: {formatScheduledSlotsSummary(persistedReservedSlots)}
+                      </Text>
+                    )}
                     {item.status === 'CONVERTED' && (
                       <Text size="xs" mt={6} c="teal">
                         Procedimento convertido em agendamento.
@@ -1561,7 +1619,7 @@ export function TeaPreReserva() {
                         {itemWeeklyTarget}x/semana
                       </Text>
                       <Text size="sm" ta="right">
-                        {formatWeekdaySummary(item?.preferences?.weekdays)}
+                        {scheduleSummaryLabel}
                       </Text>
                     </Stack>
                     <ActionIcon
@@ -1679,17 +1737,15 @@ export function TeaPreReserva() {
               >
                 Sugerir horários automáticos
               </Button>
-              {activeTab !== 'concluidas' && (
-                <Button
-                  className={getTeaActionButtonClass('danger')}
-                  leftSection={<Trash2 size={18} />}
-                  onClick={() => void handleDeletePit()}
-                  loading={updatingId === group.groupKey}
-                  disabled={!teaProfileId}
-                >
-                  Excluir PIT
-                </Button>
-              )}
+              <Button
+                className={getTeaActionButtonClass('danger')}
+                leftSection={<Trash2 size={18} />}
+                onClick={() => void handleDeletePit()}
+                loading={deletePitTarget?.groupKey === group.groupKey && updatingId === group.groupKey}
+                disabled={!teaProfileId}
+              >
+                Excluir PIT
+              </Button>
             </Box>
           ) : (
             <Box className="tea-pre-reserva-actions-grid tea-pre-reserva-actions-grid--approval tea-pre-reserva-actions-grid--compact">
@@ -1717,18 +1773,16 @@ export function TeaPreReserva() {
               >
                 Ver anexos
               </Button>
-              {activeTab !== 'concluidas' && (
-                <Button
-                  className={getTeaActionButtonClass('danger')}
-                  leftSection={<Trash2 size={18} />}
-                  onClick={() => void handleDeletePit()}
-                  loading={updatingId === group.groupKey}
-                  disabled={!teaProfileId}
-                  style={{ gridColumn: '1 / -1' }}
-                >
-                  Excluir PIT
-                </Button>
-              )}
+              <Button
+                className={getTeaActionButtonClass('danger')}
+                leftSection={<Trash2 size={18} />}
+                onClick={() => void handleDeletePit()}
+                loading={deletePitTarget?.groupKey === group.groupKey && updatingId === group.groupKey}
+                disabled={!teaProfileId}
+                style={{ gridColumn: '1 / -1' }}
+              >
+                Excluir PIT
+              </Button>
             </Box>
           )}
         </Stack>
@@ -2945,9 +2999,18 @@ export function TeaPreReserva() {
     setUpdatingId(checklistGroupKey || reservationIds[0]);
     try {
       const results = await Promise.allSettled(
-        reservationIds.map((reservationId) => teaPreReservationService.convertToAppointment(reservationId, {
-          convertSeries: true,
-        })),
+        reservationIds.map((reservationId) => {
+          const reservation = checklistGroupReservations.find(
+            (item) => String(item?.preReservationId || '') === String(reservationId),
+          );
+          const pitTherapyId = String(reservation?.pitTherapyId || reservation?.preReservationId || '').trim();
+          const seriesStartDate = pitTherapyId ? String(acceptDateByTherapy[pitTherapyId] || '').trim() : '';
+
+          return teaPreReservationService.convertToAppointment(reservationId, {
+            convertSeries: true,
+            seriesStartDate: seriesStartDate || undefined,
+          });
+        }),
       );
 
       const successCount = results.filter((result) => result.status === 'fulfilled').length;
@@ -4623,6 +4686,17 @@ export function TeaPreReserva() {
                               })}
                               {[...existingReservationsWithoutDuplicates, ...completedReservationsWithoutDuplicates].map((item) => (
                                 <Box key={`summary-${String(item.preReservationId)}`}>
+                                  {(() => {
+                                    const persistedReservedSlots = getPersistedSlotsFromReservation(item);
+                                    const shouldShowPersistedReservedSlots = (
+                                      ['PENDING_AUTHORIZATION', 'AUTHORIZED', 'CONVERTED'].includes(String(item?.status || ''))
+                                      && persistedReservedSlots.length > 0
+                                    );
+                                    const scheduleSummaryLabel = shouldShowPersistedReservedSlots
+                                      ? formatScheduledSlotsSummary(persistedReservedSlots)
+                                      : formatWeekdaySummary(item?.preferences?.weekdays);
+                                    return (
+                                      <>
                                   <Divider my="xs" />
                                   <Group justify="space-between" align="flex-start" wrap="nowrap">
                                     <Box style={{ flex: 1, minWidth: 0 }}>
@@ -4656,16 +4730,24 @@ export function TeaPreReserva() {
                                           Procedimento convertido em agendamento.
                                         </Text>
                                       )}
+                                      {shouldShowPersistedReservedSlots && (
+                                        <Text size="xs" mt={6} c="dimmed">
+                                          Horários reservados: {formatScheduledSlotsSummary(persistedReservedSlots)}
+                                        </Text>
+                                      )}
                                     </Box>
                                     <Stack gap={2} align="flex-end" style={{ flexShrink: 0 }}>
                                       <Text size="sm" fw={500}>
                                         {Math.max(1, Number(item?.preferences?.weeklyFrequency || 1))}x/semana
                                       </Text>
                                       <Text size="sm" ta="right">
-                                        {formatWeekdaySummary(item?.preferences?.weekdays)}
+                                        {scheduleSummaryLabel}
                                       </Text>
                                     </Stack>
                                   </Group>
+                                      </>
+                                    );
+                                  })()}
                                 </Box>
                               ))}
                               </Stack>
@@ -4751,7 +4833,7 @@ export function TeaPreReserva() {
                                 size="xs"
                                 className={getTeaActionButtonClass('danger')}
                                 leftSection={<Trash2 size={16} />}
-                                loading={updatingId === group.groupKey}
+                                loading={deletePitTarget?.groupKey === group.groupKey && updatingId === group.groupKey}
                                 onClick={() => handleDeletePitByTeaProfileId(groupTeaProfileId, group.groupKey, String(group.therapies[0]?.pitId || ''))}
                                 disabled={!groupTeaProfileId}
                               >

@@ -38,6 +38,13 @@ export function FacialCapture({
     };
   }, [opened]);
 
+  useEffect(() => {
+    if (!opened || capturedImage || !stream || !videoRef.current) return;
+
+    videoRef.current.srcObject = stream;
+    videoRef.current.play().catch(() => undefined);
+  }, [opened, capturedImage, stream]);
+
   const startCamera = async () => {
     try {
       setLoading(true);
@@ -61,6 +68,11 @@ export function FacialCapture({
   };
 
   const stopCamera = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
+
     if (stream) {
       facialRecognitionService.stopWebcam(stream);
       setStream(null);
@@ -92,8 +104,20 @@ export function FacialCapture({
     }
   };
 
-  const handleRetake = () => {
+  const handleRetake = async () => {
     setCapturedImage(null);
+
+    // When the preview image is removed, the video element mounts again and
+    // needs the current stream rebound. If the stream was interrupted, restart it.
+    const hasActiveTrack = stream?.getVideoTracks().some((track) => track.readyState === 'live');
+    if (hasActiveTrack && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => undefined);
+      return;
+    }
+
+    stopCamera();
+    await startCamera();
   };
 
   return (
