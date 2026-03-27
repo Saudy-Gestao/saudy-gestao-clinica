@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import appointmentService from '../services/appointmentService';
 import teaPreReservationService from '../services/teaPreReservationService';
 import doctorService from '../services/doctorService';
 import sectorService from '../services/sectorService';
@@ -19,18 +18,32 @@ export type TeaAgendaItem = {
   source: 'APPOINTMENT' | 'RESERVATION';
 };
 
+const PERSISTED_RESERVATION_SLOT_STATUSES = new Set([
+  'RESERVED',
+  'PROPOSED',
+  'PENDING_AUTHORIZATION',
+  'AUTHORIZED',
+  'CONVERTED',
+]);
+
 export const fetchTeaWeeklyAgenda = async (): Promise<TeaAgendaItem[]> => {
-  const [data, reservationData, doctorData, sectorData]: any[] = await Promise.all([
-    appointmentService.list({ limit: 4000, offset: 0 }),
+  const [pendingReservationData, createdReservationData, doctorData, sectorData]: any[] = await Promise.all([
+    teaPreReservationService.listPending(),
     teaPreReservationService.listCreated({ limit: 4000, offset: 0 }),
     doctorService.listDoctors(),
     sectorService.listSectors(),
   ]);
 
-  const rawItems: any[] = Array.isArray(data)
-    ? data
-    : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.data?.items) ? data.data.items : []));
-  const reservedItems: any[] = Array.isArray(reservationData?.items) ? reservationData.items : [];
+  const pendingItems: any[] = Array.isArray(pendingReservationData)
+    ? pendingReservationData
+    : (Array.isArray(pendingReservationData?.items)
+      ? pendingReservationData.items
+      : (Array.isArray(pendingReservationData?.data?.items)
+        ? pendingReservationData.data.items
+        : (Array.isArray(pendingReservationData?.data) ? pendingReservationData.data : [])));
+  const createdItems: any[] = Array.isArray(createdReservationData?.items)
+    ? createdReservationData.items
+    : (Array.isArray(createdReservationData?.data?.items) ? createdReservationData.data.items : []);
   const doctors: any[] = Array.isArray(doctorData)
     ? doctorData
     : (Array.isArray(doctorData?.items) ? doctorData.items : (Array.isArray(doctorData?.data?.items) ? doctorData.data.items : []));
@@ -61,86 +74,80 @@ export const fetchTeaWeeklyAgenda = async (): Promise<TeaAgendaItem[]> => {
     if (doctorName && roomName) roomByDoctorName.set(doctorName.toLowerCase(), roomName);
   });
 
-  const buildAgendaSignature = (payload: {
-    patientName?: string;
-    doctorName?: string;
-    specialty?: string;
-    date?: string;
-    time?: string;
-  }) => [
-    String(payload.patientName || '').trim().toLowerCase(),
-    String(payload.doctorName || '').trim().toLowerCase(),
-    String(payload.specialty || '').trim().toLowerCase(),
-    String(payload.date || '').trim(),
-    String(payload.time || '').trim(),
-  ].join('|');
+  const normalizeDateToIso = (value: unknown) => {
+    const parsed = dayjs(String(value || ''));
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD') : '';
+  };
 
-  const convertedReservationSignatures = new Set(
-    reservedItems
-      .filter((it: any) => String(it?.status || '').toUpperCase() === 'CONVERTED')
-      .map((it: any) => buildAgendaSignature({
-        patientName: String(it?.patient?.name || ''),
-        doctorName: String(it?.professionalName || ''),
-        specialty: String(it?.procedureName || ''),
-        date: it?.suggestedDate ? dayjs(it.suggestedDate).format('YYYY-MM-DD') : '',
-        time: String(it?.suggestedTime || ''),
-      })),
+  const allowedReservationIds = new Set(
+    pendingItems
+      .map((item: any) => String(item?.preReservationId || '').trim())
+      .filter(Boolean),
+  );
+  const allowedTherapyIds = new Set(
+    pendingItems
+      .map((item: any) => String(item?.pitTherapyId || '').trim())
+      .filter(Boolean),
   );
 
-  const mappedAppointments: TeaAgendaItem[] = rawItems
-    .map((it: any) => ({
-      id: `appointment-${String(it?.id || '')}`,
-      patientName: String(it?.patientName || it?.patient_name || it?.patient?.name || it?.pacienteNome || ''),
-      doctorName: String(it?.doctorName || it?.doctor_name || it?.doctor?.name || it?.medicoNome || ''),
-      specialty: String(it?.specialty || it?.procedure || it?.procedureName || it?.procedimento || it?.especialidade || ''),
-      roomName: (() => {
-        const doctorId = String(it?.doctorId || it?.doctor?.id || '').trim();
-        const doctorName = String(it?.doctorName || it?.doctor_name || it?.doctor?.name || it?.medicoNome || '').trim().toLowerCase();
-        return roomByDoctorId.get(doctorId) || roomByDoctorName.get(doctorName) || '';
-      })(),
-      date: String(it?.date || it?.data || ''),
-      time: String(it?.time || it?.hora || ''),
-      type: String(it?.type || it?.tipoConsulta || ''),
-      status: String(it?.status || ''),
-      source: 'APPOINTMENT' as const,
-    }))
-    .filter((item) => item.id && item.date && item.time)
-    .filter((item) => (
-      String(item.type || '').toUpperCase().includes('TEA')
-      || convertedReservationSignatures.has(buildAgendaSignature(item))
-    ));
+  const agendaItems: TeaAgendaItem[] = [];
+  const seen = new Set<string>();
 
-  const mappedReservations: TeaAgendaItem[] = reservedItems
-    .map((it: any) => ({
-      id: `reservation-${String(it?.id || '')}`,
-      patientName: String(it?.patient?.name || ''),
-      doctorName: String(it?.professionalName || ''),
-      specialty: String(it?.procedureName || ''),
-      roomName: (() => {
-        const doctorId = String(it?.professionalDoctorId || it?.professional?.id || it?.pitTherapy?.professionalDoctorId || '').trim();
-        const doctorName = String(it?.professionalName || '').trim().toLowerCase();
-        return roomByDoctorId.get(doctorId) || roomByDoctorName.get(doctorName) || '';
-      })(),
-      date: it?.suggestedDate ? dayjs(it.suggestedDate).format('YYYY-MM-DD') : '',
-      time: String(it?.suggestedTime || ''),
-      type: 'RESERVA TEA',
-      status: String(it?.status || 'RESERVED'),
-      source: 'RESERVATION' as const,
-    }))
-    .filter((item) => item.id && item.date && item.time);
+  createdItems
+    .filter((item: any) => {
+      const status = String(item?.status || '').trim().toUpperCase();
+      const reservationKey = String(item?.preReservationId || item?.id || '').trim();
+      const therapyKey = String(item?.pitTherapyId || reservationKey).trim();
+      const matchesTeaFlow = (
+        (reservationKey && allowedReservationIds.has(reservationKey))
+        || (therapyKey && allowedTherapyIds.has(therapyKey))
+      );
+      return Boolean(
+        matchesTeaFlow
+        && therapyKey
+        && status
+        && PERSISTED_RESERVATION_SLOT_STATUSES.has(status),
+      );
+    })
+    .forEach((it: any) => {
+      const reservationKey = String(it?.preReservationId || it?.id || '').trim();
+      const therapyKey = String(it?.pitTherapyId || reservationKey).trim();
+      const doctorId = String(it?.professionalDoctorId || it?.professional?.id || it?.pitTherapy?.professionalDoctorId || '').trim();
+      const doctorName = String(it?.professionalName || it?.professional?.name || '').trim();
+      const roomName = roomByDoctorId.get(doctorId) || roomByDoctorName.get(doctorName.toLowerCase()) || '';
 
-  const reservationStatusesThatOccupy = new Set(['RESERVED', 'PROPOSED', 'PENDING_AUTHORIZATION', 'AUTHORIZED']);
-  const occupyingReservations = mappedReservations.filter((item) => reservationStatusesThatOccupy.has(String(item.status || '').toUpperCase()));
-  const dedupedBySignature = new Map<string, TeaAgendaItem>();
-  [...occupyingReservations, ...mappedAppointments].forEach((item) => {
-    const signature = buildAgendaSignature(item);
-    const current = dedupedBySignature.get(signature);
-    if (!current || item.source === 'APPOINTMENT') {
-      dedupedBySignature.set(signature, item);
-    }
-  });
+      const pushAgendaItem = (dateRaw: unknown, timeRaw: unknown, slotIndex?: number) => {
+        const date = normalizeDateToIso(dateRaw);
+        const time = String(timeRaw || '').trim();
+        if (!date || !time) return;
 
-  return Array.from(dedupedBySignature.values());
+        const signature = [therapyKey, date, time].join('#');
+        if (seen.has(signature)) return;
+        seen.add(signature);
+
+        agendaItems.push({
+          id: slotIndex === undefined ? `reservation-${reservationKey}-${date}-${time}` : `reservation-${reservationKey}-${slotIndex}-${date}-${time}`,
+          patientName: String(it?.patient?.name || ''),
+          doctorName,
+          specialty: String(it?.procedureName || it?.procedure?.name || it?.therapyType || ''),
+          roomName,
+          date,
+          time,
+          type: 'RESERVA TEA',
+          status: String(it?.status || 'RESERVED'),
+          source: 'RESERVATION' as const,
+        });
+      };
+
+      const weeklyPatternSlots = Array.isArray(it?.weeklySlotPattern) ? it.weeklySlotPattern : [];
+      weeklyPatternSlots.forEach((slot: any, index: number) => {
+        pushAgendaItem(slot?.date || slot?.suggestedDate, slot?.time || slot?.suggestedTime, index);
+      });
+
+      pushAgendaItem(it?.slotSuggestion?.suggestedDate || it?.suggestedDate, it?.slotSuggestion?.suggestedTime || it?.suggestedTime);
+    });
+
+  return agendaItems.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
 };
 
 export const useTeaWeeklyAgendaQuery = () => useQuery({
