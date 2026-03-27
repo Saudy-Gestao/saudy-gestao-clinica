@@ -22,6 +22,10 @@ import {
 } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
+import {
+  filterModulesForCompanyType,
+  normalizeCompanyModuleType,
+} from '../../utils/moduleTypeAccess';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
@@ -59,10 +63,18 @@ export function WorkflowSections() {
     () => extractAllowedModules(currentUser),
     [currentUser],
   );
+  const companyModuleType = useMemo(
+    () => normalizeCompanyModuleType((currentUser as any)?.sector?.branch?.company?.module_type),
+    [currentUser],
+  );
+  const visibleAllowedModules = useMemo(
+    () => filterModulesForCompanyType(allowedModules.map((name) => ({ name })), companyModuleType).map((module) => String(module.name)),
+    [allowedModules, companyModuleType],
+  );
 
   const hasResolvedAccessData = useMemo(() => {
-    const user = currentUser as any;
-    return Array.isArray(user?.accesses) || Array.isArray(user?.access) || Array.isArray(user?.modules);
+      const user = currentUser as any;
+      return Array.isArray(user?.accesses) || Array.isArray(user?.access) || Array.isArray(user?.modules);
   }, [currentUser]);
 
   useEffect(() => {
@@ -139,7 +151,7 @@ export function WorkflowSections() {
   const filteredSections = sections.map(section => ({
     ...section,
     items: section.items.filter(item => 
-      allowedModules.length === 0 || allowedModules.includes(item.moduleName)
+      visibleAllowedModules.length === 0 || visibleAllowedModules.includes(item.moduleName)
     )
   })).filter(section => section.items.length > 0); // Remove seções vazias
 
@@ -179,7 +191,7 @@ export function WorkflowSections() {
             ))}
           </Stack>
         </Box>
-      ) : allowedModules.length === 0 ? (
+      ) : visibleAllowedModules.length === 0 ? (
         <Box p="xl" style={{ textAlign: 'center' }}>
           <Text size="lg" c="dimmed" mb="xs">
             🔒 Você ainda não possui acessos configurados

@@ -21,6 +21,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'adm-hub', label: 'ADM Hub', route: '/adm-hub', prefixes: ['/adm-hub'] },
   { key: 'adm-leads', label: 'Possíveis Clientes', route: '/possiveis-clientes', prefixes: ['/possiveis-clientes'] },
   { key: 'adm-clientes', label: 'Cadastro de Cliente', route: '/cadastro-cliente', prefixes: ['/cadastro-cliente'] },
+  { key: 'adm-clientes-edicao', label: 'Gestão de Clientes', route: '/adm-clientes', prefixes: ['/adm-clientes'] },
   { key: 'pre-atendimento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
   { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },

@@ -55,6 +55,11 @@ import userService from '../../services/userService';
 import accessService from '../../services/accessService';
 import type { Module } from '../../services/moduleService';
 import { FloatingInput } from '../common/FloatingInput';
+import {
+  filterAccessesForCompanyType,
+  filterModulesForCompanyType,
+  normalizeCompanyModuleType,
+} from '../../utils/moduleTypeAccess';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { WhatsAppCredentials } from './WhatsAppCredentials';
 import { useSettingsCompaniesQuery } from '../../hooks/useSettingsCompaniesQuery';
@@ -334,7 +339,11 @@ export function SettingsPage() {
     }
   };
 
-  const getAllModuleIds = () => (Array.isArray(modules) ? modules.map((m) => m.id).filter(Boolean) : []);
+  const selectedCompany = companies.find((company) => company.id === selectedCompanyId) || null;
+  const selectedCompanyModuleType = normalizeCompanyModuleType(selectedCompany?.module_type);
+  const availableModules = filterModulesForCompanyType(modules, selectedCompanyModuleType);
+
+  const getAllModuleIds = () => (Array.isArray(availableModules) ? availableModules.map((m) => m.id).filter(Boolean) : []);
 
   const normalizeModuleSelection = (values: string[]) => {
     const allModuleIds = getAllModuleIds();
@@ -411,7 +420,12 @@ export function SettingsPage() {
     setBranchQuota(quotas[selectedCompanyId] || null);
   }, [selectedCompanyId, companies]);
 
-  const maxBranchesAllowed = branchQuota ? branchQuota.initialBranchCount + branchQuota.allowedCreates : null;
+  const companyAdditionalBranchesAllowed = Number(selectedCompany?.additionalBranchesAllowed);
+  const maxBranchesAllowed = Number.isFinite(companyAdditionalBranchesAllowed)
+    ? 1 + Math.max(0, companyAdditionalBranchesAllowed)
+    : branchQuota
+      ? branchQuota.initialBranchCount + branchQuota.allowedCreates
+      : null;
   const reachedBranchLimit = maxBranchesAllowed !== null && branches.length >= maxBranchesAllowed;
 
   // Reload companies when userCompanyId is set
@@ -486,8 +500,8 @@ export function SettingsPage() {
   }, [modulesData]);
 
   useEffect(() => {
-    setAccessesList(accessesData || []);
-  }, [accessesData]);
+    setAccessesList(filterAccessesForCompanyType(accessesData || [], selectedCompanyModuleType));
+  }, [accessesData, selectedCompanyModuleType]);
 
   // --- Handlers ---
 
@@ -803,6 +817,8 @@ export function SettingsPage() {
 
       const freshUser = await userService.getUser(currentUser.id);
       localStorage.setItem('user', JSON.stringify(freshUser));
+      queryClient.setQueryData([...queryKeys.currentUserProfile, String(currentUser.id)], freshUser);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.currentUserProfile, String(currentUser.id)] });
       window.dispatchEvent(new CustomEvent('auth:user-updated'));
     } catch (error) {
       console.error('Erro ao atualizar dados do usuário logado:', error);
@@ -811,10 +827,10 @@ export function SettingsPage() {
 
   // Accesses
   const openAccessModalForCreate = () => {
-    if (modules.length === 0) {
+    if (availableModules.length === 0) {
       notifications.show({ 
         title: 'Aviso', 
-        message: 'Carregando módulos, aguarde...', 
+        message: 'Nenhum módulo disponível para o tipo da empresa selecionada.', 
         color: 'yellow' 
       });
       return;
@@ -826,16 +842,16 @@ export function SettingsPage() {
   };
 
   const openAccessModalForEdit = (access: any) => {
-    if (modules.length === 0) {
+    if (availableModules.length === 0) {
       notifications.show({ 
         title: 'Aviso', 
-        message: 'Carregando módulos, aguarde...', 
+        message: 'Nenhum módulo disponível para o tipo da empresa selecionada.', 
         color: 'yellow' 
       });
       return;
     }
     setEditingAccess(access);
-    const accessModuleIds = access.modules?.map((m: any) => m.id) || [];
+    const accessModuleIds = filterModulesForCompanyType(access.modules || [], selectedCompanyModuleType).map((m: any) => m.id);
     const allModuleIds = getAllModuleIds();
     const shouldUseTotal = allModuleIds.length > 0 && allModuleIds.every((id) => accessModuleIds.includes(id));
 
@@ -850,7 +866,7 @@ export function SettingsPage() {
   const handleSaveAccess = async () => {
     const payload = {
       ...accessForm,
-      moduleIds: expandModuleSelectionForSave(accessForm.moduleIds || []),
+      moduleIds: expandModuleSelectionForSave(accessForm.moduleIds || []).filter((id) => getAllModuleIds().includes(id)),
     };
 
     // Validate form
@@ -1120,7 +1136,7 @@ export function SettingsPage() {
           </ActionIcon>
           <Title order={1} fw={600} style={{ fontSize: '1.8rem' }}>Configurações</Title>
         </Group>
-        <Text c="dimmed">{companies.find(c => c.id === selectedCompanyId)?.legalName}</Text>
+        <Text c="dimmed">{selectedCompany?.legalName}</Text>
       </Group>
 
       <Grid gutter="xl">
@@ -1621,10 +1637,10 @@ export function SettingsPage() {
                                     label="Módulos"
                                     placeholder="Selecione os módulos"
                                     data={
-                                      Array.isArray(modules) && modules.length > 0
+                                      Array.isArray(availableModules) && availableModules.length > 0
                                         ? [
                                             { value: ACCESS_TOTAL_VALUE, label: ACCESS_TOTAL_LABEL },
-                                            ...modules.map((m) => ({
+                                            ...availableModules.map((m) => ({
                                               value: m.id || '',
                                               label: m.label || m.name || 'Sem nome',
                                             })),
@@ -1634,7 +1650,7 @@ export function SettingsPage() {
                                     value={accessForm.moduleIds || []}
                                     onChange={(value) => setAccessForm({ ...accessForm, moduleIds: normalizeModuleSelection(value) })}
                                     searchable
-                                    disabled={!modules || modules.length === 0}
+                                    disabled={!availableModules || availableModules.length === 0}
                                     error={accessErrors.moduleIds}
                                     withAsterisk
                                     styles={{

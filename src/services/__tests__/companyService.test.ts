@@ -24,6 +24,7 @@ describe('companyService', () => {
       admin: { name: 'A', email: 'a@b', password: 'p' },
       company: { cnpj: '1', phone: '2', razaoSocial: 'R', nomeFantasia: 'N', address: 'E' },
       branchesCount: 3,
+      modulo: 'tea',
     };
 
     // capture body by mocking api.post
@@ -38,6 +39,7 @@ describe('companyService', () => {
       accesses: expect.any(Array),
       branch: expect.objectContaining({ tradeName: 'N' }),
       branchesCount: 3,
+      modulo: 'tea',
     }));
     expect(res).toEqual({ ok: true });
   });

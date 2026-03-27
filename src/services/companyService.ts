@@ -21,7 +21,7 @@ const companyService = {
   // `branchesCount`.  The API expects a `/auth/register` body, so we
   // massage the structure here and forward the request.
   createCompany: async (data: any) => {
-    const { admin, company, branchesCount } = data;
+    const { admin, company, branchesCount, modulo } = data;
     // map frontend names to backend schema
     const body: any = {
       company: {
@@ -49,6 +49,7 @@ const companyService = {
         address: '',
       },
       accesses: [{ description: 'Administrador' }],
+      modulo,
     };
 
     if (branchesCount !== undefined) {

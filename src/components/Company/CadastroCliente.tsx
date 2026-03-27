@@ -17,7 +17,7 @@ import {
   Radio,
 } from '@mantine/core';
 import { ArrowLeft, Building2, ShieldCheck, Waypoints } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
+import { notifications, showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import companyService from '../../services/companyService';
 import { isValidEmail, normalizeEmail } from '../../utils/formatters';
@@ -134,6 +134,17 @@ export function CadastroCliente() {
   const handleSubmit = async () => {
     if (!validateStep(2)) return;
     setSubmitting(true);
+    const notificationId = 'cadastro-cliente-submit';
+
+    notifications.show({
+      id: notificationId,
+      title: 'Cadastrando cliente',
+      message: 'Estamos criando a empresa, o usuário inicial e enviando os dados de acesso por e-mail.',
+      color: 'blue',
+      loading: true,
+      autoClose: false,
+      withCloseButton: false,
+    });
 
     try {
       const additionalBranchesAllowed = branches ?? 0;
@@ -173,12 +184,14 @@ export function CadastroCliente() {
         saveBranchCreateQuota(result.company.id, payload.branchesCount, initialBranchCount);
       }
 
-      showNotification({ title: 'Sucesso', message: 'Cliente cadastrado com sucesso', color: 'green' });
-      // Importante: mostrar a senha gerada para o admin
-      if (plainPassword) {
-        showNotification({ title: 'Senha gerada', message: `Senha: ${plainPassword}`, color: 'blue' });
-      }
-
+      notifications.update({
+        id: notificationId,
+        title: 'Cliente cadastrado',
+        message: 'Cadastro concluído com sucesso. O e-mail com os dados de acesso foi processado.',
+        color: 'green',
+        loading: false,
+        autoClose: 5000,
+      });
       if (isFromAdmHub) {
         navigate('/adm-hub');
       } else {
@@ -187,7 +200,14 @@ export function CadastroCliente() {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
       const message = e?.response?.data?.message || e?.message || 'Erro ao cadastrar cliente';
-      showNotification({ title: 'Erro', message, color: 'red' });
+      notifications.update({
+        id: notificationId,
+        title: 'Falha no cadastro',
+        message,
+        color: 'red',
+        loading: false,
+        autoClose: 7000,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -324,16 +344,16 @@ export function CadastroCliente() {
                 Fluxo administrativo com 3 etapas: acesso, empresa e quantidade de filiais adicionais.
               </Text>
               <Group>
-                <Button variant="default" onClick={handleBack} disabled={active === 0}>
-                  Voltar
-                </Button>
+                  <Button variant="default" onClick={handleBack} disabled={active === 0 || submitting}>
+                    Voltar
+                  </Button>
                 {active < 2 ? (
-                  <Button onClick={handleNext} bg={DARK_BLUE}>
+                  <Button onClick={handleNext} bg={DARK_BLUE} disabled={submitting}>
                     Próximo
                   </Button>
                 ) : (
-                  <Button onClick={handleSubmit} bg={DARK_BLUE} loading={submitting}>
-                    Cadastrar
+                  <Button onClick={handleSubmit} bg={DARK_BLUE} loading={submitting} disabled={submitting}>
+                    {submitting ? 'Cadastrando...' : 'Cadastrar'}
                   </Button>
                 )}
               </Group>

@@ -18,6 +18,12 @@ const adminModules = [
     description: 'Crie novas empresas, administrador inicial e liberação de filiais.',
     route: '/cadastro-cliente',
   },
+  {
+    icon: Building2,
+    title: 'Gestão de Clientes',
+    description: 'Edite dados da empresa, campos cadastrais e o tipo de módulo liberado.',
+    route: '/adm-clientes',
+  },
 ];
 
 export function AdminHub() {
