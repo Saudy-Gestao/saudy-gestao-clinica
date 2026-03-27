@@ -53,6 +53,9 @@ interface Agendamento {
   medicoNome: string;
   especialidade: string;
   convenio: string;
+  convenioNumber: string;
+  convenioValidUntil: string;
+  convenioStatus: string;
   data: string;
   hora: string;
   tipoConsulta: string;
@@ -68,6 +71,9 @@ interface NovoAgendamento {
   pacienteCPF: string;
   especialidade: string;
   convenio: string;
+  convenioNumber: string;
+  convenioValidUntil: string;
+  convenioStatus: string;
   data: Date | null;
   hora: string;
   profissional: string;
@@ -144,6 +150,9 @@ const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   pacienteCPF: '',
   especialidade: '',
   convenio: 'Particular',
+  convenioNumber: '',
+  convenioValidUntil: '',
+  convenioStatus: 'Particular',
   data: null,
   hora: '',
   profissional: '',
@@ -192,6 +201,13 @@ const resolvePatientInsuranceValidity = (patient: any): string => {
 
   return parsed.format('MM/YY');
 };
+
+const resolvePatientInsuranceNumber = (patient: any): string => String(
+  patient?.healthInsuranceNumber
+  ?? patient?.insuranceCardNumber
+  ?? patient?.convenioNumber
+  ?? '',
+).trim();
 
 const patientHasRegisteredInsurance = (patient: any): boolean => {
   const insuranceName = String(
@@ -309,6 +325,19 @@ const normalizeProcedureAppointmentType = (value?: string | null): 'CONSULTA' | 
 
 const isParticularInsurance = (value?: string | null): boolean => {
   return normalizeComparableText(value) === normalizeComparableText(PARTICULAR_INSURANCE_LABEL);
+};
+
+const buildInsuranceFormValues = (patient: any, fallbackInsuranceName?: string) => {
+  const insuranceName = resolvePatientInsuranceName(patient || {}) || fallbackInsuranceName || PARTICULAR_INSURANCE_LABEL;
+  const hasRegisteredInsurance = patientHasRegisteredInsurance(patient || {})
+    || !isParticularInsurance(insuranceName);
+
+  return {
+    convenio: insuranceName,
+    convenioNumber: hasRegisteredInsurance ? resolvePatientInsuranceNumber(patient) : '',
+    convenioValidUntil: hasRegisteredInsurance ? resolvePatientInsuranceValidity(patient) : '',
+    convenioStatus: hasRegisteredInsurance ? 'Ativo' : PARTICULAR_STATUS_LABEL,
+  };
 };
 
 const matchesDoctorToProcedure = (doctorSpecialties: string[], procedureName: string): boolean => {
@@ -486,6 +515,7 @@ export function Agendamento() {
     setNovoAgendamento({
       ...INITIAL_NOVO_AGENDAMENTO,
       convenio: PARTICULAR_INSURANCE_LABEL,
+      convenioStatus: PARTICULAR_STATUS_LABEL,
       data: keepDate,
     });
     setSelectedPatientId(null);
@@ -534,6 +564,9 @@ export function Agendamento() {
     medicoNome: it.doctorName || it.doctor_name || it.doctor?.name || it.medicoNome || '',
     especialidade: it.specialty || it.procedure || it.procedureName || it.procedimento || it.especialidade || '',
     convenio: it.convenio || it.insurance || it.healthInsuranceName || '',
+    convenioNumber: it.convenioNumber || it.convenio_number || it.healthInsuranceNumber || it.insuranceCardNumber || '',
+    convenioValidUntil: it.convenioValidUntil || it.convenio_valid_until || it.healthInsuranceExpiry || it.healthInsuranceValidity || '',
+    convenioStatus: it.convenioStatus || it.convenio_status || '',
     data: normalizeDateOnly(it.date || it.data || ''),
     hora: it.time || it.hora || '',
     tipoConsulta: it.type || it.tipoConsulta || 'CONSULTA',
@@ -944,6 +977,9 @@ export function Agendamento() {
       pacienteCPF: agendamento.pacienteCPF || '',
       especialidade: agendamento.especialidade,
       convenio: agendamento.convenio,
+      convenioNumber: agendamento.convenioNumber || '',
+      convenioValidUntil: agendamento.convenioValidUntil || '',
+      convenioStatus: agendamento.convenioStatus || (isParticularInsurance(agendamento.convenio) ? PARTICULAR_STATUS_LABEL : 'Ativo'),
       data: appointmentDate,
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
@@ -981,6 +1017,9 @@ export function Agendamento() {
       pacienteCPF: agendamento.pacienteCPF || '',
       especialidade: agendamento.especialidade,
       convenio: agendamento.convenio,
+      convenioNumber: agendamento.convenioNumber || '',
+      convenioValidUntil: agendamento.convenioValidUntil || '',
+      convenioStatus: agendamento.convenioStatus || (isParticularInsurance(agendamento.convenio) ? PARTICULAR_STATUS_LABEL : 'Ativo'),
       data: appointmentDate,
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
@@ -1019,6 +1058,9 @@ export function Agendamento() {
         pacienteNome: '',
         pacienteCPF: '',
         convenio: PARTICULAR_INSURANCE_LABEL,
+        convenioNumber: '',
+        convenioValidUntil: '',
+        convenioStatus: PARTICULAR_STATUS_LABEL,
       }));
       return;
     }
@@ -1028,13 +1070,14 @@ export function Agendamento() {
     setSelectedPatientId(value);
     const p = patientById[value];
     if (!p) return;
+    const insuranceFields = buildInsuranceFormValues(p);
 
     setNovoAgendamento((prev) => ({
       ...prev,
       pacienteId: String(p.id ?? p.patientId ?? value),
       pacienteNome: p.name || p.fullName || p.patientName || prev.pacienteNome || '',
       pacienteCPF: p.cpf || prev.pacienteCPF || '',
-      convenio: resolvePatientInsuranceName(p),
+      ...insuranceFields,
     }));
   };
 
@@ -1043,13 +1086,14 @@ export function Agendamento() {
 
     const patient = patientById[selectedPatientId];
     if (!patient) return;
+    const insuranceFields = buildInsuranceFormValues(patient);
 
     setNovoAgendamento((prev) => ({
       ...prev,
       pacienteId: String(patient.id ?? patient.patientId ?? selectedPatientId),
       pacienteNome: patient.name || patient.fullName || patient.patientName || prev.pacienteNome || '',
       pacienteCPF: patient.cpf || prev.pacienteCPF || '',
-      convenio: resolvePatientInsuranceName(patient),
+      ...insuranceFields,
     }));
   }, [selectedPatientId, patientById, isManualPatientFlow]);
 
@@ -1144,6 +1188,14 @@ export function Agendamento() {
         healthInsuranceName:
           normalizeComparableText(novoAgendamento.convenio) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL)
             ? (novoAgendamento.convenio || undefined)
+            : undefined,
+        healthInsuranceNumber:
+          normalizeComparableText(novoAgendamento.convenio) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL)
+            ? (novoAgendamento.convenioNumber || undefined)
+            : undefined,
+        healthInsuranceExpiry:
+          normalizeComparableText(novoAgendamento.convenio) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL)
+            ? (novoAgendamento.convenioValidUntil || undefined)
             : undefined,
       });
 
@@ -1251,6 +1303,9 @@ export function Agendamento() {
           specialty: selectedSpecialties.join(', '),
           durationMinutes: selectedProcedureDuration,
           convenio: resolvedInsuranceName,
+          convenioNumber: novoAgendamento.convenioNumber || undefined,
+          convenioValidUntil: novoAgendamento.convenioValidUntil || undefined,
+          convenioStatus: novoAgendamento.convenioStatus || undefined,
           insurance: resolvedInsuranceName,
           healthInsuranceName: resolvedInsuranceName,
           date: formatDateForApi(novoAgendamento.data),
@@ -1305,6 +1360,9 @@ export function Agendamento() {
               specialty: suggestion.procedure,
               durationMinutes: suggestion.durationMinutes,
               convenio: resolvedInsuranceName,
+              convenioNumber: novoAgendamento.convenioNumber || undefined,
+              convenioValidUntil: novoAgendamento.convenioValidUntil || undefined,
+              convenioStatus: novoAgendamento.convenioStatus || undefined,
               insurance: resolvedInsuranceName,
               healthInsuranceName: resolvedInsuranceName,
               date: formatDateForApi(suggestion.date),
@@ -1326,6 +1384,9 @@ export function Agendamento() {
             specialty: selectedSpecialties.join(', '),
             durationMinutes: selectedProcedureDuration,
             convenio: resolvedInsuranceName,
+            convenioNumber: novoAgendamento.convenioNumber || undefined,
+            convenioValidUntil: novoAgendamento.convenioValidUntil || undefined,
+            convenioStatus: novoAgendamento.convenioStatus || undefined,
             insurance: resolvedInsuranceName,
             healthInsuranceName: resolvedInsuranceName,
             date: formatDateForApi(novoAgendamento.data),
@@ -1480,6 +1541,9 @@ export function Agendamento() {
       pacienteCPF: appt.patientCpf || '',
       especialidade: specialty,
       convenio: appt.convenio || '',
+      convenioNumber: appt.convenioNumber || '',
+      convenioValidUntil: appt.convenioValidUntil || '',
+      convenioStatus: appt.convenioStatus || '',
       data: appt.date ? new Date(`${appt.date}T00:00:00`) : null,
       hora: appt.time || '',
       profissional: appt.doctorName || '',
@@ -1605,30 +1669,14 @@ export function Agendamento() {
   const reviewDateValue = reviewPrimaryManualSelection?.date || reviewPrimarySuggestedSelection?.date || novoAgendamento.data;
   const reviewTimeValue = reviewPrimaryManualSelection?.time || reviewPrimarySuggestedSelection?.time || novoAgendamento.hora || '';
   const reviewProfessionalValue = reviewPrimaryManualSelection?.doctorName || reviewPrimarySuggestedSelection?.doctorName || novoAgendamento.profissional || '';
-  const selectedPatientRecord = patientById[selectedPatientId || ''] || null;
-  const selectedPatientInsuranceName = selectedPatientRecord
-    ? resolvePatientInsuranceName(selectedPatientRecord)
-    : (novoAgendamento.convenio || PARTICULAR_INSURANCE_LABEL);
-  const selectedPatientInsuranceHasRegisteredPlan = selectedPatientRecord
-    ? patientHasRegisteredInsurance(selectedPatientRecord)
-    : normalizeComparableText(selectedPatientInsuranceName) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL);
-  const selectedPatientInsuranceNumber = selectedPatientInsuranceHasRegisteredPlan
-    ? String(selectedPatientRecord?.healthInsuranceNumber || selectedPatientRecord?.insuranceCardNumber || '')
-    : NOT_APPLICABLE_LABEL;
-  const selectedPatientInsuranceValidity = selectedPatientInsuranceHasRegisteredPlan
-    ? resolvePatientInsuranceValidity(selectedPatientRecord)
-    : NOT_APPLICABLE_LABEL;
-  const selectedPatientInsuranceStatus = selectedPatientInsuranceHasRegisteredPlan
-    ? 'Ativo'
-    : PARTICULAR_STATUS_LABEL;
   const insuranceSelectData = canEditInsuranceFields ? insuranceOptions : [];
   const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : '';
   const insuranceSelectPlaceholder = !canEditInsuranceFields
     ? 'Selecione um paciente primeiro'
     : (insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio');
-  const insuranceCardNumberValue = canEditInsuranceFields ? selectedPatientInsuranceNumber : '';
-  const insuranceValidityValue = canEditInsuranceFields ? selectedPatientInsuranceValidity : '';
-  const insuranceStatusValue = canEditInsuranceFields ? selectedPatientInsuranceStatus : '';
+  const insuranceCardNumberValue = canEditInsuranceFields ? novoAgendamento.convenioNumber : NOT_APPLICABLE_LABEL;
+  const insuranceValidityValue = canEditInsuranceFields ? novoAgendamento.convenioValidUntil : NOT_APPLICABLE_LABEL;
+  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : '';
   const hasAnySelectedSchedule = Boolean(
     novoAgendamento.hora
     || manualProcedureSelections.length
@@ -1930,6 +1978,29 @@ export function Agendamento() {
           : slotSupportsProcedureDuration(doctor, slot, date)
       ));
     });
+  };
+  const findFirstAvailabilityForDate = (
+    date: Date,
+    periods: Array<'Manhã' | 'Tarde' | 'Noite'> = ['Manhã', 'Tarde', 'Noite'],
+  ): { period: 'Manhã' | 'Tarde' | 'Noite'; slot: string; doctor: string } | null => {
+    for (const period of periods) {
+      for (const doctor of schedulerDoctors) {
+        const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], period, date);
+        for (const slot of doctorSlots) {
+          const isAvailable = isMultiProcedureFlow
+            ? getSelectableProceduresForSlot(doctor, slot, date).some((procedureName) => (
+              slotSupportsDuration(doctor, slot, getProcedureDuration(procedureName), date, editingAgendamentoId)
+            ))
+            : slotSupportsProcedureDuration(doctor, slot, date);
+
+          if (isAvailable) {
+            return { period, slot, doctor };
+          }
+        }
+      }
+    }
+
+    return null;
   };
   const getCompatibleDoctorsForProcedure = (procedureName: string): string[] => {
     const normalizedSelected = normalizeComparableText(procedureName);
@@ -2321,13 +2392,21 @@ export function Agendamento() {
     }));
   };
   const goToNextAvailableDate = () => {
-    for (let offset = 1; offset <= 30; offset += 1) {
+    for (let offset = 0; offset <= 30; offset += 1) {
       const candidate = addDays(schedulingDate, offset);
-      if (dateHasAvailability(candidate)) {
-        goToSchedulingDate(candidate);
+      const nextAvailability = findFirstAvailabilityForDate(candidate);
+      if (nextAvailability) {
+        setViewedDate(candidate);
+        setActiveSchedulePeriod(nextAvailability.period);
+        setNovoAgendamento((prev) => ({
+          ...prev,
+          data: candidate,
+          profissional: prev.profissional || nextAvailability.doctor,
+          hora: nextAvailability.slot,
+        }));
         showNotification({
           title: 'Próxima disponibilidade encontrada',
-          message: `Mostrando agenda de ${dayjs(candidate).format('DD/MM/YYYY')}.`,
+          message: `${dayjs(candidate).format('DD/MM/YYYY')} às ${nextAvailability.slot} com ${nextAvailability.doctor}.`,
           color: 'blue',
         });
         return;
@@ -2336,7 +2415,7 @@ export function Agendamento() {
 
     showNotification({
       title: 'Sem disponibilidade',
-      message: 'Não encontramos horários disponíveis nos próximos 30 dias para esse turno.',
+      message: 'Não encontramos horários disponíveis nos próximos 30 dias em nenhum turno.',
       color: 'yellow',
     });
   };
@@ -2546,7 +2625,17 @@ export function Agendamento() {
                   placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
                   value={insuranceSelectValue}
-                  onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenio: value || PARTICULAR_INSURANCE_LABEL })}
+                  onChange={(value) => {
+                    const nextConvenio = value || PARTICULAR_INSURANCE_LABEL;
+                    const isParticular = isParticularInsurance(nextConvenio);
+                    setNovoAgendamento({
+                      ...novoAgendamento,
+                      convenio: nextConvenio,
+                      convenioStatus: isParticular
+                        ? PARTICULAR_STATUS_LABEL
+                        : (novoAgendamento.convenioStatus || 'Ativo'),
+                    });
+                  }}
                   searchable
                   clearable
                   disabled={insurancesLoading}
@@ -2555,17 +2644,17 @@ export function Agendamento() {
                 <FloatingInput
                   label="Número da carteirinha"
                   value={insuranceCardNumberValue}
-                  readOnly
+                  onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioNumber: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Data de validade"
                   value={insuranceValidityValue}
-                  readOnly
+                  onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioValidUntil: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Status"
                   value={insuranceStatusValue}
-                  readOnly
+                  onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioStatus: e.currentTarget.value })}
                 />
               </SimpleGrid>
 
@@ -2836,11 +2925,11 @@ export function Agendamento() {
                         <Box>
                           <Text fw={700}>Nenhuma disponibilidade nesse dia</Text>
                           <Text size="sm" c="dimmed">
-                            Podemos procurar o próximo dia com vaga nesse mesmo turno para não quebrar o fluxo da marcação.
+                            Podemos procurar o próximo horário disponível em qualquer turno para continuar a marcação.
                           </Text>
                         </Box>
                         <Button variant="light" color="yellow" onClick={goToNextAvailableDate}>
-                          Buscar próximo dia com vaga
+                          Buscar próximo turno/dia disponível
                         </Button>
                       </Group>
                     </Paper>
