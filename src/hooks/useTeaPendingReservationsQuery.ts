@@ -8,13 +8,38 @@ type Params = {
   status?: string | null;
 };
 
+const normalizePatientFromReservation = (item: any) => {
+  const patient = item?.patient ?? {};
+  const birthDate = (
+    patient?.birthDate
+    || patient?.birth_date
+    || patient?.birthdate
+    || item?.birthDate
+    || item?.birth_date
+    || item?.birthdate
+    || item?.patientBirthDate
+    || item?.patient_birth_date
+    || item?.patientBirthdate
+  );
+
+  return {
+    ...patient,
+    id: patient?.id || item?.patientId || item?.patient_id,
+    name: patient?.name || patient?.nome || item?.patientName || item?.patient_name,
+    cpf: patient?.cpf || item?.patientCpf || item?.patient_cpf,
+    birthDate,
+    birth_date: patient?.birth_date || birthDate,
+    birthdate: patient?.birthdate || birthDate,
+  };
+};
+
 export const fetchTeaPendingReservations = async (params: Params) => {
   const data: any = await teaPreReservationService.listPending({
     search: params.search || undefined,
     status: (params.status || undefined) as TeaPreReservationStatus | undefined,
   });
 
-  return Array.isArray(data)
+  const items = Array.isArray(data)
     ? data
     : (Array.isArray(data?.items)
       ? data.items
@@ -23,6 +48,11 @@ export const fetchTeaPendingReservations = async (params: Params) => {
         : (Array.isArray(data?.data)
           ? data.data
           : [])));
+
+  return items.map((item: any) => ({
+    ...item,
+    patient: normalizePatientFromReservation(item),
+  }));
 };
 
 export const useTeaPendingReservationsQuery = (params: Params) => useQuery({

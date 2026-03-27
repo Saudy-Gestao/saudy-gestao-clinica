@@ -47,6 +47,7 @@ import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import teaProfileService from '../../services/teaProfileService';
 import convenioAuthorizationService from '../../services/convenioAuthorizationService';
+import patientService from '../../services/patientService';
 import type { TeaPreReservationStatus } from '../../services/teaPreReservationService';
 import { useTeaPendingReservationsQuery } from '../../hooks/useTeaPendingReservationsQuery';
 import { useTeaReservationTimelineQuery } from '../../hooks/useTeaReservationTimelineQuery';
@@ -649,6 +650,7 @@ export function TeaPreReserva() {
   const [checklistGroupKey, setChecklistGroupKey] = useState<string | null>(null);
   const [checklistGroupLabel, setChecklistGroupLabel] = useState<string>('');
   const [checklistGroupReservations, setChecklistGroupReservations] = useState<any[]>([]);
+  const [checklistPatientBirthDateFallback, setChecklistPatientBirthDateFallback] = useState<Date | null>(null);
   const [acceptModalOpened, setAcceptModalOpened] = useState(false);
   const [acceptModalMode, setAcceptModalMode] = useState<'suggestion' | 'conversion'>('suggestion');
   const [deletePitConfirmModalOpened, setDeletePitConfirmModalOpened] = useState(false);
@@ -774,6 +776,46 @@ export function TeaPreReserva() {
   const checklistPatientBirthDate = parseApiDateToLocalDate(
     checklistPatient?.birthDate || checklistPatient?.birth_date || checklistPatient?.birthdate,
   );
+  const checklistPatientResolvedBirthDate = checklistPatientBirthDate || checklistPatientBirthDateFallback;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!checklistModalOpened) {
+      setChecklistPatientBirthDateFallback(null);
+      return undefined;
+    }
+
+    if (checklistPatientBirthDate) {
+      setChecklistPatientBirthDateFallback(null);
+      return undefined;
+    }
+
+    const patientId = String(checklistPatient?.id || '').trim();
+    if (!patientId) {
+      setChecklistPatientBirthDateFallback(null);
+      return undefined;
+    }
+
+    (async () => {
+      try {
+        const patient = await patientService.getPatientById(patientId);
+        if (cancelled) return;
+
+        setChecklistPatientBirthDateFallback(parseApiDateToLocalDate(
+          patient?.birthDate || patient?.birth_date || patient?.birthdate,
+        ));
+      } catch {
+        if (!cancelled) {
+          setChecklistPatientBirthDateFallback(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checklistModalOpened, checklistPatient?.id, checklistPatientBirthDate]);
 
   const acceptConversionHasMissingStartDate = (
     acceptModalMode === 'conversion'
@@ -4259,7 +4301,7 @@ export function TeaPreReserva() {
                   <Box className="tea-pre-reserva-checklist-patient__field">
                     <Text size="sm" className="tea-pre-reserva-checklist-patient__label">Data de nascimento</Text>
                     <Text size="lg" className="tea-pre-reserva-checklist-patient__value">
-                      {checklistPatientBirthDate ? dayjs(checklistPatientBirthDate).format('DD/MM/YYYY') : '-'}
+                      {checklistPatientResolvedBirthDate ? dayjs(checklistPatientResolvedBirthDate).format('DD/MM/YYYY') : '-'}
                     </Text>
                   </Box>
                 </Box>
