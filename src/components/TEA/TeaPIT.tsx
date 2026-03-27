@@ -28,6 +28,7 @@ import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useTeaPitQuery } from '../../hooks/useTeaPitQuery';
+import { usePatientAppointmentsQuery } from '../../hooks/usePatientAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingInput } from '../common/FloatingInput';
@@ -83,6 +84,70 @@ const SHIFT_OPTIONS = [
   { value: 'NOITE', label: 'Noite' },
 ];
 
+const WEEKDAY_PT = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+const timeToMinutes = (time?: string | null) => {
+  const [hourRaw, minuteRaw] = String(time || '').split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
+  return (hour * 60) + minute;
+};
+
+const formatScheduledSlotSummary = (slots: Array<{ date: string; time: string }> = []) => {
+  return [...slots]
+    .filter((slot) => slot?.date && slot?.time)
+    .map((slot) => ({
+      weekday: WEEKDAY_PT[dayjs(slot.date).day()] || '',
+      time: String(slot.time).trim(),
+    }))
+    .filter((slot) => slot.weekday && slot.time)
+    .filter((slot, index, arr) => arr.findIndex((item) => item.weekday === slot.weekday && item.time === slot.time) === index)
+    .sort((a, b) => {
+      const weekdayDiff = WEEKDAY_PT.indexOf(a.weekday) - WEEKDAY_PT.indexOf(b.weekday);
+      if (weekdayDiff !== 0) return weekdayDiff;
+      return timeToMinutes(a.time) - timeToMinutes(b.time);
+    })
+    .map((slot) => `${slot.weekday} ${slot.time}`)
+    .join(' | ');
+};
+
+const extractScheduledSlotsFromTherapy = (therapy: any) => {
+  const slotCandidates: Array<{ date: string; time: string }> = [];
+  const appendSlot = (dateRaw: unknown, timeRaw: unknown) => {
+    const parsedDate = parseApiDateToLocalDate(dateRaw as string);
+    const date = parsedDate ? dayjs(parsedDate).format('YYYY-MM-DD') : '';
+    const time = String(timeRaw || '').trim();
+    if (!date || !time) return;
+    if (slotCandidates.some((slot) => slot.date === date && slot.time === time)) return;
+    slotCandidates.push({ date, time });
+  };
+
+  const slotArrays = [
+    therapy?.weeklySlotPattern,
+    therapy?.scheduledSlots,
+    therapy?.appointments,
+    therapy?.futureAppointments,
+    therapy?.preReservations,
+    therapy?.reservations,
+  ];
+
+  slotArrays.forEach((items) => {
+    if (!Array.isArray(items)) return;
+    items.forEach((item: any) => {
+      appendSlot(
+        item?.date || item?.sessionDate || item?.suggestedDate || item?.slotSuggestion?.suggestedDate,
+        item?.time || item?.sessionTime || item?.suggestedTime || item?.slotSuggestion?.suggestedTime,
+      );
+    });
+  });
+
+  appendSlot(therapy?.sessionDate, therapy?.sessionTime);
+  appendSlot(therapy?.suggestedDate, therapy?.suggestedTime);
+
+  return slotCandidates;
+};
+
 export function TeaPIT() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,6 +175,11 @@ export function TeaPIT() {
   const { data: doctorsData, isLoading: loadingDoctors, error: doctorsError } = useDoctorsAdminQuery();
   const { data: proceduresData, isLoading: loadingProcedures, error: proceduresError } = useProceduresAdminQuery();
   const { data: pitData, error: pitError } = useTeaPitQuery(selectedTeaProfileId);
+  const selectedTeaProfile = useMemo(
+    () => teaProfiles.find((item: any) => String(item?.id || '') === String(selectedTeaProfileId || '')) || null,
+    [teaProfiles, selectedTeaProfileId],
+  );
+  const { data: patientAppointments = [] } = usePatientAppointmentsQuery(selectedTeaProfile?.patient?.id || null);
 
   const teaProfileOptions = useMemo(
     () => teaProfiles.map((it: any) => ({
@@ -254,6 +324,45 @@ export function TeaPIT() {
       setSelectedTeaProfileId(pid);
     }
   }, [location.state]);
+
+  const scheduledSummaryByTherapyId = useMemo(() => {
+    const pit = (pitData as any)?.item;
+    const pitTherapies = Array.isArray(pit?.therapies) ? pit.therapies : [];
+    const appointments = Array.isArray(patientAppointments) ? patientAppointments : [];
+
+    return pitTherapies.reduce((acc: Record<string, string>, therapy: any) => {
+      const therapyId = String(therapy?.id || '');
+      if (!therapyId) return acc;
+
+      const procedureName = String(therapy?.therapyType || '').trim().toLowerCase();
+      const professionalName = String(therapy?.professional || '').trim().toLowerCase();
+      const appointmentSlots = appointments
+        .filter((item: any) => {
+          const specialty = String(item?.specialty || item?.procedure || item?.procedureName || '').trim().toLowerCase();
+          const doctor = String(item?.doctorName || item?.professional || '').trim().toLowerCase();
+          const status = String(item?.status || '').trim().toUpperCase();
+          const isActiveAppointment = status !== 'CANCELADO' && status !== 'CANCELED';
+
+          if (!isActiveAppointment) return false;
+          if (!procedureName || specialty !== procedureName) return false;
+          if (!professionalName) return true;
+          return doctor === professionalName;
+        })
+        .map((item: any) => ({
+          date: dayjs(item?.date || item?.data || '').isValid() ? dayjs(item?.date || item?.data).format('YYYY-MM-DD') : '',
+          time: String(item?.time || item?.hora || '').trim(),
+        }))
+        .filter((slot) => slot.date && slot.time);
+
+      const slots = [
+        ...extractScheduledSlotsFromTherapy(therapy),
+        ...appointmentSlots,
+      ].filter((slot, index, arr) => arr.findIndex((item) => item.date === slot.date && item.time === slot.time) === index);
+      const summary = formatScheduledSlotSummary(slots);
+      if (summary) acc[therapyId] = summary;
+      return acc;
+    }, {});
+  }, [pitData, patientAppointments]);
 
   const setTherapyField = (index: number, field: keyof TherapyItem, value: any) => {
     setTherapies((prev) => prev.map((item, idx) => idx === index ? { ...item, [field]: value } : item));
@@ -580,7 +689,14 @@ export function TeaPIT() {
                   </div>
 
                   <Group justify="space-between" mt="sm">
-                    <Text size="xs" c="dimmed">Preencha terapia e frequência para manter consistência no PIT</Text>
+                    <Box>
+                      <Text size="xs" c="dimmed">Preencha terapia e frequencia para manter consistencia no PIT</Text>
+                      {therapy.id && scheduledSummaryByTherapyId[therapy.id] && (
+                        <Text size="xs" c="blue" mt={4}>
+                          Dias e horarios agendados: {scheduledSummaryByTherapyId[therapy.id]}
+                        </Text>
+                      )}
+                    </Box>
                     <div>
                       <ActionIcon
                         variant="light"
@@ -648,3 +764,4 @@ export function TeaPIT() {
     </Box>
   );
 }
+
