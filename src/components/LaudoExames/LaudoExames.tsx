@@ -785,8 +785,10 @@ export function LaudoExames() {
 
   const filteredTemplates = useMemo(() => {
     if (!selectedExam) return templates;
-    const exactMatches = templates.filter((template) => template.examType === selectedExam.examType);
-    return exactMatches.length > 0 ? exactMatches : templates;
+    return templates.filter((template) => (
+      String(template.examType || '').trim().toLowerCase()
+      === String(selectedExam.examType || '').trim().toLowerCase()
+    ));
   }, [templates, selectedExam]);
 
   const filteredTemplatesByQuery = useMemo(() => {

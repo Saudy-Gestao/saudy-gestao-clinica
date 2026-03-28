@@ -1168,6 +1168,15 @@ body {
 }
 
 /* Floating label inputs */
+.mantine-Modal-body {
+  overflow: visible;
+}
+
+.mantine-Modal-body .floating-field,
+.mantine-Modal-body .floating-mantine-field {
+  margin-top: 6px;
+}
+
 .floating-field {
   position: relative;
 }

@@ -36,6 +36,7 @@ type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+const DEFAULT_REPORT_GROUPS = ['Tomografia', 'Ressonancia', 'Ultrassonografia', 'Raio-X', 'Mamografia', 'Densitometria'];
 
 interface TemplateItem {
   id: string;
@@ -125,6 +126,17 @@ export function LaudoConfiguracoes() {
     if (!q) return templates;
     return templates.filter((item) => item.name.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q));
   }, [templates, templateQuery]);
+
+  const templateGroupOptions = useMemo(() => {
+    const groups = new Set(DEFAULT_REPORT_GROUPS);
+    templates.forEach((item) => {
+      const group = String(item.group || '').trim();
+      if (group) groups.add(group);
+    });
+    return Array.from(groups)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ value, label: value }));
+  }, [templates]);
 
   const filteredPhrases = useMemo(() => {
     const q = phraseQuery.trim().toLowerCase();
@@ -413,7 +425,6 @@ export function LaudoConfiguracoes() {
           <Tabs.List>
             <Tabs.Tab value="templates">Padrões</Tabs.Tab>
             <Tabs.Tab value="phrases">Frases</Tabs.Tab>
-            <Tabs.Tab value="worklist">Fila de Laudo</Tabs.Tab>
             <Tabs.Tab value="settings">Configurações</Tabs.Tab>
           </Tabs.List>
 
@@ -667,13 +678,13 @@ export function LaudoConfiguracoes() {
             onChange={(value) => setTemplateForm((prev) => ({ ...prev, examType: value || '' }))}
             required
           />
-          <FloatingInput
+          <FloatingSelect
             label="Grupo"
-            value={templateForm.group}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTemplateForm((prev) => ({ ...prev, group: value }));
-            }}
+            data={templateGroupOptions}
+            searchable
+            clearable
+            value={templateForm.group || null}
+            onChange={(value) => setTemplateForm((prev) => ({ ...prev, group: value || '' }))}
           />
           <Box>
             <Text size="sm" fw={500} mb={6}>Conteúdo do padrão</Text>
