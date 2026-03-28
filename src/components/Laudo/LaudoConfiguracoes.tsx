@@ -36,6 +36,12 @@ type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+const decodeHtmlEntities = (value: string) => {
+  if (typeof document === 'undefined') return value;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+};
 const DEFAULT_REPORT_GROUPS = ['Tomografia', 'Ressonancia', 'Ultrassonografia', 'Raio-X', 'Mamografia', 'Densitometria'];
 
 interface TemplateItem {
@@ -521,9 +527,9 @@ export function LaudoConfiguracoes() {
                     </Table.Tr>
                   ) : filteredPhrases.map((item) => (
                     <Table.Tr key={item.id}>
-                      <Table.Td>{item.label}</Table.Td>
+                      <Table.Td>{decodeHtmlEntities(item.label)}</Table.Td>
                       <Table.Td>{item.examType}</Table.Td>
-                      <Table.Td><Text lineClamp={2}>{stripHtml(item.text)}</Text></Table.Td>
+                      <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
                       <Table.Td>
                         <Group gap={6}>
                           <ActionIcon variant="subtle" color="blue" onClick={() => {

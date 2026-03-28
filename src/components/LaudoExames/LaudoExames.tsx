@@ -61,6 +61,13 @@ interface ExamItem {
 }
 
 const isRichTextEmpty = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim().length === 0;
+const stripHtml = (value: string) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+const decodeHtmlEntities = (value: string) => {
+  if (typeof document === 'undefined') return value;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+};
 
 interface ReportTemplate {
   id: string;
@@ -1068,11 +1075,6 @@ export function LaudoExames() {
       setEditorContent((previous) => `${previous}${htmlFragment}`);
     }
 
-    showNotification({
-      title: 'Padrão aplicado',
-      message: `${selectedTemplate.name} aplicado ao laudo atual.`,
-      color: 'blue',
-    });
   };
 
   const insertPhrase = (phraseId?: string) => {
@@ -1103,11 +1105,6 @@ export function LaudoExames() {
     } else {
       setEditorContent((previous) => `${previous}${htmlFragment}`);
     }
-    showNotification({
-      title: 'Frase inserida',
-      message: `A frase "${phrase.label}" foi inserida no laudo.`,
-      color: 'blue',
-    });
   };
 
   const buildPreviewHtml = () => {
@@ -2098,8 +2095,8 @@ export function LaudoExames() {
                               onClick={() => setSelectedPhraseId(phrase.id)}
                               onDoubleClick={() => insertPhrase(phrase.id)}
                             >
-                              <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{phrase.label}</Text>
-                              <Text size="xs" c="dimmed" lineClamp={2} mt={4}>{phrase.text}</Text>
+                              <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{decodeHtmlEntities(phrase.label)}</Text>
+                              <Text size="xs" c="dimmed" lineClamp={2} mt={4}>{decodeHtmlEntities(stripHtml(phrase.text))}</Text>
                             </Paper>
                           ))
                         )}
