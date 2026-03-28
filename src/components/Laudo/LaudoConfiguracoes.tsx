@@ -84,18 +84,22 @@ export function LaudoConfiguracoes() {
   const [requiresReviewer, setRequiresReviewer] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const tinyMceContentStyle = isDark
-    ? `body { font-family: Inter, sans-serif; font-size:14px; }
-       html { scrollbar-color: #5f6b84 #1f2b3d; }
-       body::-webkit-scrollbar { width: 10px; }
-       body::-webkit-scrollbar-track { background: #1f2b3d; }
-       body::-webkit-scrollbar-thumb { background: #5f6b84; border-radius: 8px; border: 2px solid #1f2b3d; }
-       body::-webkit-scrollbar-thumb:hover { background: #7a879f; }`
-    : `body { font-family: Inter, sans-serif; font-size:14px; }
-       html { scrollbar-color: #c1c7d0 #f1f3f5; }
-       body::-webkit-scrollbar { width: 10px; }
-       body::-webkit-scrollbar-track { background: #f1f3f5; }
-       body::-webkit-scrollbar-thumb { background: #c1c7d0; border-radius: 8px; border: 2px solid #f1f3f5; }
-       body::-webkit-scrollbar-thumb:hover { background: #aeb5bf; }`;
+    ? `:root, html { color-scheme: dark; }
+       body { font-family: Inter, sans-serif; font-size:14px; }
+       html, body { scrollbar-width: thin; scrollbar-color: #5f6b84 #1f2b3d; }
+       html::-webkit-scrollbar, body::-webkit-scrollbar { width: 12px; height: 12px; background: #1f2b3d; }
+       html::-webkit-scrollbar-track, body::-webkit-scrollbar-track { background: #1f2b3d; }
+       html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb { background: #5f6b84; border-radius: 10px; border: 2px solid #1f2b3d; }
+       html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover { background: #7a879f; }
+       html::-webkit-scrollbar-corner, body::-webkit-scrollbar-corner { background: #1f2b3d; }`
+    : `:root, html { color-scheme: light; }
+       body { font-family: Inter, sans-serif; font-size:14px; }
+       html, body { scrollbar-width: thin; scrollbar-color: #c1c7d0 #f1f3f5; }
+       html::-webkit-scrollbar, body::-webkit-scrollbar { width: 12px; height: 12px; background: #f1f3f5; }
+       html::-webkit-scrollbar-track, body::-webkit-scrollbar-track { background: #f1f3f5; }
+       html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb { background: #c1c7d0; border-radius: 10px; border: 2px solid #f1f3f5; }
+       html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover { background: #aeb5bf; }
+       html::-webkit-scrollbar-corner, body::-webkit-scrollbar-corner { background: #f1f3f5; }`;
 
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [phrases, setPhrases] = useState<PhraseItem[]>([]);
