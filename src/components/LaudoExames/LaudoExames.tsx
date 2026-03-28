@@ -1056,7 +1056,16 @@ export function LaudoExames() {
       return;
     }
 
-    setEditorContent(selectedTemplate.content);
+    const htmlFragment = selectedTemplate.content;
+
+    if (editorRef.current) {
+      editorRef.current.focus();
+      editorRef.current.insertContent(htmlFragment);
+      setEditorContent(editorRef.current.getContent());
+    } else {
+      setEditorContent((previous) => `${previous}${htmlFragment}`);
+    }
+
     showNotification({
       title: 'Padrão aplicado',
       message: `${selectedTemplate.name} aplicado ao laudo atual.`,
