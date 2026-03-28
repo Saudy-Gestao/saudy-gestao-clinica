@@ -2730,6 +2730,8 @@ export function Agendamento() {
                 </Box>
               </Group>
 
+              {selectedProcedureSummary.length > 0 ? (
+              <>
               <Box
                 ml={isMobile ? 6 : 4}
                 h={26}
@@ -3151,6 +3153,12 @@ export function Agendamento() {
                     </Stack>
                   </Modal>
                 </Stack>
+              )}
+              </>
+              ) : (
+                <Text size="sm" c="dimmed">
+                  Selecione ao menos um procedimento para visualizar os horários disponíveis.
+                </Text>
               )}
 
               <Group gap="xs" style={{ position: 'relative', zIndex: 1, marginLeft: isMobile ? -8 : -10 }}>
