@@ -83,6 +83,19 @@ export function LaudoConfiguracoes() {
   const [activeTab, setActiveTab] = useState<string | null>('templates');
   const [requiresReviewer, setRequiresReviewer] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
+  const tinyMceContentStyle = isDark
+    ? `body { font-family: Inter, sans-serif; font-size:14px; }
+       html { scrollbar-color: #5f6b84 #1f2b3d; }
+       body::-webkit-scrollbar { width: 10px; }
+       body::-webkit-scrollbar-track { background: #1f2b3d; }
+       body::-webkit-scrollbar-thumb { background: #5f6b84; border-radius: 8px; border: 2px solid #1f2b3d; }
+       body::-webkit-scrollbar-thumb:hover { background: #7a879f; }`
+    : `body { font-family: Inter, sans-serif; font-size:14px; }
+       html { scrollbar-color: #c1c7d0 #f1f3f5; }
+       body::-webkit-scrollbar { width: 10px; }
+       body::-webkit-scrollbar-track { background: #f1f3f5; }
+       body::-webkit-scrollbar-thumb { background: #c1c7d0; border-radius: 8px; border: 2px solid #f1f3f5; }
+       body::-webkit-scrollbar-thumb:hover { background: #aeb5bf; }`;
 
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [phrases, setPhrases] = useState<PhraseItem[]>([]);
@@ -708,7 +721,7 @@ export function LaudoConfiguracoes() {
                 skin: isDark ? 'oxide-dark' : 'oxide',
                 content_css: isDark ? 'dark' : 'default',
                 toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
+                content_style: tinyMceContentStyle,
               }}
             />
           </Box>
@@ -751,7 +764,7 @@ export function LaudoConfiguracoes() {
                 skin: isDark ? 'oxide-dark' : 'oxide',
                 content_css: isDark ? 'dark' : 'default',
                 toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
+                content_style: tinyMceContentStyle,
               }}
             />
           </Box>
