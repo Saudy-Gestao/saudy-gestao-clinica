@@ -102,7 +102,7 @@ export function WorkflowSections() {
       title: 'Jornada do Paciente',
       items: [
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
-        { icon: CalendarCheck, label: 'Pré-agendamento', desc: 'Pré-autorização e documentos', route: '/pre-agendamento', moduleName: 'pre-agendamento' },
+        { icon: CalendarCheck, label: 'Pré-atendimento', desc: 'Pré-autorização e documentos', route: '/pre-agendamento', moduleName: 'pre-agendamento' },
         { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Check-in, checklist e recepção', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
       ]
     },
