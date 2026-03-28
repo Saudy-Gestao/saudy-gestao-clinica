@@ -15,6 +15,7 @@ import {
   Tabs,
   Text,
   Title,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -76,6 +77,8 @@ export function LaudoConfiguracoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const [activeTab, setActiveTab] = useState<string | null>('templates');
   const [requiresReviewer, setRequiresReviewer] = useState(true);
@@ -702,8 +705,10 @@ export function LaudoConfiguracoes() {
                 height: 300,
                 menubar: false,
                 plugins: ['lists', 'link', 'table', 'wordcount'],
+                skin: isDark ? 'oxide-dark' : 'oxide',
+                content_css: isDark ? 'dark' : 'default',
                 toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
+                content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
               }}
             />
           </Box>
@@ -743,8 +748,10 @@ export function LaudoConfiguracoes() {
                 height: 260,
                 menubar: false,
                 plugins: ['lists', 'link', 'table', 'wordcount'],
+                skin: isDark ? 'oxide-dark' : 'oxide',
+                content_css: isDark ? 'dark' : 'default',
                 toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
+                content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
               }}
             />
           </Box>
