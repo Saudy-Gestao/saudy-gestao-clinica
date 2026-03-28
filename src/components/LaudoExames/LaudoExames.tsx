@@ -1111,6 +1111,12 @@ export function LaudoExames() {
     if (!selectedExam) return '';
 
     const resolvedContent = resolvePlaceholders(getAllLaudoContent(), selectedExam);
+    const pageBg = isDark ? '#0f172a' : '#ffffff';
+    const cardBg = isDark ? '#111827' : '#ffffff';
+    const border = isDark ? '#334155' : '#e2e8f0';
+    const title = isDark ? '#e2e8f0' : '#0f172a';
+    const text = isDark ? '#cbd5e1' : '#0f172a';
+    const muted = isDark ? '#94a3b8' : '#475569';
 
     return `
       <!DOCTYPE html>
@@ -1120,18 +1126,35 @@ export function LaudoExames() {
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <title>Laudo ${selectedExam.id}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 28px; color: #0f172a; }
-            h1 { font-size: 20px; margin-bottom: 6px; }
-            .meta { font-size: 12px; color: #475569; margin-bottom: 18px; }
+            :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
+            html, body { margin: 0; padding: 0; background: ${pageBg}; color: ${text}; }
+            body { font-family: Inter, Arial, sans-serif; }
+            .sheet {
+              margin: 18px;
+              padding: 28px;
+              border-radius: 10px;
+              border: 1px solid ${border};
+              background: ${cardBg};
+            }
+            h1 { font-size: 20px; margin-bottom: 6px; color: ${title}; }
+            .meta { font-size: 12px; color: ${muted}; margin-bottom: 18px; }
             .block { margin-bottom: 14px; }
-            .signature { margin-top: 24px; font-size: 12px; color: #334155; }
+            .signature { margin-top: 24px; font-size: 12px; color: ${muted}; }
+            @media print {
+              :root { color-scheme: light; }
+              html, body { background: #fff !important; color: #111 !important; }
+              .sheet { margin: 0; border: none; border-radius: 0; padding: 0; background: #fff !important; }
+              h1, .meta, .signature { color: #111 !important; }
+            }
           </style>
         </head>
         <body>
-          <h1>Laudo - ${selectedExam.examType}</h1>
-          <div class="meta">Paciente: ${selectedExam.patientName}  •  CPF: ${selectedExam.cpf}  •  Exame: ${selectedExam.id}</div>
-          <div class="block">${resolvedContent}</div>
-          <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'}  •  Revisor: ${requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Não obrigatório'}</div>
+          <div class="sheet">
+            <h1>Laudo - ${selectedExam.examType}</h1>
+            <div class="meta">Paciente: ${selectedExam.patientName}  •  CPF: ${selectedExam.cpf}  •  Exame: ${selectedExam.id}</div>
+            <div class="block">${resolvedContent}</div>
+            <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'}  •  Revisor: ${requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Não obrigatório'}</div>
+          </div>
         </body>
       </html>
     `;
