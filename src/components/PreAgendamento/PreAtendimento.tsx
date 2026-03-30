@@ -119,6 +119,29 @@ const INITIAL_NOVO_PACIENTE: NovoPatiente = {
   observacoes: '',
 };
 
+const normalizePhoneForApi = (value?: string) => {
+  const digits = onlyDigits(value || '');
+  if (digits.length <= 11) return digits;
+  if (digits.length === 12 && digits.startsWith('55')) return digits.slice(2);
+  if (digits.length === 13 && digits.startsWith('55')) return digits.slice(2);
+  return digits.slice(-11);
+};
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeAppointmentIdForApi = (value?: string) => {
+  const id = String(value || '').trim();
+  if (!id) return undefined;
+  return UUID_REGEX.test(id) ? id : undefined;
+};
+
+const isConsultationAppointmentFkError = (error: any) => {
+  const details = String(error?.response?.data?.details || '');
+  const message = String(error?.response?.data?.error || error?.message || '');
+  return details.includes('consultations_appointmentId_fkey')
+    || message.toLowerCase().includes('foreign key constraint');
+};
+
 export function PreAtendimento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -987,6 +1010,8 @@ export function PreAtendimento() {
       let generatedInvoice: any = null;
       const checklistPatientBirthDate = parseDisplayDateToApi(checklistPatient.dataNascimento);
       const checklistPatientGender = normalizeChecklistGenderForApi(checklistPatient.sexo);
+      const normalizedPhone = normalizePhoneForApi(checklistPatient.telefone);
+      const normalizedAppointmentId = normalizeAppointmentIdForApi(checklistPatient.appointmentId);
 
       if (checklistData.atendimentoParticular) {
         generatedInvoice = await invoiceService.createInvoice({
@@ -1005,8 +1030,8 @@ export function PreAtendimento() {
           cpf: onlyDigits(checklistPatient.cpf || '') || undefined,
           birthDate: checklistPatientBirthDate,
           gender: checklistPatientGender,
-          phone: checklistPatient.telefone || undefined,
-          cellphone: checklistPatient.telefone || undefined,
+          phone: normalizedPhone || undefined,
+          cellphone: normalizedPhone || undefined,
           email: checklistPatient.email || undefined,
           address: checklistPatient.endereco || undefined,
           hasHealthInsurance: !isPrivateCare(checklistPatient),
@@ -1023,7 +1048,7 @@ export function PreAtendimento() {
         cpf: onlyDigits(checklistPatient.cpf || '') || undefined,
         birthDate: checklistPatientBirthDate,
         gender: checklistPatientGender,
-        phone: checklistPatient.telefone || undefined,
+        phone: normalizedPhone || undefined,
         email: checklistPatient.email || undefined,
         address: checklistPatient.endereco || undefined,
         convenio: checklistData.atendimentoParticular
@@ -1048,9 +1073,9 @@ export function PreAtendimento() {
         ].filter(Boolean).join(' Ã¢â‚¬Â¢ ') || undefined,
       });
 
-      await consultationService.create({
+      const consultationPayload = {
         patientName: checklistPatient.nomeCompleto,
-        appointmentId: checklistPatient.appointmentId || undefined,
+        appointmentId: normalizedAppointmentId,
         doctorId: checklistPatient.doctorId || undefined,
         doctorName: checklistPatient.doctorName || extractDoctorNameFromAgenda(checklistPatient.agenda) || undefined,
         convenio: checklistData.atendimentoParticular
@@ -1080,7 +1105,20 @@ export function PreAtendimento() {
           checklistPatient.observacoesTriagem,
           checklistData.observacoes,
         ].filter(Boolean).join(' • ') || undefined,
-      });
+      };
+
+      try {
+        await consultationService.create(consultationPayload);
+      } catch (consultationError: any) {
+        if (consultationPayload.appointmentId && isConsultationAppointmentFkError(consultationError)) {
+          await consultationService.create({
+            ...consultationPayload,
+            appointmentId: undefined,
+          });
+        } else {
+          throw consultationError;
+        }
+      }
 
       await loadReceptionPatients();
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });

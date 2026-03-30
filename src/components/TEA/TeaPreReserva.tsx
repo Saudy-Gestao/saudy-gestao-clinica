@@ -737,6 +737,27 @@ export function TeaPreReserva() {
   const [collapsedTherapyCards, setCollapsedTherapyCards] = useState<Record<string, boolean>>({});
   const [bulkStatusActionState, setBulkStatusActionState] = useState<BulkStatusActionState | null>(null);
   const [bulkStatusSelectedReservationIds, setBulkStatusSelectedReservationIds] = useState<string[]>([]);
+  const [slotDetailsModalOpened, setSlotDetailsModalOpened] = useState(false);
+  const [slotDetailsModalTitle, setSlotDetailsModalTitle] = useState('');
+  const [slotDetailsModalSlots, setSlotDetailsModalSlots] = useState<Array<{ date: string; time: string }>>([]);
+
+  const openSlotDetailsModal = (title: string, slots: Array<{ date: string; time: string }>) => {
+    const uniqueSlots = Array.from(
+      new Map(
+        (slots || [])
+          .filter((slot) => slot?.date && slot?.time)
+          .map((slot) => [`${slot.date}#${slot.time}`, { date: slot.date, time: String(slot.time).trim() }]),
+      ).values(),
+    ).sort((a, b) => {
+      const dateDiff = dayjs(a.date).valueOf() - dayjs(b.date).valueOf();
+      if (dateDiff !== 0) return dateDiff;
+      return timeToMinutes(a.time) - timeToMinutes(b.time);
+    });
+
+    setSlotDetailsModalTitle(title);
+    setSlotDetailsModalSlots(uniqueSlots);
+    setSlotDetailsModalOpened(true);
+  };
 
   const toggleTherapyCard = (cardKey: string) => {
     setCollapsedTherapyCards((prev) => ({
@@ -1601,6 +1622,7 @@ export function TeaPreReserva() {
                 ['PENDING_AUTHORIZATION', 'AUTHORIZED', 'CONVERTED'].includes(String(item?.status || ''))
                 && persistedReservedSlots.length > 0
               );
+              const hasConvertedSlots = item.status === 'CONVERTED' && persistedReservedSlots.length > 0;
               const scheduleSummaryLabel = shouldShowPersistedReservedSlots
                 ? formatScheduledSlotsSummary(persistedReservedSlots)
                 : formatWeekdaySummary(item?.preferences?.weekdays);
@@ -1644,11 +1666,6 @@ export function TeaPreReserva() {
                         Reserva aprovada e aguardando retorno da autorização.
                       </Text>
                     )}
-                    {shouldShowPersistedReservedSlots && (
-                      <Text size="xs" mt={6} c="dimmed">
-                        Horários reservados: {formatScheduledSlotsSummary(persistedReservedSlots)}
-                      </Text>
-                    )}
                     {item.status === 'CONVERTED' && (
                       <Text size="xs" mt={6} c="teal">
                         Procedimento convertido em agendamento.
@@ -1660,9 +1677,38 @@ export function TeaPreReserva() {
                       <Text size="sm" fw={500}>
                         {itemWeeklyTarget}x/semana
                       </Text>
-                      <Text size="sm" ta="right">
-                        {scheduleSummaryLabel}
-                      </Text>
+                      {shouldShowPersistedReservedSlots ? (
+                        <Group gap={6} justify="flex-end" wrap="wrap">
+                          <Button
+                            size="compact-xs"
+                            variant="light"
+                            color="indigo"
+                            onClick={() => openSlotDetailsModal(
+                              `${item.procedure?.name || 'Procedimento'} • Reservados`,
+                              persistedReservedSlots,
+                            )}
+                          >
+                            Reservados ({persistedReservedSlots.length})
+                          </Button>
+                          {hasConvertedSlots && (
+                            <Button
+                              size="compact-xs"
+                              variant="light"
+                              color="teal"
+                              onClick={() => openSlotDetailsModal(
+                                `${item.procedure?.name || 'Procedimento'} • Agendados`,
+                                persistedReservedSlots,
+                              )}
+                            >
+                              Agendados ({persistedReservedSlots.length})
+                            </Button>
+                          )}
+                        </Group>
+                      ) : (
+                        <Text size="sm" ta="right">
+                          {scheduleSummaryLabel}
+                        </Text>
+                      )}
                     </Stack>
                     <ActionIcon
                       variant="subtle"
@@ -2402,30 +2448,39 @@ export function TeaPreReserva() {
   const handleLoadGroupSuggestions = async (
     context: SuggestionGroupContext,
     options?: {
+      targetTherapyIds?: string[];
       excludeSlotsByTherapy?: Record<string, string[]>;
       daysAhead?: number;
       existingSlotsByTherapy?: Record<string, Array<{ date: string; time: string }>>;
     },
   ) => {
+    const targetTherapyIdSet = new Set((options?.targetTherapyIds || []).filter(Boolean));
+    const scopedTherapies = targetTherapyIdSet.size > 0
+      ? context.therapies.filter((therapy) => targetTherapyIdSet.has(therapy.pitTherapyId))
+      : context.therapies;
     const excludeSlotsByTherapy = options?.excludeSlotsByTherapy || {};
 
     if (!options?.excludeSlotsByTherapy) {
       setTriedSlotsByTherapyId((prev) => {
         const next = { ...prev };
-        context.therapies.forEach((therapy) => {
+        scopedTherapies.forEach((therapy) => {
           delete next[therapy.pitTherapyId];
         });
         return next;
       });
     }
 
-    if (!context.therapies.length) {
+    if (!scopedTherapies.length) {
       showNotification({ title: 'Atenção', message: 'Esse PIT não possui terapias para sugerir', color: 'yellow' });
       return;
     }
 
 
-    setLoadingSuggestionsId(context.groupKey);
+    setLoadingSuggestionsId(
+      targetTherapyIdSet.size === 1
+        ? Array.from(targetTherapyIdSet)[0]
+        : context.groupKey,
+    );
     try {
       const pickBestSuggestions = (
         rawList: SuggestedSlot[],
@@ -2622,7 +2677,7 @@ export function TeaPreReserva() {
       const reservedPatientSlots: Array<{ date: string; time: string; durationMinutes: number }> = [];
       const results: Array<{ pitTherapyId: string; list: SuggestedSlot[]; fallbackLevel: SuggestionFallbackLevel }> = [];
 
-      for (const therapy of context.therapies) {
+      for (const therapy of scopedTherapies) {
           const weeklyFrequency = Math.max(1, Number(therapy.weeklyFrequency) || 1);
           const existingBase = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
           const existingSignatures = Array.from(new Set(
@@ -2774,7 +2829,7 @@ export function TeaPreReserva() {
       setSuggestionFallbackByTherapyId((prev) => ({ ...prev, ...nextFallbackByTherapyId }));
       setSuggestionExistingSlotsByTherapyId((prev) => {
         const next = { ...prev };
-        context.therapies.forEach((therapy) => {
+        scopedTherapies.forEach((therapy) => {
           next[therapy.pitTherapyId] = options?.existingSlotsByTherapy?.[therapy.pitTherapyId] || [];
         });
         return next;
@@ -2788,7 +2843,13 @@ export function TeaPreReserva() {
         });
         return next;
       });
-      setSuggestionModalContext(context);
+      setSuggestionModalContext((prev) => {
+        if (!prev) return context;
+        if (prev.groupKey === context.groupKey && prev.therapies.length >= context.therapies.length) {
+          return prev;
+        }
+        return context;
+      });
       setSuggestionModalOpened(true);
     } catch (err: any) {
       showNotification({
@@ -3237,19 +3298,6 @@ export function TeaPreReserva() {
                       >
                         <Group justify="space-between" wrap="wrap" gap="sm">
                           <Group gap="sm" style={{ flexShrink: 0 }}>
-                            <Box
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 999,
-                                backgroundColor: isTherapyReady ? colorToken.accentColor : 'var(--mantine-color-yellow-5)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                                marginTop: 5,
-                              }}
-                            />
                             <Stack gap={3}>
                               <Group gap={8} wrap="nowrap" align="center">
                                 <Box
@@ -3257,7 +3305,7 @@ export function TeaPreReserva() {
                                     width: 10,
                                     height: 10,
                                     borderRadius: 999,
-                                    backgroundColor: colorToken.accentColor,
+                                    backgroundColor: isTherapyReady ? colorToken.accentColor : 'var(--mantine-color-yellow-5)',
                                     flexShrink: 0,
                                   }}
                                 />
@@ -3299,8 +3347,9 @@ export function TeaPreReserva() {
                                 if (!suggestionModalContext) return;
                                 const excludeSlots = slots.map((slot) => `${slot.date}#${slot.time}`);
                                 await handleLoadGroupSuggestions(
-                                  { ...suggestionModalContext, therapies: [therapy] },
+                                  suggestionModalContext,
                                   {
+                                    targetTherapyIds: [therapy.pitTherapyId],
                                     excludeSlotsByTherapy: { [therapy.pitTherapyId]: excludeSlots },
                                     daysAhead: 90,
                                   },
@@ -3450,7 +3499,30 @@ export function TeaPreReserva() {
           </Group>
         </Stack>
       </Modal>
-      
+
+      <Modal
+        opened={slotDetailsModalOpened}
+        onClose={() => setSlotDetailsModalOpened(false)}
+        title={slotDetailsModalTitle || 'Horários'}
+        centered
+        size="md"
+      >
+        <Stack gap="xs">
+          {slotDetailsModalSlots.length === 0 ? (
+            <Text size="sm" c="dimmed">Sem horários para exibir.</Text>
+          ) : (
+            slotDetailsModalSlots.map((slot) => (
+              <Paper key={`${slot.date}-${slot.time}`} p="xs" withBorder>
+                <Text size="sm" fw={600}>
+                  {formatWeekdayPt(slot.date)}, {dayjs(slot.date).format('DD/MM/YYYY')}
+                </Text>
+                <Text size="sm" c="dimmed">{slot.time}</Text>
+              </Paper>
+            ))
+          )}
+        </Stack>
+      </Modal>
+
       <Modal
         opened={acceptModalOpened}
         onClose={() => setAcceptModalOpened(false)}
@@ -4665,9 +4737,17 @@ export function TeaPreReserva() {
                                           {formatWeekdaySummary(therapyItem.preferences?.weekdays)}
                                         </Text>
                                         {existingScheduledSlots.length > 0 && (
-                                          <Text size="xs" c="dimmed" ta="right" style={{ whiteSpace: 'nowrap' }}>
-                                            Horários já agendados: {formatScheduledSlotsSummary(existingScheduledSlots)}
-                                          </Text>
+                                          <Button
+                                            size="compact-xs"
+                                            variant="light"
+                                            color="teal"
+                                            onClick={() => openSlotDetailsModal(
+                                              `${therapyItem.procedure?.name || 'Procedimento'} • Agendados`,
+                                              existingScheduledSlots,
+                                            )}
+                                          >
+                                            Agendados ({existingScheduledSlots.length})
+                                          </Button>
                                         )}
                                     </Stack>
                                     {hasExpandableAlerts && (
@@ -4688,11 +4768,6 @@ export function TeaPreReserva() {
                                     )}
                                     </Group>
                                   </Group>
-                                  {false && existingScheduledSlots.length > 0 && (
-                                    <Text size="xs" c="dimmed" mt={4}>
-                                      Horários já agendados: {formatScheduledSlotsSummary(existingScheduledSlots)}
-                                    </Text>
-                                  )}
                                   {hasExpandableAlerts && !isPendingCardCollapsed && (
                                     <>
                                   {therapyItem?.removedFromPit && (
@@ -4734,6 +4809,7 @@ export function TeaPreReserva() {
                                       ['PENDING_AUTHORIZATION', 'AUTHORIZED', 'CONVERTED'].includes(String(item?.status || ''))
                                       && persistedReservedSlots.length > 0
                                     );
+                                    const hasConvertedSlots = item.status === 'CONVERTED' && persistedReservedSlots.length > 0;
                                     const scheduleSummaryLabel = shouldShowPersistedReservedSlots
                                       ? formatScheduledSlotsSummary(persistedReservedSlots)
                                       : formatWeekdaySummary(item?.preferences?.weekdays);
@@ -4772,19 +4848,43 @@ export function TeaPreReserva() {
                                           Procedimento convertido em agendamento.
                                         </Text>
                                       )}
-                                      {shouldShowPersistedReservedSlots && (
-                                        <Text size="xs" mt={6} c="dimmed">
-                                          Horários reservados: {formatScheduledSlotsSummary(persistedReservedSlots)}
-                                        </Text>
-                                      )}
                                     </Box>
                                     <Stack gap={2} align="flex-end" style={{ flexShrink: 0 }}>
                                       <Text size="sm" fw={500}>
                                         {Math.max(1, Number(item?.preferences?.weeklyFrequency || 1))}x/semana
                                       </Text>
-                                      <Text size="sm" ta="right">
-                                        {scheduleSummaryLabel}
-                                      </Text>
+                                      {shouldShowPersistedReservedSlots ? (
+                                        <Group gap={6} justify="flex-end" wrap="wrap">
+                                          <Button
+                                            size="compact-xs"
+                                            variant="light"
+                                            color="indigo"
+                                            onClick={() => openSlotDetailsModal(
+                                              `${item.procedure?.name || item.procedureName || 'Procedimento'} • Reservados`,
+                                              persistedReservedSlots,
+                                            )}
+                                          >
+                                            Reservados ({persistedReservedSlots.length})
+                                          </Button>
+                                          {hasConvertedSlots && (
+                                            <Button
+                                              size="compact-xs"
+                                              variant="light"
+                                              color="teal"
+                                              onClick={() => openSlotDetailsModal(
+                                                `${item.procedure?.name || item.procedureName || 'Procedimento'} • Agendados`,
+                                                persistedReservedSlots,
+                                              )}
+                                            >
+                                              Agendados ({persistedReservedSlots.length})
+                                            </Button>
+                                          )}
+                                        </Group>
+                                      ) : (
+                                        <Text size="sm" ta="right">
+                                          {scheduleSummaryLabel}
+                                        </Text>
+                                      )}
                                     </Stack>
                                   </Group>
                                       </>
