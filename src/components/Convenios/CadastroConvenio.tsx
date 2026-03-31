@@ -31,6 +31,12 @@ interface InsuranceRow {
   name: string;
   code?: string | null;
   description?: string | null;
+  tissRegistroAns?: string | null;
+  tissOperadoraCnpj?: string | null;
+  tissVersao?: string | null;
+  tissPrestadorCnpj?: string | null;
+  tissPrestadorCnes?: string | null;
+  tissCodigoPrestadorOperadora?: string | null;
   isActive: boolean;
   subInsurances: string[];
   createdAt?: string | null;
@@ -57,6 +63,12 @@ export function CadastroConvenio() {
     name: '',
     code: '',
     description: '',
+    tissRegistroAns: '',
+    tissOperadoraCnpj: '',
+    tissVersao: '3.05.00',
+    tissPrestadorCnpj: '',
+    tissPrestadorCnes: '',
+    tissCodigoPrestadorOperadora: '',
     isActive: true,
     subInsurances: [] as string[],
   });
@@ -103,6 +115,12 @@ export function CadastroConvenio() {
       name: it.name || it.nome || '',
       code: it.code || it.codigo || null,
       description: it.description || it.descricao || null,
+      tissRegistroAns: it.tissRegistroAns || null,
+      tissOperadoraCnpj: it.tissOperadoraCnpj || null,
+      tissVersao: it.tissVersao || null,
+      tissPrestadorCnpj: it.tissPrestadorCnpj || null,
+      tissPrestadorCnes: it.tissPrestadorCnes || null,
+      tissCodigoPrestadorOperadora: it.tissCodigoPrestadorOperadora || null,
       isActive: it.isActive ?? true,
       subInsurances: Array.isArray(it.subInsurances)
         ? it.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
@@ -120,12 +138,30 @@ export function CadastroConvenio() {
         name: item.name || '',
         code: item.code || '',
         description: item.description || '',
+        tissRegistroAns: item.tissRegistroAns || '',
+        tissOperadoraCnpj: item.tissOperadoraCnpj || '',
+        tissVersao: item.tissVersao || '3.05.00',
+        tissPrestadorCnpj: item.tissPrestadorCnpj || '',
+        tissPrestadorCnes: item.tissPrestadorCnes || '',
+        tissCodigoPrestadorOperadora: item.tissCodigoPrestadorOperadora || '',
         isActive: item.isActive ?? true,
         subInsurances: Array.isArray(item.subInsurances) ? item.subInsurances : [],
       });
     } else {
       setEditingId(null);
-      setForm({ name: '', code: '', description: '', isActive: true, subInsurances: [] });
+      setForm({
+        name: '',
+        code: '',
+        description: '',
+        tissRegistroAns: '',
+        tissOperadoraCnpj: '',
+        tissVersao: '3.05.00',
+        tissPrestadorCnpj: '',
+        tissPrestadorCnes: '',
+        tissCodigoPrestadorOperadora: '',
+        isActive: true,
+        subInsurances: [],
+      });
     }
     setSubInsuranceInput('');
     setModalOpen(true);
@@ -144,6 +180,12 @@ export function CadastroConvenio() {
           name: form.name.trim(),
           code: form.code.trim() || undefined,
           description: form.description.trim() || undefined,
+          tissRegistroAns: form.tissRegistroAns.trim() || undefined,
+          tissOperadoraCnpj: form.tissOperadoraCnpj.trim() || undefined,
+          tissVersao: form.tissVersao.trim() || undefined,
+          tissPrestadorCnpj: form.tissPrestadorCnpj.trim() || undefined,
+          tissPrestadorCnes: form.tissPrestadorCnes.trim() || undefined,
+          tissCodigoPrestadorOperadora: form.tissCodigoPrestadorOperadora.trim() || undefined,
           isActive: form.isActive,
           subInsurances: form.subInsurances,
         });
@@ -155,6 +197,12 @@ export function CadastroConvenio() {
           name: form.name.trim(),
           code: form.code.trim() || undefined,
           description: form.description.trim() || undefined,
+          tissRegistroAns: form.tissRegistroAns.trim() || undefined,
+          tissOperadoraCnpj: form.tissOperadoraCnpj.trim() || undefined,
+          tissVersao: form.tissVersao.trim() || undefined,
+          tissPrestadorCnpj: form.tissPrestadorCnpj.trim() || undefined,
+          tissPrestadorCnes: form.tissPrestadorCnes.trim() || undefined,
+          tissCodigoPrestadorOperadora: form.tissCodigoPrestadorOperadora.trim() || undefined,
           isActive: form.isActive,
           subInsurances: form.subInsurances,
         });
@@ -165,7 +213,19 @@ export function CadastroConvenio() {
 
       setModalOpen(false);
       setEditingId(null);
-      setForm({ name: '', code: '', description: '', isActive: true, subInsurances: [] });
+      setForm({
+        name: '',
+        code: '',
+        description: '',
+        tissRegistroAns: '',
+        tissOperadoraCnpj: '',
+        tissVersao: '3.05.00',
+        tissPrestadorCnpj: '',
+        tissPrestadorCnes: '',
+        tissCodigoPrestadorOperadora: '',
+        isActive: true,
+        subInsurances: [],
+      });
       setSubInsuranceInput('');
     } catch (err: any) {
       showNotification({
@@ -465,6 +525,81 @@ export function CadastroConvenio() {
               onChange={(e) => handleDescriptionChange(e?.currentTarget?.value ?? '')}
             />
 
+            <Text fw={600} size="sm" mt="md">Configuração TISS</Text>
+            <Text size="xs" c="dimmed" mb="xs">
+              Esses dados são usados na geração do XML TISS.
+            </Text>
+
+            <FloatingInput
+              label="Registro ANS da operadora"
+              placeholder="Ex: 123456"
+              value={form.tissRegistroAns}
+              onChange={(e) => {
+                const value = e?.currentTarget?.value ?? '';
+                setForm((prev) => ({ ...prev, tissRegistroAns: value }));
+              }}
+            />
+
+            <Box mt="sm">
+              <FloatingInput
+                label="CNPJ da operadora"
+                placeholder="Somente números"
+                value={form.tissOperadoraCnpj}
+                onChange={(e) => {
+                  const value = e?.currentTarget?.value ?? '';
+                  setForm((prev) => ({ ...prev, tissOperadoraCnpj: value }));
+                }}
+              />
+            </Box>
+
+            <Box mt="sm">
+              <FloatingInput
+                label="Versão TISS"
+                placeholder="Ex: 3.05.00"
+                value={form.tissVersao}
+                onChange={(e) => {
+                  const value = e?.currentTarget?.value ?? '';
+                  setForm((prev) => ({ ...prev, tissVersao: value }));
+                }}
+              />
+            </Box>
+
+            <Box mt="sm">
+              <FloatingInput
+                label="CNPJ do prestador executante"
+                placeholder="Somente números"
+                value={form.tissPrestadorCnpj}
+                onChange={(e) => {
+                  const value = e?.currentTarget?.value ?? '';
+                  setForm((prev) => ({ ...prev, tissPrestadorCnpj: value }));
+                }}
+              />
+            </Box>
+
+            <Box mt="sm">
+              <FloatingInput
+                label="CNES do prestador executante"
+                placeholder="Ex: 1234567"
+                value={form.tissPrestadorCnes}
+                onChange={(e) => {
+                  const value = e?.currentTarget?.value ?? '';
+                  setForm((prev) => ({ ...prev, tissPrestadorCnes: value }));
+                }}
+              />
+            </Box>
+
+            <Box mt="sm">
+              <FloatingInput
+                label="Código do prestador na operadora"
+                placeholder="Código contratado"
+                value={form.tissCodigoPrestadorOperadora}
+                onChange={(e) => {
+                  const value = e?.currentTarget?.value ?? '';
+                  setForm((prev) => ({ ...prev, tissCodigoPrestadorOperadora: value }));
+                }}
+              />
+            </Box>
+
             <Switch
               mt="sm"
               label="Convenio ativo"
@@ -477,7 +612,10 @@ export function CadastroConvenio() {
                 label="Subconvênio"
                 placeholder="Digite e pressione Enter"
                 value={subInsuranceInput}
-                onChange={(e) => setSubInsuranceInput(e.currentTarget.value)}
+                onChange={(e) => {
+                  const value = e?.currentTarget?.value ?? '';
+                  setSubInsuranceInput(value);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();

@@ -17,6 +17,7 @@ export const queryKeys = {
   convenioAuthorizations: ['convenio-authorizations'] as const,
   financeEntries: ['finance-entries'] as const,
   invoices: ['invoices'] as const,
+  tissBatches: ['tiss-batches'] as const,
   inventoryItems: ['inventory-items'] as const,
   deliveries: ['deliveries'] as const,
   reports: ['reports'] as const,
