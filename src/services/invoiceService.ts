@@ -6,6 +6,19 @@ export interface CreateInvoicePayload {
   issuedAt?: string; // ISO
   dueDate?: string; // YYYY-MM-DD
   convention?: string; // convenio
+  operatorGuideNumber?: string;
+  authorizationPassword?: string;
+  authorizationDate?: string; // YYYY-MM-DD
+  authorizationExpiryDate?: string; // YYYY-MM-DD
+  authorizedAttendanceType?: string;
+  packageValue?: number;
+  materialsValue?: number;
+  feesValue?: number;
+  dailyValue?: number;
+  gasesValue?: number;
+  opmeValue?: number;
+  expectedDiscountValue?: number;
+  expectedGlosaValue?: number;
   value: number;
   discount?: number;
   paymentMethod?: string;

@@ -4,6 +4,12 @@ export interface CreateInsurancePayload {
   name: string;
   code?: string;
   description?: string;
+  tissRegistroAns?: string;
+  tissOperadoraCnpj?: string;
+  tissVersao?: string;
+  tissPrestadorCnpj?: string;
+  tissPrestadorCnes?: string;
+  tissCodigoPrestadorOperadora?: string;
   isActive?: boolean;
   subInsurances?: string[];
 }

@@ -42,6 +42,8 @@ interface ProcedureForm {
   name: string;
   description: string;
   appointmentType: 'CONSULTA' | 'EXAME';
+  tussCode: string;
+  tussTableCode: string;
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   acceptedSubInsurances: Record<string, string[]>;
@@ -55,6 +57,8 @@ interface ProcedureItem {
   id: string;
   name: string;
   appointmentType: 'CONSULTA' | 'EXAME';
+  tussCode?: string;
+  tussTableCode?: string;
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
   modalities: string[];
@@ -68,6 +72,8 @@ const INITIAL_FORM: ProcedureForm = {
   name: '',
   description: '',
   appointmentType: 'CONSULTA',
+  tussCode: '',
+  tussTableCode: '',
   acceptsInsurance: false,
   acceptedInsurances: [],
   acceptedSubInsurances: {},
@@ -182,6 +188,8 @@ export function CadastroProcedimento() {
       id: String(it.id ?? it.procedureId ?? ''),
       name: it.name || 'Procedimento',
       appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
+      tussCode: String(it.tussCode || '').trim() || undefined,
+      tussTableCode: String(it.tussTableCode || '').trim() || undefined,
       acceptsInsurance: Boolean(it.acceptsInsurance),
       acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
       modalities: Array.isArray(it.modalities) ? it.modalities : [],
@@ -344,6 +352,8 @@ export function CadastroProcedimento() {
         description: form.description.trim() || undefined,
         appointmentType: form.appointmentType,
         durationMinutes: form.durationMinutes ?? null,
+        tussCode: form.tussCode.trim() || null,
+        tussTableCode: form.tussTableCode.trim() || null,
         acceptsInsurance: form.acceptsInsurance,
         acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
         acceptedSubInsurances: form.acceptsInsurance ? form.acceptedSubInsurances : {},
@@ -519,6 +529,8 @@ export function CadastroProcedimento() {
         durationMinutes: data.durationMinutes !== undefined && data.durationMinutes !== null
           ? Number(data.durationMinutes)
           : null,
+        tussCode: String(data.tussCode || '').trim(),
+        tussTableCode: String(data.tussTableCode || '').trim(),
         acceptsInsurance: Boolean(data.acceptsInsurance),
         acceptedInsurances: Array.isArray(data.acceptedInsurances) ? data.acceptedInsurances : [],
         acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},
@@ -612,6 +624,21 @@ export function CadastroProcedimento() {
                     onChange={(value) => setForm((prev) => ({ ...prev, durationMinutes: typeof value === 'number' ? value : null }))}
                     min={1}
                     step={5}
+                  />
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <FloatingInput
+                    label="Código TUSS"
+                    placeholder="Ex: 40314618"
+                    value={form.tussCode}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tussCode: e?.currentTarget?.value ?? '' }))}
+                  />
+                  <FloatingInput
+                    label="Tabela de referência"
+                    placeholder="Ex: 22"
+                    value={form.tussTableCode}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tussTableCode: e?.currentTarget?.value ?? '' }))}
                   />
                 </SimpleGrid>
 
@@ -857,6 +884,11 @@ export function CadastroProcedimento() {
                             <Group justify="space-between" align="flex-start" wrap="nowrap">
                               <Stack gap={4} style={{ flex: 1 }}>
                                 <Text fw={600} size="sm">{item.name}</Text>
+                                {(item.tussCode || item.tussTableCode) && (
+                                  <Text size="xs" c="dimmed">
+                                    TUSS: {item.tussCode || '-'} • Tabela: {item.tussTableCode || '-'}
+                                  </Text>
+                                )}
                                 <Group gap="xs">
                                   <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
                                     {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
@@ -935,6 +967,11 @@ export function CadastroProcedimento() {
                                 <Table.Td>
                                   <Stack gap={2}>
                                     <Text fw={600} size="sm">{item.name}</Text>
+                                    {(item.tussCode || item.tussTableCode) && (
+                                      <Text size="xs" c="dimmed">
+                                        TUSS: {item.tussCode || '-'} • Tabela: {item.tussTableCode || '-'}
+                                      </Text>
+                                    )}
                                     <Text size="xs" c="dimmed">
                                       {item.modalities.length ? item.modalities.join(', ') : 'Sem modalidades'}
                                     </Text>

@@ -6,6 +6,8 @@ export interface CreateProcedurePayload {
   appointmentType?: 'CONSULTA' | 'EXAME';
   price?: number | null;
   durationMinutes?: number | null;
+  tussCode?: string | null;
+  tussTableCode?: string | null;
   acceptsInsurance?: boolean;
   acceptedInsurances?: string[];
   acceptedSubInsurances?: Record<string, string[]>;
@@ -20,6 +22,8 @@ export interface UpdateProcedurePayload {
   appointmentType?: 'CONSULTA' | 'EXAME';
   price?: number | null;
   durationMinutes?: number | null;
+  tussCode?: string | null;
+  tussTableCode?: string | null;
   acceptsInsurance?: boolean;
   acceptedInsurances?: string[];
   acceptedSubInsurances?: Record<string, string[]>;
