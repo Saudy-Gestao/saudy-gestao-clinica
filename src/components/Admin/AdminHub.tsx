@@ -1,5 +1,5 @@
 import { Box, Stack, Text, Group, Paper, SimpleGrid, Title, ThemeIcon } from '@mantine/core';
-import { Building2, ChevronRight, LayoutGrid, MessageSquareText, UserPlus } from 'lucide-react';
+import { Building2, ChevronRight, LayoutGrid, LifeBuoy, MessageSquareText, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StatsCards } from '../StatsCards/StatsCards';
 import { Header } from '../Header/Header';
@@ -23,6 +23,12 @@ const adminModules = [
     title: 'Gestão de Clientes',
     description: 'Edite dados da empresa, campos cadastrais e o tipo de módulo liberado.',
     route: '/adm-clientes',
+  },
+  {
+    icon: LifeBuoy,
+    title: 'Chamados',
+    description: 'Analise tickets enviados pelos usuários e acompanhe o status de cada atendimento.',
+    route: '/adm-tickets',
   },
 ];
 

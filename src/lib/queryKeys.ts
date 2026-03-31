@@ -1,5 +1,7 @@
 export const queryKeys = {
   adminLeads: ['admin-leads'] as const,
+  adminTickets: ['admin-tickets'] as const,
+  myTickets: ['my-tickets'] as const,
   receptionQueue: ['reception-queue'] as const,
   clinicalQueue: ['clinical-queue'] as const,
   appointments: ['appointments'] as const,

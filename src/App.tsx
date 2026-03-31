@@ -16,6 +16,8 @@ import { AdmRegister } from './components/Auth/AdmRegister';
 import { AdminHub } from './components/Admin/AdminHub';
 import { PossiveisClientes } from './components/Admin/PossiveisClientes';
 import { AdminClients } from './components/Admin/AdminClients';
+import { AdminTickets } from './components/Admin/AdminTickets';
+import { AdminTicketDetails } from './components/Admin/AdminTicketDetails';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
@@ -52,6 +54,9 @@ import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
 import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
 import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
+import { TicketFab } from './components/common/TicketFab';
+import { MyTicketsPage } from './components/Tickets/MyTicketsPage';
+import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -61,13 +66,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
   const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
-  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes'];
+  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (isAdmOnly && !admAllowedPaths.includes(location.pathname)) {
+  const isAllowedForAdmOnly = admAllowedPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
+  if (isAdmOnly && !isAllowedForAdmOnly) {
     return <Navigate to="/adm-hub" replace />;
   }
 
@@ -77,7 +83,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
     key: 'mantine-color-scheme',
-    defaultValue: 'dark',
+    defaultValue: 'light',
   });
   const [, setAuthVersion] = useState(0);
   const isAuthenticated = authService.isAuthenticated();
@@ -125,6 +131,14 @@ function App() {
             path="/adm-clientes"
             element={<ProtectedRoute><AdminClients /></ProtectedRoute>}
           />
+          <Route
+            path="/adm-tickets"
+            element={<ProtectedRoute><AdminTickets /></ProtectedRoute>}
+          />
+          <Route
+            path="/adm-tickets/:id"
+            element={<ProtectedRoute><AdminTicketDetails /></ProtectedRoute>}
+          />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route path="/check-in" element={<PublicCheckIn />} />
@@ -137,6 +151,14 @@ function App() {
           <Route
             path="/fila-atendimento"
             element={<ProtectedRoute><PatientQueuePage /></ProtectedRoute>}
+          />
+          <Route
+            path="/meus-chamados"
+            element={<ProtectedRoute><MyTicketsPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/meus-chamados/:id"
+            element={<ProtectedRoute><MyTicketDetailsPage /></ProtectedRoute>}
           />
           <Route 
             path="/settings" 
@@ -280,6 +302,7 @@ function App() {
           />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
+          <TicketFab />
         </BrowserRouter>
       </DatesProvider>
     </MantineProvider>

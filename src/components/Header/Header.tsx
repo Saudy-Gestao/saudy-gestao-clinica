@@ -22,6 +22,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'adm-leads', label: 'Possíveis Clientes', route: '/possiveis-clientes', prefixes: ['/possiveis-clientes'] },
   { key: 'adm-clientes', label: 'Cadastro de Cliente', route: '/cadastro-cliente', prefixes: ['/cadastro-cliente'] },
   { key: 'adm-clientes-edicao', label: 'Gestão de Clientes', route: '/adm-clientes', prefixes: ['/adm-clientes'] },
+  { key: 'adm-tickets', label: 'Chamados', route: '/adm-tickets', prefixes: ['/adm-tickets'] },
   { key: 'pre-atendimento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
   { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },
@@ -42,6 +43,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'cadastro-equipamento', label: 'Cadastro de Equipamentos', route: '/cadastro-equipamento', prefixes: ['/cadastro-equipamento'] },
   { key: 'cadastro-anamnese', label: 'Cadastro de Anamnese', route: '/cadastro-anamnese', prefixes: ['/cadastro-anamnese'] },
   { key: 'cadastro-enfermagem', label: 'Cadastro de Enfermagem', route: '/cadastro-enfermagem', prefixes: ['/cadastro-enfermagem'] },
+  { key: 'meus-chamados', label: 'Meus Chamados', route: '/meus-chamados', prefixes: ['/meus-chamados'] },
 ];
 
 const resolveModuleByPath = (pathname: string): ModuleDefinition | null => {

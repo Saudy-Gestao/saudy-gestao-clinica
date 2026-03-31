@@ -9,5 +9,7 @@ export const useAdminLeadsQuery = (filters?: { status?: LeadStatus | 'ALL'; sear
   useQuery({
     queryKey: [...queryKeys.adminLeads, filters?.status || 'ALL', filters?.search || ''],
     queryFn: () => fetchAdminLeads(filters),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    refetchOnMount: 'always',
   });
