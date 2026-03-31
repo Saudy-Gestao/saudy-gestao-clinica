@@ -1,8 +1,9 @@
-import { Menu, Avatar, Group, UnstyledButton, Switch } from '@mantine/core';
-import { User, Settings, Moon, Sun } from 'lucide-react';
+import { Menu, Avatar, Group, UnstyledButton, Switch, Badge } from '@mantine/core';
+import { User, Settings, Moon, Sun, LifeBuoy } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import { useLocalStorage } from '@mantine/hooks';
 import { useNavigate } from 'react-router-dom';
+import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 
 export function UserMenu() {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ export function UserMenu() {
   });
 
   const isDark = colorScheme === 'dark';
+  const { data: myTicketsData } = useMyTicketsQuery();
+  const unreadCount = Number(myTicketsData?.unreadCount || 0);
 
   return (
     <Menu shadow="md" position="bottom-end">
@@ -31,6 +34,13 @@ export function UserMenu() {
           </Menu.Item>
           <Menu.Item icon={<Settings size={16} />} onClick={() => navigate('/settings')}>
             Configurações
+          </Menu.Item>
+          <Menu.Item
+            icon={<LifeBuoy size={16} />}
+            onClick={() => navigate('/meus-chamados')}
+            rightSection={unreadCount > 0 ? <Badge color="red" size="xs">{unreadCount}</Badge> : null}
+          >
+            Meus Chamados
           </Menu.Item>
           <Menu.Item
             icon={isDark ? <Moon size={16} /> : <Sun size={16} />}

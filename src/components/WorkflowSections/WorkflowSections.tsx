@@ -1,4 +1,4 @@
-import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme, Skeleton, Stack } from '@mantine/core';
+import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme, Skeleton, Stack, Badge } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
 import {
@@ -26,12 +26,15 @@ import {
   filterModulesForCompanyType,
   normalizeCompanyModuleType,
 } from '../../utils/moduleTypeAccess';
+import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
   const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
   const { data: currentUser, isLoading, isFetching, refetch } = useCurrentUserProfileQuery();
+  const { data: myTicketsData } = useMyTicketsQuery();
+  const unreadMyTickets = Number(myTicketsData?.unreadCount || 0);
 
   const extractAllowedModules = (user: any) => {
     const modules: string[] = [];
@@ -137,6 +140,7 @@ export function WorkflowSections() {
         { icon: Warehouse, label: 'Estoque', desc: 'Materiais e insumos', route: '/estoque', moduleName: 'estoque' },
         { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira', route: '/financeiro', moduleName: 'financeiro' },
         { icon: DollarSign, label: 'Faturamento', desc: 'Cobranças e NFs', route: '/faturamento', moduleName: 'faturamento' },
+        { icon: MessageCircle, label: 'Meus Chamados', desc: 'Acompanhe seus tickets', route: '/meus-chamados', moduleName: 'meus-chamados' },
       ]
     },
     {
@@ -150,8 +154,10 @@ export function WorkflowSections() {
   // Filtra as seções para mostrar apenas módulos permitidos
   const filteredSections = sections.map(section => ({
     ...section,
-    items: section.items.filter(item => 
-      visibleAllowedModules.length === 0 || visibleAllowedModules.includes(item.moduleName)
+    items: section.items.filter(item =>
+      item.moduleName === 'meus-chamados'
+      || visibleAllowedModules.length === 0
+      || visibleAllowedModules.includes(item.moduleName)
     )
   })).filter(section => section.items.length > 0); // Remove seções vazias
 
@@ -242,7 +248,12 @@ export function WorkflowSections() {
                       <item.icon size={18} color={accentColor} />
                     </ThemeIcon>
                     <Box>
-                      <Text fw={500} size="sm" lineClamp={1}>{item.label}</Text>
+                      <Group gap={6} wrap="nowrap">
+                        <Text fw={500} size="sm" lineClamp={1}>{item.label}</Text>
+                        {item.moduleName === 'meus-chamados' && unreadMyTickets > 0 ? (
+                          <Badge color="red" size="xs">{unreadMyTickets}</Badge>
+                        ) : null}
+                      </Group>
                       <Text size="xs" c="dimmed" lineClamp={1}>{item.desc}</Text>
                     </Box>
                   </Group>
