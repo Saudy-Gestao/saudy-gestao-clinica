@@ -78,6 +78,19 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     CONFIRMATION_REPLY_RESCHEDULE: 'resposta_reagendar',
   };
 
+  const defaultTemplateMessages: Record<string, string> = {
+    APPOINTMENT_CREATED:
+      'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nSeu atendimento está confirmado:\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n📍 {{local}}\n📎 Para agilizar seu atendimento, pedimos que envie seus documentos pelo link abaixo:\n👉 {{link_documentos}}\nEm caso de necessidade, fale conosco por aqui.',
+    APPOINTMENT_CONFIRMATION:
+      'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nEstamos entrando em contato para confirmar seu agendamento:\n📅 Data: {{data}}\n⏰ Horário: {{hora}}\n👩‍⚕️ Profissional: {{profissional}}\n📍 Local: {{local}}\nPor favor, escolha uma das opções abaixo:\n✅ Confirmar\n❌ Reagendar\nFicamos no aguardo.',
+    CONFIRMATION_REPLY_CONFIRMED:
+      '✅ Agendamento confirmado com sucesso!\n📅 {{data}}\n⏰ {{hora}}\n👩‍⚕️ {{profissional}}\nQualquer imprevisto, fale conosco por este canal.\nAté breve! 💙',
+    CONFIRMATION_REPLY_RESCHEDULE:
+      'Em breve um atendente entrará em contato para realizar seu reagendamento.',
+    NO_SHOW:
+      'Olá, {{paciente_nome}}.\nSomos da {{clinica_nome}}.\nNotamos que você não apareceu para o seu agendamento:\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n📍 {{local}}\nCaso tenha ocorrido algum imprevisto, pedimos que nos informe por aqui.',
+  };
+
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
@@ -143,7 +156,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     return {
       type,
       name: existingTemplate?.name || templateTypeLabels[type] || '',
-      message: existingTemplate?.message || '',
+      message: existingTemplate?.message || defaultTemplateMessages[type] || '',
       hsmTemplateName: existingTemplate?.hsmTemplateName || templateTypeHsmNames[type] || '',
       isActive: existingTemplate?.isActive ?? true,
     };
@@ -241,9 +254,10 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     setSyncLoading(true);
     try {
       const result = await whatsappService.syncHsmStatus();
+      const created = Number(result.created ?? 0);
       notifications.show({
         title: 'Sincronizado',
-        message: `${result.synced} template(s) verificados, ${result.updated} atualizado(s).`,
+        message: `${result.synced} template(s) verificados, ${created} importado(s) e ${result.updated} atualizado(s).`,
         color: 'green',
       });
       await refreshPageData();
@@ -414,6 +428,11 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                         <Badge size="sm" variant="light">
                           {getMessageTypeLabel(template.type)}
                         </Badge>
+                        {template.importedFromGupshupSync && (
+                          <Badge size="sm" variant="outline" color="teal">
+                            Importado da Gupshup
+                          </Badge>
+                        )}
                         {template.hsmTemplateName && (
                           <>
                             <Badge size="sm" variant="filled" color={getHsmStatusLabel(template.hsmTemplateStatus).color}>

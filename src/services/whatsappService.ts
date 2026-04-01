@@ -27,6 +27,7 @@ export interface WhatsAppMessageTemplate {
   hsmTemplateId?: string | null;
   hsmTemplateStatus?: string | null;
   hsmTemplateApproved: boolean;
+  importedFromGupshupSync: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -111,7 +112,7 @@ export default {
     await api.delete(`/care/whatsapp/templates/${id}`);
   },
 
-  async syncHsmStatus(): Promise<{ synced: number; updated: number; gupshupTemplates: Record<string, { status: string; id: string | null }> }> {
+  async syncHsmStatus(): Promise<{ synced: number; created: number; updated: number; gupshupTemplates: Record<string, { status: string; id: string | null }> }> {
     const res = await api.post('/care/whatsapp/templates/sync-hsm', {});
     return res.data;
   },
