@@ -13,7 +13,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react';
+import { ChevronLeft, PhoneCall, Play, FileText, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
@@ -36,11 +36,9 @@ interface ConsultationRow {
   triageRequired: boolean;
 }
 
-const CLINICAL_QUEUE_TYPE = 'Fila clínica';
 const WAITING_STATUS = 'Aguardando atendimento';
 const CALLED_STATUS = 'Chamado para atendimento';
 const IN_PROGRESS_STATUS = 'Em atendimento';
-const DONE_STATUS = 'Atendimento concluído';
 const ACTIVE_STATUSES = [WAITING_STATUS, CALLED_STATUS, IN_PROGRESS_STATUS];
 
 const statusBadge = (status: string) => {
@@ -64,6 +62,7 @@ const getClinicalActionConfig = (status: string) => {
       variant: 'filled' as const,
       icon: <PhoneCall size={14} />,
       nextStatus: CALLED_STATUS,
+      openClinicalPage: false,
     };
   }
 
@@ -74,16 +73,18 @@ const getClinicalActionConfig = (status: string) => {
       variant: 'filled' as const,
       icon: <Play size={14} />,
       nextStatus: IN_PROGRESS_STATUS,
+      openClinicalPage: true,
     };
   }
 
   if (status === IN_PROGRESS_STATUS) {
     return {
-      label: 'Finalizar',
-      color: 'teal',
+      label: 'Abrir prontuário',
+      color: 'indigo',
       variant: 'light' as const,
-      icon: <CheckCircle2 size={14} />,
-      nextStatus: DONE_STATUS,
+      icon: <FileText size={14} />,
+      nextStatus: IN_PROGRESS_STATUS,
+      openClinicalPage: true,
     };
   }
 
@@ -140,7 +141,6 @@ export function Consulta() {
     } catch {
       setLoggedDoctorName('');
     }
-
   }, []);
 
   useEffect(() => {
@@ -168,16 +168,25 @@ export function Consulta() {
     );
   }, [rows, query]);
 
-  const updateClinicalStatus = async (row: ConsultationRow, nextStatus: string) => {
+  const openClinicalCare = (row: ConsultationRow) => {
+    navigate(`/consulta/atendimento/${row.id}`);
+  };
+
+  const updateClinicalStatus = async (
+    row: ConsultationRow,
+    nextStatus: string,
+    openClinicalPage = false,
+  ) => {
     try {
       setLoadingId(row.id);
-      await consultationService.update(row.id, { queue: nextStatus, queueType: CLINICAL_QUEUE_TYPE });
+      await consultationService.update(row.id, { queue: nextStatus });
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
       showNotification({
         title: 'Fila clínica atualizada',
         message: `${row.nomeCompleto} agora está em "${nextStatus}".`,
         color: 'green',
       });
+      if (openClinicalPage) openClinicalCare(row);
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -298,7 +307,11 @@ export function Consulta() {
                             variant={action.variant}
                             color={action.color}
                             leftSection={action.icon}
-                            onClick={() => updateClinicalStatus(row, action.nextStatus)}
+                            onClick={() => (
+                              action.openClinicalPage && row.statusFluxo === IN_PROGRESS_STATUS
+                                ? openClinicalCare(row)
+                                : updateClinicalStatus(row, action.nextStatus, action.openClinicalPage)
+                            )}
                             loading={loadingId === row.id}
                           >
                             {action.label}

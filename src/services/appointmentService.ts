@@ -50,6 +50,12 @@ export default {
     return res.data;
   },
 
+  async getById(id: string) {
+    const url = `/care/appointments/${id}`;
+    const res = await api.get(url);
+    return res.data;
+  },
+
   async update(id: string, payload: Partial<AppointmentPayload>) {
     const url = `/care/appointments/${id}`;
     const res = await api.put(url, payload);

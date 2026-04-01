@@ -5,6 +5,7 @@ export interface BranchSettings {
   branchId: string;
   requireFacialForReportDelivery: boolean;
   requireFacialForPatientRegistration: boolean;
+  doctorCanScheduleExamFromConsultation: boolean;
   noShowToleranceMinutes: number;
   publicCheckInEnabled: boolean;
   publicCheckInLastEnabledAt?: string | null;
