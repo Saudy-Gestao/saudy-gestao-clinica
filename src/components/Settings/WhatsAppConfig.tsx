@@ -42,12 +42,12 @@ import { FloatingInput } from '../common/FloatingInput';
 import { FloatingNumberInput } from '../common/FloatingNumberInput';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import { FloatingSelect } from '../common/FloatingSelect';
+import { useWhatsAppConfigQuery } from '../../hooks/useWhatsAppConfigQuery';
 
 interface TemplateFormValues {
   type: string;
   name: string;
   message: string;
-  hsmTemplateName: string;
   isActive: boolean;
 }
 
@@ -70,14 +70,6 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     CONFIRMATION_REPLY_RESCHEDULE: 'Resposta: Reagendar',
   };
 
-  const templateTypeHsmNames: Record<string, string> = {
-    APPOINTMENT_CREATED: 'resumo_agendamento',
-    APPOINTMENT_CONFIRMATION: 'confirmacao_agendamento',
-    NO_SHOW: 'falta_agendamento',
-    CONFIRMATION_REPLY_CONFIRMED: 'resposta_confirmado',
-    CONFIRMATION_REPLY_RESCHEDULE: 'resposta_reagendar',
-  };
-
   const defaultTemplateMessages: Record<string, string> = {
     APPOINTMENT_CREATED:
       'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nSeu atendimento está confirmado:\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n📍 {{local}}\n📎 Para agilizar seu atendimento, pedimos que envie seus documentos pelo link abaixo:\n👉 {{link_documentos}}\nEm caso de necessidade, fale conosco por aqui.',
@@ -95,11 +87,17 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const [activeTab, setActiveTab] = useState('templates');
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toggleLoadingType, setToggleLoadingType] = useState<string | null>(null);
+  const [sendValidationOnSave, setSendValidationOnSave] = useState(false);
+  const [activationConfirm, setActivationConfirm] = useState<{ mode: 'form' | 'list'; templateId?: string } | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<{ id: string; name: string } | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [showAlert, setShowAlert] = useState(true);
   const { data, error, isFetching } = useWhatsAppPageDataQuery();
+  const { data: whatsappConfig } = useWhatsAppConfigQuery();
   const templates = data?.templates || [];
   const logs = data?.logs || [];
   const variables = data?.variables || [];
@@ -109,8 +107,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     type: 'APPOINTMENT_CREATED',
     name: '',
     message: '',
-    hsmTemplateName: '',
-    isActive: true,
+    isActive: false,
   });
 
   const [notificationForm, setNotificationForm] = useState<NotificationFormValues>({
@@ -150,6 +147,12 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     }
   };
 
+  const hasDatabaseWhatsAppCredentials = Boolean(
+    whatsappConfig?.accountSid?.trim()
+    && whatsappConfig?.authToken?.trim()
+    && whatsappConfig?.fromNumber?.trim(),
+  );
+
   const getDefaultTemplateForm = (type: string): TemplateFormValues => {
     const existingTemplate = templates.find((template) => template.type === type);
 
@@ -157,9 +160,24 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       type,
       name: existingTemplate?.name || templateTypeLabels[type] || '',
       message: existingTemplate?.message || defaultTemplateMessages[type] || '',
-      hsmTemplateName: existingTemplate?.hsmTemplateName || templateTypeHsmNames[type] || '',
-      isActive: existingTemplate?.isActive ?? true,
+      isActive: existingTemplate?.isActive ?? false,
     };
+  };
+
+  const validateTemplateForm = (form: TemplateFormValues) => {
+    const message = form.message.trim();
+    const variablesFound = message.match(/\{\{[^}]+\}\}/g) || [];
+
+    if (/^\{\{[^}]+\}\}$/.test(message)) {
+      return 'Não é permitido salvar um template com variável sozinha.';
+    }
+
+    const lastVariable = variablesFound[variablesFound.length - 1];
+    if (lastVariable && message.endsWith(lastVariable)) {
+      return 'Não é permitido salvar um template terminando com variável.';
+    }
+
+    return null;
   };
 
   const handleSaveNotificationConfig = async (e: React.FormEvent) => {
@@ -186,14 +204,44 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
   const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasDatabaseWhatsAppCredentials) {
+      notifications.show({
+        title: 'Credencial obrigatória',
+        message: 'Salve primeiro a credencial do WhatsApp da filial nas configurações.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const validationError = validateTemplateForm(templateForm);
+    if (validationError) {
+      notifications.show({
+        title: 'Validação do template',
+        message: validationError,
+        color: 'yellow',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const saved = await whatsappService.saveTemplate(templateForm);
+      const shouldSendForValidation = sendValidationOnSave && templateForm.isActive;
+      const saved = await whatsappService.saveTemplate({
+        ...(editingTemplateId ? { id: editingTemplateId } : {}),
+        ...templateForm,
+        isActive: shouldSendForValidation ? false : templateForm.isActive,
+      });
 
-      // Auto-enviar para Gupshup se o nome HSM estiver preenchido
-      if (templateForm.hsmTemplateName) {
+      if (shouldSendForValidation) {
         try {
           await whatsappService.pushTemplateToGupshup(saved.id);
+          await whatsappService.saveTemplate({
+            id: saved.id,
+            type: saved.type,
+            name: saved.name,
+            message: saved.message,
+            isActive: true,
+          });
           notifications.show({
             title: 'Template salvo e enviado para o Gupshup',
             message: 'Aguarde a aprovação da Meta para usar HSM.',
@@ -201,8 +249,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
           });
         } catch (pushError: any) {
           notifications.show({
-            title: 'Template salvo, mas erro ao enviar para Gupshup',
-            message: pushError.response?.data?.error || 'Verifique as credenciais e o App ID do Gupshup.',
+            title: 'Erro ao enviar template para Gupshup',
+            message: pushError.response?.data?.error || 'O template foi mantido desativado porque o envio falhou.',
             color: 'yellow',
             autoClose: 8000,
           });
@@ -218,6 +266,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       setShowTemplateModal(false);
       setTemplateForm(getDefaultTemplateForm('APPOINTMENT_CREATED'));
       setIsEditingTemplate(false);
+      setEditingTemplateId(null);
+      setSendValidationOnSave(false);
       await refreshPageData();
     } catch (error: any) {
       notifications.show({
@@ -232,6 +282,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
   const handleDeleteTemplate = async () => {
     if (!deleteConfirmTemplate) return;
+    setDeleteLoading(true);
     try {
       await whatsappService.deleteTemplate(deleteConfirmTemplate.id);
       notifications.show({
@@ -244,9 +295,11 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: 'Erro ao excluir template',
+        message: error.response?.data?.error || 'Erro ao excluir template',
         color: 'red',
       });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -298,16 +351,19 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const openTemplateModal = (template?: any) => {
     if (template) {
       setIsEditingTemplate(true);
+      setEditingTemplateId(template.id);
       setTemplateForm({
         type: template.type,
         name: template.name,
         message: template.message,
-        hsmTemplateName: template.hsmTemplateName || templateTypeHsmNames[template.type] || '',
         isActive: template.isActive,
       });
+      setSendValidationOnSave(false);
     } else {
       setIsEditingTemplate(false);
+      setEditingTemplateId(null);
       setTemplateForm(getDefaultTemplateForm('APPOINTMENT_CREATED'));
+      setSendValidationOnSave(false);
     }
     setShowTemplateModal(true);
   };
@@ -344,6 +400,77 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       IN_REVIEW: { color: 'blue', label: 'Em análise' },
     };
     return statusConfig[normalized] || { color: 'gray', label: normalized || 'Sem status' };
+  };
+
+  const handleTemplateToggle = async (template: any, nextIsActive: boolean) => {
+    if (!nextIsActive) {
+      setToggleLoadingType(template.type);
+      try {
+        await whatsappService.saveTemplate({
+          id: template.id,
+          type: template.type,
+          name: template.name,
+          message: template.message,
+          isActive: false,
+        });
+        await refreshPageData();
+      } catch (toggleError: any) {
+        notifications.show({
+          title: 'Erro',
+          message: toggleError.response?.data?.error || 'Erro ao atualizar template',
+          color: 'red',
+        });
+      } finally {
+        setToggleLoadingType(null);
+      }
+      return;
+    }
+
+    setActivationConfirm({ mode: 'list', templateId: template.id });
+  };
+
+  const confirmActivation = async () => {
+    if (!activationConfirm) return;
+
+    if (activationConfirm.mode === 'form') {
+      setTemplateForm((prev) => ({ ...prev, isActive: true }));
+      setSendValidationOnSave(true);
+      setActivationConfirm(null);
+      return;
+    }
+
+    const template = templates.find((item) => item.id === activationConfirm.templateId);
+    if (!template) {
+      setActivationConfirm(null);
+      return;
+    }
+
+    setToggleLoadingType(template.type);
+    try {
+      await whatsappService.pushTemplateToGupshup(template.id);
+      await whatsappService.saveTemplate({
+        id: template.id,
+        type: template.type,
+        name: template.name,
+        message: template.message,
+        isActive: true,
+      });
+      notifications.show({
+        title: 'Template enviado para validação',
+        message: 'O template foi ativado e enviado para o Gupshup.',
+        color: 'green',
+      });
+      setActivationConfirm(null);
+      await refreshPageData();
+    } catch (pushError: any) {
+      notifications.show({
+        title: 'Erro',
+        message: pushError.response?.data?.error || pushError.response?.data?.detail || 'Erro ao ativar e enviar template',
+        color: 'red',
+      });
+    } finally {
+      setToggleLoadingType(null);
+    }
   };
 
   return (
@@ -436,7 +563,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                         {template.hsmTemplateName && (
                           <>
                             <Badge size="sm" variant="filled" color={getHsmStatusLabel(template.hsmTemplateStatus).color}>
-                              HSM: {template.hsmTemplateName} · {getHsmStatusLabel(template.hsmTemplateStatus).label}
+                              HSM: {getHsmStatusLabel(template.hsmTemplateStatus).label}
                             </Badge>
                             {template.hsmTemplateId && (
                               <Badge size="sm" variant="outline" color="gray">
@@ -450,16 +577,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                     <Group gap="xs">
                       <Switch
                         checked={template.isActive}
-                        onChange={async (event) => {
-                          await whatsappService.saveTemplate({
-                            type: template.type,
-                            name: template.name,
-                            message: template.message,
-                            hsmTemplateName: template.hsmTemplateName || undefined,
-                            isActive: event.currentTarget.checked,
-                          });
-                          await refreshPageData();
-                        }}
+                        disabled={toggleLoadingType === template.type}
+                        onChange={(event) => void handleTemplateToggle(template, event.currentTarget.checked)}
                       />
                       <ActionIcon
                         variant="light"
@@ -520,15 +639,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
                 <FloatingNumberInput
                   label="Horas antes do agendamento"
-                  description="Quantas horas antes do agendamento enviar a confirmação"
+                  description="Defina quantas horas antes do agendamento a mensagem de confirmação deve ser enviada"
                   min={1}
                   max={168}
                   value={notificationForm.confirmationHoursBefore}
                   onChange={(value) => setNotificationForm(prev => ({ ...prev, confirmationHoursBefore: Number(value) }))}
                   disabled={!notificationForm.sendConfirmationEnabled}
                 />
-
-                <Divider my="md" />
 
                 <Button
                   type="submit"
@@ -610,17 +727,18 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               label="Tipo de Mensagem"
               required
               data={[
-                { value: 'APPOINTMENT_CREATED', label: 'Resumo de Agendamento' },
-                { value: 'APPOINTMENT_CONFIRMATION', label: 'Confirmação' },
-                { value: 'NO_SHOW', label: 'Falta' },
-                { value: 'CONFIRMATION_REPLY_CONFIRMED', label: 'Resposta: Confirmado' },
-                { value: 'CONFIRMATION_REPLY_RESCHEDULE', label: 'Resposta: Reagendar' },
+                { value: 'APPOINTMENT_CREATED', label: 'Resumo de Agendamento', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CREATED') },
+                { value: 'APPOINTMENT_CONFIRMATION', label: 'Confirmação', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CONFIRMATION') },
+                { value: 'NO_SHOW', label: 'Falta', disabled: !isEditingTemplate && templates.some((template) => template.type === 'NO_SHOW') },
+                { value: 'CONFIRMATION_REPLY_CONFIRMED', label: 'Resposta: Confirmado', disabled: !isEditingTemplate && templates.some((template) => template.type === 'CONFIRMATION_REPLY_CONFIRMED') },
+                { value: 'CONFIRMATION_REPLY_RESCHEDULE', label: 'Resposta: Reagendar', disabled: !isEditingTemplate && templates.some((template) => template.type === 'CONFIRMATION_REPLY_RESCHEDULE') },
               ]}
               value={templateForm.type}
               onChange={(value) => {
                 if (!value) return;
                 if (!isEditingTemplate) {
                   setTemplateForm(getDefaultTemplateForm(value));
+                  setSendValidationOnSave(false);
                   return;
                 }
                 setTemplateForm(prev => ({ ...prev, type: value as any }));
@@ -634,15 +752,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               value={templateForm.name}
               onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
             />
-
-            <FloatingInput
-              label="Nome do Template (Gupshup/Meta HSM)"
-              placeholder="Ex: confirmacao_agendamento"
-              value={templateForm.hsmTemplateName}
-              onChange={(e) => setTemplateForm(prev => ({ ...prev, hsmTemplateName: e.target.value }))}
-            />
             <Text size="xs" c="dimmed" mt={-8}>
-              Nome exato do template aprovado no painel Gupshup. Quando preenchido, o envio usa HSM.
+              O nome interno na Gupshup será gerado automaticamente a partir deste título, normalizado e com UUID no final.
             </Text>
 
             <div>
@@ -674,11 +785,23 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             <Switch
               label="Template ativo"
               checked={templateForm.isActive}
-              onChange={(e) => setTemplateForm(prev => ({ ...prev, isActive: e.target.checked }))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setActivationConfirm({ mode: 'form' });
+                  return;
+                }
+                setTemplateForm(prev => ({ ...prev, isActive: false }));
+                setSendValidationOnSave(false);
+              }}
             />
 
             <Group justify="flex-end">
-              <Button variant="light" type="button" onClick={() => setShowTemplateModal(false)}>
+              <Button variant="light" type="button" onClick={() => {
+                setShowTemplateModal(false);
+                setEditingTemplateId(null);
+                setIsEditingTemplate(false);
+                setSendValidationOnSave(false);
+              }}>
                 Cancelar
               </Button>
               <Button type="submit" loading={loading || isFetching}>
@@ -706,8 +829,31 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             <Button variant="default" onClick={() => setDeleteConfirmTemplate(null)}>
               Cancelar
             </Button>
-            <Button color="red" leftSection={<IconTrash size={16} />} onClick={handleDeleteTemplate}>
+            <Button color="red" leftSection={<IconTrash size={16} />} onClick={handleDeleteTemplate} loading={deleteLoading}>
               Excluir
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={!!activationConfirm}
+        onClose={() => setActivationConfirm(null)}
+        title="Enviar template para validação"
+        centered
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Deseja enviar este template para validação na Gupshup?
+            Se confirmar, o toggle será ativado.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setActivationConfirm(null)}>
+              Não
+            </Button>
+            <Button onClick={() => void confirmActivation()} loading={toggleLoadingType !== null && activationConfirm?.mode === 'list'}>
+              Sim
             </Button>
           </Group>
         </Stack>

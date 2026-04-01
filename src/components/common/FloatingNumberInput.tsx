@@ -6,7 +6,7 @@ interface FloatingNumberInputProps extends NumberInputProps {
   containerProps?: BoxProps;
 }
 
-export function FloatingNumberInput({ label, containerProps, value, error, ...props }: FloatingNumberInputProps) {
+export function FloatingNumberInput({ label, containerProps, value, error, description, ...props }: FloatingNumberInputProps) {
   const hasValue = value !== null && value !== undefined && value !== '';
 
   return (
@@ -20,12 +20,18 @@ export function FloatingNumberInput({ label, containerProps, value, error, ...pr
           {...props}
           value={value}
           error={undefined}
+          description={undefined}
           label={undefined}
           placeholder=""
           variant="unstyled"
         />
         <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
       </Box>
+      {description ? (
+        <Text size="xs" c="dimmed" mt={4}>
+          {description}
+        </Text>
+      ) : null}
       {error ? (
         <Text size="xs" c="red" mt={4}>
           {error}

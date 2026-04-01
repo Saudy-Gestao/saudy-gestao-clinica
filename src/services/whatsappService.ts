@@ -93,6 +93,7 @@ export default {
   },
 
   async saveTemplate(data: {
+    id?: string;
     type: string;
     name: string;
     message: string;
