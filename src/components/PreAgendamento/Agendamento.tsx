@@ -1232,9 +1232,13 @@ export function Agendamento() {
         patientCpf: nextPatient.cpf,
       };
     } catch (err: any) {
+      const fieldErrors = err?.response?.data?.fields;
+      const firstFieldError = fieldErrors && typeof fieldErrors === 'object'
+        ? Object.values(fieldErrors).find((value) => typeof value === 'string' && value.trim().length > 0)
+        : null;
       showNotification({
         title: 'Erro ao finalizar cadastro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível criar o paciente antes do agendamento.',
+        message: String(firstFieldError || err?.response?.data?.message || err?.message || 'Não foi possível criar o paciente antes do agendamento.'),
         color: 'red',
       });
       return null;
