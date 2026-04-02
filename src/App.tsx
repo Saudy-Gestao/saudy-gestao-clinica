@@ -57,6 +57,9 @@ import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
 import { TicketFab } from './components/common/TicketFab';
 import { MyTicketsPage } from './components/Tickets/MyTicketsPage';
 import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
+import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogin';
+import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
+import patientPortalAuthService from './services/patientPortalAuthService';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -80,6 +83,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PatientPortalProtectedRoute({ children }: { children: React.ReactNode }) {
+  const isPatientAuthenticated = patientPortalAuthService.isAuthenticated();
+  if (!isPatientAuthenticated) {
+    return <Navigate to="/portal/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   const [colorScheme] = useLocalStorage<'light' | 'dark'>({
     key: 'mantine-color-scheme',
@@ -89,6 +101,7 @@ function App() {
   const isAuthenticated = authService.isAuthenticated();
   const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
   const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
+  const isPatientAuthenticated = patientPortalAuthService.isAuthenticated();
 
   useEffect(() => {
     const onAuthChanged = () => {
@@ -96,8 +109,10 @@ function App() {
     };
 
     window.addEventListener('auth:changed', onAuthChanged);
+    window.addEventListener('patient-auth:changed', onAuthChanged);
     return () => {
       window.removeEventListener('auth:changed', onAuthChanged);
+      window.removeEventListener('patient-auth:changed', onAuthChanged);
     };
   }, []);
 
@@ -110,6 +125,14 @@ function App() {
           <Route 
             path="/login" 
             element={isAuthenticated ? <Navigate to={isAdmOnly ? '/adm-hub' : '/dashboard'} replace /> : <Login />} 
+          />
+          <Route
+            path="/portal/login"
+            element={isPatientAuthenticated ? <Navigate to="/portal" replace /> : <PatientPortalLogin />}
+          />
+          <Route
+            path="/portal"
+            element={<PatientPortalProtectedRoute><PatientPortalDashboard /></PatientPortalProtectedRoute>}
           />
           <Route 
             path="/adm" 
