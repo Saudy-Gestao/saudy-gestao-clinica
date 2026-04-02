@@ -5,6 +5,8 @@ export interface AppointmentPayload {
   patientCpf?: string;
   patientId?: string;
   doctorName?: string;
+  roomId?: string;
+  medicalEquipmentId?: string;
   specialty?: string;
   durationMinutes?: number;
   convenio?: string;

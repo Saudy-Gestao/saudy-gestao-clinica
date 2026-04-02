@@ -63,6 +63,8 @@ export interface ConsultationExamOrderPayload {
   preferredTime?: string;
   scheduleDate?: string;
   scheduleTime?: string;
+  scheduleRoomId?: string;
+  scheduleMedicalEquipmentId?: string;
 }
 
 export default {

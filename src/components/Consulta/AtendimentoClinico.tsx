@@ -204,9 +204,13 @@ export function AtendimentoClinico() {
         const items = normalizeArray(res).map((item: any) => {
           const date = String(item?.date || '').trim();
           const time = String(item?.time || '').trim();
-          const value = `${date}|${time}`;
-          return { value, label: `${date} às ${time}` };
-        }).filter((item: any) => item.value !== '|');
+          const roomId = String(item?.roomId || '').trim();
+          const equipmentId = String(item?.medicalEquipmentId || '').trim();
+          const roomName = String(item?.roomName || 'Sala').trim();
+          const equipmentName = String(item?.medicalEquipmentName || 'Equipamento').trim();
+          const value = `${date}|${time}|${roomId}|${equipmentId}`;
+          return { value, label: `${date} às ${time} • ${roomName} • ${equipmentName}` };
+        }).filter((item: any) => !String(item.value).includes('|||'));
         setSlotOptions(items);
       } catch {
         setSlotOptions([]);
@@ -259,7 +263,7 @@ export function AtendimentoClinico() {
     if (!examType) return showNotification({ title: 'Informe o exame', message: 'Selecione o procedimento solicitado.', color: 'yellow' });
 
     const slotRaw = String(examOrder.scheduleSlot || '').trim();
-    const [scheduleDate, scheduleTime] = slotRaw.includes('|') ? slotRaw.split('|') : ['', ''];
+    const [scheduleDate, scheduleTime, scheduleRoomId, scheduleMedicalEquipmentId] = slotRaw.includes('|') ? slotRaw.split('|') : ['', '', '', ''];
     if (examConfig.doctorCanScheduleExamFromConsultation && (!scheduleDate || !scheduleTime)) {
       return showNotification({
         title: 'Selecione um horário',
@@ -276,6 +280,8 @@ export function AtendimentoClinico() {
         examType,
         scheduleDate: examConfig.doctorCanScheduleExamFromConsultation && scheduleDate ? scheduleDate : undefined,
         scheduleTime: examConfig.doctorCanScheduleExamFromConsultation && scheduleTime ? scheduleTime : undefined,
+        scheduleRoomId: examConfig.doctorCanScheduleExamFromConsultation && scheduleRoomId ? scheduleRoomId : undefined,
+        scheduleMedicalEquipmentId: examConfig.doctorCanScheduleExamFromConsultation && scheduleMedicalEquipmentId ? scheduleMedicalEquipmentId : undefined,
       });
       setOrders((prev: any[]) => [res?.appointment || examOrder, ...prev]);
       setForm((prev: any) => ({ ...prev, examRequests: [prev.examRequests, `${examType}${examOrder.notes ? ` - ${examOrder.notes}` : ''}`].filter(Boolean).join('\n') }));

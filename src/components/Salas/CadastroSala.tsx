@@ -41,6 +41,9 @@ interface SalaRow {
   name: string;
   description?: string | null;
   branchId: string;
+  workingDays: string[];
+  workingHoursStart?: string | null;
+  workingHoursEnd?: string | null;
   doctorIds?: string[];
   doctorNames?: string[];
 }
@@ -75,6 +78,16 @@ const normalizeDoctorOptions = (data: any): DoctorOption[] => {
     .filter((doctor: DoctorOption) => Boolean(doctor.value));
 };
 
+const WEEKDAY_OPTIONS = [
+  { value: 'segunda', label: 'Segunda' },
+  { value: 'terca', label: 'Terça' },
+  { value: 'quarta', label: 'Quarta' },
+  { value: 'quinta', label: 'Quinta' },
+  { value: 'sexta', label: 'Sexta' },
+  { value: 'sabado', label: 'Sábado' },
+  { value: 'domingo', label: 'Domingo' },
+];
+
 export function CadastroSala() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -103,6 +116,9 @@ export function CadastroSala() {
     description: '',
     branchId: '',
     doctorIds: [] as string[],
+    workingDays: [] as string[],
+    workingHoursStart: '',
+    workingHoursEnd: '',
   });
 
   const branchLabelById = useMemo(() => {
@@ -208,6 +224,11 @@ export function CadastroSala() {
         name: sector.name || '',
         description: stripRoomMarker(sector.description) || null,
         branchId: String(sector.branchId || ''),
+        workingDays: Array.isArray(sector.workingDays)
+          ? sector.workingDays.map((day: any) => String(day || '').trim()).filter(Boolean)
+          : [],
+        workingHoursStart: sector.workingHoursStart || null,
+        workingHoursEnd: sector.workingHoursEnd || null,
         doctorIds: [],
         doctorNames: [],
       }))
@@ -242,6 +263,9 @@ export function CadastroSala() {
         description: item.description || '',
         branchId: item.branchId || selectedBranchId || '',
         doctorIds: linkedDoctors.map((doctor) => doctor.value),
+        workingDays: Array.isArray(item.workingDays) ? item.workingDays : [],
+        workingHoursStart: String(item.workingHoursStart || ''),
+        workingHoursEnd: String(item.workingHoursEnd || ''),
       });
     } else {
       setEditingId(null);
@@ -250,6 +274,9 @@ export function CadastroSala() {
         description: '',
         branchId: selectedBranchId || '',
         doctorIds: [],
+        workingDays: [],
+        workingHoursStart: '',
+        workingHoursEnd: '',
       });
     }
     setModalOpen(true);
@@ -300,10 +327,32 @@ export function CadastroSala() {
 
     setSaving(true);
     try {
+      if ((form.workingHoursStart && !form.workingHoursEnd) || (!form.workingHoursStart && form.workingHoursEnd)) {
+        showNotification({
+          title: 'Erro',
+          message: 'Informe horário inicial e final do funcionamento da sala.',
+          color: 'red',
+        });
+        setSaving(false);
+        return;
+      }
+      if (form.workingHoursStart && form.workingHoursEnd && form.workingHoursEnd <= form.workingHoursStart) {
+        showNotification({
+          title: 'Erro',
+          message: 'O horário final deve ser maior que o horário inicial.',
+          color: 'red',
+        });
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         name: form.name.trim(),
         description: markRoomDescription(form.description || ''),
         branchId: form.branchId,
+        workingDays: form.workingDays || [],
+        workingHoursStart: form.workingHoursStart || null,
+        workingHoursEnd: form.workingHoursEnd || null,
       };
 
       let roomId = editingId;
@@ -338,7 +387,15 @@ export function CadastroSala() {
 
       setModalOpen(false);
       setEditingId(null);
-      setForm({ name: '', description: '', branchId: selectedBranchId || '', doctorIds: [] });
+      setForm({
+        name: '',
+        description: '',
+        branchId: selectedBranchId || '',
+        doctorIds: [],
+        workingDays: [],
+        workingHoursStart: '',
+        workingHoursEnd: '',
+      });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -621,6 +678,29 @@ export function CadastroSala() {
             clearable
             nothingFoundMessage="Nenhum médico encontrado para esta filial"
           />
+          <FloatingMultiSelect
+            label="Dias de funcionamento"
+            value={form.workingDays}
+            onChange={(values) => setForm((prev) => ({ ...prev, workingDays: values }))}
+            data={WEEKDAY_OPTIONS}
+            searchable
+            clearable
+            nothingFoundMessage="Nenhum dia encontrado"
+          />
+          <Group grow>
+            <FloatingInput
+              label="Início do funcionamento"
+              type="time"
+              value={form.workingHoursStart}
+              onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, workingHoursStart: value })); }}
+            />
+            <FloatingInput
+              label="Fim do funcionamento"
+              type="time"
+              value={form.workingHoursEnd}
+              onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, workingHoursEnd: value })); }}
+            />
+          </Group>
           <FloatingTextarea
             label="Descrição"
             placeholder="Informações adicionais da sala"
@@ -671,3 +751,5 @@ export function CadastroSala() {
     </Box>
   );
 }
+
+
