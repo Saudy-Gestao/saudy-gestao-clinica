@@ -31,6 +31,404 @@ import publicCheckInSessionService from '../../services/publicCheckInSessionServ
 
 const DARK_SURFACE = '#0F1838';
 const CARD_SURFACE = '#162552';
+const TOTEM_LANGUAGE_KEY = 'public-check-in:language';
+
+type UiLanguage = 'pt-BR' | 'en-US' | 'es-ES' | 'fr-FR';
+
+const UI_COPY: Record<UiLanguage, Record<string, string>> = {
+  'pt-BR': {
+    languageLabel: 'Idioma',
+    languagePt: 'Português (BR)',
+    languageEn: 'English',
+    languageEs: 'Español',
+    languageFr: 'Français',
+    statusQueued: 'Na fila de atendimento',
+    statusNoConfirmed: 'Sem agendamento confirmado',
+    statusPatientNotFound: 'Paciente não encontrado',
+    statusFaceNotRecognized: 'Rosto não reconhecido',
+    titleCheckInArrival: 'Check-in de chegada',
+    titleEnterKiosk: 'Entrar no modo totem',
+    subtitleCheckInArrival: 'Posicione seu rosto na câmera para identificarmos você e localizarmos seu atendimento de hoje.',
+    subtitleEnterKiosk: 'Use o login da clínica para habilitar este totem, manter a operação auditável e liberar o check-in da filial.',
+    loginEmailLabel: 'Email do usuário',
+    loginEmailPlaceholder: 'usuario@clinica.com',
+    passwordLabel: 'Senha',
+    passwordPlaceholder: 'Digite sua senha',
+    loginButton: 'Entrar e ligar o totem',
+    kioskAuthenticated: 'Totem autenticado',
+    startFacial: 'Iniciar reconhecimento facial',
+    firstTimeButton: 'Primeira vez? Cadastre seu rosto',
+    firstTimeTitle: 'Primeiro acesso no totem',
+    firstTimeDescription: 'Informe seu CPF para localizar seu cadastro e registrar seu rosto pela primeira vez.',
+    cpfLabel: 'CPF',
+    cpfPlaceholder: '000.000.000-00',
+    cancel: 'Cancelar',
+    findRecord: 'Localizar cadastro',
+    manualFallbackHint: 'Se não conseguirmos identificar você, a recepção poderá continuar o atendimento manualmente.',
+    blockedHint: 'Sem login, o totem permanece bloqueado e o check-in da filial não fica acessível.',
+    resultTitle: 'Resultado do check-in',
+    branchConfigured: 'Filial configurada',
+    branchLoading: 'Carregando filial...',
+    branchNotIdentified: 'Não foi possível identificar a filial configurada.',
+    resultNeedsLogin: 'Entre com um usuário da clínica para liberar o check-in desta filial.',
+    closeKiosk: 'Encerrar totem',
+    kioskLockedTitle: 'Totem bloqueado até autenticação',
+    kioskLockedDescription: 'O check-in desta filial agora exige login de um usuário da clínica. Depois do login, o atendimento fica auditável e o totem pode ser desligado com logout.',
+    checkInOffTitle: 'Check-in desligado para esta filial',
+    checkInOffDescription: 'Esta URL já está correta, mas o check-in público ainda precisa ser ligado nas configurações da filial para começar a funcionar.',
+    waitingTitle: 'Aguardando identificação',
+    waitingDescription: 'Assim que o reconhecimento facial for concluído, vamos mostrar aqui se você já foi encaminhado para a fila da recepção.',
+    unknownPatient: 'Não conseguimos identificar você',
+    cpfPrefix: 'CPF',
+    faceRetryHint: 'Você pode tentar novamente com melhor iluminação ou seguir para a recepção para identificação manual.',
+    trustPrefix: 'Confiança do reconhecimento',
+    appointmentsTodayTitle: 'Agendamentos localizados hoje',
+    scheduledFallback: 'Agendado',
+    procedureFallback: 'Procedimento',
+    doctorFallback: 'Profissional não informado',
+    insurancePrefix: 'Convênio',
+    facialRegisterTitle: 'Cadastro facial do paciente',
+    facialRecognitionTitle: 'Reconhecimento facial de chegada',
+    facialRegisterDescription: 'Posicione seu rosto no centro da câmera para concluir o cadastro facial.',
+    facialRecognitionDescription: 'Posicione seu rosto no centro da câmera. Vamos validar sua identidade e localizar seu atendimento de hoje.',
+    closeKioskModalTitle: 'Encerrar totem',
+    closeKioskModalText: 'Para evitar desligamentos acidentais, confirme a senha do usuário autenticado antes de encerrar este totem.',
+    userPasswordLabel: 'Senha do usuário',
+    userPasswordPlaceholder: 'Digite a senha',
+    confirmClose: 'Confirmar encerramento',
+    loginRequiredTitle: 'Login necessário',
+    loginRequiredMessage: 'Informe email e senha para ligar o modo totem.',
+    kioskReleasedTitle: 'Totem liberado',
+    kioskReleasedMessage: 'Login realizado com sucesso. O check-in já está pronto para uso.',
+    loginErrorTitle: 'Erro ao entrar',
+    loginErrorMessage: 'Não foi possível autenticar este usuário.',
+    confirmNeededTitle: 'Confirmação necessária',
+    confirmNeededMessage: 'Digite a senha do usuário autenticado para encerrar o totem.',
+    kioskClosedTitle: 'Totem encerrado',
+    kioskClosedMessage: 'O check-in foi desligado neste navegador.',
+    wrongPasswordTitle: 'Senha incorreta',
+    wrongPasswordMessage: 'Não foi possível encerrar o totem com a senha informada.',
+    sessionExpiredTitle: 'Sessão expirada',
+    sessionExpiredMessageCheckIn: 'Entre novamente para continuar usando o check-in desta filial.',
+    sessionExpiredMessageTotem: 'Entre novamente para continuar usando o totem.',
+    invalidCpfTitle: 'CPF inválido',
+    invalidCpfMessage: 'Digite um CPF válido para localizar seu cadastro.',
+    branchMissingTitle: 'Filial não identificada',
+    branchMissingMessage: 'Este totem precisa estar vinculado a uma filial válida.',
+    lookupErrorTitle: 'Erro ao localizar cadastro',
+    lookupErrorMessage: 'Não foi possível localizar seu cadastro pelo CPF informado.',
+    faceRegisterDoneMessageQueued: 'Cadastro facial concluído com sucesso. Você já foi encaminhado para a fila da recepção.',
+    faceRegisterDoneMessageDefault: 'Cadastro facial concluído com sucesso.',
+    faceRegisterDoneTitle: 'Cadastro facial concluído',
+    faceRegisterDoneToast: 'Seu rosto foi cadastrado com sucesso.',
+    faceRegisterErrorTitle: 'Erro ao cadastrar rosto',
+    faceRegisterErrorMessage: 'Não foi possível concluir o cadastro facial.',
+    kioskUrlMissing: 'URL do totem sem filial configurada.',
+    branchLookupError: 'Não foi possível identificar a filial configurada.',
+    kioskNeedsBranch: 'Este totem precisa ser acessado com uma filial configurada na URL.',
+    checkInDisabledError: 'O check-in desta filial está desligado no momento.',
+    faceNotRecognizedError: 'Não conseguimos reconhecer seu rosto com confiança suficiente.',
+    checkInGenericError: 'Não foi possível concluir o check-in. Tente novamente ou procure a recepção.',
+    statusMessageQueued: 'Check-in realizado com sucesso. Paciente enviado para a fila de atendimento.',
+    statusMessageNoConfirmed: 'Paciente reconhecido, mas sem agendamento confirmado para hoje.',
+    statusMessagePatientNotFound: 'Paciente não encontrado para esta filial.',
+    statusMessageFaceNotRecognized: 'Não conseguimos reconhecer seu rosto com confiança suficiente.',
+  },
+  'en-US': {
+    languageLabel: 'Language',
+    languagePt: 'Portuguese (BR)',
+    languageEn: 'English',
+    languageEs: 'Spanish',
+    languageFr: 'French',
+    statusQueued: 'In the care queue',
+    statusNoConfirmed: 'No confirmed appointment',
+    statusPatientNotFound: 'Patient not found',
+    statusFaceNotRecognized: 'Face not recognized',
+    titleCheckInArrival: 'Arrival check-in',
+    titleEnterKiosk: 'Enter kiosk mode',
+    subtitleCheckInArrival: 'Position your face in front of the camera so we can identify you and find today’s appointment.',
+    subtitleEnterKiosk: 'Use the clinic login to enable this kiosk, keep operations auditable, and unlock branch check-in.',
+    loginEmailLabel: 'User email',
+    loginEmailPlaceholder: 'user@clinic.com',
+    passwordLabel: 'Password',
+    passwordPlaceholder: 'Enter your password',
+    loginButton: 'Sign in and enable kiosk',
+    kioskAuthenticated: 'Kiosk authenticated',
+    startFacial: 'Start facial recognition',
+    firstTimeButton: 'First time? Register your face',
+    firstTimeTitle: 'First kiosk access',
+    firstTimeDescription: 'Enter your CPF to find your record and register your face for the first time.',
+    cpfLabel: 'CPF',
+    cpfPlaceholder: '000.000.000-00',
+    cancel: 'Cancel',
+    findRecord: 'Find record',
+    manualFallbackHint: 'If we cannot identify you, reception can continue with manual check-in.',
+    blockedHint: 'Without login, the kiosk remains locked and branch check-in is unavailable.',
+    resultTitle: 'Check-in result',
+    branchConfigured: 'Configured branch',
+    branchLoading: 'Loading branch...',
+    branchNotIdentified: 'Could not identify the configured branch.',
+    resultNeedsLogin: 'Sign in with a clinic user to enable check-in for this branch.',
+    closeKiosk: 'Close kiosk',
+    kioskLockedTitle: 'Kiosk locked until authentication',
+    kioskLockedDescription: 'Check-in for this branch now requires a clinic user login. After login, operation is auditable and the kiosk can be closed with logout.',
+    checkInOffTitle: 'Check-in is off for this branch',
+    checkInOffDescription: 'This URL is correct, but public check-in must still be enabled in branch settings.',
+    waitingTitle: 'Waiting for identification',
+    waitingDescription: 'As soon as facial recognition is completed, we will show whether you were sent to reception queue.',
+    unknownPatient: 'We could not identify you',
+    cpfPrefix: 'CPF',
+    faceRetryHint: 'You can try again with better lighting or proceed to reception for manual identification.',
+    trustPrefix: 'Recognition confidence',
+    appointmentsTodayTitle: 'Today’s appointments found',
+    scheduledFallback: 'Scheduled',
+    procedureFallback: 'Procedure',
+    doctorFallback: 'Professional not informed',
+    insurancePrefix: 'Insurance',
+    facialRegisterTitle: 'Patient facial registration',
+    facialRecognitionTitle: 'Arrival facial recognition',
+    facialRegisterDescription: 'Center your face in the camera to complete facial registration.',
+    facialRecognitionDescription: 'Center your face in the camera. We will validate your identity and locate today’s appointment.',
+    closeKioskModalTitle: 'Close kiosk',
+    closeKioskModalText: 'To avoid accidental shutdown, confirm the authenticated user password before closing this kiosk.',
+    userPasswordLabel: 'User password',
+    userPasswordPlaceholder: 'Enter password',
+    confirmClose: 'Confirm closing',
+    loginRequiredTitle: 'Login required',
+    loginRequiredMessage: 'Enter email and password to enable kiosk mode.',
+    kioskReleasedTitle: 'Kiosk enabled',
+    kioskReleasedMessage: 'Login successful. Check-in is ready to use.',
+    loginErrorTitle: 'Sign-in error',
+    loginErrorMessage: 'Could not authenticate this user.',
+    confirmNeededTitle: 'Confirmation required',
+    confirmNeededMessage: 'Enter the authenticated user password to close the kiosk.',
+    kioskClosedTitle: 'Kiosk closed',
+    kioskClosedMessage: 'Check-in was disabled on this browser.',
+    wrongPasswordTitle: 'Wrong password',
+    wrongPasswordMessage: 'Could not close the kiosk with the provided password.',
+    sessionExpiredTitle: 'Session expired',
+    sessionExpiredMessageCheckIn: 'Sign in again to continue using this branch check-in.',
+    sessionExpiredMessageTotem: 'Sign in again to continue using the kiosk.',
+    invalidCpfTitle: 'Invalid CPF',
+    invalidCpfMessage: 'Enter a valid CPF to find your record.',
+    branchMissingTitle: 'Branch not identified',
+    branchMissingMessage: 'This kiosk must be linked to a valid branch.',
+    lookupErrorTitle: 'Record lookup error',
+    lookupErrorMessage: 'Could not find your record with the provided CPF.',
+    faceRegisterDoneMessageQueued: 'Facial registration completed. You were already sent to the reception queue.',
+    faceRegisterDoneMessageDefault: 'Facial registration completed successfully.',
+    faceRegisterDoneTitle: 'Facial registration completed',
+    faceRegisterDoneToast: 'Your face was registered successfully.',
+    faceRegisterErrorTitle: 'Face registration error',
+    faceRegisterErrorMessage: 'Could not complete facial registration.',
+    kioskUrlMissing: 'Kiosk URL has no configured branch.',
+    branchLookupError: 'Could not identify the configured branch.',
+    kioskNeedsBranch: 'This kiosk must be accessed with a branch configured in the URL.',
+    checkInDisabledError: 'Public check-in is currently disabled for this branch.',
+    faceNotRecognizedError: 'We could not recognize your face with enough confidence.',
+    checkInGenericError: 'Could not complete check-in. Please try again or contact reception.',
+    statusMessageQueued: 'Check-in completed successfully. Patient sent to the reception queue.',
+    statusMessageNoConfirmed: 'Patient recognized, but there is no confirmed appointment for today.',
+    statusMessagePatientNotFound: 'Patient not found for this branch.',
+    statusMessageFaceNotRecognized: 'We could not recognize your face with enough confidence.',
+  },
+  'es-ES': {
+    languageLabel: 'Idioma',
+    languagePt: 'Portugués (BR)',
+    languageEn: 'Inglés',
+    languageEs: 'Español',
+    languageFr: 'Francés',
+    statusQueued: 'En la fila de atención',
+    statusNoConfirmed: 'Sin cita confirmada',
+    statusPatientNotFound: 'Paciente no encontrado',
+    statusFaceNotRecognized: 'Rostro no reconocido',
+    titleCheckInArrival: 'Check-in de llegada',
+    titleEnterKiosk: 'Entrar en modo tótem',
+    subtitleCheckInArrival: 'Coloque su rostro frente a la cámara para identificarle y localizar su atención de hoy.',
+    subtitleEnterKiosk: 'Use el inicio de sesión de la clínica para habilitar este tótem, mantener la operación auditable y liberar el check-in de la sucursal.',
+    loginEmailLabel: 'Correo del usuario',
+    loginEmailPlaceholder: 'usuario@clinica.com',
+    passwordLabel: 'Contraseña',
+    passwordPlaceholder: 'Ingrese su contraseña',
+    loginButton: 'Iniciar sesión y activar tótem',
+    kioskAuthenticated: 'Tótem autenticado',
+    startFacial: 'Iniciar reconocimiento facial',
+    firstTimeButton: '¿Primera vez? Registre su rostro',
+    firstTimeTitle: 'Primer acceso al tótem',
+    firstTimeDescription: 'Ingrese su CPF para localizar su registro y registrar su rostro por primera vez.',
+    cpfLabel: 'CPF',
+    cpfPlaceholder: '000.000.000-00',
+    cancel: 'Cancelar',
+    findRecord: 'Buscar registro',
+    manualFallbackHint: 'Si no podemos identificarle, recepción puede continuar la atención manualmente.',
+    blockedHint: 'Sin inicio de sesión, el tótem permanece bloqueado y el check-in no está disponible.',
+    resultTitle: 'Resultado del check-in',
+    branchConfigured: 'Sucursal configurada',
+    branchLoading: 'Cargando sucursal...',
+    branchNotIdentified: 'No se pudo identificar la sucursal configurada.',
+    resultNeedsLogin: 'Inicie sesión con un usuario de la clínica para habilitar el check-in de esta sucursal.',
+    closeKiosk: 'Cerrar tótem',
+    kioskLockedTitle: 'Tótem bloqueado hasta autenticación',
+    kioskLockedDescription: 'El check-in de esta sucursal ahora requiere inicio de sesión de un usuario de la clínica. Después, la operación queda auditable y el tótem puede cerrarse con logout.',
+    checkInOffTitle: 'Check-in desactivado para esta sucursal',
+    checkInOffDescription: 'Esta URL es correcta, pero el check-in público aún debe activarse en la configuración de la sucursal.',
+    waitingTitle: 'Esperando identificación',
+    waitingDescription: 'Cuando termine el reconocimiento facial, mostraremos aquí si ya fue enviado a la fila de recepción.',
+    unknownPatient: 'No pudimos identificarle',
+    cpfPrefix: 'CPF',
+    faceRetryHint: 'Puede intentarlo de nuevo con mejor iluminación o acudir a recepción para identificación manual.',
+    trustPrefix: 'Confianza del reconocimiento',
+    appointmentsTodayTitle: 'Citas encontradas hoy',
+    scheduledFallback: 'Agendado',
+    procedureFallback: 'Procedimiento',
+    doctorFallback: 'Profesional no informado',
+    insurancePrefix: 'Seguro',
+    facialRegisterTitle: 'Registro facial del paciente',
+    facialRecognitionTitle: 'Reconocimiento facial de llegada',
+    facialRegisterDescription: 'Coloque su rostro en el centro de la cámara para completar el registro facial.',
+    facialRecognitionDescription: 'Coloque su rostro en el centro de la cámara. Validaremos su identidad y localizaremos su atención de hoy.',
+    closeKioskModalTitle: 'Cerrar tótem',
+    closeKioskModalText: 'Para evitar apagados accidentales, confirme la contraseña del usuario autenticado antes de cerrar este tótem.',
+    userPasswordLabel: 'Contraseña del usuario',
+    userPasswordPlaceholder: 'Ingrese la contraseña',
+    confirmClose: 'Confirmar cierre',
+    loginRequiredTitle: 'Inicio de sesión necesario',
+    loginRequiredMessage: 'Ingrese correo y contraseña para activar el modo tótem.',
+    kioskReleasedTitle: 'Tótem habilitado',
+    kioskReleasedMessage: 'Inicio de sesión exitoso. El check-in ya está listo.',
+    loginErrorTitle: 'Error al iniciar sesión',
+    loginErrorMessage: 'No se pudo autenticar este usuario.',
+    confirmNeededTitle: 'Confirmación necesaria',
+    confirmNeededMessage: 'Ingrese la contraseña del usuario autenticado para cerrar el tótem.',
+    kioskClosedTitle: 'Tótem cerrado',
+    kioskClosedMessage: 'El check-in fue desactivado en este navegador.',
+    wrongPasswordTitle: 'Contraseña incorrecta',
+    wrongPasswordMessage: 'No se pudo cerrar el tótem con la contraseña informada.',
+    sessionExpiredTitle: 'Sesión expirada',
+    sessionExpiredMessageCheckIn: 'Inicie sesión nuevamente para seguir usando el check-in de esta sucursal.',
+    sessionExpiredMessageTotem: 'Inicie sesión nuevamente para seguir usando el tótem.',
+    invalidCpfTitle: 'CPF inválido',
+    invalidCpfMessage: 'Ingrese un CPF válido para localizar su registro.',
+    branchMissingTitle: 'Sucursal no identificada',
+    branchMissingMessage: 'Este tótem debe estar vinculado a una sucursal válida.',
+    lookupErrorTitle: 'Error al buscar registro',
+    lookupErrorMessage: 'No fue posible localizar su registro con el CPF informado.',
+    faceRegisterDoneMessageQueued: 'Registro facial completado con éxito. Ya fue enviado a la fila de recepción.',
+    faceRegisterDoneMessageDefault: 'Registro facial completado con éxito.',
+    faceRegisterDoneTitle: 'Registro facial completado',
+    faceRegisterDoneToast: 'Su rostro fue registrado con éxito.',
+    faceRegisterErrorTitle: 'Error al registrar rostro',
+    faceRegisterErrorMessage: 'No se pudo completar el registro facial.',
+    kioskUrlMissing: 'La URL del tótem no tiene sucursal configurada.',
+    branchLookupError: 'No se pudo identificar la sucursal configurada.',
+    kioskNeedsBranch: 'Este tótem debe abrirse con una sucursal configurada en la URL.',
+    checkInDisabledError: 'El check-in público de esta sucursal está desactivado por el momento.',
+    faceNotRecognizedError: 'No pudimos reconocer su rostro con confianza suficiente.',
+    checkInGenericError: 'No fue posible completar el check-in. Intente de nuevo o busque recepción.',
+    statusMessageQueued: 'Check-in completado con éxito. Paciente enviado a la fila de recepción.',
+    statusMessageNoConfirmed: 'Paciente reconocido, pero sin cita confirmada para hoy.',
+    statusMessagePatientNotFound: 'Paciente no encontrado para esta sucursal.',
+    statusMessageFaceNotRecognized: 'No pudimos reconocer su rostro con confianza suficiente.',
+  },
+  'fr-FR': {
+    languageLabel: 'Langue',
+    languagePt: 'Portugais (BR)',
+    languageEn: 'Anglais',
+    languageEs: 'Espagnol',
+    languageFr: 'Français',
+    statusQueued: 'Dans la file d’accueil',
+    statusNoConfirmed: 'Aucun rendez-vous confirmé',
+    statusPatientNotFound: 'Patient introuvable',
+    statusFaceNotRecognized: 'Visage non reconnu',
+    titleCheckInArrival: 'Check-in d’arrivée',
+    titleEnterKiosk: 'Entrer en mode borne',
+    subtitleCheckInArrival: 'Positionnez votre visage devant la caméra pour vous identifier et retrouver votre rendez-vous du jour.',
+    subtitleEnterKiosk: 'Utilisez le login de la clinique pour activer cette borne, garder l’opération traçable et libérer le check-in de l’unité.',
+    loginEmailLabel: 'Email utilisateur',
+    loginEmailPlaceholder: 'utilisateur@clinique.com',
+    passwordLabel: 'Mot de passe',
+    passwordPlaceholder: 'Saisissez votre mot de passe',
+    loginButton: 'Se connecter et activer la borne',
+    kioskAuthenticated: 'Borne authentifiée',
+    startFacial: 'Démarrer la reconnaissance faciale',
+    firstTimeButton: 'Première fois ? Enregistrez votre visage',
+    firstTimeTitle: 'Premier accès à la borne',
+    firstTimeDescription: 'Saisissez votre CPF pour retrouver votre dossier et enregistrer votre visage.',
+    cpfLabel: 'CPF',
+    cpfPlaceholder: '000.000.000-00',
+    cancel: 'Annuler',
+    findRecord: 'Rechercher le dossier',
+    manualFallbackHint: 'Si nous ne pouvons pas vous identifier, l’accueil pourra poursuivre manuellement.',
+    blockedHint: 'Sans connexion, la borne reste bloquée et le check-in n’est pas disponible.',
+    resultTitle: 'Résultat du check-in',
+    branchConfigured: 'Unité configurée',
+    branchLoading: 'Chargement de l’unité...',
+    branchNotIdentified: 'Impossible d’identifier l’unité configurée.',
+    resultNeedsLogin: 'Connectez-vous avec un utilisateur de la clinique pour activer le check-in de cette unité.',
+    closeKiosk: 'Fermer la borne',
+    kioskLockedTitle: 'Borne bloquée jusqu’à authentification',
+    kioskLockedDescription: 'Le check-in de cette unité exige désormais un login utilisateur. Après connexion, le flux reste traçable et la borne peut être fermée via logout.',
+    checkInOffTitle: 'Check-in désactivé pour cette unité',
+    checkInOffDescription: 'Cette URL est correcte, mais le check-in public doit encore être activé dans les paramètres de l’unité.',
+    waitingTitle: 'En attente d’identification',
+    waitingDescription: 'Dès la fin de la reconnaissance faciale, nous afficherons ici si vous avez été envoyé dans la file d’accueil.',
+    unknownPatient: 'Nous n’avons pas pu vous identifier',
+    cpfPrefix: 'CPF',
+    faceRetryHint: 'Vous pouvez réessayer avec un meilleur éclairage ou aller à l’accueil pour une identification manuelle.',
+    trustPrefix: 'Confiance de reconnaissance',
+    appointmentsTodayTitle: 'Rendez-vous trouvés aujourd’hui',
+    scheduledFallback: 'Planifié',
+    procedureFallback: 'Procédure',
+    doctorFallback: 'Professionnel non renseigné',
+    insurancePrefix: 'Assurance',
+    facialRegisterTitle: 'Enregistrement facial du patient',
+    facialRecognitionTitle: 'Reconnaissance faciale d’arrivée',
+    facialRegisterDescription: 'Positionnez votre visage au centre de la caméra pour terminer l’enregistrement facial.',
+    facialRecognitionDescription: 'Positionnez votre visage au centre de la caméra. Nous allons valider votre identité et retrouver votre rendez-vous du jour.',
+    closeKioskModalTitle: 'Fermer la borne',
+    closeKioskModalText: 'Pour éviter une fermeture accidentelle, confirmez le mot de passe de l’utilisateur authentifié.',
+    userPasswordLabel: 'Mot de passe utilisateur',
+    userPasswordPlaceholder: 'Saisissez le mot de passe',
+    confirmClose: 'Confirmer la fermeture',
+    loginRequiredTitle: 'Connexion requise',
+    loginRequiredMessage: 'Saisissez email et mot de passe pour activer le mode borne.',
+    kioskReleasedTitle: 'Borne activée',
+    kioskReleasedMessage: 'Connexion réussie. Le check-in est prêt à l’usage.',
+    loginErrorTitle: 'Erreur de connexion',
+    loginErrorMessage: 'Impossible d’authentifier cet utilisateur.',
+    confirmNeededTitle: 'Confirmation requise',
+    confirmNeededMessage: 'Saisissez le mot de passe de l’utilisateur authentifié pour fermer la borne.',
+    kioskClosedTitle: 'Borne fermée',
+    kioskClosedMessage: 'Le check-in a été désactivé dans ce navigateur.',
+    wrongPasswordTitle: 'Mot de passe incorrect',
+    wrongPasswordMessage: 'Impossible de fermer la borne avec le mot de passe saisi.',
+    sessionExpiredTitle: 'Session expirée',
+    sessionExpiredMessageCheckIn: 'Connectez-vous de nouveau pour continuer le check-in de cette unité.',
+    sessionExpiredMessageTotem: 'Connectez-vous de nouveau pour continuer sur la borne.',
+    invalidCpfTitle: 'CPF invalide',
+    invalidCpfMessage: 'Saisissez un CPF valide pour retrouver votre dossier.',
+    branchMissingTitle: 'Unité non identifiée',
+    branchMissingMessage: 'Cette borne doit être liée à une unité valide.',
+    lookupErrorTitle: 'Erreur de recherche',
+    lookupErrorMessage: 'Impossible de localiser votre dossier avec le CPF saisi.',
+    faceRegisterDoneMessageQueued: 'Enregistrement facial terminé. Vous avez déjà été envoyé dans la file d’accueil.',
+    faceRegisterDoneMessageDefault: 'Enregistrement facial terminé avec succès.',
+    faceRegisterDoneTitle: 'Enregistrement facial terminé',
+    faceRegisterDoneToast: 'Votre visage a été enregistré avec succès.',
+    faceRegisterErrorTitle: 'Erreur d’enregistrement facial',
+    faceRegisterErrorMessage: 'Impossible de terminer l’enregistrement facial.',
+    kioskUrlMissing: 'URL de la borne sans unité configurée.',
+    branchLookupError: 'Impossible d’identifier l’unité configurée.',
+    kioskNeedsBranch: 'Cette borne doit être ouverte avec une unité configurée dans l’URL.',
+    checkInDisabledError: 'Le check-in public de cette unité est désactivé pour le moment.',
+    faceNotRecognizedError: 'Nous n’avons pas pu reconnaître votre visage avec une confiance suffisante.',
+    checkInGenericError: 'Impossible de terminer le check-in. Réessayez ou contactez l’accueil.',
+    statusMessageQueued: 'Check-in effectué avec succès. Patient envoyé dans la file d’accueil.',
+    statusMessageNoConfirmed: 'Patient reconnu, mais aucun rendez-vous confirmé pour aujourd’hui.',
+    statusMessagePatientNotFound: 'Patient introuvable pour cette unité.',
+    statusMessageFaceNotRecognized: 'Nous n’avons pas pu reconnaître votre visage avec une confiance suffisante.',
+  },
+};
 
 const formatCpf = (value?: string | null) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -40,17 +438,23 @@ const formatCpf = (value?: string | null) => {
 
 const onlyDigits = (value?: string | null) => String(value || '').replace(/\D/g, '');
 
-const statusConfig: Record<string, { color: string; label: string }> = {
-  QUEUED: { color: 'green', label: 'Na fila de atendimento' },
-  NO_CONFIRMED_APPOINTMENTS: { color: 'yellow', label: 'Sem agendamento confirmado' },
-  PATIENT_NOT_FOUND: { color: 'red', label: 'Paciente não encontrado' },
-  FACIAL_NOT_RECOGNIZED: { color: 'red', label: 'Rosto não reconhecido' },
+const statusConfig: Record<string, { color: string }> = {
+  QUEUED: { color: 'green' },
+  NO_CONFIRMED_APPOINTMENTS: { color: 'yellow' },
+  PATIENT_NOT_FOUND: { color: 'red' },
+  FACIAL_NOT_RECOGNIZED: { color: 'red' },
 };
 
 export function PublicCheckIn() {
   const { branchId: branchIdParam } = useParams();
   const branchId = branchIdParam || '';
   const queryClient = useQueryClient();
+  const [language, setLanguage] = useState<UiLanguage>(() => {
+    if (typeof window === 'undefined') return 'pt-BR';
+    const saved = window.localStorage.getItem(TOTEM_LANGUAGE_KEY) as UiLanguage | null;
+    if (saved === 'pt-BR' || saved === 'en-US' || saved === 'es-ES' || saved === 'fr-FR') return saved;
+    return 'pt-BR';
+  });
   const [isAuthenticated, setIsAuthenticated] = useState(() => publicCheckInSessionService.isAuthenticated());
   const [currentUserName, setCurrentUserName] = useState(() => publicCheckInSessionService.getCurrentUser()?.name || '');
   const [loginEmail, setLoginEmail] = useState('');
@@ -71,11 +475,32 @@ export function PublicCheckIn() {
   const [firstTimeRegistering, setFirstTimeRegistering] = useState(false);
   const [pendingFirstTimeCheckIn, setPendingFirstTimeCheckIn] = useState<PublicCheckInResponse | null>(null);
   const { data: branchInfo, error: branchInfoError, isLoading: branchInfoLoading } = usePublicBranchInfoQuery(branchId, isAuthenticated);
+  const t = UI_COPY[language];
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(TOTEM_LANGUAGE_KEY, language);
+  }, [language]);
 
   const currentStatus = useMemo(() => {
     const status = checkInResult?.status || '';
-    return statusConfig[status] || null;
-  }, [checkInResult]);
+    const config = statusConfig[status];
+    if (!config) return null;
+    if (status === 'QUEUED') return { ...config, label: t.statusQueued };
+    if (status === 'NO_CONFIRMED_APPOINTMENTS') return { ...config, label: t.statusNoConfirmed };
+    if (status === 'PATIENT_NOT_FOUND') return { ...config, label: t.statusPatientNotFound };
+    if (status === 'FACIAL_NOT_RECOGNIZED') return { ...config, label: t.statusFaceNotRecognized };
+    return { ...config, label: status };
+  }, [checkInResult, t]);
+
+  const localizedCheckInMessage = useMemo(() => {
+    if (!checkInResult?.status) return checkInResult?.message || '';
+    if (checkInResult.status === 'QUEUED') return t.statusMessageQueued;
+    if (checkInResult.status === 'NO_CONFIRMED_APPOINTMENTS') return t.statusMessageNoConfirmed;
+    if (checkInResult.status === 'PATIENT_NOT_FOUND') return t.statusMessagePatientNotFound;
+    if (checkInResult.status === 'FACIAL_NOT_RECOGNIZED') return t.statusMessageFaceNotRecognized;
+    return checkInResult.message || '';
+  }, [checkInResult, t]);
 
   const resetFlow = () => {
     setRecognitionResult(null);
@@ -111,7 +536,7 @@ export function PublicCheckIn() {
 
   useEffect(() => {
     if (!branchId) {
-      setBranchLookupError('URL do totem sem filial configurada.');
+      setBranchLookupError(t.kioskUrlMissing);
       return;
     }
     if (!isAuthenticated) {
@@ -122,15 +547,14 @@ export function PublicCheckIn() {
       setBranchLookupError(null);
       return;
     }
-    const error: any = branchInfoError;
-    setBranchLookupError(error?.response?.data?.error || 'Não foi possível identificar a filial configurada.');
-  }, [branchId, branchInfoError, isAuthenticated]);
+    setBranchLookupError(t.branchLookupError);
+  }, [branchId, branchInfoError, isAuthenticated, t]);
 
   const handleLogin = async () => {
     if (!loginEmail.trim() || !loginPassword) {
       showNotification({
-        title: 'Login necessário',
-        message: 'Informe email e senha para ligar o modo totem.',
+        title: t.loginRequiredTitle,
+        message: t.loginRequiredMessage,
         color: 'yellow',
       });
       return;
@@ -147,14 +571,14 @@ export function PublicCheckIn() {
       setCurrentUserName(publicCheckInSessionService.getCurrentUser()?.name || '');
       await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicBranchInfo, branchId] });
       showNotification({
-        title: 'Totem liberado',
-        message: 'Login realizado com sucesso. O check-in já está pronto para uso.',
+        title: t.kioskReleasedTitle,
+        message: t.kioskReleasedMessage,
         color: 'green',
       });
     } catch (error: any) {
       showNotification({
-        title: 'Erro ao entrar',
-        message: error?.response?.data?.message || 'Não foi possível autenticar este usuário.',
+        title: t.loginErrorTitle,
+        message: error?.response?.data?.message || t.loginErrorMessage,
         color: 'red',
       });
     } finally {
@@ -178,8 +602,8 @@ export function PublicCheckIn() {
     const currentUser = publicCheckInSessionService.getCurrentUser();
     if (!currentUser?.email || !logoutPassword) {
       showNotification({
-        title: 'Confirmação necessária',
-        message: 'Digite a senha do usuário autenticado para encerrar o totem.',
+        title: t.confirmNeededTitle,
+        message: t.confirmNeededMessage,
         color: 'yellow',
       });
       return;
@@ -194,14 +618,14 @@ export function PublicCheckIn() {
       await completeLogout();
       setLogoutModalOpen(false);
       showNotification({
-        title: 'Totem encerrado',
-        message: 'O check-in foi desligado neste navegador.',
+        title: t.kioskClosedTitle,
+        message: t.kioskClosedMessage,
         color: 'green',
       });
     } catch {
       showNotification({
-        title: 'Senha incorreta',
-        message: 'Não foi possível encerrar o totem com a senha informada.',
+        title: t.wrongPasswordTitle,
+        message: t.wrongPasswordMessage,
         color: 'red',
       });
     } finally {
@@ -213,7 +637,7 @@ export function PublicCheckIn() {
     if (!branchId) {
       setCheckInResult({
         status: 'PATIENT_NOT_FOUND',
-        message: 'Este totem precisa ser acessado com uma filial configurada na URL.',
+        message: t.kioskNeedsBranch,
       });
       return;
     }
@@ -246,8 +670,8 @@ export function PublicCheckIn() {
         setCurrentUserName('');
         setCheckInResult(null);
         showNotification({
-          title: 'Sessão expirada',
-          message: 'Entre novamente para continuar usando o check-in desta filial.',
+          title: t.sessionExpiredTitle,
+          message: t.sessionExpiredMessageCheckIn,
           color: 'yellow',
         });
         return;
@@ -258,18 +682,18 @@ export function PublicCheckIn() {
       } else if (responseData?.code === 'PUBLIC_CHECKIN_DISABLED') {
         setCheckInResult({
           status: 'PATIENT_NOT_FOUND',
-          message: responseData?.error || 'O check-in desta filial está desligado no momento.',
+          message: responseData?.error || t.checkInDisabledError,
         });
       } else if (responseData?.detail) {
         setRecognitionResult(null);
         setCheckInResult({
           status: 'FACIAL_NOT_RECOGNIZED',
-          message: responseData.detail || 'Não conseguimos reconhecer seu rosto com confiança suficiente.',
+          message: responseData.detail || t.faceNotRecognizedError,
         });
       } else {
         setCheckInResult({
           status: 'PATIENT_NOT_FOUND',
-          message: responseData?.message || error?.message || 'Não foi possível concluir o check-in. Tente novamente ou procure a recepção.',
+          message: responseData?.message || error?.message || t.checkInGenericError,
         });
       }
     } finally {
@@ -295,8 +719,8 @@ export function PublicCheckIn() {
     const cpfDigits = onlyDigits(firstTimeCpf);
     if (cpfDigits.length !== 11) {
       showNotification({
-        title: 'CPF inválido',
-        message: 'Digite um CPF válido para localizar seu cadastro.',
+        title: t.invalidCpfTitle,
+        message: t.invalidCpfMessage,
         color: 'yellow',
       });
       return;
@@ -304,8 +728,8 @@ export function PublicCheckIn() {
 
     if (!branchId) {
       showNotification({
-        title: 'Filial não identificada',
-        message: 'Este totem precisa estar vinculado a uma filial válida.',
+        title: t.branchMissingTitle,
+        message: t.branchMissingMessage,
         color: 'red',
       });
       return;
@@ -333,8 +757,8 @@ export function PublicCheckIn() {
         setIsAuthenticated(false);
         setCurrentUserName('');
         showNotification({
-          title: 'Sessão expirada',
-          message: 'Entre novamente para continuar usando o totem.',
+          title: t.sessionExpiredTitle,
+          message: t.sessionExpiredMessageTotem,
           color: 'yellow',
         });
         return;
@@ -343,8 +767,8 @@ export function PublicCheckIn() {
         setCheckInResult(responseData);
       } else {
         showNotification({
-          title: 'Erro ao localizar cadastro',
-          message: responseData?.message || error?.message || 'Não foi possível localizar seu cadastro pelo CPF informado.',
+          title: t.lookupErrorTitle,
+          message: responseData?.message || error?.message || t.lookupErrorMessage,
           color: 'red',
         });
       }
@@ -370,22 +794,22 @@ export function PublicCheckIn() {
       setCheckInResult({
         ...pendingFirstTimeCheckIn,
         message: pendingFirstTimeCheckIn.status === 'QUEUED'
-          ? 'Cadastro facial concluído com sucesso. Você já foi encaminhado para a fila da recepção.'
-          : pendingFirstTimeCheckIn.message || 'Cadastro facial concluído com sucesso.',
+          ? t.faceRegisterDoneMessageQueued
+          : pendingFirstTimeCheckIn.message || t.faceRegisterDoneMessageDefault,
       });
       setFirstTimeMode(false);
       setFirstTimeCpf('');
       setPendingFirstTimeCheckIn(null);
       await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicBranchInfo, branchId] });
       showNotification({
-        title: 'Cadastro facial concluído',
-        message: 'Seu rosto foi cadastrado com sucesso.',
+        title: t.faceRegisterDoneTitle,
+        message: t.faceRegisterDoneToast,
         color: 'green',
       });
     } catch (error: any) {
       showNotification({
-        title: 'Erro ao cadastrar rosto',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível concluir o cadastro facial.',
+        title: t.faceRegisterErrorTitle,
+        message: error?.response?.data?.message || error?.message || t.faceRegisterErrorMessage,
         color: 'red',
       });
       setFacialCaptureOpen(true);
@@ -401,18 +825,60 @@ export function PublicCheckIn() {
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing={0} style={{ minHeight: '100vh' }}>
         <Center p={{ base: 'xl', md: 48 }} bg="#0A1128">
           <Stack align="center" gap="xl" maw={520} w="100%">
+            <Stack gap={6} w="100%">
+              <Text c="white" fw={600} size="sm">{t.languageLabel}</Text>
+              <Group gap="xs" wrap="wrap">
+                <Button
+                  size="xs"
+                  radius="xl"
+                  variant={language === 'pt-BR' ? 'filled' : 'light'}
+                  color={language === 'pt-BR' ? 'blue' : 'gray'}
+                  onClick={() => setLanguage('pt-BR')}
+                >
+                  🇧🇷 {t.languagePt}
+                </Button>
+                <Button
+                  size="xs"
+                  radius="xl"
+                  variant={language === 'en-US' ? 'filled' : 'light'}
+                  color={language === 'en-US' ? 'blue' : 'gray'}
+                  onClick={() => setLanguage('en-US')}
+                >
+                  🇺🇸 {t.languageEn}
+                </Button>
+                <Button
+                  size="xs"
+                  radius="xl"
+                  variant={language === 'es-ES' ? 'filled' : 'light'}
+                  color={language === 'es-ES' ? 'blue' : 'gray'}
+                  onClick={() => setLanguage('es-ES')}
+                >
+                  🇪🇸 {t.languageEs}
+                </Button>
+                <Button
+                  size="xs"
+                  radius="xl"
+                  variant={language === 'fr-FR' ? 'filled' : 'light'}
+                  color={language === 'fr-FR' ? 'blue' : 'gray'}
+                  onClick={() => setLanguage('fr-FR')}
+                >
+                  🇫🇷 {t.languageFr}
+                </Button>
+              </Group>
+            </Stack>
+
             <ThemeIcon size={88} radius="xl" color="blue" variant="light">
               {isAuthenticated ? <Camera size={40} /> : <ShieldCheck size={40} />}
             </ThemeIcon>
 
             <Stack align="center" gap="xs">
               <Title order={1} c="white" ta="center">
-                {isAuthenticated ? 'Check-in de chegada' : 'Entrar no modo totem'}
+                {isAuthenticated ? t.titleCheckInArrival : t.titleEnterKiosk}
               </Title>
               <Text c="rgba(255,255,255,0.72)" ta="center" size="lg">
                 {isAuthenticated
-                  ? 'Posicione seu rosto na câmera para identificarmos você e localizarmos seu atendimento de hoje.'
-                  : 'Use o login da clínica para habilitar este totem, manter a operação auditável e liberar o check-in da filial.'}
+                  ? t.subtitleCheckInArrival
+                  : t.subtitleEnterKiosk}
               </Text>
             </Stack>
 
@@ -426,9 +892,9 @@ export function PublicCheckIn() {
               >
                 <Stack gap="md">
                   <TextInput
-                    label="Email do usuário"
+                    label={t.loginEmailLabel}
                     labelProps={{ style: { color: 'white' } }}
-                    placeholder="usuario@clinica.com"
+                    placeholder={t.loginEmailPlaceholder}
                     value={loginEmail}
                     onChange={(event) => setLoginEmail(event.currentTarget.value)}
                     styles={{
@@ -441,9 +907,9 @@ export function PublicCheckIn() {
                   />
 
                   <PasswordInput
-                    label="Senha"
+                    label={t.passwordLabel}
                     labelProps={{ style: { color: 'white' } }}
-                    placeholder="Digite sua senha"
+                    placeholder={t.passwordPlaceholder}
                     value={loginPassword}
                     onChange={(event) => setLoginPassword(event.currentTarget.value)}
                     styles={{
@@ -463,14 +929,14 @@ export function PublicCheckIn() {
                     loading={loginLoading}
                     fullWidth
                   >
-                    Entrar e ligar o totem
+                    {t.loginButton}
                   </Button>
                 </Stack>
               </Paper>
             ) : (
               <>
                 <Badge size="lg" radius="sm" color="green" variant="light">
-                  Totem autenticado{currentUserName ? ` • ${currentUserName}` : ''}
+                  {t.kioskAuthenticated}{currentUserName ? ` • ${currentUserName}` : ''}
                 </Badge>
 
                 <Button
@@ -482,7 +948,7 @@ export function PublicCheckIn() {
                   fullWidth
                   disabled={firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
                 >
-                  Iniciar reconhecimento facial
+                  {t.startFacial}
                 </Button>
 
                 <Button
@@ -494,7 +960,7 @@ export function PublicCheckIn() {
                   disabled={processing || firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
                   fullWidth
                 >
-                  Primeira vez? Cadastre seu rosto
+                  {t.firstTimeButton}
                 </Button>
               </>
             )}
@@ -510,17 +976,17 @@ export function PublicCheckIn() {
                 <Stack gap="sm">
                   <Box>
                     <Text c="white" fw={700}>
-                      Primeiro acesso no totem
+                      {t.firstTimeTitle}
                     </Text>
                     <Text c="dimmed" size="sm">
-                      Informe seu CPF para localizar seu cadastro e registrar seu rosto pela primeira vez.
+                      {t.firstTimeDescription}
                     </Text>
                   </Box>
 
                   <TextInput
-                    label="CPF"
+                    label={t.cpfLabel}
                     labelProps={{ style: { color: 'white' } }}
-                    placeholder="000.000.000-00"
+                    placeholder={t.cpfPlaceholder}
                     value={firstTimeCpf}
                     onChange={(event) => setFirstTimeCpf(formatCpf(event.currentTarget.value))}
                     maxLength={14}
@@ -535,10 +1001,10 @@ export function PublicCheckIn() {
 
                   <Group justify="space-between">
                     <Button variant="subtle" color="gray" onClick={handleCancelFirstTimeFlow}>
-                      Cancelar
+                      {t.cancel}
                     </Button>
                     <Button onClick={handleFirstTimeLookup} loading={firstTimeLookupLoading}>
-                      Localizar cadastro
+                      {t.findRecord}
                     </Button>
                   </Group>
                 </Stack>
@@ -547,8 +1013,8 @@ export function PublicCheckIn() {
 
             <Text c="rgba(255,255,255,0.6)" size="sm" ta="center">
               {isAuthenticated
-                ? 'Se não conseguirmos identificar você, a recepção poderá continuar o atendimento manualmente.'
-                : 'Sem login, o totem permanece bloqueado e o check-in da filial não fica acessível.'}
+                ? t.manualFallbackHint
+                : t.blockedHint}
             </Text>
           </Stack>
         </Center>
@@ -558,16 +1024,16 @@ export function PublicCheckIn() {
             <Group justify="space-between" align="center">
               <Box>
                 <Text c="white" fw={700} size="xl">
-                  Resultado do check-in
+                  {t.resultTitle}
                 </Text>
                 <Text c="dimmed">
                   {!isAuthenticated
-                    ? 'Entre com um usuário da clínica para liberar o check-in desta filial.'
+                    ? t.resultNeedsLogin
                     : branchInfo?.tradeName
-                    ? `Filial configurada: ${branchInfo.tradeName}`
+                    ? `${t.branchConfigured}: ${branchInfo.tradeName}`
                     : branchInfoLoading
-                      ? 'Carregando filial...'
-                      : branchLookupError || 'Não foi possível identificar a filial configurada.'}
+                      ? t.branchLoading
+                      : branchLookupError || t.branchNotIdentified}
                 </Text>
               </Box>
 
@@ -582,7 +1048,7 @@ export function PublicCheckIn() {
                       setLogoutModalOpen(true);
                     }}
                   >
-                    Encerrar totem
+                    {t.closeKiosk}
                   </Button>
                 )}
                 <ActionIcon variant="light" size="xl" onClick={resetFlow} disabled={processing}>
@@ -605,10 +1071,10 @@ export function PublicCheckIn() {
                       {loginLoading ? <Loader size={28} /> : <ShieldCheck size={32} />}
                     </ThemeIcon>
                     <Text c="white" fw={600} size="lg">
-                      Totem bloqueado até autenticação
+                      {t.kioskLockedTitle}
                     </Text>
                     <Text c="dimmed" ta="center" maw={420}>
-                      O check-in desta filial agora exige login de um usuário da clínica. Depois do login, o atendimento fica auditável e o totem pode ser desligado com logout.
+                      {t.kioskLockedDescription}
                     </Text>
                   </Stack>
                 </Center>
@@ -627,10 +1093,10 @@ export function PublicCheckIn() {
                       <CircleAlert size={32} />
                     </ThemeIcon>
                     <Text c="white" fw={600} size="lg">
-                      Check-in desligado para esta filial
+                      {t.checkInOffTitle}
                     </Text>
                     <Text c="dimmed" ta="center" maw={420}>
-                      Esta URL já está correta, mas o check-in público ainda precisa ser ligado nas configurações da filial para começar a funcionar.
+                      {t.checkInOffDescription}
                     </Text>
                   </Stack>
                 </Center>
@@ -649,10 +1115,10 @@ export function PublicCheckIn() {
                       <ClipboardCheck size={32} />
                     </ThemeIcon>
                     <Text c="white" fw={600} size="lg">
-                      Aguardando identificação
+                      {t.waitingTitle}
                     </Text>
                     <Text c="dimmed" ta="center" maw={420}>
-                      Assim que o reconhecimento facial for concluído, vamos mostrar aqui se você já foi encaminhado para a fila da recepção.
+                      {t.waitingDescription}
                     </Text>
                   </Stack>
                 </Center>
@@ -674,10 +1140,10 @@ export function PublicCheckIn() {
                         </ThemeIcon>
                         <Box>
                           <Text c="white" fw={700} size="xl">
-                            {checkInResult.patient?.name || recognitionResult?.patient?.name || 'Não conseguimos identificar você'}
+                            {checkInResult.patient?.name || recognitionResult?.patient?.name || t.unknownPatient}
                           </Text>
                           {(checkInResult.patient?.cpf || recognitionResult?.patient?.cpf) && (
-                            <Text c="dimmed">CPF: {formatCpf(checkInResult.patient?.cpf || recognitionResult?.patient?.cpf)}</Text>
+                            <Text c="dimmed">{t.cpfPrefix}: {formatCpf(checkInResult.patient?.cpf || recognitionResult?.patient?.cpf)}</Text>
                           )}
                         </Box>
                       </Group>
@@ -690,18 +1156,18 @@ export function PublicCheckIn() {
                     </Group>
 
                     <Text c="white" size="lg">
-                      {checkInResult.message}
+                      {localizedCheckInMessage || checkInResult.message}
                     </Text>
 
                     {checkInResult.status === 'FACIAL_NOT_RECOGNIZED' && (
                       <Text c="dimmed" size="sm">
-                        Você pode tentar novamente com melhor iluminação ou seguir para a recepção para identificação manual.
+                        {t.faceRetryHint}
                       </Text>
                     )}
 
                     {recognitionResult?.trust !== undefined && (
                       <Text c="dimmed" size="sm">
-                        Confiança do reconhecimento: {(recognitionResult.trust * 100).toFixed(1)}%
+                        {t.trustPrefix}: {(recognitionResult.trust * 100).toFixed(1)}%
                       </Text>
                     )}
                   </Stack>
@@ -710,7 +1176,7 @@ export function PublicCheckIn() {
                 {(checkInResult.appointments || []).length > 0 && (
                   <Stack gap="sm">
                     <Text c="white" fw={700} size="lg">
-                      Agendamentos localizados hoje
+                      {t.appointmentsTodayTitle}
                     </Text>
 
                     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
@@ -729,19 +1195,19 @@ export function PublicCheckIn() {
                                 {appointment.time || '--:--'}
                               </Text>
                               <Badge variant="light" color="blue">
-                                {appointment.status || 'Agendado'}
+                                {appointment.status || t.scheduledFallback}
                               </Badge>
                             </Group>
 
                             <Text c="white" fw={600}>
-                              {appointment.specialty || 'Procedimento'}
+                              {appointment.specialty || t.procedureFallback}
                             </Text>
                             <Text c="dimmed">
-                              {appointment.doctorName || 'Profissional não informado'}
+                              {appointment.doctorName || t.doctorFallback}
                             </Text>
                             {appointment.convenio && (
                               <Text c="dimmed" size="sm">
-                                Convênio: {appointment.convenio}
+                                {t.insurancePrefix}: {appointment.convenio}
                               </Text>
                             )}
                           </Stack>
@@ -760,10 +1226,10 @@ export function PublicCheckIn() {
         opened={facialCaptureOpen}
         onClose={() => setFacialCaptureOpen(false)}
         onCapture={pendingFirstTimeCheckIn ? handleFirstTimeCapture : handleFacialScan}
-        title={pendingFirstTimeCheckIn ? 'Cadastro facial do paciente' : 'Reconhecimento facial de chegada'}
+        title={pendingFirstTimeCheckIn ? t.facialRegisterTitle : t.facialRecognitionTitle}
         description={pendingFirstTimeCheckIn
-          ? 'Posicione seu rosto no centro da câmera para concluir o cadastro facial.'
-          : 'Posicione seu rosto no centro da câmera. Vamos validar sua identidade e localizar seu atendimento de hoje.'}
+          ? t.facialRegisterDescription
+          : t.facialRecognitionDescription}
       />
 
       <Modal
@@ -773,17 +1239,17 @@ export function PublicCheckIn() {
           setLogoutModalOpen(false);
           setLogoutPassword('');
         }}
-        title="Encerrar totem"
+        title={t.closeKioskModalTitle}
         centered
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            Para evitar desligamentos acidentais, confirme a senha do usuário autenticado antes de encerrar este totem.
+            {t.closeKioskModalText}
           </Text>
 
           <PasswordInput
-            label="Senha do usuário"
-            placeholder="Digite a senha"
+            label={t.userPasswordLabel}
+            placeholder={t.userPasswordPlaceholder}
             value={logoutPassword}
             onChange={(event) => setLogoutPassword(event.currentTarget.value)}
             disabled={logoutLoading}
@@ -798,10 +1264,10 @@ export function PublicCheckIn() {
               }}
               disabled={logoutLoading}
             >
-              Cancelar
+              {t.cancel}
             </Button>
             <Button color="red" onClick={handleLogout} loading={logoutLoading}>
-              Confirmar encerramento
+              {t.confirmClose}
             </Button>
           </Group>
         </Stack>
