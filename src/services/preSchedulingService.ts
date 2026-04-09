@@ -124,10 +124,13 @@ const preSchedulingService = {
       message: string;
       publicUrl: string;
       hasAnamnesis?: boolean;
-      whatsappMock: {
-        provider: 'mock';
+      whatsapp: {
+        provider: 'mock' | 'gupshup';
         to?: string | null;
         message: string;
+        status?: string;
+        messageId?: string | null;
+        error?: string | null;
       };
     };
   },

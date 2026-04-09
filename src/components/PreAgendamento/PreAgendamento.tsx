@@ -266,11 +266,11 @@ export function PreAgendamento() {
       const data = await preSchedulingService.sendLink(selectedItem.appointmentId);
       setLinkResult({
         publicUrl: data.publicUrl,
-        message: data.whatsappMock?.message || '',
-        to: data.whatsappMock?.to,
+        message: data.whatsapp?.message || '',
+        to: data.whatsapp?.to,
       });
       showNotification({
-        title: 'Link enviado (mock)',
+        title: 'Link enviado',
         message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
         color: 'green',
       });

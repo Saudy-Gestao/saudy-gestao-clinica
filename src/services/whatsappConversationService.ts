@@ -21,6 +21,9 @@ export interface HumanConversationItem {
   humanAssignedAt?: string | null;
   humanClosedAt?: string | null;
   humanClosedByUserName?: string | null;
+  humanProtocolNumber?: string | null;
+  humanProtocolStartedAt?: string | null;
+  humanProtocolClosedAt?: string | null;
   lastInboundMessage?: string | null;
   lastOutboundMessage?: string | null;
   updatedAt: string;
@@ -36,8 +39,24 @@ export interface HumanConversationMessage {
   authorType: 'PATIENT' | 'BOT' | 'OPERATOR' | 'SYSTEM';
   authorUserId?: string | null;
   authorName?: string | null;
+  providerMessageId?: string | null;
+  metadata?: Record<string, unknown> | null;
   message: string;
   createdAt: string;
+}
+
+export interface HumanConversationPatientInfo {
+  id: string;
+  name?: string | null;
+  cpf?: string | null;
+  cellphone?: string | null;
+  phone?: string | null;
+  birthDate?: string | null;
+  healthInsuranceName?: string | null;
+  healthInsuranceNumber?: string | null;
+  email?: string | null;
+  address?: string | null;
+  observations?: string | null;
 }
 
 export interface HumanConversationOperatorConfig {
@@ -47,6 +66,8 @@ export interface HumanConversationOperatorConfig {
   branchName?: string | null;
   isActive: boolean;
   maxActiveConversations: number;
+  idleTimeoutMinutes: number;
+  closeWarningMinutes: number;
   flowKeys: string[];
   activeConversationCount: number;
 }
@@ -65,6 +86,8 @@ const whatsappConversationService = {
   async saveOperatorConfig(userId: string, payload: {
     isActive: boolean;
     maxActiveConversations: number;
+    idleTimeoutMinutes: number;
+    closeWarningMinutes: number;
     flowKeys: string[];
   }) {
     const res = await api.put(`/care/whatsapp/conversations/operators/${userId}`, payload);
@@ -83,6 +106,7 @@ const whatsappConversationService = {
 
   async getMessages(conversationId: string): Promise<{
     conversation: HumanConversationItem;
+    patient?: HumanConversationPatientInfo | null;
     items: HumanConversationMessage[];
   }> {
     const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`);

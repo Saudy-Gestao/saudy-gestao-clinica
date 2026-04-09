@@ -687,10 +687,10 @@ export function SettingsPage() {
   };
 
   const handleSaveSector = async () => {
-    if (!selectedBranchForSectors) return;
+    if (!sectorForm.branchId) return;
     
     // Validate form
-    const validation = validateSectorForm({ ...sectorForm, branchId: selectedBranchForSectors });
+    const validation = validateSectorForm(sectorForm);
     if (!validation.isValid) {
       setSectorErrors(validation.errors);
       notifications.show({ 
@@ -708,7 +708,7 @@ export function SettingsPage() {
         await sectorService.updateSector(editingSector.id, sectorForm);
         notifications.show({ title: 'Sucesso', message: 'Setor atualizado', color: 'green' });
       } else {
-        await sectorService.createSector({ ...sectorForm, branchId: selectedBranchForSectors });
+        await sectorService.createSector(sectorForm);
         notifications.show({ title: 'Sucesso', message: 'Setor criado', color: 'green' });
       }
       setSectorModalOpen(false);
@@ -1336,6 +1336,14 @@ export function SettingsPage() {
                         )}
                          <Modal opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar Setor' : 'Novo Setor'} centered>
                              <Stack pt="lg">
+                                <Select
+                                  label="Filial"
+                                  data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                  value={sectorForm.branchId}
+                                  onChange={(v) => setSectorForm({ ...sectorForm, branchId: v || '' })}
+                                  error={sectorErrors.branchId}
+                                  searchable
+                                />
                                 <FloatingInput 
                                   label="Nome" 
                                   value={sectorForm.name} 
@@ -1372,13 +1380,10 @@ export function SettingsPage() {
                             <Select 
                                 label="Filial"
                                 placeholder="Selecione..." 
-                                data={(branches || [])
-                                  .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
-                                  .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                 value={selectedBranchForSectors}
                                 onChange={setSelectedBranchForSectors}
                                 style={{ flex: 1 }}
-                                disabled={!!loggedBranchId}
                             />
                             <Select 
                                 label="Setor"
@@ -1443,15 +1448,12 @@ export function SettingsPage() {
                                 <Grid.Col span={12}>
                                     <Select
                                         label="Filial"
-                                        data={(branches || [])
-                                          .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
-                                          .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                        data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                         value={userForm.branchId}
                                         onChange={(v) => setUserForm({ ...userForm, branchId: v || '', sectorId: '', doctorId: '' })}
                                         mb="xs"
                                         error={userErrors.branchId}
                                         searchable
-                                        disabled={!!loggedBranchId}
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
