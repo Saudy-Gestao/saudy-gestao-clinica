@@ -282,8 +282,8 @@ export function CadastroEquipamento() {
   }, [branches]);
 
   useEffect(() => {
-    setLoading(equipmentsQuery.isFetching);
-  }, [equipmentsQuery.isFetching]);
+    setLoading(equipmentsQuery.isLoading && items.length === 0);
+  }, [equipmentsQuery.isLoading, items.length]);
 
   useEffect(() => {
     if (equipmentsQuery.error) {

@@ -529,8 +529,8 @@ export function CadastroPaciente() {
   }, []);
 
   useEffect(() => {
-    setPatientsLoading(patientsQuery.isFetching);
-  }, [patientsQuery.isFetching]);
+    setPatientsLoading(patientsQuery.isLoading && patients.length === 0);
+  }, [patients.length, patientsQuery.isLoading]);
 
   useEffect(() => {
     if (patientsQuery.error) {

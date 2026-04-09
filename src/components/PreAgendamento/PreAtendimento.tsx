@@ -595,12 +595,12 @@ export function PreAtendimento() {
   }, [receptionQueueQuery.data]);
 
   useEffect(() => {
-    setPatientsLoading(patientsQuery.isFetching);
-  }, [patientsQuery.isFetching]);
+    setPatientsLoading(patientsQuery.isLoading && patients.length === 0);
+  }, [patients.length, patientsQuery.isLoading]);
 
   useEffect(() => {
-    setInsurancesLoading(insurancesQuery.isFetching);
-  }, [insurancesQuery.isFetching]);
+    setInsurancesLoading(insurancesQuery.isLoading && insuranceOptions.length === 0);
+  }, [insuranceOptions.length, insurancesQuery.isLoading]);
 
   useEffect(() => {
     if (!patientsQuery.error) return;

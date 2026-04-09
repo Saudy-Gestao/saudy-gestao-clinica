@@ -718,20 +718,20 @@ export function Agendamento() {
   }, [appointmentsQuery.data]);
 
   useEffect(() => {
-    setPatientsLoading(patientsQuery.isFetching);
-  }, [patientsQuery.isFetching]);
+    setPatientsLoading(patientsQuery.isLoading && patientOptions.length === 0);
+  }, [patientOptions.length, patientsQuery.isLoading]);
 
   useEffect(() => {
-    setInsurancesLoading(insurancesQuery.isFetching);
-  }, [insurancesQuery.isFetching]);
+    setInsurancesLoading(insurancesQuery.isLoading && insuranceOptions.length === 0);
+  }, [insuranceOptions.length, insurancesQuery.isLoading]);
 
   useEffect(() => {
-    setDoctorsLoading(doctorsQuery.isFetching);
-  }, [doctorsQuery.isFetching]);
+    setDoctorsLoading(doctorsQuery.isLoading && doctorOptions.length === 0);
+  }, [doctorOptions.length, doctorsQuery.isLoading]);
 
   useEffect(() => {
-    setProceduresLoading(proceduresCatalogQuery.isFetching);
-  }, [proceduresCatalogQuery.isFetching]);
+    setProceduresLoading(proceduresCatalogQuery.isLoading && procedureOptions.length === 0);
+  }, [procedureOptions.length, proceduresCatalogQuery.isLoading]);
 
   useEffect(() => {
     if (!patientsQuery.error) return;

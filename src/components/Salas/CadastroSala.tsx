@@ -181,8 +181,8 @@ export function CadastroSala() {
   }, [branchesQuery.data, selectedBranchId]);
 
   useEffect(() => {
-    setLoading(roomsQuery.isFetching);
-  }, [roomsQuery.isFetching]);
+    setLoading(roomsQuery.isLoading && items.length === 0);
+  }, [items.length, roomsQuery.isLoading]);
 
   useEffect(() => {
     if (roomsQuery.error) {

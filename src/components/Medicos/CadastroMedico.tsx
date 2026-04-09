@@ -408,8 +408,8 @@ export function CadastroMedico() {
   };
 
   useEffect(() => {
-    setDoctorsLoading(doctorsQuery.isFetching);
-  }, [doctorsQuery.isFetching]);
+    setDoctorsLoading(doctorsQuery.isLoading && doctors.length === 0);
+  }, [doctors.length, doctorsQuery.isLoading]);
 
   useEffect(() => {
     if (doctorsQuery.error) {

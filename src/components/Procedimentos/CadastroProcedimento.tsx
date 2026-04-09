@@ -168,8 +168,8 @@ export function CadastroProcedimento() {
   );
 
   useEffect(() => {
-    setProceduresLoading(proceduresQuery.isFetching);
-  }, [proceduresQuery.isFetching]);
+    setProceduresLoading(proceduresQuery.isLoading && procedures.length === 0);
+  }, [procedures.length, proceduresQuery.isLoading]);
 
   useEffect(() => {
     if (proceduresQuery.error) {

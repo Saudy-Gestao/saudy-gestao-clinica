@@ -84,8 +84,8 @@ export function CadastroConvenio() {
   }, [items, query]);
 
   useEffect(() => {
-    setItemsLoading(insurancesQuery.isFetching);
-  }, [insurancesQuery.isFetching]);
+    setItemsLoading(insurancesQuery.isLoading && items.length === 0);
+  }, [insurancesQuery.isLoading, items.length]);
 
   useEffect(() => {
     if (insurancesQuery.error) {
