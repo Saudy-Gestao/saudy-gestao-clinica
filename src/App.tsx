@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { useLocalStorage } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
 import { DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/pt-br';
 import { theme } from './themes/theme';
 import authService from './services/authService';
+import { APP_COLOR_SCHEME_EVENT, getAppColorScheme, type AppColorScheme } from './utils/appColorScheme';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
@@ -94,10 +94,7 @@ function PatientPortalProtectedRoute({ children }: { children: React.ReactNode }
 }
 
 function App() {
-  const [colorScheme] = useLocalStorage<'light' | 'dark'>({
-    key: 'mantine-color-scheme',
-    defaultValue: 'light',
-  });
+  const [colorScheme, setColorScheme] = useState<AppColorScheme>(getAppColorScheme);
   const [, setAuthVersion] = useState(0);
   const isAuthenticated = authService.isAuthenticated();
   const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
@@ -114,6 +111,20 @@ function App() {
     return () => {
       window.removeEventListener('auth:changed', onAuthChanged);
       window.removeEventListener('patient-auth:changed', onAuthChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncColorScheme = () => {
+      setColorScheme(getAppColorScheme());
+    };
+
+    window.addEventListener(APP_COLOR_SCHEME_EVENT, syncColorScheme as EventListener);
+    window.addEventListener('storage', syncColorScheme);
+
+    return () => {
+      window.removeEventListener(APP_COLOR_SCHEME_EVENT, syncColorScheme as EventListener);
+      window.removeEventListener('storage', syncColorScheme);
     };
   }, []);
 

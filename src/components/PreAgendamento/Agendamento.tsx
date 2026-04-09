@@ -412,6 +412,13 @@ const formatDateForApi = (value: Date | null): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatTypedDateValue = (value: string): string => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 const onlyDigits = (value?: string | null): string => String(value || '').replace(/\D/g, '');
 const addDays = (date: Date, amount: number): Date => dayjs(date).add(amount, 'day').toDate();
 const getTodayStart = (): Date => dayjs().startOf('day').toDate();
@@ -1674,13 +1681,13 @@ export function Agendamento() {
   const reviewTimeValue = reviewPrimaryManualSelection?.time || reviewPrimarySuggestedSelection?.time || novoAgendamento.hora || '';
   const reviewProfessionalValue = reviewPrimaryManualSelection?.doctorName || reviewPrimarySuggestedSelection?.doctorName || novoAgendamento.profissional || '';
   const insuranceSelectData = canEditInsuranceFields ? insuranceOptions : [];
-  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : '';
+  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : PARTICULAR_INSURANCE_LABEL;
   const insuranceSelectPlaceholder = !canEditInsuranceFields
     ? 'Selecione um paciente primeiro'
     : (insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio');
   const insuranceCardNumberValue = canEditInsuranceFields ? novoAgendamento.convenioNumber : NOT_APPLICABLE_LABEL;
   const insuranceValidityValue = canEditInsuranceFields ? novoAgendamento.convenioValidUntil : NOT_APPLICABLE_LABEL;
-  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : '';
+  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : NOT_APPLICABLE_LABEL;
   const hasAnySelectedSchedule = Boolean(
     novoAgendamento.hora
     || manualProcedureSelections.length
@@ -2626,6 +2633,7 @@ export function Agendamento() {
               <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
                 <FloatingSelect
                   label="Tipo do convênio*"
+                  alwaysFloatLabel
                   placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
                   value={insuranceSelectValue}
@@ -2641,22 +2649,25 @@ export function Agendamento() {
                     });
                   }}
                   searchable
-                  clearable
+                  clearable={canEditInsuranceFields && Boolean(insuranceSelectValue)}
                   disabled={insurancesLoading}
                   nothingFoundMessage="Nenhum convênio encontrado"
                 />
                 <FloatingInput
                   label="Número da carteirinha"
+                  alwaysFloatLabel
                   value={insuranceCardNumberValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioNumber: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Data de validade"
+                  alwaysFloatLabel
                   value={insuranceValidityValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioValidUntil: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Status"
+                  alwaysFloatLabel
                   value={insuranceStatusValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioStatus: e.currentTarget.value })}
                 />
@@ -2679,6 +2690,13 @@ export function Agendamento() {
                   label="Data da marcação"
                   placeholder="Selecione a data"
                   value={novoAgendamento.data}
+                  onInput={(event) => {
+                    const input = event.currentTarget;
+                    const formatted = formatTypedDateValue(input.value);
+                    if (input.value !== formatted) {
+                      input.value = formatted;
+                    }
+                  }}
                   onChange={(value) => {
                     const rawDate = value ? new Date(value) : null;
                     const nextDate = rawDate
