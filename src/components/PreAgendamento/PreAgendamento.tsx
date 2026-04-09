@@ -185,8 +185,8 @@ export function PreAgendamento() {
   });
 
   useEffect(() => {
-    setLoading(preSchedulingsQuery.isFetching);
-  }, [preSchedulingsQuery.isFetching]);
+    setLoading(preSchedulingsQuery.isLoading && items.length === 0);
+  }, [items.length, preSchedulingsQuery.isLoading]);
 
   useEffect(() => {
     setItems(Array.isArray(preSchedulingsQuery.data) ? preSchedulingsQuery.data : []);
