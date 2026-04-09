@@ -146,6 +146,7 @@ export function WorkflowSections() {
     {
       title: 'Comunicação',
       items: [
+        { icon: MessageCircle, label: 'Conversas', desc: 'Atendimento humanizado do WhatsApp', route: '/conversas', moduleName: 'whatsapp-config' },
         { icon: MessageCircle, label: 'WhatsApp', desc: 'Mensagens, templates e configuração', route: '/whatsapp', moduleName: 'whatsapp-config' },
       ]
     }

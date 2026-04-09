@@ -44,6 +44,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'cadastro-anamnese', label: 'Cadastro de Anamnese', route: '/cadastro-anamnese', prefixes: ['/cadastro-anamnese'] },
   { key: 'cadastro-enfermagem', label: 'Cadastro de Enfermagem', route: '/cadastro-enfermagem', prefixes: ['/cadastro-enfermagem'] },
   { key: 'meus-chamados', label: 'Meus Chamados', route: '/meus-chamados', prefixes: ['/meus-chamados'] },
+  { key: 'conversas', label: 'Conversas', route: '/conversas', prefixes: ['/conversas'] },
 ];
 
 const resolveModuleByPath = (pathname: string): ModuleDefinition | null => {

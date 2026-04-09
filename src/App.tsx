@@ -45,6 +45,7 @@ import { CadastroEnfermagem } from './components/Enfermagem/CadastroEnfermagem';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
 import { WhatsAppPage } from './components/Settings/WhatsAppPage';
+import { Conversations } from './components/Communication/Conversations';
 import { TeaEvolucao } from './components/TEA/TeaEvolucao';
 import { TeaPIT } from './components/TEA/TeaPIT';
 import { TeaRelatorios } from './components/TEA/TeaRelatorios';
@@ -274,6 +275,10 @@ function App() {
           <Route
             path="/cadastro-enfermagem"
             element={<ProtectedRoute><CadastroEnfermagem /></ProtectedRoute>}
+          />
+          <Route
+            path="/conversas"
+            element={<ProtectedRoute><Conversations /></ProtectedRoute>}
           />
           <Route
             path="/whatsapp"
