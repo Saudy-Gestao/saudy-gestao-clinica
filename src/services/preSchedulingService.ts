@@ -22,6 +22,7 @@ export interface PreSchedulingItem {
   patientName: string;
   patientCpf?: string;
   patientPhone?: string | null;
+  source?: 'COMMON' | 'BOT' | string;
   doctorName?: string | null;
   specialty?: string | null;
   convenio?: string | null;

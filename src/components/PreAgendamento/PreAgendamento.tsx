@@ -444,8 +444,17 @@ export function PreAgendamento() {
                       items.map((item) => (
                         <Table.Tr key={item.appointmentId}>
                           <Table.Td>
-                            <Stack gap={0}>
-                              <Text fw={600}>{item.patientName || '-'}</Text>
+                            <Stack gap={4}>
+                              <Group gap="xs">
+                                <Text fw={600}>{item.patientName || '-'}</Text>
+                                <Badge
+                                  size="xs"
+                                  variant="light"
+                                  color={item.source === 'BOT' ? 'blue' : 'gray'}
+                                >
+                                  {item.source === 'BOT' ? 'BOT' : 'COMUM'}
+                                </Badge>
+                              </Group>
                               <Text size="xs" c="dimmed">{formatCPF(item.patientCpf || '') || '-'}</Text>
                             </Stack>
                           </Table.Td>
