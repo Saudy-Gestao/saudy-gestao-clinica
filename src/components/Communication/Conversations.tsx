@@ -755,7 +755,7 @@ export function Conversations() {
                   <SimpleGrid cols={{ base: 1, md: 2 }}>
                     <NumberInput
                       label="Aviso de ociosidade"
-                      description="Minutos sem resposta do paciente para avisar sobre encerramento"
+                      description="Minutos sem resposta do paciente para encerramento"
                       min={1}
                       value={draft.idleTimeoutMinutes}
                       onChange={(value) => setOperatorDrafts((current) => ({
