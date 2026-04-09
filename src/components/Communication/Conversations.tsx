@@ -28,9 +28,13 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   AlertCircle,
+  Check,
+  CheckCheck,
   FileClock,
   Info,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCcw,
   Send,
   Settings,
@@ -75,6 +79,10 @@ const formatCpf = (value?: string | null) => {
 };
 
 const isMediaMessage = (message: string) => /^\[(Imagem|Documento|Vídeo|Áudio) recebido\]/i.test(String(message || '').trim());
+const isDeliveryEvent = (message: HumanConversationMessage) => {
+  const event = String((message.metadata as any)?.event || '').trim().toUpperCase();
+  return event === 'SENT' || event === 'DELIVERED' || event === 'READ';
+};
 const isEventMessage = (message: HumanConversationMessage) => (
   message.authorType === 'SYSTEM' && (
     String(message.message || '').startsWith('[Evento]')
@@ -133,6 +141,7 @@ export function Conversations() {
   const [operatorsModalOpen, setOperatorsModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operatorDrafts, setOperatorDrafts] = useState<OperatorDraftMap>({});
 
   const conversationsQuery = useQuery({
@@ -273,8 +282,29 @@ export function Conversations() {
   };
 
   const selectedPatient = messagesQuery.data?.patient || null;
-  const currentMessages = messagesQuery.data?.items || [];
+  const rawMessages = messagesQuery.data?.items || [];
   const currentConversation = messagesQuery.data?.conversation || selectedConversation;
+
+  const messageStatusMap = useMemo(() => {
+    const map = new Map<string, 'SENT' | 'DELIVERED' | 'READ'>();
+    for (const message of rawMessages) {
+      if (!isDeliveryEvent(message)) continue;
+      const providerMessageId = String((message.metadata as any)?.providerMessageId || '').trim();
+      const event = String((message.metadata as any)?.event || '').trim().toUpperCase() as 'SENT' | 'DELIVERED' | 'READ';
+      if (!providerMessageId || !event) continue;
+
+      const current = map.get(providerMessageId);
+      if (event === 'READ' || !current || (event === 'DELIVERED' && current === 'SENT')) {
+        map.set(providerMessageId, event);
+      }
+    }
+    return map;
+  }, [rawMessages]);
+
+  const currentMessages = useMemo(
+    () => rawMessages.filter((message) => !isDeliveryEvent(message)),
+    [rawMessages],
+  );
 
   const queueButtonLabel = (item: HumanConversationItem) => {
     if (item.humanStatus === 'QUEUED') return 'Assumir da fila';
@@ -330,9 +360,9 @@ export function Conversations() {
   );
 
   return (
-    <Box p="md">
+    <Box p={0}>
       <Header />
-      <Stack gap="md">
+      <Stack gap="md" px="md" pb="md" pt="sm">
         <Group justify="space-between" align="center">
           <Box>
             <Text fw={700} size="xl">Conversas</Text>
@@ -348,38 +378,73 @@ export function Conversations() {
           </Group>
         </Group>
 
-        <SimpleGrid cols={{ base: 1, lg: 3 }} spacing="md">
-          <Paper withBorder p="md" radius="lg" style={{ minHeight: 760 }}>
+        <Box
+          style={{
+            display: 'grid',
+            gridTemplateColumns: sidebarCollapsed ? '84px minmax(0, 1fr)' : 'minmax(320px, 420px) minmax(0, 1fr)',
+            gap: '16px',
+            alignItems: 'stretch',
+          }}
+        >
+          <Paper withBorder p={sidebarCollapsed ? 'xs' : 'md'} radius="lg" style={{ minHeight: 760, overflow: 'hidden' }}>
             <Stack gap="sm">
-              <SegmentedControl
-                value={status}
-                onChange={setStatus}
-                data={[
-                  { value: 'QUEUED', label: 'Fila' },
-                  { value: 'ASSIGNED', label: 'Em atendimento' },
-                  { value: 'CLOSED', label: 'Encerradas' },
-                ]}
-              />
-              <TextInput
-                label="Buscar"
-                placeholder="Paciente, telefone, protocolo ou mensagem"
-                value={search}
-                onChange={(event) => setSearch(event.currentTarget.value)}
-              />
-              <Select
-                label="Fluxo"
-                placeholder="Todos"
-                clearable
-                data={flowOptions}
-                value={flowKey}
-                onChange={setFlowKey}
-              />
-              <Switch
-                label="Mostrar só as minhas"
-                checked={mineOnly}
-                onChange={(event) => setMineOnly(event.currentTarget.checked)}
-              />
-              <Divider />
+              {!sidebarCollapsed ? (
+                <>
+                  <Group align="center" wrap="nowrap">
+                    <SegmentedControl
+                      style={{ flex: 1 }}
+                      value={status}
+                      onChange={setStatus}
+                      data={[
+                        { value: 'QUEUED', label: 'Fila' },
+                        { value: 'ASSIGNED', label: 'Em atendimento' },
+                        { value: 'CLOSED', label: 'Encerradas' },
+                      ]}
+                    />
+                    <Tooltip label={sidebarCollapsed ? 'Expandir lista' : 'Minimizar lista'}>
+                      <ActionIcon
+                        variant="light"
+                        size="lg"
+                        onClick={() => setSidebarCollapsed((value) => !value)}
+                      >
+                        {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                  <TextInput
+                    label="Buscar"
+                    placeholder="Paciente, telefone, protocolo ou mensagem"
+                    value={search}
+                    onChange={(event) => setSearch(event.currentTarget.value)}
+                  />
+                  <Select
+                    label="Fluxo"
+                    placeholder="Todos"
+                    clearable
+                    data={flowOptions}
+                    value={flowKey}
+                    onChange={setFlowKey}
+                  />
+                  <Switch
+                    label="Mostrar só as minhas"
+                    checked={mineOnly}
+                    onChange={(event) => setMineOnly(event.currentTarget.checked)}
+                  />
+                  <Divider />
+                </>
+              ) : null}
+              {sidebarCollapsed ? (
+                <Tooltip label="Expandir lista">
+                  <ActionIcon
+                    variant="light"
+                    size="lg"
+                    onClick={() => setSidebarCollapsed(false)}
+                    mx="auto"
+                  >
+                    <PanelLeftOpen size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              ) : null}
               <ScrollArea h={610} offsetScrollbars>
                 <Stack gap="sm">
                   {items.map((item) => (
@@ -405,31 +470,46 @@ export function Conversations() {
                               <ThemeIcon variant="light" radius="xl" size="md">
                                 <MessageCircle size={14} />
                               </ThemeIcon>
-                              <Box style={{ flex: 1 }}>
-                                <Text fw={700} lineClamp={1}>{item.patientName || item.phone}</Text>
-                                <Text size="xs" c="dimmed">{item.phone}</Text>
-                              </Box>
+                              {!sidebarCollapsed ? (
+                                <Box style={{ flex: 1 }}>
+                                  <Text fw={700} lineClamp={1}>{item.patientName || item.phone}</Text>
+                                  <Text size="xs" c="dimmed">{item.phone}</Text>
+                                </Box>
+                              ) : null}
                             </Group>
                           </Box>
-                          <Badge color={STATUS_COLOR[item.humanStatus || 'CLOSED']} variant="light">
-                            {STATUS_LABEL[item.humanStatus || 'CLOSED']}
-                          </Badge>
+                          {!sidebarCollapsed ? (
+                            <Badge color={STATUS_COLOR[item.humanStatus || 'CLOSED']} variant="light">
+                              {STATUS_LABEL[item.humanStatus || 'CLOSED']}
+                            </Badge>
+                          ) : null}
                         </Group>
-                        <Group gap={6}>
-                          <Badge variant="outline">{item.humanFlowLabel || item.humanFlowKey || 'Sem fluxo'}</Badge>
-                          {item.humanProtocolNumber ? <Badge variant="light" color="dark">{item.humanProtocolNumber}</Badge> : null}
-                        </Group>
-                        <Text size="sm" c="dimmed" lineClamp={2}>
-                          {item.lastInboundMessage || item.lastOutboundMessage || 'Sem mensagens recentes'}
-                        </Text>
-                        <Group justify="space-between" gap="xs">
-                          <Text size="xs" c="dimmed">
-                            {item.humanAssignedUserName ? `Atendente: ${item.humanAssignedUserName}` : 'Aguardando atendente'}
-                          </Text>
-                          <Text size="xs" c="dimmed">
-                            {dayjs(item.updatedAt).format('DD/MM HH:mm')}
-                          </Text>
-                        </Group>
+                        {!sidebarCollapsed ? (
+                          <>
+                            <Group gap={6}>
+                              <Badge variant="outline">{item.humanFlowLabel || item.humanFlowKey || 'Sem fluxo'}</Badge>
+                              {item.humanProtocolNumber ? <Badge variant="light" color="dark">{item.humanProtocolNumber}</Badge> : null}
+                            </Group>
+                            <Text size="sm" c="dimmed" lineClamp={2}>
+                              {item.lastInboundMessage || item.lastOutboundMessage || 'Sem mensagens recentes'}
+                            </Text>
+                            <Group justify="space-between" gap="xs">
+                              <Text size="xs" c="dimmed">
+                                {item.humanAssignedUserName ? `Atendente: ${item.humanAssignedUserName}` : 'Aguardando atendente'}
+                              </Text>
+                              <Text size="xs" c="dimmed">
+                                {dayjs(item.updatedAt).format('DD/MM HH:mm')}
+                              </Text>
+                            </Group>
+                          </>
+                        ) : (
+                          <Stack gap={4} align="center">
+                            <Badge color={STATUS_COLOR[item.humanStatus || 'CLOSED']} variant="light" size="xs">
+                              {String(STATUS_LABEL[item.humanStatus || 'CLOSED']).split(' ')[0]}
+                            </Badge>
+                            <Text size="xs" c="dimmed">{dayjs(item.updatedAt).format('HH:mm')}</Text>
+                          </Stack>
+                        )}
                       </Stack>
                     </Card>
                   ))}
@@ -439,7 +519,7 @@ export function Conversations() {
             </Stack>
           </Paper>
 
-          <Paper withBorder p="md" radius="lg" style={{ gridColumn: 'span 2', minHeight: 760 }}>
+          <Paper withBorder p="md" radius="lg" style={{ minHeight: 760 }}>
             {!selectedConversation ? (
               <Stack align="center" justify="center" h={700}>
                 <MessageCircle size={36} />
@@ -525,6 +605,9 @@ export function Conversations() {
                   <Stack gap="sm" pr="xs">
                     {currentMessages.map((message) => {
                       const styles = bubbleStyles(message, colorScheme);
+                      const messageState = message.providerMessageId
+                        ? messageStatusMap.get(message.providerMessageId) || 'SENT'
+                        : null;
                       return (
                         <Paper
                           key={message.id}
@@ -543,6 +626,19 @@ export function Conversations() {
                             <Badge variant="light" color="indigo" mb={6}>Mídia / documento</Badge>
                           ) : null}
                           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{message.message}</Text>
+                          {message.authorType === 'OPERATOR' && messageState ? (
+                            <Group justify="flex-end" gap={4} mt={8}>
+                              {messageState === 'SENT' ? (
+                                <Check size={14} color="var(--mantine-color-gray-5)" />
+                              ) : null}
+                              {messageState === 'DELIVERED' ? (
+                                <CheckCheck size={14} color="var(--mantine-color-gray-5)" />
+                              ) : null}
+                              {messageState === 'READ' ? (
+                                <CheckCheck size={14} color="var(--mantine-color-blue-5)" />
+                              ) : null}
+                            </Group>
+                          ) : null}
                         </Paper>
                       );
                     })}
@@ -579,7 +675,7 @@ export function Conversations() {
               </Stack>
             )}
           </Paper>
-        </SimpleGrid>
+        </Box>
       </Stack>
 
       <Modal
