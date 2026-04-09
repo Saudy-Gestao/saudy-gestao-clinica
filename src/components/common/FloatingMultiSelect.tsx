@@ -6,7 +6,7 @@ interface FloatingMultiSelectProps extends MultiSelectProps {
   containerProps?: BoxProps;
 }
 
-export function FloatingMultiSelect({ label, containerProps, value, error, ...props }: FloatingMultiSelectProps) {
+export function FloatingMultiSelect({ label, containerProps, value, error, styles, ...props }: FloatingMultiSelectProps) {
   const hasValue = Array.isArray(value) && value.length > 0;
 
   return (
@@ -22,6 +22,33 @@ export function FloatingMultiSelect({ label, containerProps, value, error, ...pr
           error={undefined}
           label={undefined}
           placeholder=""
+          styles={{
+            input: {
+              border: 'none',
+              borderBottom: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 0,
+              minHeight: 34,
+              padding: '8px 28px 4px 0',
+              background: 'transparent',
+              boxShadow: 'none',
+            },
+            pillsList: {
+              gap: 6,
+              minHeight: 0,
+              paddingTop: 0,
+              paddingBottom: 0,
+            },
+            inputField: {
+              minHeight: 18,
+              fontSize: '0.875rem',
+              color: 'var(--mantine-color-text)',
+              padding: 0,
+            },
+            pill: {
+              height: 22,
+            },
+            ...styles,
+          }}
           variant="unstyled"
         />
         <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
