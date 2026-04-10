@@ -10,7 +10,7 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import { Header } from '../Header/Header';
 import reportService from '../../services/reportService';
 import ResultModal from '../common/ResultModal';
-import { isValidCPF } from '../../utils/formatters';
+import { formatCPF, formatDateInput, isValidCPF } from '../../utils/formatters';
 import { useReportsQuery } from '../../hooks/useReportsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -302,7 +302,7 @@ export function Laudo() {
                     <input
                       type="text"
                       value={laudoData.cpf}
-                      onChange={(e) => setLaudoData({ ...laudoData, cpf: e.currentTarget.value })}
+                      onChange={(e) => setLaudoData({ ...laudoData, cpf: formatCPF(e.currentTarget.value) })}
                       placeholder=" "
                         readOnly={isViewing}
                         disabled={isViewing}
@@ -319,7 +319,7 @@ export function Laudo() {
                     <input
                       type="text"
                       value={laudoData.dataNascimento}
-                      onChange={(e) => setLaudoData({ ...laudoData, dataNascimento: e.currentTarget.value })}
+                      onChange={(e) => setLaudoData({ ...laudoData, dataNascimento: formatDateInput(e.currentTarget.value) })}
                       placeholder=" "
                         readOnly={isViewing}
                         disabled={isViewing}
@@ -545,7 +545,7 @@ export function Laudo() {
                 <input
                   type="text"
                   value={laudoData.cpf}
-                  onChange={(e) => { setLaudoData({ ...laudoData, cpf: e.currentTarget.value }); setErrors((prev) => ({ ...prev, cpf: undefined })); }}
+                  onChange={(e) => { setLaudoData({ ...laudoData, cpf: formatCPF(e.currentTarget.value) }); setErrors((prev) => ({ ...prev, cpf: undefined })); }}
                   placeholder=" "
                   readOnly={isViewing || !isNewPatient}
                   disabled={isViewing || !isNewPatient}
@@ -565,7 +565,7 @@ export function Laudo() {
                 <input
                   type="text"
                   value={laudoData.dataNascimento}
-                  onChange={(e) => setLaudoData({ ...laudoData, dataNascimento: e.currentTarget.value })}
+                  onChange={(e) => setLaudoData({ ...laudoData, dataNascimento: formatDateInput(e.currentTarget.value) })}
                   placeholder=" "
                   readOnly={isViewing || !isNewPatient}
                   disabled={isViewing || !isNewPatient}

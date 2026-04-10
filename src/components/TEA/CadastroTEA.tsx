@@ -466,7 +466,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
           cpf: cpfDigits || undefined,
           birthDate: form.birthDate ? dayjs(form.birthDate).format('YYYY-MM-DD') : undefined,
           gender: form.gender || undefined,
-          cellphone: form.cellphone.trim() || undefined,
+          cellphone: onlyDigits(form.cellphone) || undefined,
           email: normalizeEmail(form.email) || undefined,
           healthInsuranceName: normalizedInsuranceName || undefined,
           healthInsuranceNumber: isParticular ? undefined : (form.healthInsuranceNumber.trim() || undefined),
