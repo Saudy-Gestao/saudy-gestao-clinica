@@ -91,6 +91,55 @@ const formatAppointmentType = (value?: string | null) => {
 };
 
 const isMediaMessage = (message: string) => /^\[(Imagem|Documento|Vídeo|Áudio) recebido\]/i.test(String(message || '').trim());
+const extractFirstUrlFromText = (value?: string | null) => {
+  const text = String(value || '');
+  const match = text.match(/https?:\/\/[^\s]+/i);
+  return match ? match[0] : '';
+};
+
+const parseMetadataObject = (value: unknown): Record<string, unknown> => {
+  if (!value) return {};
+  if (typeof value === 'object') return value as Record<string, unknown>;
+  if (typeof value !== 'string') return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+};
+
+const findMetadataString = (root: Record<string, unknown>, candidateKeys: string[]): string => {
+  const normalizedKeys = candidateKeys.map((key) => key.toLowerCase());
+  const stack: unknown[] = [root];
+  const seen = new Set<unknown>();
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object') continue;
+    if (seen.has(current)) continue;
+    seen.add(current);
+
+    if (Array.isArray(current)) {
+      for (const item of current) stack.push(item);
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current as Record<string, unknown>)) {
+      const keyLower = key.toLowerCase();
+      if (typeof value === 'string' && normalizedKeys.includes(keyLower) && value.trim()) {
+        return value.trim();
+      }
+      if (typeof value === 'object' && value) {
+        stack.push(value);
+      }
+    }
+  }
+
+  return '';
+};
+
 const resolveMediaUrl = (value?: string | null) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -101,37 +150,47 @@ const resolveMediaUrl = (value?: string | null) => {
 };
 
 const extractMediaMetadata = (message: HumanConversationMessage) => {
-  const metadata = (message.metadata || {}) as Record<string, unknown>;
-  const rawUrl = [
-    metadata.mediaUrl,
-    metadata.url,
-    metadata.fileUrl,
-    metadata.downloadUrl,
-    metadata.attachmentUrl,
-    metadata.documentUrl,
-    metadata.imageUrl,
-    metadata.videoUrl,
-    metadata.audioUrl,
-    metadata.path,
-  ].find((value) => typeof value === 'string' && String(value).trim().length > 0) as string | undefined;
+  const metadata = parseMetadataObject(message.metadata);
+  const rawUrl = findMetadataString(metadata, [
+    'mediaUrl',
+    'media_url',
+    'url',
+    'fileUrl',
+    'file_url',
+    'downloadUrl',
+    'download_url',
+    'attachmentUrl',
+    'attachment_url',
+    'documentUrl',
+    'document_url',
+    'imageUrl',
+    'image_url',
+    'videoUrl',
+    'video_url',
+    'audioUrl',
+    'audio_url',
+    'path',
+  ]) || extractFirstUrlFromText(message.message);
 
-  const mimeType = String(
-    metadata.mimeType
-    || metadata.mimetype
-    || metadata.contentType
-    || '',
-  ).trim().toLowerCase();
+  const mimeType = findMetadataString(metadata, [
+    'mimeType',
+    'mime_type',
+    'mimetype',
+    'contentType',
+    'content_type',
+  ]).toLowerCase();
 
-  const fileName = String(
-    metadata.fileName
-    || metadata.filename
-    || metadata.originalName
-    || metadata.name
-    || '',
-  ).trim();
+  const fileName = findMetadataString(metadata, [
+    'fileName',
+    'file_name',
+    'filename',
+    'originalName',
+    'original_name',
+    'name',
+  ]);
 
-  const caption = String(metadata.caption || '').trim();
-  const mediaTypeHint = String(metadata.mediaType || metadata.type || '').trim().toLowerCase();
+  const caption = findMetadataString(metadata, ['caption']);
+  const mediaTypeHint = findMetadataString(metadata, ['mediaType', 'media_type', 'type']).toLowerCase();
   const resolvedUrl = resolveMediaUrl(rawUrl);
 
   const isImage = mimeType.startsWith('image/') || mediaTypeHint.includes('image');
