@@ -269,6 +269,28 @@ export function PreAgendamento() {
     setLinkOpen(true);
   };
 
+  const handleSendTeleconsultationLinkDirect = async (item: PreSchedulingItem) => {
+    setSendingLink(true);
+    try {
+      await teleconsultationLinkService.sendWhatsAppLinkByAppointment(item.appointmentId);
+      showNotification({
+        title: 'Link enviado',
+        message: 'Link de teleconsulta gerado com sucesso.',
+        color: 'green',
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao enviar link',
+        message: resolveApiErrorMessage(err, 'Não foi possível enviar o link da teleconsulta.'),
+        color: 'red',
+      });
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
   const handleSendLink = async (mode: 'DOCS' | 'TELECONSULTA' = linkMode) => {
     if (!selectedItem) return;
     setSendingLink(true);
@@ -576,9 +598,10 @@ export function PreAgendamento() {
                                       viewMode === 'history'
                                       || !isPreAuthorized
                                       || isCanceled
+                                      || sendingLink
                                       || Boolean(item.teleconsultationLinkSent)
                                     }
-                                    onClick={() => openSendLink(item, 'TELECONSULTA')}
+                                    onClick={() => handleSendTeleconsultationLinkDirect(item)}
                                   >
                                     Enviar link teleconsulta
                                   </Menu.Item>
