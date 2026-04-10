@@ -921,7 +921,7 @@ export function Conversations() {
             </Stack>
           </Paper>
 
-          <Paper withBorder p="md" radius="lg" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Paper withBorder p="md" radius="lg" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {!selectedConversation ? (
               <Stack align="center" justify="center" style={{ flex: 1 }}>
                 <MessageCircle size={36} />
@@ -929,7 +929,7 @@ export function Conversations() {
               </Stack>
             ) : (
               <Stack gap="md" style={{ flex: 1, minHeight: 0 }}>
-                <Group justify="space-between" align="flex-start" wrap="nowrap">
+                <Group justify="space-between" align="flex-start" wrap="nowrap" style={{ flexShrink: 0 }}>
                   <Box style={{ flex: 1 }}>
                     <Group gap="xs" wrap="nowrap" align="center">
                       <Text fw={700} size="lg">{selectedConversation.patientName || 'Paciente sem identificação'}</Text>
@@ -990,7 +990,7 @@ export function Conversations() {
                 </Group>
 
                 {messageSearchOpen ? (
-                  <Group gap="xs" wrap="nowrap">
+                  <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                     <TextInput
                       placeholder="Digite para buscar e rolar até a mensagem"
                       leftSection={<Search size={16} />}
@@ -1075,7 +1075,7 @@ export function Conversations() {
                 </ScrollArea>
 
                 {selectedConversation.humanStatus !== 'CLOSED' ? (
-                  <Card radius="lg" withBorder padding="md">
+                  <Card radius="lg" withBorder padding="md" style={{ flexShrink: 0 }}>
                     <Stack gap="xs">
                       <Textarea
                         label="Responder ao paciente"
@@ -1097,7 +1097,7 @@ export function Conversations() {
                     </Stack>
                   </Card>
                 ) : (
-                  <Badge color="gray" variant="light" w="fit-content">
+                  <Badge color="gray" variant="light" w="fit-content" style={{ flexShrink: 0 }}>
                     Atendimento encerrado
                   </Badge>
                 )}
