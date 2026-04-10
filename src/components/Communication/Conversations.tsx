@@ -50,6 +50,7 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import { queryKeys } from '../../lib/queryKeys';
 import { getApiBaseUrl } from '../../services/getApiBaseUrl';
 import whatsappConversationService, {
+  type HumanConversationConfigScope,
   type HumanConversationFlow,
   type HumanConversationItem,
   type HumanConversationMessage,
@@ -72,6 +73,11 @@ const STATUS_COLOR: Record<string, string> = {
   ASSIGNED: 'blue',
   CLOSED: 'gray',
 };
+
+const SETTINGS_SCOPE_OPTIONS: Array<{ value: HumanConversationConfigScope; label: string }> = [
+  { value: 'COMPANY', label: 'Empresa (padrão)' },
+  { value: 'BRANCH', label: 'Filial (sobrescrever)' },
+];
 
 type OperatorDraftMap = Record<string, {
   isActive: boolean;
@@ -284,6 +290,7 @@ export function Conversations() {
   const [messageSearch, setMessageSearch] = useState('');
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [operatorsModalOpen, setOperatorsModalOpen] = useState(false);
+  const [settingsScope, setSettingsScope] = useState<HumanConversationConfigScope>('COMPANY');
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
   const [protocolNumberInput, setProtocolNumberInput] = useState('');
@@ -320,8 +327,8 @@ export function Conversations() {
   });
 
   const operatorsQuery = useQuery({
-    queryKey: queryKeys.whatsappConversationOperators,
-    queryFn: () => whatsappConversationService.listOperators(),
+    queryKey: [...queryKeys.whatsappConversationOperators, settingsScope],
+    queryFn: () => whatsappConversationService.listOperators(settingsScope),
     refetchInterval: 20_000,
   });
 
@@ -371,6 +378,12 @@ export function Conversations() {
       return next;
     });
   }, [operatorsQuery.data]);
+
+  useEffect(() => {
+    setOperatorDrafts({});
+    setConversationSettingsDraft(null);
+    setExpandedOperators({});
+  }, [settingsScope]);
 
   useEffect(() => {
     if (operatorsQuery.data?.settings && !conversationSettingsDraft) {
@@ -443,9 +456,15 @@ export function Conversations() {
   });
 
   const saveOperatorMutation = useMutation({
-    mutationFn: ({ userId, payload }: { userId: string; payload: OperatorDraftMap[string] }) => whatsappConversationService.saveOperatorConfig(userId, payload),
+    mutationFn: ({ userId, payload }: { userId: string; payload: OperatorDraftMap[string] }) => whatsappConversationService.saveOperatorConfig(userId, payload, { scope: settingsScope }),
     onSuccess: async () => {
-      notifications.show({ title: 'Configuração salva', message: 'As regras do atendente foram atualizadas.', color: 'green' });
+      notifications.show({
+        title: 'Configuração salva',
+        message: settingsScope === 'COMPANY'
+          ? 'As regras do atendente foram salvas como padrão da empresa.'
+          : 'As regras do atendente foram salvas como sobrescrita desta filial.',
+        color: 'green',
+      });
       await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationOperators });
     },
     onError: (error: any) => {
@@ -458,10 +477,16 @@ export function Conversations() {
   });
 
   const saveSettingsMutation = useMutation({
-    mutationFn: (payload: { idleTimeoutMinutes: number; closeWarningMinutes: number }) => whatsappConversationService.saveSettings(payload),
+    mutationFn: (payload: { idleTimeoutMinutes: number; closeWarningMinutes: number }) => whatsappConversationService.saveSettings(payload, { scope: settingsScope }),
     onSuccess: async (data) => {
       setConversationSettingsDraft(data);
-      notifications.show({ title: 'Configuração salva', message: 'Os tempos globais do atendimento foram atualizados.', color: 'green' });
+      notifications.show({
+        title: 'Configuração salva',
+        message: settingsScope === 'COMPANY'
+          ? 'Os tempos globais foram salvos como padrão da empresa.'
+          : 'Os tempos globais foram salvos como sobrescrita desta filial.',
+        color: 'green',
+      });
       await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationOperators });
     },
     onError: (error: any) => {
@@ -1136,12 +1161,29 @@ export function Conversations() {
         size="xl"
       >
         <Stack gap="sm">
+          <Paper withBorder radius="lg" p="md">
+            <Stack gap="xs">
+              <Text fw={700}>Escopo da configuração</Text>
+              <Text size="sm" c="dimmed">
+                Por padrão, configure em nível de empresa. Use filial apenas quando precisar de exceção local.
+              </Text>
+              <SegmentedControl
+                value={settingsScope}
+                onChange={(value) => setSettingsScope(value as HumanConversationConfigScope)}
+                data={SETTINGS_SCOPE_OPTIONS}
+              />
+            </Stack>
+          </Paper>
           {conversationSettingsDraft ? (
             <Paper withBorder radius="lg" p="md">
               <Stack gap="md">
                 <Box>
                   <Text fw={700}>Configuração geral do atendimento</Text>
-                  <Text size="sm" c="dimmed">Esses tempos valem para toda a operação de conversas desta filial.</Text>
+                  <Text size="sm" c="dimmed">
+                    {settingsScope === 'COMPANY'
+                      ? 'Esses tempos viram o padrão da empresa para todas as filiais.'
+                      : 'Esses tempos valem apenas como sobrescrita para esta filial.'}
+                  </Text>
                 </Box>
                 <SimpleGrid cols={{ base: 1, md: 2 }}>
                   <NumberInput
