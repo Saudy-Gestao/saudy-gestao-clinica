@@ -17,7 +17,8 @@ import {
   Table,
   Loader,
   Skeleton,
-  Badge
+  Badge,
+  Switch,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, Power } from 'lucide-react';
@@ -118,6 +119,7 @@ interface DoctorForm {
   rg: string;
   specialty: string;
   specialties: string[];
+  teleconsultationEnabled: boolean;
   biography: string;
   address: string;
   addressNumber: string;
@@ -171,6 +173,7 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   rg: '',
   specialty: '',
   specialties: [],
+  teleconsultationEnabled: false,
   biography: '',
   address: '',
   addressNumber: '',
@@ -182,6 +185,8 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   isActive: true,
   workingSchedules: [],
 };
+
+const TELECONSULTATION_SPECIALTY_FLAG = '__TELECONSULTA__';
 
 const getWorkingSchedulesFromRaw = (raw: ApiRecord): WorkingSchedule[] => {
   const explicitSchedules = Array.isArray(raw.workingSchedules)
@@ -377,9 +382,11 @@ export function CadastroMedico() {
 
   const populateFormFromDoctor = (raw: ApiRecord) => {
     const birthDate = getDate(raw.birthDate);
-    const specialties = Array.isArray(raw.specialties)
+    const rawSpecialties = Array.isArray(raw.specialties)
       ? (raw.specialties as unknown[]).map((item) => getString(item)).filter(Boolean)
       : [];
+    const teleconsultationEnabled = rawSpecialties.includes(TELECONSULTATION_SPECIALTY_FLAG);
+    const specialties = rawSpecialties.filter((item) => item !== TELECONSULTATION_SPECIALTY_FLAG);
 
     const workingSchedules = getWorkingSchedulesFromRaw(raw);
     setForm({
@@ -395,6 +402,7 @@ export function CadastroMedico() {
       rg: getString(raw.rg),
       specialty: getString(raw.specialty),
       specialties,
+      teleconsultationEnabled,
       biography: getString(raw.biography),
       address: getString(raw.address),
       addressNumber: getString(raw.addressNumber),
@@ -427,7 +435,9 @@ export function CadastroMedico() {
     const list = getApiList(doctorsQuery.data);
     const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
       const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
-      const specialties = Array.isArray(item.specialties) ? (item.specialties as unknown[]) : [];
+      const specialties = Array.isArray(item.specialties)
+        ? (item.specialties as unknown[]).map((value) => String(value)).filter((value) => value !== TELECONSULTATION_SPECIALTY_FLAG)
+        : [];
       return {
         id: String(item.id ?? item.doctorId ?? ''),
         name,
@@ -444,13 +454,6 @@ export function CadastroMedico() {
   const statesOptions = [
     'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
   ].map((s) => ({ value: s, label: s }));
-
-  const specialtyOptions = [
-    { value: 'clinico', label: 'Clínico Geral' },
-    { value: 'cardiologista', label: 'Cardiologia' },
-    { value: 'ortopedista', label: 'Ortopedia' },
-    { value: 'ginecologista', label: 'Ginecologia' },
-  ];
 
   const daysOptions = [
     { value: 'Segunda', label: 'Segunda' },
@@ -572,7 +575,10 @@ export function CadastroMedico() {
         cpf: form.cpf,
         rg: form.rg?.trim() || undefined,
         specialty: form.specialty || undefined,
-        specialties: form.specialties || [],
+        specialties: [
+          ...(form.specialties || []),
+          ...(form.teleconsultationEnabled ? [TELECONSULTATION_SPECIALTY_FLAG] : []),
+        ],
         biography: form.biography || undefined,
         address: form.address || undefined,
         addressNumber: form.addressNumber || undefined,
@@ -824,21 +830,23 @@ export function CadastroMedico() {
                     required
                     error={fieldErrors.crmState}
                   />
-                  <FloatingSelect
+                  <FloatingInput
                     label="Especialidade principal"
-                    data={specialtyOptions}
                     value={form.specialty}
-                    onChange={(v) => { setForm({ ...form, specialty: v || '' }); clearFieldError('specialty'); }}
+                    onChange={(e) => { setForm({ ...form, specialty: e.currentTarget.value }); clearFieldError('specialty'); }}
                     error={fieldErrors.specialty}
                     required
                   />
-                  <FloatingMultiSelect
-                    label="Outras especialidades"
-                    data={specialtyOptions}
-                    value={form.specialties}
-                    onChange={(v) => setForm({ ...form, specialties: v })}
-                  />
                 </SimpleGrid>
+                <Switch
+                  mt="md"
+                  label="Médico habilitado para teleconsulta"
+                  checked={form.teleconsultationEnabled}
+                  onChange={(event) => {
+                    const checked = event.currentTarget.checked;
+                    setForm((prev) => ({ ...prev, teleconsultationEnabled: checked }));
+                  }}
+                />
                 <FloatingTextarea
                   label="Biografia"
                   placeholder="Breve descrição profissional"
@@ -1246,7 +1254,7 @@ export function CadastroMedico() {
                 })()}
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
-              <Text size="sm"><Text fw={600} span>Outras especialidades:</Text> {formatDetailValue(selectedDoctor?.raw?.specialties)}</Text>
+              <Text size="sm"><Text fw={600} span>Teleconsulta:</Text> {Array.isArray(selectedDoctor?.raw?.specialties) && (selectedDoctor?.raw?.specialties as unknown[]).some((item) => String(item) === TELECONSULTATION_SPECIALTY_FLAG) ? 'Habilitado' : 'Desabilitado'}</Text>
             </SimpleGrid>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">

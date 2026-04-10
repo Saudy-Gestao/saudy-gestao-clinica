@@ -1,0 +1,594 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalStorage } from '@mantine/hooks';
+import { Box, Button, Group, Text } from '@mantine/core';
+import { LampDesk, MicOff, PhoneOff, Send, SignalHigh } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { showNotification } from '@mantine/notifications';
+import { Header } from '../Header/Header';
+import teleconsultationLinkService, { type TeleconsultationPublicTokenMeta } from '../../services/teleconsultationLinkService';
+import consultationService from '../../services/consultationService';
+import styles from './TeleconsultaPatientWaiting.module.css';
+
+const DOCTOR = {
+  name: 'Dra. Maria Santos',
+  specialty: 'Clínico Geral',
+};
+
+const parseScheduledTime = (value: string) => {
+  const [hour, minute] = String(value || '').split(':').map((it) => Number(it));
+  const date = new Date();
+  date.setHours(Number.isFinite(hour) ? hour : 14, Number.isFinite(minute) ? minute : 30, 0, 0);
+  return date;
+};
+
+const formatClock = (seconds: number, overdue = false) => {
+  const safe = Math.max(0, Math.abs(seconds));
+  const minutes = String(Math.floor(safe / 60)).padStart(2, '0');
+  const secs = String(Math.floor(safe % 60)).padStart(2, '0');
+  return overdue ? `+${minutes}:${secs}` : `${minutes}:${secs}`;
+};
+
+const RTC_CONFIGURATION: RTCConfiguration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+};
+const PREPARED_SESSION_KEY_PREFIX = 'teleconsulta:prepared:';
+const CLINICAL_QUEUE_TYPE = 'Fila clínica';
+const IN_PROGRESS_STATUS = 'Em atendimento';
+const DONE_STATUS = 'Atendimento concluído';
+
+const normalizeCollection = (data: any) => (
+  Array.isArray(data)
+    ? data
+    : (Array.isArray(data?.items)
+      ? data.items
+      : (Array.isArray(data?.data) ? data.data : []))
+);
+
+export function TeleconsultaPatientWaiting() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [colorScheme] = useLocalStorage<'light' | 'dark'>({
+    key: 'mantine-color-scheme',
+    defaultValue: 'light',
+  });
+  const [now, setNow] = useState<Date>(() => new Date());
+  const [doctorJoined, setDoctorJoined] = useState(false);
+  const [patientJoined, setPatientJoined] = useState(false);
+  const [tokenMeta, setTokenMeta] = useState<TeleconsultationPublicTokenMeta | null>(null);
+  const [inCall, setInCall] = useState(false);
+  const [remoteConnected, setRemoteConnected] = useState(false);
+  const [signalingReady, setSignalingReady] = useState(false);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const pollingRef = useRef<number | null>(null);
+  const lastEventIdRef = useRef<number>(0);
+  const enteringCallRef = useRef(false);
+  const consultationIdRef = useRef<string | null>(null);
+  const isDark = colorScheme === 'dark';
+  const token = params.get('token') || '';
+  const clearPreparedSession = () => {
+    if (!token) return;
+    sessionStorage.removeItem(`${PREPARED_SESSION_KEY_PREFIX}${token}`);
+  };
+
+  useEffect(() => {
+    if (!token) {
+      setTokenMeta(null);
+      return;
+    }
+
+    let active = true;
+    teleconsultationLinkService.resolvePublicToken(token)
+      .then((data) => {
+        if (!active) return;
+        setTokenMeta(data);
+      })
+      .catch((error: any) => {
+        if (!active) return;
+        setTokenMeta(null);
+        showNotification({
+          title: 'Link inválido',
+          message: error?.response?.data?.error || error?.response?.data?.message || 'Não foi possível validar o link da teleconsulta.',
+          color: 'red',
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  const scheduledLabel = tokenMeta?.appointment?.time || params.get('scheduled') || '14:30';
+  const tokenRole = String(tokenMeta?.role || '').toUpperCase();
+  const isDoctorRole = tokenRole === 'DOCTOR';
+  const counterpartRole = isDoctorRole ? 'PATIENT' : 'DOCTOR';
+  const doctorName = tokenMeta?.appointment?.doctorName || DOCTOR.name;
+  const doctorSpecialty = tokenMeta?.appointment?.specialty || DOCTOR.specialty;
+  const patientName = tokenMeta?.appointment?.patientName || 'Paciente não informado';
+  const topCardLabel = isDoctorRole ? 'Paciente' : 'Médico Responsável';
+  const topCardName = isDoctorRole ? patientName : doctorName;
+  const topCardDetail = isDoctorRole ? 'Paciente da teleconsulta' : doctorSpecialty;
+  const allowJoinFromMinutesBefore = tokenMeta?.window?.allowJoinFromMinutesBefore ?? 10;
+  const fromPreparation = params.get('fromPrep') === '1';
+  const hasPreparedSession = token ? sessionStorage.getItem(`${PREPARED_SESSION_KEY_PREFIX}${token}`) === '1' : false;
+  const scheduledAt = useMemo(() => parseScheduledTime(scheduledLabel), [scheduledLabel]);
+
+  useEffect(() => {
+    if (!token || !isDoctorRole) return;
+    if (fromPreparation || hasPreparedSession) return;
+    navigate(`/teleconsulta/preparacao?token=${encodeURIComponent(token)}`, { replace: true });
+  }, [fromPreparation, hasPreparedSession, isDoctorRole, navigate, token]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const onDoctorJoined = () => setDoctorJoined(true);
+    window.addEventListener('teleconsulta:doctor-joined', onDoctorJoined);
+    return () => window.removeEventListener('teleconsulta:doctor-joined', onDoctorJoined);
+  }, []);
+
+  const stopMediaAndPeer = (sendHangup = false) => {
+    if (sendHangup && token) {
+      void teleconsultationLinkService.sendPublicSignal(token, { type: 'hangup', toRole: 'ALL' }).catch(() => undefined);
+    }
+
+    if (peerRef.current) {
+      peerRef.current.ontrack = null;
+      peerRef.current.onicecandidate = null;
+      peerRef.current.close();
+      peerRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    remoteStreamRef.current = null;
+
+    setRemoteConnected(false);
+    enteringCallRef.current = false;
+  };
+
+  const resolveConsultationIdByAppointment = async () => {
+    if (consultationIdRef.current) return consultationIdRef.current;
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!appointmentId) return null;
+
+    const data = await consultationService.list({
+      queueType: CLINICAL_QUEUE_TYPE,
+      limit: 200,
+    });
+    const rows = normalizeCollection(data);
+    const matched = rows.find((row: any) => {
+      const candidate = String(row?.appointmentId || row?.appointment_id || row?.appointment?.id || '').trim();
+      return candidate === appointmentId;
+    });
+    const resolvedId = matched?.id ? String(matched.id) : null;
+    consultationIdRef.current = resolvedId;
+    return resolvedId;
+  };
+
+  const updateConsultationQueue = async (targetStatus: string) => {
+    if (!isDoctorRole) return;
+    const consultationId = await resolveConsultationIdByAppointment();
+    if (!consultationId) return;
+    await consultationService.update(consultationId, {
+      queue: targetStatus,
+      queueType: CLINICAL_QUEUE_TYPE,
+    });
+  };
+
+  const ensurePeerConnection = async () => {
+    if (peerRef.current) return peerRef.current;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+    localStreamRef.current = stream;
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+      await localVideoRef.current.play().catch(() => undefined);
+    }
+
+    const peer = new RTCPeerConnection(RTC_CONFIGURATION);
+    stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+    peer.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      if (remoteStream) {
+        remoteStreamRef.current = remoteStream;
+      }
+      if (remoteVideoRef.current && remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        void remoteVideoRef.current.play().catch(() => undefined);
+      }
+      setRemoteConnected(true);
+    };
+
+    peer.onicecandidate = (event) => {
+      if (!event.candidate || !token) return;
+      void teleconsultationLinkService.sendPublicSignal(token, {
+        type: 'ice',
+        toRole: counterpartRole as 'PATIENT' | 'DOCTOR',
+        payload: event.candidate.toJSON(),
+      }).catch(() => undefined);
+    };
+
+    peerRef.current = peer;
+    return peer;
+  };
+
+  const enterConsultation = async () => {
+    if (!token || enteringCallRef.current) return;
+    enteringCallRef.current = true;
+
+    try {
+      if (isDoctorRole) {
+        await updateConsultationQueue(IN_PROGRESS_STATUS);
+      }
+
+      setInCall(true);
+      const peer = await ensurePeerConnection();
+
+      if (isDoctorRole) {
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        await teleconsultationLinkService.sendPublicSignal(token, {
+          type: 'offer',
+          toRole: 'PATIENT',
+          payload: offer,
+        });
+      } else {
+        await teleconsultationLinkService.sendPublicSignal(token, {
+          type: 'ready',
+          toRole: 'DOCTOR',
+          payload: { ts: Date.now() },
+        });
+      }
+    } catch (error: any) {
+      setInCall(false);
+      stopMediaAndPeer(false);
+      showNotification({
+        title: 'Falha ao iniciar chamada',
+        message: error?.message || 'Não foi possível iniciar a teleconsulta.',
+        color: 'red',
+      });
+    } finally {
+      enteringCallRef.current = false;
+    }
+  };
+
+  const finalizeDoctorConsultation = async () => {
+    if (!isDoctorRole) return;
+    try {
+      await updateConsultationQueue(IN_PROGRESS_STATUS);
+      await updateConsultationQueue(DONE_STATUS);
+      clearPreparedSession();
+      navigate('/consulta', { replace: true });
+    } catch (error: any) {
+      showNotification({
+        title: 'Falha ao finalizar atendimento',
+        message: error?.response?.data?.message || error?.response?.data?.error || 'Não foi possível concluir a consulta na fila clínica.',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleSignalEvent = async (event: { type: string; payload?: any; fromRole?: string }) => {
+    const type = String(event?.type || '').toLowerCase();
+
+    if (type === 'doctor-joined' && !isDoctorRole) {
+      setDoctorJoined(true);
+      return;
+    }
+
+    if (type === 'ready' && isDoctorRole) {
+      setPatientJoined(true);
+      if (inCall && peerRef.current) {
+        const offer = await peerRef.current.createOffer();
+        await peerRef.current.setLocalDescription(offer);
+        await teleconsultationLinkService.sendPublicSignal(token, {
+          type: 'offer',
+          toRole: 'PATIENT',
+          payload: offer,
+        });
+      }
+      return;
+    }
+
+    if (type === 'offer') {
+      if (!inCall) setInCall(true);
+      const peer = await ensurePeerConnection();
+      await peer.setRemoteDescription(new RTCSessionDescription(event.payload));
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+      await teleconsultationLinkService.sendPublicSignal(token, {
+        type: 'answer',
+        toRole: 'DOCTOR',
+        payload: answer,
+      });
+      return;
+    }
+
+    if (type === 'answer' && peerRef.current) {
+      await peerRef.current.setRemoteDescription(new RTCSessionDescription(event.payload));
+      return;
+    }
+
+    if (type === 'ice' && peerRef.current && event.payload) {
+      try {
+        await peerRef.current.addIceCandidate(new RTCIceCandidate(event.payload));
+      } catch {
+        // Ignora candidatos inválidos enquanto a chamada estabiliza.
+      }
+      return;
+    }
+
+    if (type === 'hangup') {
+      stopMediaAndPeer(false);
+      setInCall(false);
+      if (isDoctorRole) {
+        clearPreparedSession();
+        navigate('/consulta', { replace: true });
+        return;
+      }
+      showNotification({
+        title: 'Consulta encerrada',
+        message: 'A outra ponta finalizou a teleconsulta.',
+        color: 'blue',
+      });
+    }
+  };
+
+  const pollSignals = async () => {
+    if (!token) return;
+    try {
+      const response = await teleconsultationLinkService.pullPublicSignals(token, lastEventIdRef.current, 50);
+      if (typeof response?.lastEventId === 'number') {
+        lastEventIdRef.current = Math.max(lastEventIdRef.current, response.lastEventId);
+      }
+      for (const event of response?.events || []) {
+        await handleSignalEvent(event);
+      }
+      setSignalingReady(true);
+    } catch {
+      // Mantém polling silencioso.
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    void pollSignals();
+    pollingRef.current = window.setInterval(() => {
+      void pollSignals();
+    }, 1200);
+
+    return () => {
+      if (pollingRef.current) {
+        window.clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, inCall, isDoctorRole]);
+
+  useEffect(() => {
+    if (!token || !isDoctorRole) return;
+    void teleconsultationLinkService.sendPublicSignal(token, {
+      type: 'doctor-joined',
+      toRole: 'PATIENT',
+      payload: { ts: Date.now() },
+    }).catch(() => undefined);
+  }, [isDoctorRole, token]);
+
+  useEffect(() => {
+    if (!inCall) return;
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      void localVideoRef.current.play().catch(() => undefined);
+    }
+    if (remoteVideoRef.current && remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      void remoteVideoRef.current.play().catch(() => undefined);
+    }
+  }, [inCall]);
+
+  useEffect(() => {
+    return () => {
+      stopMediaAndPeer(false);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const diffSeconds = useMemo(
+    () => Math.floor((scheduledAt.getTime() - now.getTime()) / 1000),
+    [now, scheduledAt],
+  );
+
+  const withinWindow = diffSeconds <= allowJoinFromMinutesBefore * 60;
+  const isOverdue = diffSeconds < 0;
+
+  const counterpartReady = isDoctorRole ? patientJoined : doctorJoined;
+
+  const status = useMemo(() => {
+    if (counterpartReady) {
+      return { label: 'Tudo pronto!', color: '#58d82e' };
+    }
+
+    if (isOverdue) {
+      return { label: 'Aguardando médico (atraso)', color: '#ff4c4c' };
+    }
+
+    if (diffSeconds <= 5 * 60) {
+      return { label: 'Quase pronto', color: '#f7a623' };
+    }
+
+    return { label: 'Em preparação', color: '#7b90ff' };
+  }, [counterpartReady, diffSeconds, isOverdue]);
+
+  const ringProgress = useMemo(() => {
+    if (counterpartReady) return 1;
+    if (isOverdue) return Math.min(Math.abs(diffSeconds) / 600, 1);
+    return Math.max(0, Math.min(1, (600 - Math.max(diffSeconds, 0)) / 600));
+  }, [counterpartReady, diffSeconds, isOverdue]);
+
+  const ringColor = counterpartReady ? '#58d82e' : isOverdue ? '#ff4c4c' : status.color;
+  const timeText = counterpartReady ? 'PRONTO' : formatClock(diffSeconds, isOverdue);
+  const canJoinConsultation = isDoctorRole || (counterpartReady && withinWindow);
+
+  return (
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header />
+      <Box className={`${styles.page} ${isDark ? styles.pageDark : styles.pageLight}`}>
+        <Box className={styles.wrapper}>
+          <Text className={styles.title}>Teleconsulta</Text>
+
+          <Box className={`${styles.topCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
+            <Box className={styles.topLeft}>
+              <Box className={styles.avatar}>MS</Box>
+              <div>
+                <p className={styles.metaLabel}>{topCardLabel}</p>
+                <p className={styles.metaName}>{topCardName}</p>
+                <p className={styles.metaDetail}>{topCardDetail}</p>
+              </div>
+            </Box>
+
+            <Box className={styles.schedule}>
+              <p className={styles.scheduleLabel}>Horário Agendado</p>
+              <p className={styles.scheduleTime}>{scheduledLabel}</p>
+            </Box>
+          </Box>
+
+          {inCall ? (
+            <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`} style={{ padding: 16 }}>
+              <Group justify="space-between" mb="md">
+                <Text fw={700} size="lg">Consulta em andamento</Text>
+                <Button
+                  size="sm"
+                  color="red"
+                  variant="light"
+                  leftSection={<PhoneOff size={16} />}
+                  onClick={() => {
+                    stopMediaAndPeer(true);
+                    setInCall(false);
+                    void finalizeDoctorConsultation();
+                  }}
+                >
+                  Encerrar chamada
+                </Button>
+              </Group>
+              <Box style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260 }}>
+                  <video ref={localVideoRef} muted autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </Box>
+                <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260, position: 'relative' }}>
+                  <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {!remoteConnected ? (
+                    <Text size="sm" c="gray.3" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+                      Aguardando conexão da outra ponta...
+                    </Text>
+                  ) : null}
+                </Box>
+              </Box>
+            </Box>
+          ) : (
+            <Box className={styles.mainGrid}>
+              <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
+                <Box className={styles.waitHeader}>
+                  <div>
+                    <p className={styles.waitTitle}>Tempo de Espera</p>
+                    <p className={styles.waitSubtitle}>Atualizado em tempo real</p>
+                  </div>
+
+                  <Box className={styles.legend}>
+                    <span className={styles.legendRow}><span className={styles.legendDot} style={{ background: '#7b90ff' }} />Em preparação</span>
+                    <span className={styles.legendRow}><span className={styles.legendDot} style={{ background: '#f7a623' }} />Quase pronto</span>
+                    <span className={styles.legendRow}><span className={styles.legendDot} style={{ background: '#58d82e' }} />Tudo pronto!</span>
+                  </Box>
+                </Box>
+
+                <Box className={styles.ringArea}>
+                  <Box
+                    className={styles.ring}
+                    style={{
+                      ['--ring-bg' as string]: `conic-gradient(${ringColor} ${Math.round(ringProgress * 360)}deg, ${isDark ? '#08163f' : '#c6d0eb'} 0deg)`,
+                    }}
+                  >
+                    <span className={styles.timeText}>{timeText}</span>
+                  </Box>
+
+                  <span className={styles.statusBadge} style={{ color: status.color }}>
+                    <span className={styles.legendDot} style={{ background: status.color }} />
+                    {status.label}
+                  </span>
+                </Box>
+              </Box>
+
+              <Box className={`${styles.chatCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
+                <Box className={`${styles.chatHeader} ${isDark ? styles.chatHeaderDark : styles.chatHeaderLight}`}>
+                  <p className={styles.chatTitle}>Chat</p>
+                  <p className={styles.chatDoctor}>{doctorName}</p>
+                </Box>
+
+                <Box className={styles.chatBody}>
+                  <Box className={`${styles.chatBubble} ${isDark ? styles.chatBubbleDark : styles.chatBubbleLight}`}>
+                    Olá! Este é o canal de pré-consulta. Você pode enviar documentos, exames ou dúvidas para {doctorName} antes da chamada começar.
+                  </Box>
+                </Box>
+
+                <Box className={styles.chatInputRow}>
+                  <button type="button" className={`${styles.inputBtn} ${isDark ? styles.inputBtnDark : styles.inputBtnLight}`}>+</button>
+                  <input className={`${styles.inputField} ${isDark ? styles.inputFieldDark : styles.inputFieldLight}`} placeholder="Mensagem" />
+                  <button type="button" className={`${styles.inputBtn} ${isDark ? styles.inputBtnDark : styles.inputBtnLight}`}><Send size={20} /></button>
+                </Box>
+              </Box>
+            </Box>
+          )}
+
+          {!withinWindow && !isDoctorRole ? (
+            <Text c="yellow.3" mt={10}>
+              A consulta será liberada {allowJoinFromMinutesBefore} minutos antes do horário agendado.
+            </Text>
+          ) : null}
+
+          <Box className={styles.enterRow}>
+            <Button size="lg" radius="md" disabled={!canJoinConsultation || !signalingReady || inCall} onClick={() => { void enterConsultation(); }}>
+              {isDoctorRole ? 'Entrar na Teleconsulta' : 'Entrar na Consulta'}
+            </Button>
+          </Box>
+
+          <Box className={styles.tipsRow}>
+            <Box className={`${styles.tipCard} ${isDark ? styles.tipCardDark : styles.tipCardLight}`}>
+              <LampDesk size={24} />
+              <Text className={styles.tipText}>Escolha um ambiente iluminado</Text>
+            </Box>
+            <Box className={`${styles.tipCard} ${isDark ? styles.tipCardDark : styles.tipCardLight}`}>
+              <MicOff size={24} />
+              <Text className={styles.tipText}>Um local silencioso</Text>
+            </Box>
+            <Box className={`${styles.tipCard} ${isDark ? styles.tipCardDark : styles.tipCardLight}`}>
+              <SignalHigh size={24} />
+              <Text className={styles.tipText}>Use uma conexão estável</Text>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+}

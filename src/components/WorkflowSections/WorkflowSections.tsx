@@ -27,6 +27,7 @@ import {
   normalizeCompanyModuleType,
 } from '../../utils/moduleTypeAccess';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
+import { isDoctorUser } from '../../utils/userRole';
 
 export function WorkflowSections() {
   const navigate = useNavigate();
@@ -35,6 +36,50 @@ export function WorkflowSections() {
   const { data: currentUser, isLoading, isFetching, refetch } = useCurrentUserProfileQuery();
   const { data: myTicketsData } = useMyTicketsQuery();
   const unreadMyTickets = Number(myTicketsData?.unreadCount || 0);
+
+  const normalizeModuleKey = (value: unknown) => {
+    const raw = String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+    if (!raw) return '';
+
+    const compact = raw.replace(/\s+/g, ' ').trim();
+    const aliases: Record<string, string> = {
+      'agendamento': 'agendamento',
+      'pre agendamento': 'pre-agendamento',
+      'pre-atendimento': 'pre-atendimento',
+      'pre atendimento': 'pre-atendimento',
+      'consulta': 'consulta',
+      'teleconsulta': 'consulta',
+      'execucao de exames': 'execucao-exames',
+      'laudo': 'laudo',
+      'laudo por exame': 'laudo',
+      'autorizacao convenio': 'autorizacao-convenio',
+      'modulo tea': 'modulo-tea',
+      'cadastro de paciente': 'cadastro-paciente',
+      'cadastro de medico': 'cadastro-medico',
+      'cadastro de procedimentos': 'cadastro-procedimento',
+      'cadastro de procedimento': 'cadastro-procedimento',
+      'cadastro de convenio': 'cadastro-convenio',
+      'cadastro de salas': 'cadastro-sala',
+      'cadastro de equipamentos': 'cadastro-equipamento',
+      'cadastro de anamnese': 'cadastro-anamnese',
+      'cadastro de enfermagem': 'cadastro-enfermagem',
+      'entrega': 'entrega',
+      'estoque': 'estoque',
+      'financeiro': 'financeiro',
+      'faturamento': 'faturamento',
+      'whatsapp': 'whatsapp-config',
+      'conversas': 'whatsapp-config',
+      'meus chamados': 'meus-chamados',
+      'configuracoes de laudo': 'laudo',
+    };
+
+    if (aliases[compact]) return aliases[compact];
+    return compact.replace(/\s+/g, '-');
+  };
 
   const extractAllowedModules = (user: any) => {
     const modules: string[] = [];
@@ -46,16 +91,18 @@ export function WorkflowSections() {
 
     accesses.forEach((access: any) => {
       (access.modules || []).forEach((module: any) => {
-        if (module?.name && !modules.includes(module.name)) {
-          modules.push(module.name);
+        const moduleKey = normalizeModuleKey(module?.name);
+        if (moduleKey && !modules.includes(moduleKey)) {
+          modules.push(moduleKey);
         }
       });
     });
 
     (Array.isArray(user?.modules) ? user.modules : []).forEach((module: any) => {
       const moduleName = typeof module === 'string' ? module : module?.name;
-      if (moduleName && !modules.includes(moduleName)) {
-        modules.push(moduleName);
+      const moduleKey = normalizeModuleKey(moduleName);
+      if (moduleKey && !modules.includes(moduleKey)) {
+        modules.push(moduleKey);
       }
     });
 
@@ -74,16 +121,12 @@ export function WorkflowSections() {
     () => filterModulesForCompanyType(allowedModules.map((name) => ({ name })), companyModuleType).map((module) => String(module.name)),
     [allowedModules, companyModuleType],
   );
+  const doctorView = isDoctorUser(currentUser);
+  const doctorDefaultModules = ['agendamento', 'pre-agendamento', 'consulta', 'laudo'];
 
   const hasResolvedAccessData = useMemo(() => {
       const user = currentUser as any;
       return Array.isArray(user?.accesses) || Array.isArray(user?.access) || Array.isArray(user?.modules);
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('user', JSON.stringify(currentUser));
-    }
   }, [currentUser]);
 
   useEffect(() => {
@@ -157,7 +200,8 @@ export function WorkflowSections() {
     ...section,
     items: section.items.filter(item =>
       item.moduleName === 'meus-chamados'
-      || visibleAllowedModules.length === 0
+      || (visibleAllowedModules.length === 0 && doctorView && doctorDefaultModules.includes(item.moduleName))
+      || (visibleAllowedModules.length === 0 && !doctorView)
       || visibleAllowedModules.includes(item.moduleName)
       || (Array.isArray((item as any).fallbackModuleNames) && (item as any).fallbackModuleNames.some((moduleName: string) => visibleAllowedModules.includes(moduleName)))
     )
@@ -199,7 +243,7 @@ export function WorkflowSections() {
             ))}
           </Stack>
         </Box>
-      ) : visibleAllowedModules.length === 0 ? (
+      ) : visibleAllowedModules.length === 0 && !doctorView ? (
         <Box p="xl" style={{ textAlign: 'center' }}>
           <Text size="lg" c="dimmed" mb="xs">
             🔒 Você ainda não possui acessos configurados

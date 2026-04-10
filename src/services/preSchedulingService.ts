@@ -90,6 +90,8 @@ export interface PreSchedulingItem {
   anamnesisAnswersCount?: number;
   tokenAvailable?: boolean;
   isResolved?: boolean;
+  isTeleconsultation?: boolean;
+  teleconsultationLinkSent?: boolean;
 }
 
 export interface PublicPreSchedulingMeta {
@@ -219,6 +221,15 @@ const preSchedulingService = {
     return response.data as {
       message: string;
       status: PreSchedulingStatus;
+    };
+  },
+
+  async manualFinalize(appointmentId: string) {
+    const response = await api.post(`/care/pre-scheduling/${appointmentId}/manual-finalize`);
+    return response.data as {
+      message: string;
+      status: PreSchedulingStatus;
+      completedAt?: string | null;
     };
   },
 

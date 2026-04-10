@@ -4,6 +4,8 @@ import { User, Settings, Moon, Sun, LifeBuoy } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
+import authService from '../../services/authService';
+import { isDoctorUser } from '../../utils/userRole';
 import { APP_COLOR_SCHEME_EVENT, applyAppColorScheme, getAppColorScheme, type AppColorScheme } from '../../utils/appColorScheme';
 
 export function UserMenu() {
@@ -17,6 +19,8 @@ export function UserMenu() {
   const isDashboardScreen = location.pathname === '/dashboard';
   const { data: myTicketsData } = useMyTicketsQuery();
   const unreadCount = Number(myTicketsData?.unreadCount || 0);
+  const currentUser = authService.getCurrentUser() as any;
+  const doctorView = isDoctorUser(currentUser);
 
   useEffect(() => {
     const syncColorScheme = () => {
@@ -58,7 +62,7 @@ export function UserMenu() {
             Perfil
           </Menu.Item>
         )}
-        {!isAdmHubScreen && (
+        {!isAdmHubScreen && !doctorView && (
           <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
             Configuracoes
           </Menu.Item>

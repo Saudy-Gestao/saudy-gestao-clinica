@@ -42,6 +42,7 @@ import {
   Copy,
   Power,
   PowerOff,
+  RefreshCw,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { resolveApiErrorMessage } from '../../lib/apiError';
@@ -484,12 +485,15 @@ export function SettingsPage() {
   }, [selectedBranchForSectors, sectorsData]);
 
   useEffect(() => {
-    if (sectors.length > 0 && !selectedSectorForUsers) {
-      setSelectedSectorForUsers(sectors[0].id);
-    } else if (sectors.length === 0) {
+    if (sectors.length === 0) {
+      setSelectedSectorForUsers(null);
+      return;
+    }
+
+    if (selectedSectorForUsers && !sectors.some((sector: any) => sector.id === selectedSectorForUsers)) {
       setSelectedSectorForUsers(null);
     }
-  }, [sectors]);
+  }, [sectors, selectedSectorForUsers]);
 
   useEffect(() => {
     let filtered = usersData || [];
@@ -505,7 +509,16 @@ export function SettingsPage() {
   }, [usersData, userCompanyId, selectedSectorForUsers, selectedBranchForSectors]);
 
   useEffect(() => {
-    setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
+    const normalizedDoctors = Array.isArray(doctorsData)
+      ? doctorsData
+      : (Array.isArray((doctorsData as any)?.items)
+        ? (doctorsData as any).items
+        : (Array.isArray((doctorsData as any)?.data?.items)
+          ? (doctorsData as any).data.items
+          : (Array.isArray((doctorsData as any)?.data)
+            ? (doctorsData as any).data
+            : [])));
+    setDoctors(normalizedDoctors);
   }, [doctorsData]);
 
   useEffect(() => {
@@ -766,6 +779,26 @@ export function SettingsPage() {
     setUserModalOpen(true);
   };
 
+  const generateRandomPassword = (length = 14) => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+    let result = '';
+    for (let index = 0; index < length; index += 1) {
+      const randomIndex = Math.floor(Math.random() * chars.length);
+      result += chars[randomIndex];
+    }
+    return result;
+  };
+
+  const handleGeneratePassword = () => {
+    const generated = generateRandomPassword();
+    setUserForm((prev) => ({ ...prev, password: generated }));
+    notifications.show({
+      title: 'Senha gerada',
+      message: 'Senha aleatória preenchida. O hash é aplicado automaticamente no backend ao salvar.',
+      color: 'blue',
+    });
+  };
+
   const handleSaveUser = async () => {
     // Validate form
     const validation = validateUserForm(userForm, !!editingUser);
@@ -783,18 +816,40 @@ export function SettingsPage() {
     setSavingUser(true);
     try {
       const payload: any = { ...userForm };
-        if (!payload.doctorId) payload.doctorId = null;
-        if (!payload.password) delete payload.password;
+      if (!payload.doctorId) payload.doctorId = null;
+      if (!payload.password) delete payload.password;
+
+      payload.accessIds = Array.from(new Set(Array.isArray(userForm.accessIds) ? userForm.accessIds : []));
 
       if (editingUser) {
         await userService.updateUser(editingUser.id, payload);
         notifications.show({ title: 'Sucesso', message: 'Usuário atualizado', color: 'green' });
       } else {
-        await userService.createUser(payload);
+        const createdUser = await userService.createUser(payload);
+
+        queryClient.setQueryData(queryKeys.settingsUsers, (previous: any) => {
+          const list = Array.isArray(previous) ? previous : [];
+          if (!createdUser?.id) return list;
+          const withoutDuplicated = list.filter((user: any) => String(user?.id || '') !== String(createdUser.id));
+          return [createdUser, ...withoutDuplicated];
+        });
+
         notifications.show({ title: 'Sucesso', message: 'Usuário criado', color: 'green' });
+
+        // Garante que a tabela esteja filtrando para a filial/setor onde o usuário foi criado.
+        const createdBranchId = String(createdUser?.sector?.branchId || payload.branchId || '').trim();
+        const createdSectorId = String(createdUser?.sector?.id || payload.sectorId || '').trim();
+
+        if (createdBranchId) {
+          setSelectedBranchForSectors(createdBranchId);
+        }
+        if (createdSectorId) {
+          setSelectedSectorForUsers(createdSectorId);
+        }
       }
       setUserModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsDoctors });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar usuário'), color: 'red' });
@@ -804,11 +859,48 @@ export function SettingsPage() {
   };
 
   const availableDoctorsForUserForm = (doctors || [])
-    .filter((doctor: any) => !userForm.branchId || doctor.branchId === userForm.branchId)
+    .filter((doctor: any) => {
+      if (!userForm.branchId) return true;
+
+      const doctorBranchId = String(doctor?.branchId || doctor?.branch?.id || '').trim();
+      if (doctorBranchId && doctorBranchId === userForm.branchId) return true;
+
+      const rooms = Array.isArray(doctor?.rooms) ? doctor.rooms : [];
+      const hasRoomInSelectedBranch = rooms.some((link: any) => {
+        const roomBranchId = String(link?.room?.branchId || link?.branchId || '').trim();
+        return roomBranchId === userForm.branchId;
+      });
+      if (hasRoomInSelectedBranch) return true;
+
+      // Compatibilidade com médicos antigos que não tinham branchId preenchido.
+      return !doctorBranchId && rooms.length === 0;
+    })
     .map((doctor: any) => ({
-      value: doctor.id,
-      label: `${doctor.name}${doctor.specialty ? ` • ${doctor.specialty}` : ''}`,
+      value: String(doctor.id || ''),
+      label: `${doctor.name || 'Médico sem nome'}${doctor.specialty ? ` • ${doctor.specialty}` : ''}`,
+    }))
+    .filter((item: any) => item.value);
+
+  const userAccessOptions = (accessesList || []).map((a: any) => ({ value: a.id, label: a.description }));
+
+  useEffect(() => {
+    if (!userModalOpen || !userForm.doctorId) return;
+    const selectedDoctor = (doctors || []).find((doctor: any) => String(doctor?.id || '') === String(userForm.doctorId));
+    if (!selectedDoctor) return;
+
+    const parsedBirthDate = selectedDoctor?.birthDate
+      ? new Date(selectedDoctor.birthDate).toISOString().slice(0, 10)
+      : '';
+
+    setUserForm((prev) => ({
+      ...prev,
+      name: String(selectedDoctor?.name || prev.name || ''),
+      email: String(selectedDoctor?.email || prev.email || ''),
+      phone: String(selectedDoctor?.cellphone || selectedDoctor?.phone || prev.phone || ''),
+      birthDate: parsedBirthDate || prev.birthDate,
+      address: String(selectedDoctor?.address || prev.address || ''),
     }));
+  }, [doctors, userForm.doctorId, userModalOpen]);
 
   const handleDeleteUser = async (id: string) => {
     try {
@@ -922,20 +1014,11 @@ export function SettingsPage() {
 
   const handleDeleteAccess = async (id: string) => {
     try {
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      // Remover acesso do usuário (ao invés de deletar do banco)
-      if (currentUser?.id) {
-        const user = await userService.getUser(currentUser.id);
-        const updatedAccessIds = (user.accesses || [])
-          .map((a: any) => a.id)
-          .filter((accessId: string) => accessId !== id);
-        await userService.updateUser(currentUser.id, { accessIds: updatedAccessIds });
-      }
-      
-      notifications.show({ title: 'Sucesso', message: 'Acesso removido', color: 'green' });
+      await accessService.deleteAccess(id);
+      notifications.show({ title: 'Sucesso', message: 'Acesso excluído', color: 'green' });
       await refreshLoggedUserInStorage();
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir acesso'), color: 'red' });
     }
@@ -1397,10 +1480,13 @@ export function SettingsPage() {
                             />
                             <Select 
                                 label="Setor"
-                                placeholder="Selecione..." 
-                                data={(sectors || []).map(s => ({ value: s.id, label: s.name }))}
-                                value={selectedSectorForUsers}
-                                onChange={setSelectedSectorForUsers}
+                                placeholder="Todos os setores" 
+                                data={[
+                                  { value: '__ALL__', label: 'Todos os setores' },
+                                  ...(sectors || []).map(s => ({ value: s.id, label: s.name })),
+                                ]}
+                                value={selectedSectorForUsers || '__ALL__'}
+                                onChange={(value) => setSelectedSectorForUsers(value === '__ALL__' ? null : value)}
                                 style={{ flex: 1 }}
                                 disabled={!selectedBranchForSectors}
                             />
@@ -1495,7 +1581,7 @@ export function SettingsPage() {
                                 <Grid.Col span={12}>
                                     <MultiSelect 
                                         label="Acessos" 
-                                        data={(accessesList || []).map(a => ({ value: a.id, label: a.description }))}
+                                        data={userAccessOptions}
                                         value={userForm.accessIds || []}
                                         onChange={(v) => setUserForm({...userForm, accessIds: v})}
                                         searchable
@@ -1525,6 +1611,17 @@ export function SettingsPage() {
                                         type="password" 
                                         value={userForm.password} 
                                         onChange={(e: any) => setUserForm({...userForm, password: e.currentTarget.value})} 
+                                        rightSection={(
+                                          <ActionIcon
+                                            variant="subtle"
+                                            color="blue"
+                                            size="sm"
+                                            onClick={handleGeneratePassword}
+                                            title="Gerar senha aleatória"
+                                          >
+                                            <RefreshCw size={14} />
+                                          </ActionIcon>
+                                        )}
                                         error={userErrors.password}
                                     />
                                 </Grid.Col>

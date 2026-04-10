@@ -49,6 +49,7 @@ interface ProcedureForm {
   acceptedInsurances: string[];
   acceptedSubInsurances: Record<string, string[]>;
   durationMinutes?: number | null;
+  supportsTeleconsultation: boolean;
   modalities: string[];
   doctorIds: string[];
   procedureMaterials: { inventoryItemId: string; quantity: number }[];
@@ -62,6 +63,7 @@ interface ProcedureItem {
   tussTableCode?: string;
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
+  supportsTeleconsultation: boolean;
   modalities: string[];
   doctorIds: string[];
   doctorsCount: number;
@@ -79,10 +81,13 @@ const INITIAL_FORM: ProcedureForm = {
   acceptedInsurances: [],
   acceptedSubInsurances: {},
   durationMinutes: null,
+  supportsTeleconsultation: false,
   modalities: [],
   doctorIds: [],
   procedureMaterials: [],
 };
+
+const TELECONSULT_MODALITY = 'Telemedicina';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -143,7 +148,6 @@ export function CadastroProcedimento() {
 
   const modalityOptions = [
     { value: 'Presencial', label: 'Presencial' },
-    { value: 'Telemedicina', label: 'Telemedicina' },
     { value: 'Domiciliar', label: 'Domiciliar' },
     { value: 'Emergencial', label: 'Emergencial' },
   ];
@@ -193,7 +197,10 @@ export function CadastroProcedimento() {
       tussTableCode: String(it.tussTableCode || '').trim() || undefined,
       acceptsInsurance: Boolean(it.acceptsInsurance),
       acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
-      modalities: Array.isArray(it.modalities) ? it.modalities : [],
+      supportsTeleconsultation: Array.isArray(it.modalities) ? it.modalities.includes(TELECONSULT_MODALITY) : false,
+      modalities: Array.isArray(it.modalities)
+        ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
+        : [],
       doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
       materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
       isActive: Boolean(it.isActive ?? true),
@@ -358,7 +365,10 @@ export function CadastroProcedimento() {
         acceptsInsurance: form.acceptsInsurance,
         acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
         acceptedSubInsurances: form.acceptsInsurance ? form.acceptedSubInsurances : {},
-        modalities: form.modalities,
+        modalities: [
+          ...form.modalities.filter((modality) => modality !== TELECONSULT_MODALITY),
+          ...(form.appointmentType === 'CONSULTA' && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
+        ],
         doctors,
         procedureMaterials: form.procedureMaterials,
       };
@@ -535,7 +545,10 @@ export function CadastroProcedimento() {
         acceptsInsurance: Boolean(data.acceptsInsurance),
         acceptedInsurances: Array.isArray(data.acceptedInsurances) ? data.acceptedInsurances : [],
         acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},
-        modalities: Array.isArray(data.modalities) ? data.modalities : [],
+        supportsTeleconsultation: Array.isArray(data.modalities) ? data.modalities.includes(TELECONSULT_MODALITY) : false,
+        modalities: Array.isArray(data.modalities)
+          ? data.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
+          : [],
         doctorIds,
         procedureMaterials: Array.isArray(data?.materials)
           ? data.materials
@@ -615,6 +628,7 @@ export function CadastroProcedimento() {
                     onChange={(value) => setForm((prev) => ({
                       ...prev,
                       appointmentType: value === 'EXAME' ? 'EXAME' : 'CONSULTA',
+                      supportsTeleconsultation: value === 'EXAME' ? false : prev.supportsTeleconsultation,
                     }))}
                     allowDeselect={false}
                   />
@@ -658,6 +672,15 @@ export function CadastroProcedimento() {
                     label="Aceita convenio"
                     checked={form.acceptsInsurance}
                     onChange={(e) => handleAcceptsInsuranceChange(e?.currentTarget?.checked ?? !form.acceptsInsurance)}
+                  />
+                  <Switch
+                    label="Suporta teleconsulta"
+                    checked={form.supportsTeleconsultation}
+                    disabled={form.appointmentType !== 'CONSULTA'}
+                    onChange={(event) => {
+                      const checked = event.currentTarget.checked;
+                      setForm((prev) => ({ ...prev, supportsTeleconsultation: checked }));
+                    }}
                   />
                   {form.acceptsInsurance && form.acceptedInsurances.length > 0 && (
                     <Group gap="xs" align="center">
@@ -894,6 +917,11 @@ export function CadastroProcedimento() {
                                   <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
                                     {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
                                   </Badge>
+                                  {item.supportsTeleconsultation && (
+                                    <Badge color="indigo" variant="light" size="sm">
+                                      Teleconsulta
+                                    </Badge>
+                                  )}
                                   <Badge color={item.acceptsInsurance ? 'teal' : 'gray'} variant="light" size="sm">
                                     {item.acceptsInsurance ? 'Aceita convênio' : 'Particular'}
                                   </Badge>
@@ -980,9 +1008,16 @@ export function CadastroProcedimento() {
                                 </Table.Td>
                                 {!isTablet && (
                                   <Table.Td>
-                                    <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
-                                      {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
-                                    </Badge>
+                                    <Group gap={6}>
+                                      <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
+                                        {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                      </Badge>
+                                      {item.supportsTeleconsultation && (
+                                        <Badge color="indigo" variant="light" size="sm">
+                                          Teleconsulta
+                                        </Badge>
+                                      )}
+                                    </Group>
                                   </Table.Td>
                                 )}
                                 {!isTablet && (

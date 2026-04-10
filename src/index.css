@@ -1218,7 +1218,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  pointer-events: auto;
   color: var(--mantine-color-dimmed);
 }
 

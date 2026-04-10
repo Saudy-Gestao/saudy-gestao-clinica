@@ -23,6 +23,8 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
 import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
+import { TeleconsultaPreparation } from './components/Teleconsulta/TeleconsultaPreparation';
+import { TeleconsultaPatientWaiting } from './components/Teleconsulta/TeleconsultaPatientWaiting';
 import { ExecucaoExames } from './components/Exames/ExecucaoExames';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
@@ -61,6 +63,7 @@ import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
 import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogin';
 import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
 import patientPortalAuthService from './services/patientPortalAuthService';
+import { isDoctorUser } from './utils/userRole';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -68,8 +71,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
+  const currentUser = authService.getCurrentUser() as any;
   const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
+  const doctorView = isDoctorUser(currentUser);
   const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {
@@ -79,6 +83,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAllowedForAdmOnly = admAllowedPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
   if (isAdmOnly && !isAllowedForAdmOnly) {
     return <Navigate to="/adm-hub" replace />;
+  }
+
+  if (doctorView && location.pathname === '/settings') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -214,6 +222,14 @@ function App() {
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
+          />
+          <Route
+            path="/teleconsulta/preparacao"
+            element={<TeleconsultaPreparation />}
+          />
+          <Route
+            path="/teleconsulta/paciente/espera"
+            element={<TeleconsultaPatientWaiting />}
           />
           <Route
             path="/execucao-exames"
