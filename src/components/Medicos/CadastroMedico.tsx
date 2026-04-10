@@ -966,7 +966,7 @@ export function CadastroMedico() {
               <Group justify="flex-end" mt="md">
                 <Button variant="default" onClick={handleCancel}>Cancelar</Button>
                 <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving} size="md" c="white">
-                  {isEditing ? 'Salvar alteracoes' : 'Salvar'}
+                  {isEditing ? 'Salvar alterações' : 'Salvar'}
                 </Button>
               </Group>
             </Stack>

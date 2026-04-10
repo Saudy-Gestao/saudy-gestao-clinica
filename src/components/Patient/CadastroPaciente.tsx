@@ -1299,7 +1299,7 @@ export function CadastroPaciente() {
               <Group justify="right">
                 <Button variant="default" onClick={handleCancel}>Cancelar</Button>
                 <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving} size="md" c="white">
-                  {isEditing ? 'Salvar alteracoes' : 'Salvar'}
+                  {isEditing ? 'Salvar alterações' : 'Salvar'}
                 </Button>
               </Group>
             </Stack>
