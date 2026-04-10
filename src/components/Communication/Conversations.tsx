@@ -33,7 +33,6 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronUp,
-  FileClock,
   Info,
   MessageCircle,
   PanelLeftClose,
@@ -480,22 +479,29 @@ export function Conversations() {
     });
   }, [currentMessages, messageSearch]);
 
-  const openProtocolModal = () => {
-    setProtocolModalOpen(true);
-    setProtocolNumberInput(String(currentConversation?.humanProtocolNumber || '').trim());
-    setProtocolLookup(null);
+  const isValidProtocolFormat = (value: string) => {
+    const trimmed = value.trim();
+    // Matches patterns like: WA-20260410-2014ED, WA-20260410-123456, etc.
+    return /^WA-\d{8}-[A-Z0-9]{6}$/i.test(trimmed);
   };
 
-  const handleLookupProtocol = async () => {
+  const openProtocolModal = (protocolNumber?: string) => {
+    setProtocolModalOpen(true);
+    const protocol = protocolNumber || String(currentConversation?.humanProtocolNumber || '').trim();
+    setProtocolNumberInput(protocol);
+    if (protocol) {
+      void handleLookupProtocol(protocol);
+    } else {
+      setProtocolLookup(null);
+    }
+  };
+
+  const handleLookupProtocol = async (customProtocol?: string) => {
     const conversationId = selectedConversation?.id;
-    const protocolNumber = String(protocolNumberInput || '').trim();
+    const protocolNumber = customProtocol || String(protocolNumberInput || '').trim();
     if (!conversationId) return;
     if (!protocolNumber) {
-      notifications.show({
-        title: 'Informe o protocolo',
-        message: 'Digite o número do protocolo para buscar o histórico.',
-        color: 'yellow',
-      });
+      setProtocolLookup(null);
       return;
     }
 
@@ -726,7 +732,14 @@ export function Conversations() {
                     placeholder="Paciente, telefone ou protocolo"
                     leftSection={<Search size={16} />}
                     value={search}
-                    onChange={(event) => setSearch(event.currentTarget.value)}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      setSearch(value);
+                      // Auto-open protocol modal when valid protocol is typed
+                      if (isValidProtocolFormat(value)) {
+                        openProtocolModal(value.trim());
+                      }
+                    }}
                   />
                   <Select
                     label="Fluxo"
@@ -860,9 +873,6 @@ export function Conversations() {
                     </Group>
                   </Box>
                   <Group gap="xs">
-                    <Button variant="light" leftSection={<FileClock size={14} />} onClick={openProtocolModal}>
-                      Protocolo
-                    </Button>
                     {selectedConversation.humanStatus !== 'CLOSED' && !isAlreadyAssignedToMe(selectedConversation) ? (
                       <Button
                         leftSection={<UserCheck size={14} />}
@@ -1206,9 +1216,9 @@ export function Conversations() {
             onChange={(event) => {
               const value = event.currentTarget.value;
               setProtocolNumberInput(value);
-              // Auto-search when a valid protocol is typed
+              // Auto-search when typed
               if (value.trim().length > 0) {
-                void handleLookupProtocol();
+                void handleLookupProtocol(value.trim());
               } else {
                 setProtocolLookup(null);
               }
