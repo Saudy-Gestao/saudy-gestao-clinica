@@ -308,6 +308,8 @@ export function Conversations() {
   const [operatorDrafts, setOperatorDrafts] = useState<OperatorDraftMap>({});
   const [conversationSettingsDraft, setConversationSettingsDraft] = useState<HumanConversationSettings | null>(null);
   const [expandedOperators, setExpandedOperators] = useState<Record<string, boolean>>({});
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<{ url: string; fileName?: string | null } | null>(null);
 
   const conversationsQuery = useQuery({
     queryKey: [...queryKeys.whatsappConversations, status, search, flowKey || '', mineOnly ? 'mine' : 'all'],
@@ -706,11 +708,17 @@ export function Conversations() {
     return (
       <Stack gap={6}>
         {media.isImage && hasMediaUrl ? (
-          <Box>
+          <Box
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              setSelectedImage({ url: media.url, fileName: media.fileName });
+              setImageModalOpen(true);
+            }}
+          >
             <img
               src={media.url}
               alt={media.fileName || 'Imagem enviada'}
-              style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }}
+              style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: 8, display: 'block', objectFit: 'cover' }}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
@@ -930,7 +938,7 @@ export function Conversations() {
                 <Text fw={600}>Selecione uma conversa</Text>
               </Stack>
             ) : (
-              <Stack gap="md" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Group justify="space-between" align="flex-start" wrap="nowrap">
                   <Box style={{ flex: 1 }}>
                     <Group gap="xs" wrap="nowrap" align="center">
@@ -1029,7 +1037,7 @@ export function Conversations() {
                   </Group>
                 ) : null}
 
-                <ScrollArea style={{ flex: 1 }} offsetScrollbars viewportRef={viewportRef}>
+                <ScrollArea style={{ flex: 1, minHeight: 0 }} offsetScrollbars viewportRef={viewportRef}>
                   <Stack gap="sm" pr="xs">
                     {currentMessages.map((message, index) => {
                       const styles = bubbleStyles(message, colorScheme);
@@ -1103,7 +1111,7 @@ export function Conversations() {
                     Atendimento encerrado
                   </Badge>
                 )}
-              </Stack>
+              </Box>
             )}
           </Paper>
         </Box>
@@ -1435,6 +1443,27 @@ export function Conversations() {
             </Stack>
           </ScrollArea>
         </Stack>
+      </Modal>
+
+      <Modal
+        opened={imageModalOpen}
+        onClose={() => {
+          setImageModalOpen(false);
+          setSelectedImage(null);
+        }}
+        title={selectedImage?.fileName || 'Imagem'}
+        size="xl"
+        centered
+      >
+        {selectedImage ? (
+          <Box style={{ textAlign: 'center' }}>
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.fileName || 'Imagem'}
+              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+            />
+          </Box>
+        ) : null}
       </Modal>
     </Box>
   );
