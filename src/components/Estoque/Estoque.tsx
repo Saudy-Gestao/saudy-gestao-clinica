@@ -15,6 +15,7 @@ import { FloatingNumberInput } from '../common/FloatingNumberInput';
 import { FloatingDateInput } from '../common/FloatingDateInput';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface StockItem {
   id: string;
@@ -138,7 +139,7 @@ export function Estoque() {
   useEffect(() => {
     if (!inventoryError) return;
     const err: any = inventoryError;
-    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar itens';
+    const msg = resolveApiErrorMessage(err, 'Erro ao carregar itens');
     setItemErrorTitle('Erro ao carregar itens');
     setItemErrorMessage(msg);
     setShowItemErrorModal(true);
@@ -367,7 +368,7 @@ export function Estoque() {
         setFieldErrors(serverFields);
       }
 
-      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Erro ao salvar item';
+      const msg = resolveApiErrorMessage(err, 'Erro ao salvar item');
       // fallback to toast for some errors but also show error modal
       setItemErrorTitle('Erro ao salvar item');
       setItemErrorMessage(msg);

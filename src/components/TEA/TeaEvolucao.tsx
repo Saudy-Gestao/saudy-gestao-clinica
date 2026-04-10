@@ -34,6 +34,7 @@ import { useTeaPitQuery } from '../../hooks/useTeaPitQuery';
 import { useTeaEvolutionsQuery } from '../../hooks/useTeaEvolutionsQuery';
 import { usePatientAppointmentsQuery } from '../../hooks/usePatientAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingDateInput } from '../common/FloatingDateInput';
 import { FloatingTextarea } from '../common/FloatingTextarea';
@@ -249,37 +250,37 @@ export function TeaEvolucao() {
   useEffect(() => {
     if (!teaProfilesError) return;
     const err: any = teaProfilesError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'), color: 'red' });
   }, [teaProfilesError]);
 
   useEffect(() => {
     if (!doctorsError) return;
     const err: any = doctorsError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'), color: 'red' });
   }, [doctorsError]);
 
   useEffect(() => {
     if (!plansError || !selectedTeaProfileId) return;
     const err: any = plansError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar planos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar planos'), color: 'red' });
   }, [plansError, selectedTeaProfileId]);
 
   useEffect(() => {
     if (!pitError || !selectedTeaProfileId) return;
     const err: any = pitError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar PIT', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar PIT'), color: 'red' });
   }, [pitError, selectedTeaProfileId]);
 
   useEffect(() => {
     if (!evolutionsError || !selectedTeaProfileId) return;
     const err: any = evolutionsError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar evoluções', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar evoluções'), color: 'red' });
   }, [evolutionsError, selectedTeaProfileId]);
 
   useEffect(() => {
     if (!appointmentsError || !selectedProfile?.patient?.id) return;
     const err: any = appointmentsError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar agendamentos'), color: 'red' });
   }, [appointmentsError, selectedProfile?.patient?.id]);
 
   useEffect(() => {
@@ -355,7 +356,7 @@ export function TeaEvolucao() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao registrar evolução',
+        message: resolveApiErrorMessage(err, 'Falha ao registrar evolução'),
         color: 'red',
       });
     } finally {

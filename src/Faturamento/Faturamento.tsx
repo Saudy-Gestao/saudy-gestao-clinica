@@ -16,6 +16,7 @@ import { FloatingInput } from '../components/common/FloatingInput';
 import { FloatingSelect } from '../components/common/FloatingSelect';
 import { FloatingTextarea } from '../components/common/FloatingTextarea';
 import { FloatingNumberInput } from '../components/common/FloatingNumberInput';
+import { resolveApiErrorMessage } from '../lib/apiError';
 import tissBatchService from '../services/tissBatchService';
 import { useTissBatchesQuery } from '../hooks/useTissBatchesQuery';
 
@@ -248,7 +249,7 @@ export function Faturamento() {
   useEffect(() => {
     if (!invoicesError) return;
     const err: any = invoicesError;
-    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar faturas';
+    const msg = resolveApiErrorMessage(err, 'Erro ao carregar faturas');
     showNotification({ title: 'Erro', message: msg, color: 'red' });
   }, [invoicesError]);
 
@@ -341,7 +342,7 @@ export function Faturamento() {
       setSelectedInvoiceIds([]);
       setTissModalOpen(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao criar lote TISS';
+      const msg = resolveApiErrorMessage(err, 'Falha ao criar lote TISS');
       showNotification({ title: 'Erro ao criar lote TISS', message: msg, color: 'red' });
     } finally {
       setCreatingTissBatch(false);
@@ -362,7 +363,7 @@ export function Faturamento() {
       window.URL.revokeObjectURL(url);
       await queryClient.invalidateQueries({ queryKey: queryKeys.tissBatches });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Não foi possível gerar o XML do lote.';
+      const msg = resolveApiErrorMessage(err, 'Não foi possível gerar o XML do lote.');
       showNotification({ title: 'Erro ao gerar XML', message: msg, color: 'red' });
     } finally {
       setDownloadingBatchId(null);
@@ -392,7 +393,7 @@ export function Faturamento() {
       setProtocolBatchId(null);
       setProtocolNumberInput('');
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao registrar protocolo';
+      const msg = resolveApiErrorMessage(err, 'Falha ao registrar protocolo');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSavingProtocol(false);
@@ -438,7 +439,7 @@ export function Faturamento() {
       setReturnBatchId(null);
       setReturnRows([]);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao registrar retorno';
+      const msg = resolveApiErrorMessage(err, 'Falha ao registrar retorno');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSavingReturn(false);
@@ -454,7 +455,7 @@ export function Faturamento() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tissBatches });
       showNotification({ title: 'Reapresentação criada', message: 'Novo lote criado para guias glosadas/parciais.', color: 'green' });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao reapresentar lote';
+      const msg = resolveApiErrorMessage(err, 'Falha ao reapresentar lote');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setRepresentingBatchId(null);
@@ -590,7 +591,7 @@ export function Faturamento() {
         setShowInvoiceSuccess(true);
         await queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
       } catch (err: any) {
-        const msg = err?.response?.data?.message || err?.response?.data?.details || err?.message || 'Erro ao atualizar fatura';
+        const msg = resolveApiErrorMessage(err, 'Erro ao atualizar fatura');
         setInvoiceErrorTitle('Erro ao atualizar fatura');
         setInvoiceErrorMessage(msg);
         setShowInvoiceError(true);
@@ -646,7 +647,7 @@ export function Faturamento() {
         setShowInvoiceSuccess(true);
         await queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
       } catch (err: any) {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao criar fatura';
+        const msg = resolveApiErrorMessage(err, 'Erro ao criar fatura');
         setInvoiceErrorTitle('Erro ao criar fatura');
         setInvoiceErrorMessage(msg);
         setShowInvoiceError(true);

@@ -4,6 +4,7 @@ import { ActionIcon, Anchor, Badge, Box, Button, Group, Paper, PinInput, Stack, 
 import { notifications } from '@mantine/notifications';
 import { CheckCircle2, LockKeyhole, MailCheck, Moon, ShieldCheck, Sun } from 'lucide-react';
 import patientPortalAuthService from '../../services/patientPortalAuthService';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF, isValidCPF, onlyDigits } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
 import './patient-portal.css';
@@ -64,7 +65,7 @@ export function PatientPortalLogin() {
       if (retryAfter > 0) setRetryAfterSeconds(retryAfter);
       notifications.show({
         title: 'Falha no acesso',
-        message: error?.response?.data?.error || 'Não foi possível solicitar o código.',
+        message: resolveApiErrorMessage(error, 'Não foi possível solicitar o código.'),
         color: 'red',
       });
     } finally {
@@ -96,7 +97,7 @@ export function PatientPortalLogin() {
       if (retryAfter > 0) setRetryAfterSeconds(retryAfter);
       notifications.show({
         title: 'Código inválido',
-        message: error?.response?.data?.error || 'Não foi possível validar o código.',
+        message: resolveApiErrorMessage(error, 'Não foi possível validar o código.'),
         color: 'red',
       });
     } finally {

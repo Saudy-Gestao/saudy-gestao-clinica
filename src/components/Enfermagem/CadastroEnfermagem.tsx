@@ -30,6 +30,7 @@ import procedureNursingTemplateService, {
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useNursingTemplatesQuery } from '../../hooks/useNursingTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
@@ -187,7 +188,7 @@ export function CadastroEnfermagem() {
     if (err) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || 'Erro ao carregar cadastro de enfermagem',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar cadastro de enfermagem'),
         color: 'red',
       });
     }
@@ -328,7 +329,7 @@ export function CadastroEnfermagem() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Erro ao salvar triagem',
+        message: resolveApiErrorMessage(err, 'Erro ao salvar triagem'),
         color: 'red',
       });
     } finally {
@@ -348,7 +349,7 @@ export function CadastroEnfermagem() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || 'Erro ao desativar triagem',
+        message: resolveApiErrorMessage(err, 'Erro ao desativar triagem'),
         color: 'red',
       });
     }

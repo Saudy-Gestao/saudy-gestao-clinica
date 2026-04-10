@@ -19,6 +19,7 @@ import {
 import { ArrowLeft, Building2, ShieldCheck, Waypoints } from 'lucide-react';
 import { notifications, showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import companyService from '../../services/companyService';
 import { isValidEmail, normalizeEmail } from '../../utils/formatters';
 import { Header } from '../Header/Header';
@@ -199,7 +200,7 @@ export function CadastroCliente() {
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
-      const message = e?.response?.data?.message || e?.message || 'Erro ao cadastrar cliente';
+      const message = resolveApiErrorMessage(e, 'Erro ao cadastrar cliente');
       notifications.update({
         id: notificationId,
         title: 'Falha no cadastro',

@@ -25,6 +25,7 @@ import { ChevronLeft, CircleHelp, Pencil, Power, ScanLine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import ResultModal from '../common/ResultModal';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { FloatingNumberInput } from '../common/FloatingNumberInput';
@@ -290,7 +291,7 @@ export function CadastroEquipamento() {
       const err: any = equipmentsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar equipamentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar equipamentos'),
         color: 'red',
       });
     }
@@ -415,7 +416,7 @@ export function CadastroEquipamento() {
       setActiveTab('lista');
       await queryClient.invalidateQueries({ queryKey: queryKeys.medicalEquipments });
     } catch (err: any) {
-      setErrorMessage(err?.response?.data?.message || err?.message || 'Não foi possível salvar o equipamento.');
+      setErrorMessage(resolveApiErrorMessage(err, 'Não foi possível salvar o equipamento.'));
       setErrorOpen(true);
     } finally {
       setSaving(false);
@@ -431,7 +432,7 @@ export function CadastroEquipamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível atualizar o status.',
+        message: resolveApiErrorMessage(err, 'Não foi possível atualizar o status.'),
         color: 'red',
       });
     }
@@ -450,7 +451,7 @@ export function CadastroEquipamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível testar a comunicação.',
+        message: resolveApiErrorMessage(err, 'Não foi possível testar a comunicação.'),
         color: 'red',
       });
     } finally {

@@ -18,6 +18,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { ArrowLeft, LifeBuoy, Paperclip, Send, X } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import ticketService, { type TicketItem, type TicketType, type TicketStatus, type TicketMessageItem, type TicketPriority } from '../../services/ticketService';
 
@@ -136,7 +137,7 @@ export function MyTicketDetailsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao carregar chamado',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível carregar os detalhes do chamado.',
+        message: resolveApiErrorMessage(error, 'Não foi possível carregar os detalhes do chamado.'),
         color: 'red',
       });
       navigate('/meus-chamados');
@@ -161,7 +162,7 @@ export function MyTicketDetailsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao registrar atualização',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível enviar a atualização.',
+        message: resolveApiErrorMessage(error, 'Não foi possível enviar a atualização.'),
         color: 'red',
       });
     } finally {
@@ -192,7 +193,7 @@ export function MyTicketDetailsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao abrir anexo',
-        message: error?.response?.data?.message || error?.message || `Não foi possível abrir ${fileName || 'o anexo'}.`,
+        message: resolveApiErrorMessage(error, `Não foi possível abrir ${fileName || 'o anexo'}.`),
         color: 'red',
       });
     } finally {
@@ -214,7 +215,7 @@ export function MyTicketDetailsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao confirmar fechamento',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível confirmar o fechamento.',
+        message: resolveApiErrorMessage(error, 'Não foi possível confirmar o fechamento.'),
         color: 'red',
       });
     } finally {

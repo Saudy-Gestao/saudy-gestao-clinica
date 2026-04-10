@@ -43,6 +43,7 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface Agendamento {
   id: string;
@@ -665,7 +666,7 @@ export function Agendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Nao foi possivel abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Nao foi possivel abrir o anexo.'),
         color: 'red',
       });
     } finally {
@@ -707,7 +708,7 @@ export function Agendamento() {
       const err: any = appointmentsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar agendamentos'),
         color: 'red',
       });
     }
@@ -745,7 +746,7 @@ export function Agendamento() {
     const err: any = patientsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
       color: 'red',
     });
   }, [patientsQuery.error]);
@@ -755,7 +756,7 @@ export function Agendamento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -765,7 +766,7 @@ export function Agendamento() {
     const err: any = doctorsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -775,7 +776,7 @@ export function Agendamento() {
     const err: any = proceduresCatalogQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'),
       color: 'red',
     });
   }, [proceduresCatalogQuery.error]);
@@ -1245,7 +1246,7 @@ export function Agendamento() {
         : null;
       showNotification({
         title: 'Erro ao finalizar cadastro',
-        message: String(firstFieldError || err?.response?.data?.message || err?.message || 'Não foi possível criar o paciente antes do agendamento.'),
+        message: String(firstFieldError || resolveApiErrorMessage(err, 'Não foi possível criar o paciente antes do agendamento.')),
         color: 'red',
       });
       return null;
@@ -1353,7 +1354,7 @@ export function Agendamento() {
         setSavingAgendamento(false);
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar agendamento',
+          message: resolveApiErrorMessage(err, 'Erro ao atualizar agendamento'),
           color: 'red',
         });
         return;
@@ -1435,7 +1436,7 @@ export function Agendamento() {
         setSavingAgendamento(false);
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao criar agendamento',
+          message: resolveApiErrorMessage(err, 'Erro ao criar agendamento'),
           color: 'red',
         });
         return;
@@ -1457,7 +1458,7 @@ export function Agendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status',
+        message: resolveApiErrorMessage(err, 'Erro ao atualizar status'),
         color: 'red',
       });
     }

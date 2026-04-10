@@ -19,6 +19,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { ArrowLeft, LifeBuoy, Paperclip, Send, X } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import ticketService, { type TicketItem, type TicketType, type TicketStatus, type TicketMessageItem, type TicketPriority } from '../../services/ticketService';
 
@@ -151,7 +152,7 @@ export function AdminTicketDetails() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao carregar chamado',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível carregar os detalhes do chamado.',
+        message: resolveApiErrorMessage(error, 'Não foi possível carregar os detalhes do chamado.'),
         color: 'red',
       });
       navigate('/adm-tickets');
@@ -174,7 +175,7 @@ export function AdminTicketDetails() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao atualizar status',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível atualizar o status.',
+        message: resolveApiErrorMessage(error, 'Não foi possível atualizar o status.'),
         color: 'red',
       });
     } finally {
@@ -194,7 +195,7 @@ export function AdminTicketDetails() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao registrar atualização',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível enviar a atualização.',
+        message: resolveApiErrorMessage(error, 'Não foi possível enviar a atualização.'),
         color: 'red',
       });
     } finally {
@@ -212,7 +213,7 @@ export function AdminTicketDetails() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao atualizar prioridade',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível atualizar a prioridade.',
+        message: resolveApiErrorMessage(error, 'Não foi possível atualizar a prioridade.'),
         color: 'red',
       });
     } finally {
@@ -243,7 +244,7 @@ export function AdminTicketDetails() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao abrir anexo',
-        message: error?.response?.data?.message || error?.message || `Não foi possível abrir ${fileName || 'o anexo'}.`,
+        message: resolveApiErrorMessage(error, `Não foi possível abrir ${fileName || 'o anexo'}.`),
         color: 'red',
       });
     } finally {

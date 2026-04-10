@@ -54,6 +54,7 @@ import { useTeaReservationTimelineQuery } from '../../hooks/useTeaReservationTim
 import { useTeaReservationChecklistQuery, type TeaConversionChecklistItem } from '../../hooks/useTeaReservationChecklistQuery';
 import { useTeaManualGridQuery, type TeaManualGridDay, type TeaManualGridSlot } from '../../hooks/useTeaManualGridQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 const FINAL_RESERVATION_STATUSES: TeaPreReservationStatus[] = [
   'CONVERTED',
@@ -1434,7 +1435,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Não foi possível abrir o anexo.'),
         color: 'red',
       });
     } finally {
@@ -2131,7 +2132,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao excluir PIT',
+        message: resolveApiErrorMessage(err, 'Falha ao excluir PIT'),
         color: 'red',
       });
     } finally {
@@ -2173,7 +2174,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do PIT',
+        message: resolveApiErrorMessage(err, 'Falha ao atualizar status do PIT'),
         color: 'red',
       });
     } finally {
@@ -2186,7 +2187,7 @@ export function TeaPreReserva() {
     const err: any = pendingError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pendências de pré-reserva',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pendências de pré-reserva'),
       color: 'red',
     });
   }, [pendingError]);
@@ -2196,7 +2197,7 @@ export function TeaPreReserva() {
     const err: any = timelineError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Falha ao carregar timeline do PIT',
+      message: resolveApiErrorMessage(err, 'Falha ao carregar timeline do PIT'),
       color: 'red',
     });
   }, [timelineError, timelineModalOpened]);
@@ -2206,7 +2207,7 @@ export function TeaPreReserva() {
     const err: any = checklistError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Falha ao carregar checklist de conversão',
+      message: resolveApiErrorMessage(err, 'Falha ao carregar checklist de conversão'),
       color: 'red',
     });
   }, [checklistError, checklistModalOpened]);
@@ -2216,7 +2217,7 @@ export function TeaPreReserva() {
     const err: any = manualGridError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Falha ao carregar grade manual',
+      message: resolveApiErrorMessage(err, 'Falha ao carregar grade manual'),
       color: 'red',
     });
   }, [manualGridError, manualModalOpened]);
@@ -2341,7 +2342,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao confirmar reserva manual',
+        message: resolveApiErrorMessage(err, 'Falha ao confirmar reserva manual'),
         color: 'red',
       });
     } finally {
@@ -2854,7 +2855,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Erro ao sugerir horários',
+        message: resolveApiErrorMessage(err, 'Erro ao sugerir horários'),
         color: 'red',
       });
     } finally {
@@ -3033,7 +3034,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao validar frequência semanal',
+        message: resolveApiErrorMessage(err, 'Falha ao validar frequência semanal'),
         color: 'red',
       });
       return;
@@ -3087,7 +3088,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao aceitar sugestão automática',
+        message: resolveApiErrorMessage(err, 'Falha ao aceitar sugestão automática'),
         color: 'red',
       });
     } finally {
@@ -3144,7 +3145,7 @@ export function TeaPreReserva() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao converter PIT em lote',
+        message: resolveApiErrorMessage(err, 'Falha ao converter PIT em lote'),
         color: 'red',
       });
     } finally {

@@ -6,6 +6,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
 import { Play, ChevronRight, ArrowRight, Clock } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import preAttendanceService from '../../services/preAttendanceService';
 import { usePatientQueueQuery, type QueuePatient } from '../../hooks/usePatientQueueQuery';
@@ -31,7 +32,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
     const err: any = error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar fila',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar fila'),
       color: 'red',
     });
   }, [error]);
@@ -92,7 +93,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao chamar paciente',
+        message: resolveApiErrorMessage(err, 'Erro ao chamar paciente'),
         color: 'red',
       });
     } finally {

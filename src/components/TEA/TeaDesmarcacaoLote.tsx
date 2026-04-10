@@ -25,6 +25,7 @@ import { formatCPF } from '../../utils/formatters';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaCancellationTherapiesQuery } from '../../hooks/useTeaCancellationTherapiesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 
@@ -113,7 +114,7 @@ export function TeaDesmarcacaoLote() {
     const err: any = teaProfilesError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'),
       color: 'red',
     });
   }, [teaProfilesError]);
@@ -123,7 +124,7 @@ export function TeaDesmarcacaoLote() {
     const err: any = therapiesError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar terapias agendadas',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar terapias agendadas'),
       color: 'red',
     });
   }, [therapiesError, selectedTeaProfileId]);
@@ -188,7 +189,7 @@ export function TeaDesmarcacaoLote() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao cancelar terapia em lote',
+        message: resolveApiErrorMessage(err, 'Falha ao cancelar terapia em lote'),
         color: 'red',
       });
     } finally {
@@ -223,7 +224,7 @@ export function TeaDesmarcacaoLote() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao excluir horários desse dia',
+        message: resolveApiErrorMessage(err, 'Falha ao excluir horários desse dia'),
         color: 'red',
       });
     } finally {

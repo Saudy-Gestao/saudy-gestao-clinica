@@ -4,6 +4,7 @@ import { showNotification } from '@mantine/notifications';
 import dayjs from 'dayjs';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 const ACTIVE_CONSULTATION_STATUSES = [
   'aguardando atendimento',
@@ -30,7 +31,7 @@ export function StatsCards() {
     if (!err) return;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar estatísticas',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar estatísticas'),
       color: 'red',
     });
   }, [consultationsError, appointmentsError]);

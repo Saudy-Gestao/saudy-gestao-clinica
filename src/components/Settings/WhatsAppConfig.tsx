@@ -36,6 +36,7 @@ import {
   IconSparkles,
 } from '@tabler/icons-react';
 import whatsappService from '../../services/whatsappService';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { useWhatsAppPageDataQuery } from '../../hooks/useWhatsAppPageDataQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { FloatingInput } from '../common/FloatingInput';
@@ -130,7 +131,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     const err: any = error;
     notifications.show({
       title: 'Erro',
-      message: err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao carregar configurações do WhatsApp',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar configurações do WhatsApp'),
       color: 'red',
     });
   }, [error]);
@@ -141,7 +142,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao atualizar dados do WhatsApp',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar dados do WhatsApp'),
         color: 'red',
       });
     }
@@ -250,7 +251,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         } catch (pushError: any) {
           notifications.show({
             title: 'Erro ao enviar template para Gupshup',
-            message: pushError.response?.data?.error || 'O template foi mantido desativado porque o envio falhou.',
+            message: resolveApiErrorMessage(pushError, 'O template foi mantido desativado porque o envio falhou.'),
             color: 'yellow',
             autoClose: 8000,
           });
@@ -272,7 +273,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || error.response?.data?.message || 'Erro ao salvar template',
+        message: resolveApiErrorMessage(error, 'Erro ao salvar template'),
         color: 'red',
       });
     } finally {
@@ -295,7 +296,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao excluir template',
+        message: resolveApiErrorMessage(error, 'Erro ao excluir template'),
         color: 'red',
       });
     } finally {
@@ -317,7 +318,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao sincronizar status dos templates',
+        message: resolveApiErrorMessage(error, 'Erro ao sincronizar status dos templates'),
         color: 'red',
       });
     } finally {
@@ -340,7 +341,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao carregar templates padrão',
+        message: resolveApiErrorMessage(error, 'Erro ao carregar templates padrão'),
         color: 'red',
       });
     } finally {
@@ -417,7 +418,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       } catch (toggleError: any) {
         notifications.show({
           title: 'Erro',
-          message: toggleError.response?.data?.error || 'Erro ao atualizar template',
+          message: resolveApiErrorMessage(toggleError, 'Erro ao atualizar template'),
           color: 'red',
         });
       } finally {
@@ -465,7 +466,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     } catch (pushError: any) {
       notifications.show({
         title: 'Erro',
-        message: pushError.response?.data?.error || pushError.response?.data?.detail || 'Erro ao ativar e enviar template',
+        message: resolveApiErrorMessage(pushError, 'Erro ao ativar e enviar template'),
         color: 'red',
       });
     } finally {

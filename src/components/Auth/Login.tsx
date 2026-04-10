@@ -5,6 +5,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { Eye, EyeOff } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import authService from '../../services/authService';
 import { isValidEmail, normalizeEmail } from '../../utils/formatters';
 
@@ -49,7 +50,7 @@ export function Login() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || error.response?.data?.error || 'Erro ao fazer login',
+        message: resolveApiErrorMessage(error, 'Erro ao fazer login'),
         color: 'red',
       });
     } finally {

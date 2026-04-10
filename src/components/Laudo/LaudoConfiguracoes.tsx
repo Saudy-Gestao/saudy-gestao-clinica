@@ -24,6 +24,7 @@ import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import reportTemplateService from '../../services/reportTemplateService';
@@ -281,7 +282,7 @@ export function LaudoConfiguracoes() {
     const err: any = settingsError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar configuracoes do laudo',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar configuracoes do laudo'),
       color: 'red',
     });
   }, [settingsError]);
@@ -302,7 +303,7 @@ export function LaudoConfiguracoes() {
       setRequiresReviewer((prev) => !prev);
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar configuracao de revisor',
+        message: resolveApiErrorMessage(err, 'Falha ao atualizar configuracao de revisor'),
         color: 'red',
       });
     } finally {
@@ -365,7 +366,7 @@ export function LaudoConfiguracoes() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Padrao de laudo salvo com sucesso.', color: 'green' });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar padrao.', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar padrao.'), color: 'red' });
     }
   };
 
@@ -394,7 +395,7 @@ export function LaudoConfiguracoes() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Frase de laudo salva com sucesso.', color: 'green' });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar frase.', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar frase.'), color: 'red' });
     }
   };
 
@@ -427,7 +428,7 @@ export function LaudoConfiguracoes() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Item da fila salvo com sucesso.', color: 'green' });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar item da fila.', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar item da fila.'), color: 'red' });
     }
   };
 

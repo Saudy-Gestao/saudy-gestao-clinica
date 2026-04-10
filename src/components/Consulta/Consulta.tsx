@@ -21,6 +21,7 @@ import consultationService from '../../services/consultationService';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF } from '../../utils/formatters';
 
 interface ConsultationRow {
@@ -181,7 +182,7 @@ export function Consulta() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status do atendimento',
+        message: resolveApiErrorMessage(err, 'Erro ao atualizar status do atendimento'),
         color: 'red',
       });
     } finally {

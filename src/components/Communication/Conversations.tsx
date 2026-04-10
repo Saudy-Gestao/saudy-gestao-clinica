@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { queryKeys } from '../../lib/queryKeys';
 import { getApiBaseUrl } from '../../services/getApiBaseUrl';
 import whatsappConversationService, {
@@ -70,37 +71,6 @@ const STATUS_COLOR: Record<string, string> = {
   QUEUED: 'yellow',
   ASSIGNED: 'blue',
   CLOSED: 'gray',
-};
-
-const ERROR_MESSAGE_TRANSLATIONS: Array<{ pattern: RegExp; message: string }> = [
-  { pattern: /operator reached active conversation limit/i, message: 'Você atingiu o limite de atendimentos ativos.' },
-  { pattern: /already assigned to (another )?operator/i, message: 'Essa conversa já foi assumida por outro atendente.' },
-  { pattern: /already assigned/i, message: 'Essa conversa já está atribuída.' },
-  { pattern: /already closed|conversation closed|closed conversation/i, message: 'Essa conversa já está encerrada.' },
-  { pattern: /forbidden|unauthorized|access denied/i, message: 'Você não tem permissão para executar essa ação.' },
-  { pattern: /user not associated with a company|user not associated with a branch/i, message: 'Seu usuário não está vinculado corretamente à empresa/unidade.' },
-  { pattern: /conversation not found/i, message: 'Conversa não encontrada.' },
-  { pattern: /protocol .*not found|protocol not found/i, message: 'Protocolo não encontrado.' },
-  { pattern: /network error|failed to fetch|timeout/i, message: 'Falha de conexão. Verifique sua internet e tente novamente.' },
-];
-
-const resolveToastErrorMessage = (error: any, fallback: string) => {
-  const raw = String(error?.response?.data?.error || error?.message || '').trim();
-  if (!raw) return fallback;
-
-  for (const item of ERROR_MESSAGE_TRANSLATIONS) {
-    if (item.pattern.test(raw)) return item.message;
-  }
-
-  const status = Number(error?.response?.status || 0);
-  if (status >= 500) return 'O servidor encontrou um erro. Tente novamente em instantes.';
-
-  const looksEnglish = /^[\x00-\x7F\s.,:'"!?()\-_/]+$/.test(raw)
-    && /(operator|conversation|limit|forbidden|not found|already|invalid|failed|error|request|timeout)/i.test(raw);
-
-  if (looksEnglish) return fallback;
-
-  return raw;
 };
 
 type OperatorDraftMap = Record<string, {
@@ -434,7 +404,7 @@ export function Conversations() {
     onError: (error: any) => {
       notifications.show({
         title: 'Erro ao assumir',
-        message: resolveToastErrorMessage(error, 'Não foi possível assumir a conversa.'),
+        message: resolveApiErrorMessage(error, 'Não foi possível assumir a conversa.'),
         color: 'red',
       });
     },
@@ -450,7 +420,7 @@ export function Conversations() {
     onError: (error: any) => {
       notifications.show({
         title: 'Erro ao enviar',
-        message: resolveToastErrorMessage(error, 'Não foi possível enviar a mensagem.'),
+        message: resolveApiErrorMessage(error, 'Não foi possível enviar a mensagem.'),
         color: 'red',
       });
     },
@@ -466,7 +436,7 @@ export function Conversations() {
     onError: (error: any) => {
       notifications.show({
         title: 'Erro ao encerrar',
-        message: resolveToastErrorMessage(error, 'Não foi possível encerrar a conversa.'),
+        message: resolveApiErrorMessage(error, 'Não foi possível encerrar a conversa.'),
         color: 'red',
       });
     },
@@ -481,7 +451,7 @@ export function Conversations() {
     onError: (error: any) => {
       notifications.show({
         title: 'Erro ao salvar',
-        message: resolveToastErrorMessage(error, 'Não foi possível salvar a configuração.'),
+        message: resolveApiErrorMessage(error, 'Não foi possível salvar a configuração.'),
         color: 'red',
       });
     },
@@ -497,7 +467,7 @@ export function Conversations() {
     onError: (error: any) => {
       notifications.show({
         title: 'Erro ao salvar',
-        message: resolveToastErrorMessage(error, 'Não foi possível salvar a configuração.'),
+        message: resolveApiErrorMessage(error, 'Não foi possível salvar a configuração.'),
         color: 'red',
       });
     },
@@ -638,7 +608,7 @@ export function Conversations() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao buscar protocolo',
-        message: resolveToastErrorMessage(error, 'Não foi possível buscar o protocolo informado.'),
+        message: resolveApiErrorMessage(error, 'Não foi possível buscar o protocolo informado.'),
         color: 'red',
       });
     } finally {

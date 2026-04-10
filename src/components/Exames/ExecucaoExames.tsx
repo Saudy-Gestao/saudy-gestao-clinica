@@ -29,6 +29,7 @@ import consultationService from '../../services/consultationService';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF } from '../../utils/formatters';
 
 interface NursingTemplateQuestionOption {
@@ -310,7 +311,7 @@ export function ExecucaoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status do exame',
+        message: resolveApiErrorMessage(err, 'Erro ao atualizar status do exame'),
         color: 'red',
       });
     } finally {
@@ -340,7 +341,7 @@ export function ExecucaoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao iniciar triagem',
+        message: resolveApiErrorMessage(err, 'Erro ao iniciar triagem'),
         color: 'red',
       });
     } finally {
@@ -392,7 +393,7 @@ export function ExecucaoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Erro ao concluir triagem',
+        message: resolveApiErrorMessage(err, 'Erro ao concluir triagem'),
         color: 'red',
       });
     } finally {

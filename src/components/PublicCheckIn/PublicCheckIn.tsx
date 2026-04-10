@@ -22,6 +22,7 @@ import {
 } from '@mantine/core';
 import { Camera, CircleAlert, ClipboardCheck, LogIn, LogOut, RefreshCcw, ShieldCheck, UserRoundCheck } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
 import publicCheckInService, { type PublicCheckInResponse } from '../../services/publicCheckInService';
@@ -123,7 +124,7 @@ export function PublicCheckIn() {
       return;
     }
     const error: any = branchInfoError;
-    setBranchLookupError(error?.response?.data?.error || 'Não foi possível identificar a filial configurada.');
+    setBranchLookupError(resolveApiErrorMessage(error, 'Não foi possível identificar a filial configurada.'));
   }, [branchId, branchInfoError, isAuthenticated]);
 
   const handleLogin = async () => {
@@ -154,7 +155,7 @@ export function PublicCheckIn() {
     } catch (error: any) {
       showNotification({
         title: 'Erro ao entrar',
-        message: error?.response?.data?.message || 'Não foi possível autenticar este usuário.',
+        message: resolveApiErrorMessage(error, 'Não foi possível autenticar este usuário.'),
         color: 'red',
       });
     } finally {
@@ -385,7 +386,7 @@ export function PublicCheckIn() {
     } catch (error: any) {
       showNotification({
         title: 'Erro ao cadastrar rosto',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível concluir o cadastro facial.',
+        message: resolveApiErrorMessage(error, 'Não foi possível concluir o cadastro facial.'),
         color: 'red',
       });
       setFacialCaptureOpen(true);

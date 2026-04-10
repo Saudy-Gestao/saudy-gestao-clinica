@@ -9,6 +9,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import AuthService from '../../services/authService';
 import { validateCNPJ } from '../../utils/validations';
 import { isValidEmail, normalizeEmail } from '../../utils/formatters';
@@ -125,7 +126,7 @@ export function Cadastro() {
       console.error('Erro no registro:', error);
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || error.response?.data?.error || error.response?.data?.details || 'Erro ao criar conta',
+        message: resolveApiErrorMessage(error, 'Erro ao criar conta'),
         color: 'red',
       });
     } finally {

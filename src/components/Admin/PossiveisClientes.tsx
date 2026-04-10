@@ -20,6 +20,7 @@ import { notifications } from '@mantine/notifications';
 import { Building2, Mail, MessageSquareText, Phone, RefreshCw, Search } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import { useAdminLeadsQuery } from '../../hooks/useAdminLeadsQuery';
 import leadService, { type LeadItem, type LeadStatus } from '../../services/leadService';
@@ -92,10 +93,9 @@ export function PossiveisClientes() {
         color: 'green',
       });
     } catch (error: unknown) {
-      const typedError = error as { response?: { data?: { message?: string } }; message?: string };
       notifications.show({
         title: 'Erro ao atualizar lead',
-        message: typedError?.response?.data?.message || typedError?.message || 'Não foi possível salvar o novo status.',
+        message: resolveApiErrorMessage(error, 'Não foi possível salvar o novo status.'),
         color: 'red',
       });
     } finally {

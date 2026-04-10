@@ -18,6 +18,7 @@ import {
   IconChevronDown,
   IconChevronUp,
 } from '@tabler/icons-react';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import whatsappService from '../../services/whatsappService';
 import { useWhatsAppConfigQuery } from '../../hooks/useWhatsAppConfigQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -88,7 +89,7 @@ export function WhatsAppCredentials() {
     const err: any = error;
     notifications.show({
       title: 'Erro',
-      message: err.response?.data?.message || 'Erro ao carregar configurações',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar configurações'),
       color: 'red',
     });
   }, [error]);
@@ -108,7 +109,7 @@ export function WhatsAppCredentials() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || 'Erro ao salvar configuração',
+        message: resolveApiErrorMessage(error, 'Erro ao salvar configuração'),
         color: 'red',
       });
     } finally {

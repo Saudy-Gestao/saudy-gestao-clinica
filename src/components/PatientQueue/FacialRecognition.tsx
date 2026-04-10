@@ -4,6 +4,7 @@ import { Box, Group, Text, Button, Stack, Paper, Title, ActionIcon, Loader, Cent
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Camera, User } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FacialCapture } from '../common/FacialCapture';
@@ -43,7 +44,7 @@ export function FacialRecognition() {
       console.error('Erro no reconhecimento facial:', error);
       showNotification({
         title: 'Erro no reconhecimento',
-        message: error?.response?.data?.detail || error?.message || 'Não foi possível reconhecer o paciente. Tente novamente.',
+        message: resolveApiErrorMessage(error, 'Não foi possível reconhecer o paciente. Tente novamente.'),
         color: 'red',
       });
     } finally {

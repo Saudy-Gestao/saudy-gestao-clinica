@@ -44,6 +44,7 @@ import {
   PowerOff,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 
 // Services
@@ -573,7 +574,7 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       refreshLoggedUserInStorage();
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao atualizar empresa', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao atualizar empresa'), color: 'red' });
     } finally {
       setSavingCompany(false);
     }
@@ -665,7 +666,7 @@ export function SettingsPage() {
       setBranchModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar filial', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar filial'), color: 'red' });
     } finally {
       setSavingBranch(false);
     }
@@ -677,7 +678,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Filial excluída', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir filial', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir filial'), color: 'red' });
     }
   };
 
@@ -723,7 +724,7 @@ export function SettingsPage() {
       setSectorModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar setor', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar setor'), color: 'red' });
     } finally {
       setSavingSector(false);
     }
@@ -735,7 +736,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Setor excluído', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir setor', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir setor'), color: 'red' });
     }
   };
 
@@ -796,7 +797,7 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsDoctors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar usuário', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar usuário'), color: 'red' });
     } finally {
       setSavingUser(false);
     }
@@ -815,7 +816,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Usuário excluído', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir usuário', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir usuário'), color: 'red' });
     }
   };
 
@@ -913,7 +914,7 @@ export function SettingsPage() {
       await refreshLoggedUserInStorage();
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar acesso', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar acesso'), color: 'red' });
     } finally {
       setSavingAccess(false);
     }
@@ -936,7 +937,7 @@ export function SettingsPage() {
       await refreshLoggedUserInStorage();
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir acesso', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir acesso'), color: 'red' });
     }
   };
 
@@ -959,7 +960,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({ 
         title: 'Erro', 
-        message: error.response?.data?.error || 'Erro ao atualizar configuração', 
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar configuração'), 
         color: 'red' 
       });
     } finally {
@@ -985,7 +986,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar configuração',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar configuração'),
         color: 'red'
       });
     } finally {
@@ -1014,7 +1015,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar tolerância',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar tolerância'),
         color: 'red'
       });
     } finally {
@@ -1042,7 +1043,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar o check-in público',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar o check-in público'),
         color: 'red',
       });
     } finally {
@@ -1086,7 +1087,7 @@ export function SettingsPage() {
     if (!error) return;
     notifications.show({
       title: 'Erro',
-      message: error.response?.data?.error || error.response?.data?.message || 'Erro ao carregar configurações',
+      message: resolveApiErrorMessage(error, 'Erro ao carregar configurações'),
       color: 'red',
     });
   }, [companiesError, branchesError, branchSettingsError, sectorsError, usersError, doctorsError, modulesError, accessesError]);

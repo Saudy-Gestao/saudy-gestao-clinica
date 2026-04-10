@@ -15,6 +15,7 @@ import { formatDateInput, isValidCPF } from '../../utils/formatters';
 import { useDeliveriesQuery } from '../../hooks/useDeliveriesQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
@@ -115,7 +116,7 @@ export function Entrega() {
     if (!err) return;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar dados da entrega',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar dados da entrega'),
       color: 'red',
     });
   }, [deliveriesError, patientsError]);
@@ -312,7 +313,7 @@ export function Entrega() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao registrar entrega',
+        message: resolveApiErrorMessage(err, 'Erro ao registrar entrega'),
         color: 'red',
       });
     } finally {
@@ -402,7 +403,7 @@ export function Entrega() {
       } else {
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao registrar entrega',
+          message: resolveApiErrorMessage(err, 'Erro ao registrar entrega'),
           color: 'red',
         });
       }

@@ -37,6 +37,7 @@ import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface ProcedureForm {
   name: string;
@@ -176,7 +177,7 @@ export function CadastroProcedimento() {
       const err: any = proceduresQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'),
         color: 'red',
       });
     }
@@ -210,7 +211,7 @@ export function CadastroProcedimento() {
     const err: any = doctorsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar medicos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar medicos'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -253,7 +254,7 @@ export function CadastroProcedimento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -295,7 +296,7 @@ export function CadastroProcedimento() {
     const err: any = inventoryItemsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar materiais do estoque',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar materiais do estoque'),
       color: 'red',
     });
   }, [inventoryItemsQuery.error]);
@@ -383,7 +384,7 @@ export function CadastroProcedimento() {
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
     } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Erro ao salvar procedimento';
+      const message = resolveApiErrorMessage(err, 'Erro ao salvar procedimento');
       setErrorMessage(message);
       setShowErrorModal(true);
     } finally {
@@ -507,7 +508,7 @@ export function CadastroProcedimento() {
         color: 'green',
       });
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status';
+      const msg = resolveApiErrorMessage(err, 'Erro ao atualizar status');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -551,7 +552,7 @@ export function CadastroProcedimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimento',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar procedimento'),
         color: 'red',
       });
     }

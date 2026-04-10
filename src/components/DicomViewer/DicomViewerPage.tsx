@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, ScanLine } from 'lucide-react';
 import cornerstone from 'cornerstone-core';
 import { DicomViewer } from './DicomViewer';
 import reportWorklistService, { type DicomSeriesSummaryItem } from '../../services/reportWorklistService';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import styles from './DicomViewerPage.module.css';
 
 const SERIES_SIDEBAR_WIDTH = 192;
@@ -197,7 +198,7 @@ export function DicomViewerPage() {
       })
       .catch((err) => {
         if (requestIdRef.current !== requestId) return;
-        setError(err?.response?.data?.message || err?.message || 'Não foi possível carregar o DICOM');
+        setError(resolveApiErrorMessage(err, 'Não foi possível carregar o DICOM'));
         setLoadingStudy(false);
       });
   }, [key, loadSeries]);
@@ -210,7 +211,7 @@ export function DicomViewerPage() {
       try {
         await loadSeries(key, seriesUid);
       } catch (err: any) {
-        setError(err?.response?.data?.message || err?.message || 'Não foi possível carregar a série');
+        setError(resolveApiErrorMessage(err, 'Não foi possível carregar a série'));
       }
     },
     [activeSeriesUid, key, loadSeries],
