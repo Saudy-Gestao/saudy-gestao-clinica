@@ -44,6 +44,7 @@ import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { Header } from '../Header/Header';
 import type { ChangeEvent } from 'react';
 
 interface Patient extends NovoPatiente {
@@ -1375,6 +1376,7 @@ export function PreAtendimento() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group mb={isMobile ? 20 : 30}>
           <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
