@@ -1,6 +1,7 @@
 import { Box, Text } from '@mantine/core';
 import { type ComponentPropsWithoutRef, type ReactNode, useMemo, useState } from 'react';
 import { formatCNPJ, formatCPF, formatDateInput, formatPhone, normalizeEmail } from '../../utils/formatters';
+import { withRequiredIndicator } from './requiredLabel';
 
 interface FloatingInputProps extends ComponentPropsWithoutRef<'input'> {
   label: ReactNode;
@@ -31,6 +32,7 @@ export function FloatingInput({ label, rightSection, containerProps, error, alwa
   const isEmailField = useMemo(() => (
     isEmailByLabel || props.type === 'email'
   ), [isEmailByLabel, props.type]);
+  const requiredIndicator = Boolean((props as any).required);
   const hasValue = useMemo(() => {
     const rawValue = props.value ?? props.defaultValue;
     if (rawValue === null || rawValue === undefined) return false;
@@ -106,7 +108,7 @@ export function FloatingInput({ label, rightSection, containerProps, error, alwa
             ...(props.style || {}),
           }}
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
+        <label style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</label>
         {rightSection ? <Box className="floating-field__right-section">{rightSection}</Box> : null}
       </Box>
       {error && (

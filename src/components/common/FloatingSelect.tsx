@@ -1,5 +1,6 @@
 import { Box, Text, Select, type BoxProps, type SelectProps } from '@mantine/core';
 import type { ReactNode } from 'react';
+import { withRequiredIndicator } from './requiredLabel';
 
 interface FloatingSelectProps extends SelectProps {
   label: ReactNode;
@@ -11,6 +12,7 @@ export function FloatingSelect({ label, containerProps, value, error, alwaysFloa
   const hasValue = typeof value === 'string'
     ? value.trim().length > 0
     : value !== null && value !== undefined;
+  const requiredIndicator = Boolean((props as any).required || (props as any).withAsterisk);
 
   return (
     <Box w="100%" {...containerProps}>
@@ -47,7 +49,7 @@ export function FloatingSelect({ label, containerProps, value, error, alwaysFloa
           }}
           variant="unstyled"
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
+        <label style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</label>
       </Box>
       {error ? (
         <Text size="xs" c="red" mt={4}>
