@@ -1,6 +1,7 @@
 import api from './api';
 
 export type HumanConversationStatus = 'QUEUED' | 'ASSIGNED' | 'CLOSED';
+export type HumanConversationConfigScope = 'COMPANY' | 'BRANCH';
 
 export interface HumanConversationFlow {
   key: string;
@@ -100,32 +101,89 @@ const whatsappConversationService = {
     return res.data?.items || [];
   },
 
-  async listOperators(): Promise<{
+  async listOperators(scope: HumanConversationConfigScope = 'COMPANY'): Promise<{
     settings: HumanConversationSettings;
     items: HumanConversationOperatorConfig[];
   }> {
-    const res = await api.get('/care/whatsapp/conversations/operators');
-    return {
-      settings: res.data?.settings,
-      items: res.data?.items || [],
-    };
+    try {
+      const res = await api.get('/care/whatsapp/conversations/operators', {
+        params: { scope },
+      });
+      return {
+        settings: res.data?.settings,
+        items: res.data?.items || [],
+      };
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+      const canFallbackToLegacy = scope === 'COMPANY' && (status === 400 || status === 404 || status === 405);
+
+      if (!canFallbackToLegacy) throw error;
+
+      const fallbackRes = await api.get('/care/whatsapp/conversations/operators');
+      return {
+        settings: fallbackRes.data?.settings,
+        items: fallbackRes.data?.items || [],
+      };
+    }
   },
 
   async saveSettings(payload: {
     idleTimeoutMinutes: number;
     closeWarningMinutes: number;
+  }, options?: {
+    scope?: HumanConversationConfigScope;
+    inheritFromCompany?: boolean;
   }) {
-    const res = await api.put('/care/whatsapp/conversations/settings', payload);
-    return res.data;
+    const scope = options?.scope || 'COMPANY';
+    const body = {
+      ...payload,
+      inheritFromCompany: Boolean(options?.inheritFromCompany),
+    };
+
+    try {
+      const res = await api.put('/care/whatsapp/conversations/settings', body, {
+        params: { scope },
+      });
+      return res.data;
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+      const canFallbackToLegacy = scope === 'COMPANY' && (status === 400 || status === 404 || status === 405);
+
+      if (!canFallbackToLegacy) throw error;
+
+      const fallbackRes = await api.put('/care/whatsapp/conversations/settings', payload);
+      return fallbackRes.data;
+    }
   },
 
   async saveOperatorConfig(userId: string, payload: {
     isActive: boolean;
     maxActiveConversations: number;
     flowKeys: string[];
+  }, options?: {
+    scope?: HumanConversationConfigScope;
+    inheritFromCompany?: boolean;
   }) {
-    const res = await api.put(`/care/whatsapp/conversations/operators/${userId}`, payload);
-    return res.data;
+    const scope = options?.scope || 'COMPANY';
+    const body = {
+      ...payload,
+      inheritFromCompany: Boolean(options?.inheritFromCompany),
+    };
+
+    try {
+      const res = await api.put(`/care/whatsapp/conversations/operators/${userId}`, body, {
+        params: { scope },
+      });
+      return res.data;
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+      const canFallbackToLegacy = scope === 'COMPANY' && (status === 400 || status === 404 || status === 405);
+
+      if (!canFallbackToLegacy) throw error;
+
+      const fallbackRes = await api.put(`/care/whatsapp/conversations/operators/${userId}`, payload);
+      return fallbackRes.data;
+    }
   },
 
   async listConversations(params?: {

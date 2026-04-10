@@ -22,6 +22,7 @@ import {
   NumberInput,
   TextInput,
   SimpleGrid,
+  Divider,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -1247,7 +1248,8 @@ export function SettingsPage() {
                         <SectionTitle title="Dados da Empresa" desc="Gerencie as informações principais da sua organização." />
                         
                         {loadingCompanies ? <Loader /> : (
-                            <Stack gap="md" maw={600}>
+                            <Stack gap="lg" w="100%">
+                              <Stack gap="md" w="100%">
                                 <Grid>
                                     <Grid.Col span={6}>
                                         <FloatingInput 
@@ -1290,9 +1292,32 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                 </Grid>
-                                <Group justify="flex-end" mt="md">
-                                    <Button leftSection={<Save size={16} />} onClick={handleSaveCompany} loading={savingCompany} bg={DARK_BLUE}>Salvar Alterações</Button>
+                                <Group justify="flex-end" mt="xs">
+                                    <Button leftSection={<Save size={16} />} onClick={handleSaveCompany} loading={savingCompany} bg={DARK_BLUE}>
+                                      Salvar Dados da Empresa
+                                    </Button>
                                 </Group>
+                              </Stack>
+
+                              <Divider />
+
+                              <Paper
+                                p="lg"
+                                radius="md"
+                                withBorder
+                                style={{
+                                  borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                  background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                }}
+                              >
+                                <Group mb="md" gap="xs">
+                                  <MessageCircle size={20} />
+                                  <Text fw={600} size="md">
+                                    Configuração WhatsApp (Padrão da Empresa)
+                                  </Text>
+                                </Group>
+                                <WhatsAppCredentials scope="COMPANY" />
+                              </Paper>
                             </Stack>
                         )}
                     </Box>
@@ -2134,11 +2159,11 @@ export function SettingsPage() {
                                                     Configuração WhatsApp
                                                 </Text>
                                             </Group>
-                                            <WhatsAppCredentials />
+                                            <WhatsAppCredentials scope="BRANCH" branchId={selectedBranchForSettings} />
                                         </Paper>
 
                                         <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
-                                            💡 Dica: As configurações acima são específicas da filial selecionada.
+                                            💡 Dica: Por padrão, a filial herda as credenciais da empresa. Ative a sobrescrita apenas quando necessário.
                                         </Text>
                                     </Stack>
                                 )}
