@@ -43,6 +43,7 @@ import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useRece
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import type { ChangeEvent } from 'react';
 
 interface Patient extends NovoPatiente {
@@ -138,7 +139,7 @@ const normalizeAppointmentIdForApi = (value?: string) => {
 
 const isConsultationAppointmentFkError = (error: any) => {
   const details = String(error?.response?.data?.details || '');
-  const message = String(error?.response?.data?.error || error?.message || '');
+  const message = String(resolveApiErrorMessage(error, ''));
   return details.includes('consultations_appointmentId_fkey')
     || message.toLowerCase().includes('foreign key constraint');
 };
@@ -356,7 +357,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao anexar',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Falha ao anexar documento',
+        message: resolveApiErrorMessage(err, 'Falha ao anexar documento'),
         color: 'red',
       });
     } finally {
@@ -374,7 +375,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Não foi possível abrir o anexo.'),
         color: 'red',
       });
     } finally {
@@ -478,7 +479,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
         color: 'red',
       });
     }
@@ -632,7 +633,7 @@ export function PreAtendimento() {
     const err: any = patientsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
       color: 'red',
     });
   }, [patientsQuery.error]);
@@ -642,7 +643,7 @@ export function PreAtendimento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -771,7 +772,7 @@ export function PreAtendimento() {
       } catch (err: any) {
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar paciente',
+          message: resolveApiErrorMessage(err, 'Erro ao atualizar paciente'),
           color: 'red',
         });
         return;
@@ -824,7 +825,7 @@ export function PreAtendimento() {
       } catch (err: any) {
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao cadastrar paciente',
+          message: resolveApiErrorMessage(err, 'Erro ao cadastrar paciente'),
           color: 'red',
         });
         return;
@@ -1014,7 +1015,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao iniciar checklist',
+        message: resolveApiErrorMessage(err, 'Erro ao iniciar checklist'),
         color: 'red',
       });
     } finally {
@@ -1186,7 +1187,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao concluir checklist',
+        message: resolveApiErrorMessage(err, 'Erro ao concluir checklist'),
         color: 'red',
       });
     } finally {
@@ -1263,7 +1264,7 @@ export function PreAtendimento() {
       await invalidateReceptionQueue();
       showNotification({
         title: 'Erro na validação facial',
-        message: error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Não foi possível validar a identidade do paciente.',
+        message: resolveApiErrorMessage(error, 'Não foi possível validar a identidade do paciente.'),
         color: 'red',
       });
     } finally {

@@ -29,6 +29,7 @@ import teleconsultationLinkService from '../../services/teleconsultationLinkServ
 import { formatCPF } from '../../utils/formatters';
 import { usePreSchedulingsQuery } from '../../hooks/usePreSchedulingsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 const STATUS_LABEL: Record<PreSchedulingStatus, string> = {
   PENDING: 'Pendente',
@@ -151,8 +152,12 @@ export function PreAgendamento() {
 
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkMode, setLinkMode] = useState<'DOCS' | 'TELECONSULTA'>('DOCS');
+  const [linkResult, setLinkResult] = useState<{
+    publicUrl: string;
+    message: string;
+    to?: string;
+  } | null>(null);
   const [sendingLink, setSendingLink] = useState(false);
-  const [linkResult, setLinkResult] = useState<{ publicUrl: string; message: string; to?: string | null } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewDocuments, setReviewDocuments] = useState<Array<{
@@ -201,7 +206,7 @@ export function PreAgendamento() {
       const err: any = preSchedulingsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.message || 'Erro ao carregar pré-agendamentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar pré-agendamentos'),
         color: 'red',
       });
     }
@@ -249,7 +254,7 @@ export function PreAgendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao pré-autorizar',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível pré-autorizar.',
+        message: resolveApiErrorMessage(err, 'Não foi possível pré-autorizar.'),
         color: 'red',
       });
     } finally {
@@ -290,11 +295,29 @@ export function PreAgendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao enviar link',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível enviar o link.',
+        message: resolveApiErrorMessage(err, 'Não foi possível enviar o link.'),
         color: 'red',
       });
     } finally {
       setSendingLink(false);
+    }
+  };
+
+  const copyToClipboard = async (value: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      showNotification({
+        title: 'Copiado',
+        message: 'Link copiado para a área de transferência.',
+        color: 'green',
+      });
+    } catch {
+      showNotification({
+        title: 'Falha ao copiar',
+        message: 'Não foi possível copiar o link.',
+        color: 'red',
+      });
     }
   };
 
@@ -309,7 +332,7 @@ export function PreAgendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao carregar anexos',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível carregar os documentos.',
+        message: resolveApiErrorMessage(err, 'Não foi possível carregar os documentos.'),
         color: 'red',
       });
       setReviewDocuments([]);
@@ -334,7 +357,7 @@ export function PreAgendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro na revisão',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível concluir a revisão.',
+        message: resolveApiErrorMessage(err, 'Não foi possível concluir a revisão.'),
         color: 'red',
       });
     } finally {
@@ -374,18 +397,12 @@ export function PreAgendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir documento',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível visualizar o anexo.',
+        message: resolveApiErrorMessage(err, 'Não foi possível visualizar o anexo.'),
         color: 'red',
       });
     } finally {
       setOpeningDocumentId(null);
     }
-  };
-
-  const copyToClipboard = async (value: string) => {
-    if (!value) return;
-    await navigator.clipboard.writeText(value);
-    showNotification({ title: 'Copiado', message: 'Conteúdo copiado para área de transferência.', color: 'blue' });
   };
 
   return (
@@ -680,7 +697,6 @@ export function PreAgendamento() {
           )}
         </Stack>
       </Modal>
-
       <Modal opened={reviewOpen} onClose={() => setReviewOpen(false)} title="Revisar envio do paciente" centered size="lg">
         <Stack>
           <Text size="sm" c="dimmed">

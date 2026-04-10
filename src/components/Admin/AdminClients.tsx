@@ -24,6 +24,7 @@ import { useSettingsCompaniesQuery } from '../../hooks/useSettingsCompaniesQuery
 import { queryKeys } from '../../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { validateCompanyForm } from '../../utils/validations';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 type CompanyModuleType = 'padrao' | 'tea' | 'apenas-tea';
 
@@ -117,7 +118,7 @@ export function AdminClients() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error?.response?.data?.error || 'Erro ao atualizar cliente.',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar cliente.'),
         color: 'red',
       });
     } finally {

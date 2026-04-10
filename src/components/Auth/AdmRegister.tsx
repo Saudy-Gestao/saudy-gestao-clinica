@@ -4,6 +4,7 @@ import { Box, Button, Stack, Text, Group } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import authService from '../../services/authService';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 
 function isEtechdevDomain(email: string) {
@@ -83,7 +84,7 @@ export function AdmRegister() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error?.response?.data?.error || error?.response?.data?.message || 'Falha ao enviar código',
+        message: resolveApiErrorMessage(error, 'Falha ao enviar código'),
         color: 'red',
       });
     } finally {
@@ -105,7 +106,7 @@ export function AdmRegister() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error?.response?.data?.error || error?.response?.data?.message || 'Código inválido',
+        message: resolveApiErrorMessage(error, 'Código inválido'),
         color: 'red',
       });
     } finally {

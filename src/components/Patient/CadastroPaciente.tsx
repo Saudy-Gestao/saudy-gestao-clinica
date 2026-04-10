@@ -46,6 +46,7 @@ import { FloatingTextarea } from '../common/FloatingTextarea';
 import { findExistingCpf } from '../../utils/cpfRegistry';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -537,7 +538,7 @@ export function CadastroPaciente() {
       const err = patientsQuery.error as ApiError;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
         color: 'red',
       });
     }
@@ -580,7 +581,7 @@ export function CadastroPaciente() {
         const err = e as ApiError;
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+          message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
           color: 'red',
         });
       } finally {
@@ -878,7 +879,7 @@ export function CadastroPaciente() {
         setFieldErrors(serverFields);
         showNotification({ title: 'Erro', message: Object.values(serverFields)[0], color: 'red' });
       } else {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar paciente';
+        const msg = resolveApiErrorMessage(err, 'Erro ao registrar paciente');
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -907,7 +908,7 @@ export function CadastroPaciente() {
       setDeleteTarget(null);
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir paciente';
+      const msg = resolveApiErrorMessage(err, 'Erro ao excluir paciente');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -925,7 +926,7 @@ export function CadastroPaciente() {
       });
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status do paciente';
+      const msg = resolveApiErrorMessage(err, 'Erro ao atualizar status do paciente');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };

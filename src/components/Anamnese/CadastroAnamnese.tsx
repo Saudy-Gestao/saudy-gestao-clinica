@@ -22,6 +22,7 @@ import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2 } from 'luci
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
@@ -155,7 +156,7 @@ export function CadastroAnamnese() {
     if (err) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || 'Erro ao carregar cadastro de anamnese',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar cadastro de anamnese'),
         color: 'red',
       });
     }
@@ -294,7 +295,7 @@ export function CadastroAnamnese() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || 'Não foi possível salvar a anamnese',
+        message: resolveApiErrorMessage(err, 'Não foi possível salvar a anamnese'),
         color: 'red',
       });
     } finally {
@@ -314,7 +315,7 @@ export function CadastroAnamnese() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.response?.data?.message || 'Não foi possível desativar a anamnese',
+        message: resolveApiErrorMessage(err, 'Não foi possível desativar a anamnese'),
         color: 'red',
       });
     }

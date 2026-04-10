@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -45,6 +45,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 
 // Services
@@ -180,6 +181,7 @@ export function SettingsPage() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
+  const isMountedRef = useRef(true);
   const [activeTab, setActiveTab] = useState<string | null>('company');
   
   // Get user's company from logged user
@@ -367,6 +369,14 @@ export function SettingsPage() {
   };
 
   // --- Effects ---
+
+  // Track if component is mounted to prevent setState on unmounted component
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const prefill = getStoredCompanyPrefill();
@@ -577,7 +587,7 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       refreshLoggedUserInStorage();
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao atualizar empresa', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao atualizar empresa'), color: 'red' });
     } finally {
       setSavingCompany(false);
     }
@@ -669,7 +679,7 @@ export function SettingsPage() {
       setBranchModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar filial', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar filial'), color: 'red' });
     } finally {
       setSavingBranch(false);
     }
@@ -681,7 +691,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Filial excluída', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir filial', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir filial'), color: 'red' });
     }
   };
 
@@ -700,10 +710,10 @@ export function SettingsPage() {
   };
 
   const handleSaveSector = async () => {
-    if (!selectedBranchForSectors) return;
+    if (!sectorForm.branchId) return;
     
     // Validate form
-    const validation = validateSectorForm({ ...sectorForm, branchId: selectedBranchForSectors });
+    const validation = validateSectorForm(sectorForm);
     if (!validation.isValid) {
       setSectorErrors(validation.errors);
       notifications.show({ 
@@ -721,13 +731,13 @@ export function SettingsPage() {
         await sectorService.updateSector(editingSector.id, sectorForm);
         notifications.show({ title: 'Sucesso', message: 'Setor atualizado', color: 'green' });
       } else {
-        await sectorService.createSector({ ...sectorForm, branchId: selectedBranchForSectors });
+        await sectorService.createSector(sectorForm);
         notifications.show({ title: 'Sucesso', message: 'Setor criado', color: 'green' });
       }
       setSectorModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar setor', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar setor'), color: 'red' });
     } finally {
       setSavingSector(false);
     }
@@ -739,7 +749,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Setor excluído', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir setor', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir setor'), color: 'red' });
     }
   };
 
@@ -842,7 +852,7 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsDoctors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar usuário', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar usuário'), color: 'red' });
     } finally {
       setSavingUser(false);
     }
@@ -898,7 +908,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Usuário excluído', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir usuário', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir usuário'), color: 'red' });
     }
   };
 
@@ -996,7 +1006,7 @@ export function SettingsPage() {
       await refreshLoggedUserInStorage();
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar acesso', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar acesso'), color: 'red' });
     } finally {
       setSavingAccess(false);
     }
@@ -1010,7 +1020,7 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir acesso', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir acesso'), color: 'red' });
     }
   };
 
@@ -1033,7 +1043,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({ 
         title: 'Erro', 
-        message: error.response?.data?.error || 'Erro ao atualizar configuração', 
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar configuração'), 
         color: 'red' 
       });
     } finally {
@@ -1059,7 +1069,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar configuração',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar configuração'),
         color: 'red'
       });
     } finally {
@@ -1088,7 +1098,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar tolerância',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar tolerância'),
         color: 'red'
       });
     } finally {
@@ -1116,7 +1126,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar o check-in público',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar o check-in público'),
         color: 'red',
       });
     } finally {
@@ -1160,7 +1170,7 @@ export function SettingsPage() {
     if (!error) return;
     notifications.show({
       title: 'Erro',
-      message: error.response?.data?.error || error.response?.data?.message || 'Erro ao carregar configurações',
+      message: resolveApiErrorMessage(error, 'Erro ao carregar configurações'),
       color: 'red',
     });
   }, [companiesError, branchesError, branchSettingsError, sectorsError, usersError, doctorsError, modulesError, accessesError]);
@@ -1419,6 +1429,14 @@ export function SettingsPage() {
                         )}
                          <Modal opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar Setor' : 'Novo Setor'} centered>
                              <Stack pt="lg">
+                                <Select
+                                  label="Filial"
+                                  data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                  value={sectorForm.branchId}
+                                  onChange={(v) => setSectorForm({ ...sectorForm, branchId: v || '' })}
+                                  error={sectorErrors.branchId}
+                                  searchable
+                                />
                                 <FloatingInput 
                                   label="Nome" 
                                   value={sectorForm.name} 
@@ -1455,13 +1473,10 @@ export function SettingsPage() {
                             <Select 
                                 label="Filial"
                                 placeholder="Selecione..." 
-                                data={(branches || [])
-                                  .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
-                                  .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                 value={selectedBranchForSectors}
                                 onChange={setSelectedBranchForSectors}
                                 style={{ flex: 1 }}
-                                disabled={!!loggedBranchId}
                             />
                             <Select 
                                 label="Setor"
@@ -1529,15 +1544,12 @@ export function SettingsPage() {
                                 <Grid.Col span={12}>
                                     <Select
                                         label="Filial"
-                                        data={(branches || [])
-                                          .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
-                                          .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                        data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                         value={userForm.branchId}
                                         onChange={(v) => setUserForm({ ...userForm, branchId: v || '', sectorId: '', doctorId: '' })}
                                         mb="xs"
                                         error={userErrors.branchId}
                                         searchable
-                                        disabled={!!loggedBranchId}
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>

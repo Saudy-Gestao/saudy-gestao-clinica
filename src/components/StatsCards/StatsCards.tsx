@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { isDoctorUser } from '../../utils/userRole';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 const ACTIVE_CONSULTATION_STATUSES = [
   'aguardando atendimento',
@@ -66,7 +67,7 @@ export function StatsCards({ user }: StatsCardsProps) {
     if (!err) return;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar estatísticas',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar estatísticas'),
       color: 'red',
     });
   }, [consultationsError, appointmentsError]);

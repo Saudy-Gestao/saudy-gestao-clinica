@@ -30,6 +30,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { usePatientSummaryQuery } from '../../hooks/usePatientSummaryQuery';
 import { DARK_BLUE } from '../../themes/theme';
 
@@ -59,7 +60,7 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
     const err: any = error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Não foi possível carregar os dados do paciente.',
+      message: resolveApiErrorMessage(err, 'Não foi possível carregar os dados do paciente.'),
       color: 'red',
     });
   }, [error]);

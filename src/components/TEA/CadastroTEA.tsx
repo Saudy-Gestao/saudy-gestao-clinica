@@ -35,6 +35,7 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaPlansQuery } from '../../hooks/useTeaPlansQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
@@ -341,31 +342,31 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   useEffect(() => {
     if (!patientsError) return;
     const err: any = patientsError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'), color: 'red' });
   }, [patientsError]);
 
   useEffect(() => {
     if (!doctorsError) return;
     const err: any = doctorsError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'), color: 'red' });
   }, [doctorsError]);
 
   useEffect(() => {
     if (!insurancesError) return;
     const err: any = insurancesError;
-    showNotification({ title: 'Aviso', message: err?.response?.data?.message || err?.message || 'Não foi possível carregar a lista de convênios', color: 'yellow' });
+    showNotification({ title: 'Aviso', message: resolveApiErrorMessage(err, 'Não foi possível carregar a lista de convênios'), color: 'yellow' });
   }, [insurancesError]);
 
   useEffect(() => {
     if (!teaProfilesError) return;
     const err: any = teaProfilesError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'), color: 'red' });
   }, [teaProfilesError]);
 
   useEffect(() => {
     if (!plansError || activeSubmodule !== 'plano' || !selectedTeaProfileId) return;
     const err: any = plansError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar planos terapêuticos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar planos terapêuticos'), color: 'red' });
   }, [plansError, activeSubmodule, selectedTeaProfileId]);
 
   useEffect(() => {
@@ -512,7 +513,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     } catch (err: any) {
       const details = err?.response?.data?.fields
         ? Object.values(err.response.data.fields).join(' | ')
-        : (err?.response?.data?.details || err?.response?.data?.message || err?.message);
+        : (err?.response?.data?.details || resolveApiErrorMessage(err, 'Falha ao salvar dados TEA'));
 
       showNotification({
         title: 'Erro ao salvar',
@@ -853,7 +854,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao criar plano terapêutico',
+        message: resolveApiErrorMessage(err, 'Falha ao criar plano terapêutico'),
         color: 'red',
       });
     } finally {
@@ -870,7 +871,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao inativar plano',
+        message: resolveApiErrorMessage(err, 'Falha ao inativar plano'),
         color: 'red',
       });
     }

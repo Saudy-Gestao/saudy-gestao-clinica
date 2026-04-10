@@ -23,6 +23,7 @@ import teaEvolutionTemplateService from '../../services/teaEvolutionTemplateServ
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useTeaEvolutionTemplatesQuery } from '../../hooks/useTeaEvolutionTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTagsInput } from '../common/FloatingTagsInput';
@@ -78,13 +79,13 @@ export function TeaEvolucaoTemplates() {
   useEffect(() => {
     if (!proceduresError) return;
     const err: any = proceduresError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'), color: 'red' });
   }, [proceduresError]);
 
   useEffect(() => {
     if (!templatesError) return;
     const err: any = templatesError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar templates', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar templates'), color: 'red' });
   }, [templatesError]);
 
   const handleSave = async () => {
@@ -124,7 +125,7 @@ export function TeaEvolucaoTemplates() {
       setForm({ ...emptyForm });
       await queryClient.invalidateQueries({ queryKey: queryKeys.teaEvolutionTemplates });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Falha ao salvar template', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Falha ao salvar template'), color: 'red' });
     } finally {
       setSaving(false);
     }
@@ -151,7 +152,7 @@ export function TeaEvolucaoTemplates() {
       showNotification({ title: 'Sucesso', message: 'Template desativado', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.teaEvolutionTemplates });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || 'Falha ao desativar template', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Falha ao desativar template'), color: 'red' });
     }
   };
 

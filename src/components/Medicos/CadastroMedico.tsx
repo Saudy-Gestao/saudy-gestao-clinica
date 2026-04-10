@@ -38,6 +38,7 @@ import ResultModal from '../common/ResultModal';
 import { findExistingCpf } from '../../utils/cpfRegistry';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 type Gender = 'male' | 'female' | 'other' | '';
 
@@ -424,7 +425,7 @@ export function CadastroMedico() {
       const err = doctorsQuery.error as ApiError;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'),
         color: 'red',
       });
     }
@@ -622,7 +623,7 @@ export function CadastroMedico() {
         setFieldErrors(mapped);
         showNotification({ title: 'Erro', message: Object.values(mapped)[0], color: 'red' });
       } else {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar médico';
+        const msg = resolveApiErrorMessage(err, 'Erro ao registrar médico');
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -652,7 +653,7 @@ export function CadastroMedico() {
       setDeleteTarget(null);
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir médico';
+      const msg = resolveApiErrorMessage(err, 'Erro ao excluir médico');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -669,7 +670,7 @@ export function CadastroMedico() {
       });
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status';
+      const msg = resolveApiErrorMessage(err, 'Erro ao atualizar status');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };

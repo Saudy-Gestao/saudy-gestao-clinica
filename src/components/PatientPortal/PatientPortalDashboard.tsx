@@ -20,6 +20,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { CalendarDays, Check, ClipboardList, Download, Eye, FileClock, FileText, FolderOpen, LogOut, Moon, ShieldCheck, Stethoscope, Sun, X } from 'lucide-react';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import patientPortalService, {
   type PatientPortalAccessLogItem,
   type PatientPortalAppointmentItem,
@@ -375,7 +376,7 @@ export function PatientPortalDashboard() {
     } catch (error: any) {
       notifications.show({
         title: 'Falha ao abrir preparo',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível abrir o link de preparo/anamnese.',
+        message: resolveApiErrorMessage(error, 'Não foi possível abrir o link de preparo/anamnese.'),
         color: 'red',
       });
     } finally {
@@ -411,7 +412,7 @@ export function PatientPortalDashboard() {
     } catch (error: any) {
       notifications.show({
         title: 'Falha ao trocar perfil',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível alterar o perfil ativo.',
+        message: resolveApiErrorMessage(error, 'Não foi possível alterar o perfil ativo.'),
         color: 'red',
       });
     } finally {
@@ -433,7 +434,7 @@ export function PatientPortalDashboard() {
     } catch (error: any) {
       notifications.show({
         title: 'Falha no download',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível baixar o PDF do laudo.',
+        message: resolveApiErrorMessage(error, 'Não foi possível baixar o PDF do laudo.'),
         color: 'red',
       });
     }
@@ -468,7 +469,7 @@ export function PatientPortalDashboard() {
     } catch (error: any) {
       notifications.show({
         title: 'Falha ao abrir documento',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível abrir este documento.',
+        message: resolveApiErrorMessage(error, 'Não foi possível abrir este documento.'),
         color: 'red',
       });
     } finally {
@@ -502,7 +503,7 @@ export function PatientPortalDashboard() {
     } catch (error: any) {
       notifications.show({
         title: 'Falha na solicitação',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível solicitar a entrega física.',
+        message: resolveApiErrorMessage(error, 'Não foi possível solicitar a entrega física.'),
         color: 'red',
       });
     } finally {
@@ -518,7 +519,7 @@ export function PatientPortalDashboard() {
       } catch (error: any) {
         notifications.show({
           title: 'Erro ao carregar portal',
-          message: error?.response?.data?.error || error?.message || 'Não foi possível carregar seus dados.',
+          message: resolveApiErrorMessage(error, 'Não foi possível carregar seus dados.'),
           color: 'red',
         });
       } finally {

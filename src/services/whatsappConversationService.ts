@@ -21,6 +21,9 @@ export interface HumanConversationItem {
   humanAssignedAt?: string | null;
   humanClosedAt?: string | null;
   humanClosedByUserName?: string | null;
+  humanProtocolNumber?: string | null;
+  humanProtocolStartedAt?: string | null;
+  humanProtocolClosedAt?: string | null;
   lastInboundMessage?: string | null;
   lastOutboundMessage?: string | null;
   updatedAt: string;
@@ -36,8 +39,41 @@ export interface HumanConversationMessage {
   authorType: 'PATIENT' | 'BOT' | 'OPERATOR' | 'SYSTEM';
   authorUserId?: string | null;
   authorName?: string | null;
+  providerMessageId?: string | null;
+  metadata?: Record<string, unknown> | null;
   message: string;
   createdAt: string;
+}
+
+export interface HumanConversationProtocolSummary {
+  number: string;
+  startedAt?: string | null;
+  closedAt?: string | null;
+}
+
+export interface HumanConversationPatientInfo {
+  id: string;
+  name?: string | null;
+  cpf?: string | null;
+  cellphone?: string | null;
+  phone?: string | null;
+  birthDate?: string | null;
+  healthInsuranceName?: string | null;
+  healthInsuranceNumber?: string | null;
+  email?: string | null;
+  address?: string | null;
+  observations?: string | null;
+}
+
+export interface HumanConversationPatientAppointment {
+  id: string;
+  date?: string | null;
+  time?: string | null;
+  type?: string | null;
+  status?: string | null;
+  doctorName?: string | null;
+  specialty?: string | null;
+  convenio?: string | null;
 }
 
 export interface HumanConversationOperatorConfig {
@@ -51,15 +87,36 @@ export interface HumanConversationOperatorConfig {
   activeConversationCount: number;
 }
 
+export interface HumanConversationSettings {
+  id: string;
+  branchId: string;
+  idleTimeoutMinutes: number;
+  closeWarningMinutes: number;
+}
+
 const whatsappConversationService = {
   async listFlows(): Promise<HumanConversationFlow[]> {
     const res = await api.get('/care/whatsapp/conversations/flows');
     return res.data?.items || [];
   },
 
-  async listOperators(): Promise<HumanConversationOperatorConfig[]> {
+  async listOperators(): Promise<{
+    settings: HumanConversationSettings;
+    items: HumanConversationOperatorConfig[];
+  }> {
     const res = await api.get('/care/whatsapp/conversations/operators');
-    return res.data?.items || [];
+    return {
+      settings: res.data?.settings,
+      items: res.data?.items || [],
+    };
+  },
+
+  async saveSettings(payload: {
+    idleTimeoutMinutes: number;
+    closeWarningMinutes: number;
+  }) {
+    const res = await api.put('/care/whatsapp/conversations/settings', payload);
+    return res.data;
   },
 
   async saveOperatorConfig(userId: string, payload: {
@@ -81,12 +138,53 @@ const whatsappConversationService = {
     return res.data?.items || [];
   },
 
-  async getMessages(conversationId: string): Promise<{
+  async getMessages(conversationId: string, params?: { protocolNumber?: string }): Promise<{
     conversation: HumanConversationItem;
+    patient?: HumanConversationPatientInfo | null;
+    appointments?: {
+      next?: HumanConversationPatientAppointment | null;
+      recent: HumanConversationPatientAppointment[];
+    };
     items: HumanConversationMessage[];
   }> {
-    const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`);
+    const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`, { params });
     return res.data;
+  },
+
+  async getProtocolHistory(conversationId: string, protocolNumber: string): Promise<{
+    conversation?: HumanConversationItem;
+    protocol?: HumanConversationProtocolSummary | null;
+    items: HumanConversationMessage[];
+  }> {
+    const normalizedProtocol = String(protocolNumber || '').trim();
+    if (!normalizedProtocol) {
+      return { items: [] };
+    }
+
+    try {
+      const res = await api.get(`/care/whatsapp/conversations/${conversationId}/protocols/${encodeURIComponent(normalizedProtocol)}`);
+      return {
+        conversation: res.data?.conversation,
+        protocol: res.data?.protocol || null,
+        items: res.data?.items || [],
+      };
+    } catch {
+      const fallback = await this.getMessages(conversationId, { protocolNumber: normalizedProtocol });
+      const metadataFiltered = (fallback.items || []).filter((message) => {
+        const value = String((message.metadata as any)?.protocolNumber || '').trim();
+        return value === normalizedProtocol;
+      });
+
+      return {
+        conversation: fallback.conversation,
+        protocol: {
+          number: normalizedProtocol,
+          startedAt: fallback.conversation?.humanProtocolStartedAt || null,
+          closedAt: fallback.conversation?.humanProtocolClosedAt || null,
+        },
+        items: metadataFiltered,
+      };
+    }
   },
 
   async claimConversation(conversationId: string) {

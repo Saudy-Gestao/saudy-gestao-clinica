@@ -43,6 +43,7 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface Agendamento {
   id: string;
@@ -442,6 +443,13 @@ const formatDateForApi = (value: Date | null): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatTypedDateValue = (value: string): string => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 const onlyDigits = (value?: string | null): string => String(value || '').replace(/\D/g, '');
 const addDays = (date: Date, amount: number): Date => dayjs(date).add(amount, 'day').toDate();
 const getTodayStart = (): Date => dayjs().startOf('day').toDate();
@@ -689,7 +697,7 @@ export function Agendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Nao foi possivel abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Nao foi possivel abrir o anexo.'),
         color: 'red',
       });
     } finally {
@@ -731,7 +739,7 @@ export function Agendamento() {
       const err: any = appointmentsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar agendamentos'),
         color: 'red',
       });
     }
@@ -769,7 +777,7 @@ export function Agendamento() {
     const err: any = patientsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
       color: 'red',
     });
   }, [patientsQuery.error]);
@@ -779,7 +787,7 @@ export function Agendamento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -789,7 +797,7 @@ export function Agendamento() {
     const err: any = doctorsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -799,7 +807,7 @@ export function Agendamento() {
     const err: any = proceduresCatalogQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'),
       color: 'red',
     });
   }, [proceduresCatalogQuery.error]);
@@ -1278,7 +1286,7 @@ export function Agendamento() {
         : null;
       showNotification({
         title: 'Erro ao finalizar cadastro',
-        message: String(firstFieldError || err?.response?.data?.message || err?.message || 'Não foi possível criar o paciente antes do agendamento.'),
+        message: String(firstFieldError || resolveApiErrorMessage(err, 'Não foi possível criar o paciente antes do agendamento.')),
         color: 'red',
       });
       return null;
@@ -1389,7 +1397,7 @@ export function Agendamento() {
         setSavingAgendamento(false);
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar agendamento',
+          message: resolveApiErrorMessage(err, 'Erro ao atualizar agendamento'),
           color: 'red',
         });
         return;
@@ -1477,7 +1485,7 @@ export function Agendamento() {
         setSavingAgendamento(false);
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao criar agendamento',
+          message: resolveApiErrorMessage(err, 'Erro ao criar agendamento'),
           color: 'red',
         });
         return;
@@ -1499,7 +1507,7 @@ export function Agendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status',
+        message: resolveApiErrorMessage(err, 'Erro ao atualizar status'),
         color: 'red',
       });
     }
@@ -1739,13 +1747,13 @@ export function Agendamento() {
   const reviewTimeValue = reviewPrimaryManualSelection?.time || reviewPrimarySuggestedSelection?.time || novoAgendamento.hora || '';
   const reviewProfessionalValue = reviewPrimaryManualSelection?.doctorName || reviewPrimarySuggestedSelection?.doctorName || novoAgendamento.profissional || '';
   const insuranceSelectData = canEditInsuranceFields ? insuranceOptions : [];
-  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : '';
+  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : PARTICULAR_INSURANCE_LABEL;
   const insuranceSelectPlaceholder = !canEditInsuranceFields
     ? 'Selecione um paciente primeiro'
     : (insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio');
   const insuranceCardNumberValue = canEditInsuranceFields ? novoAgendamento.convenioNumber : NOT_APPLICABLE_LABEL;
   const insuranceValidityValue = canEditInsuranceFields ? novoAgendamento.convenioValidUntil : NOT_APPLICABLE_LABEL;
-  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : '';
+  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : NOT_APPLICABLE_LABEL;
   const hasAnySelectedSchedule = Boolean(
     novoAgendamento.hora
     || manualProcedureSelections.length
@@ -2697,6 +2705,7 @@ export function Agendamento() {
               <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
                 <FloatingSelect
                   label="Tipo do convênio*"
+                  alwaysFloatLabel
                   placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
                   value={insuranceSelectValue}
@@ -2712,22 +2721,25 @@ export function Agendamento() {
                     });
                   }}
                   searchable
-                  clearable
+                  clearable={canEditInsuranceFields && Boolean(insuranceSelectValue)}
                   disabled={insurancesLoading}
                   nothingFoundMessage="Nenhum convênio encontrado"
                 />
                 <FloatingInput
                   label="Número da carteirinha"
+                  alwaysFloatLabel
                   value={insuranceCardNumberValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioNumber: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Data de validade"
+                  alwaysFloatLabel
                   value={insuranceValidityValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioValidUntil: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Status"
+                  alwaysFloatLabel
                   value={insuranceStatusValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioStatus: e.currentTarget.value })}
                 />
@@ -2750,6 +2762,13 @@ export function Agendamento() {
                   label="Data da marcação"
                   placeholder="Selecione a data"
                   value={novoAgendamento.data}
+                  onInput={(event) => {
+                    const input = event.currentTarget;
+                    const formatted = formatTypedDateValue(input.value);
+                    if (input.value !== formatted) {
+                      input.value = formatted;
+                    }
+                  }}
                   onChange={(value) => {
                     const rawDate = value ? new Date(value) : null;
                     const nextDate = rawDate

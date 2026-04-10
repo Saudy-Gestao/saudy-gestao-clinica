@@ -31,6 +31,7 @@ import convenioAuthorizationService, {
 } from '../../services/convenioAuthorizationService';
 import { useConvenioAuthorizationsQuery } from '../../hooks/useConvenioAuthorizationsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 type AuthorizationItem = {
   id: string;
@@ -130,7 +131,7 @@ export function AutorizacaoConvenio() {
     const err: any = error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar autorizações',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar autorizações'),
       color: 'red',
     });
   }, [error]);
@@ -155,7 +156,7 @@ export function AutorizacaoConvenio() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar autorização',
+        message: resolveApiErrorMessage(err, 'Falha ao atualizar autorização'),
         color: 'red',
       });
     } finally {
@@ -190,7 +191,7 @@ export function AutorizacaoConvenio() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao anexar',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Falha ao anexar documento',
+        message: resolveApiErrorMessage(err, 'Falha ao anexar documento'),
         color: 'red',
       });
     } finally {
@@ -208,7 +209,7 @@ export function AutorizacaoConvenio() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Não foi possível abrir o anexo.'),
         color: 'red',
       });
     } finally {

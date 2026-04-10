@@ -189,7 +189,7 @@ export function WorkflowSections() {
     {
       title: 'Comunicação',
       items: [
-        { icon: MessageCircle, label: 'Conversas', desc: 'Atendimento humanizado do WhatsApp', route: '/conversas', moduleName: 'whatsapp-config' },
+        { icon: MessageCircle, label: 'Conversas', desc: 'Atendimento humanizado do WhatsApp', route: '/conversas', moduleName: 'conversas', fallbackModuleNames: ['whatsapp-config'] },
         { icon: MessageCircle, label: 'WhatsApp', desc: 'Mensagens, templates e configuração', route: '/whatsapp', moduleName: 'whatsapp-config' },
       ]
     }
@@ -203,6 +203,7 @@ export function WorkflowSections() {
       || (visibleAllowedModules.length === 0 && doctorView && doctorDefaultModules.includes(item.moduleName))
       || (visibleAllowedModules.length === 0 && !doctorView)
       || visibleAllowedModules.includes(item.moduleName)
+      || (Array.isArray((item as any).fallbackModuleNames) && (item as any).fallbackModuleNames.some((moduleName: string) => visibleAllowedModules.includes(moduleName)))
     )
   })).filter(section => section.items.length > 0); // Remove seções vazias
 

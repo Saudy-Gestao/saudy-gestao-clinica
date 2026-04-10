@@ -25,6 +25,7 @@ import { FloatingTextarea } from '../common/FloatingTextarea';
 import insuranceService from '../../services/insuranceService';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface InsuranceRow {
   id: string;
@@ -92,7 +93,7 @@ export function CadastroConvenio() {
       const err: any = insurancesQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar convenios',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar convenios'),
         color: 'red',
       });
     }
@@ -230,7 +231,7 @@ export function CadastroConvenio() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao salvar convenio',
+        message: resolveApiErrorMessage(err, 'Erro ao salvar convenio'),
         color: 'red',
       });
     } finally {
@@ -249,7 +250,7 @@ export function CadastroConvenio() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao desativar convenio',
+        message: resolveApiErrorMessage(err, 'Erro ao desativar convenio'),
         color: 'red',
       });
     } finally {

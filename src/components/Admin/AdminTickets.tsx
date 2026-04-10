@@ -20,6 +20,7 @@ import { notifications } from '@mantine/notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { LifeBuoy, MessageCircleMore, RefreshCw, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import { queryKeys } from '../../lib/queryKeys';
 import { useAdminTicketsQuery } from '../../hooks/useAdminTicketsQuery';
@@ -166,7 +167,7 @@ export function AdminTickets() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao atualizar ticket',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível atualizar o ticket.',
+        message: resolveApiErrorMessage(error, 'Não foi possível atualizar o ticket.'),
         color: 'red',
       });
     } finally {

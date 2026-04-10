@@ -8,6 +8,7 @@ import { PatientQueue } from '../PatientQueue/PatientQueue';
 import { WorkflowSections } from '../WorkflowSections/WorkflowSections';
 import { FacialCapture } from '../common/FacialCapture';
 import { PatientInfoModal } from './PatientInfoModal';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
 import authService from '../../services/authService';
 import { isDoctorUser } from '../../utils/userRole';
@@ -99,7 +100,7 @@ export function Dashboard() {
       
       showNotification({
         title: 'Erro no reconhecimento',
-        message: error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Não foi possível reconhecer o paciente.',
+        message: resolveApiErrorMessage(error, 'Não foi possível reconhecer o paciente.'),
         color: 'red',
       });
     } finally {
