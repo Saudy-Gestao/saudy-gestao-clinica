@@ -102,6 +102,30 @@ export function Header() {
     return `${day} de ${month}, ${year}`;
   }, [currentTime]);
 
+  const userDisplayName = useMemo(() => {
+    const user = currentUser as any;
+    const name = String(user?.name || '').trim();
+    if (name) return name;
+    const email = String(user?.email || '').trim();
+    if (!email) return 'Usuário';
+    return email.split('@')[0] || 'Usuário';
+  }, [currentUser]);
+
+  const companyDisplayName = useMemo(() => {
+    const user = currentUser as any;
+    return String(
+      user?.sector?.branch?.company?.tradeName
+      || user?.sector?.branch?.company?.legalName
+      || user?.company?.tradeName
+      || user?.company?.legalName
+      || user?.branch?.company?.tradeName
+      || user?.branch?.company?.legalName
+      || user?.sector?.branch?.tradeName
+      || user?.branch?.tradeName
+      || '',
+    ).trim();
+  }, [currentUser]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(new Date()), 30_000);
     return () => window.clearInterval(timer);
@@ -262,7 +286,21 @@ export function Header() {
 
         <Group gap={isMobile ? 'xs' : 'xl'} style={{ flexShrink: 0 }}>
           {!isMobile ? (
-            <Text size="md" fw={500}>{timeStr} | {dateStr}</Text>
+            <Box ta="right" maw={320}>
+              <Text size="md" fw={500}>{timeStr} | {dateStr}</Text>
+              <Text
+                size="xs"
+                c="rgba(255,255,255,0.78)"
+                style={{
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+                title={companyDisplayName ? `${userDisplayName} | ${companyDisplayName}` : userDisplayName}
+              >
+                {companyDisplayName ? `${userDisplayName} | ${companyDisplayName}` : userDisplayName}
+              </Text>
+            </Box>
           ) : null}
 
           <Group gap="xs" align="center">
