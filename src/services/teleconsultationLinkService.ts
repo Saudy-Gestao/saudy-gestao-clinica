@@ -30,7 +30,15 @@ export interface TeleconsultationSendLinkResponse {
     doctorUrl: string;
     expiresAt: string;
   };
-  whatsappMock: {
+  whatsapp?: {
+    provider: 'gupshup' | 'mock' | string;
+    to?: string | null;
+    message: string;
+    providerMessageId?: string | null;
+    status?: string;
+    error?: string;
+  };
+  whatsappMock?: {
     provider: 'mock';
     to?: string | null;
     message: string;

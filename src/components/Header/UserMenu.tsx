@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Menu, Avatar, Group, UnstyledButton, Switch, Badge } from '@mantine/core';
 import { User, Settings, Moon, Sun, LifeBuoy } from 'lucide-react';
-import { notifications } from '@mantine/notifications';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 import authService from '../../services/authService';
@@ -16,7 +15,6 @@ export function UserMenu() {
 
   const isDark = colorScheme === 'dark';
   const isAdmHubScreen = location.pathname === '/adm-hub';
-  const isDashboardScreen = location.pathname === '/dashboard';
   const { data: myTicketsData } = useMyTicketsQuery();
   const unreadCount = Number(myTicketsData?.unreadCount || 0);
   const currentUser = authService.getCurrentUser() as any;
@@ -54,14 +52,6 @@ export function UserMenu() {
       </Menu.Target>
 
       <Menu.Dropdown>
-        {!isAdmHubScreen && !isDashboardScreen && (
-          <Menu.Item
-            icon={<User size={16} />}
-            onClick={() => notifications.show({ title: 'Perfil', message: 'Funcionalidade de perfil em breve.' })}
-          >
-            Perfil
-          </Menu.Item>
-        )}
         {!isAdmHubScreen && !doctorView && (
           <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
             Configuracoes

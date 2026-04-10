@@ -1158,11 +1158,12 @@ export function PreAtendimento() {
           const sendResult = await teleconsultationLinkService.sendWhatsAppLink(checklistPreAttendanceId, {
             notes: checklistData.observacoes || undefined,
           });
+          const sentTo = sendResult.whatsapp?.to || sendResult.whatsappMock?.to;
           showNotification({
             title: 'Link de teleconsulta enviado',
-            message: sendResult.whatsappMock?.to
-              ? `Link enviado (mock) para ${sendResult.whatsappMock.to}.`
-              : 'Link gerado e envio (mock) concluído.',
+            message: sentTo
+              ? `Link enviado para ${sentTo}.`
+              : 'Link gerado e envio concluído.',
             color: 'green',
           });
         } catch (teleError: any) {

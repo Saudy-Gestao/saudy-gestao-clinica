@@ -276,13 +276,14 @@ export function PreAgendamento() {
       const data: any = mode === 'TELECONSULTA'
         ? await teleconsultationLinkService.sendWhatsAppLinkByAppointment(selectedItem.appointmentId)
         : await preSchedulingService.sendLink(selectedItem.appointmentId);
+      const whatsappData = data.whatsapp || data.whatsappMock || null;
       setLinkResult({
         publicUrl: data.publicUrl || data.links?.patientUrl,
-        message: data.whatsappMock?.message || '',
-        to: data.whatsappMock?.to,
+        message: whatsappData?.message || '',
+        to: whatsappData?.to,
       });
       showNotification({
-        title: 'Link enviado (mock)',
+        title: 'Link enviado',
         message: mode === 'TELECONSULTA'
           ? 'Link de teleconsulta gerado com sucesso.'
           : (data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.'),
@@ -643,7 +644,7 @@ export function PreAgendamento() {
       <Modal
         opened={linkOpen}
         onClose={() => setLinkOpen(false)}
-        title={linkMode === 'TELECONSULTA' ? 'Envio de link de teleconsulta (WhatsApp mock)' : 'Envio de link de documentos (WhatsApp mock)'}
+        title={linkMode === 'TELECONSULTA' ? 'Envio de link de teleconsulta (WhatsApp)' : 'Envio de link de documentos (WhatsApp mock)'}
         centered
         size="lg"
       >
