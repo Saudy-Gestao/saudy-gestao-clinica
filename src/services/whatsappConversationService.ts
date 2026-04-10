@@ -59,6 +59,17 @@ export interface HumanConversationPatientInfo {
   observations?: string | null;
 }
 
+export interface HumanConversationPatientAppointment {
+  id: string;
+  date?: string | null;
+  time?: string | null;
+  type?: string | null;
+  status?: string | null;
+  doctorName?: string | null;
+  specialty?: string | null;
+  convenio?: string | null;
+}
+
 export interface HumanConversationOperatorConfig {
   userId: string;
   userName: string;
@@ -66,10 +77,15 @@ export interface HumanConversationOperatorConfig {
   branchName?: string | null;
   isActive: boolean;
   maxActiveConversations: number;
-  idleTimeoutMinutes: number;
-  closeWarningMinutes: number;
   flowKeys: string[];
   activeConversationCount: number;
+}
+
+export interface HumanConversationSettings {
+  id: string;
+  branchId: string;
+  idleTimeoutMinutes: number;
+  closeWarningMinutes: number;
 }
 
 const whatsappConversationService = {
@@ -78,16 +94,28 @@ const whatsappConversationService = {
     return res.data?.items || [];
   },
 
-  async listOperators(): Promise<HumanConversationOperatorConfig[]> {
+  async listOperators(): Promise<{
+    settings: HumanConversationSettings;
+    items: HumanConversationOperatorConfig[];
+  }> {
     const res = await api.get('/care/whatsapp/conversations/operators');
-    return res.data?.items || [];
+    return {
+      settings: res.data?.settings,
+      items: res.data?.items || [],
+    };
+  },
+
+  async saveSettings(payload: {
+    idleTimeoutMinutes: number;
+    closeWarningMinutes: number;
+  }) {
+    const res = await api.put('/care/whatsapp/conversations/settings', payload);
+    return res.data;
   },
 
   async saveOperatorConfig(userId: string, payload: {
     isActive: boolean;
     maxActiveConversations: number;
-    idleTimeoutMinutes: number;
-    closeWarningMinutes: number;
     flowKeys: string[];
   }) {
     const res = await api.put(`/care/whatsapp/conversations/operators/${userId}`, payload);
@@ -107,6 +135,10 @@ const whatsappConversationService = {
   async getMessages(conversationId: string): Promise<{
     conversation: HumanConversationItem;
     patient?: HumanConversationPatientInfo | null;
+    appointments?: {
+      next?: HumanConversationPatientAppointment | null;
+      recent: HumanConversationPatientAppointment[];
+    };
     items: HumanConversationMessage[];
   }> {
     const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`);

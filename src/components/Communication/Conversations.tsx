@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Card,
+  Collapse,
   Divider,
   Group,
   Modal,
@@ -30,6 +31,8 @@ import {
   AlertCircle,
   Check,
   CheckCheck,
+  ChevronDown,
+  ChevronUp,
   FileClock,
   Info,
   MessageCircle,
@@ -49,7 +52,9 @@ import whatsappConversationService, {
   type HumanConversationItem,
   type HumanConversationMessage,
   type HumanConversationOperatorConfig,
+  type HumanConversationPatientAppointment,
   type HumanConversationPatientInfo,
+  type HumanConversationSettings,
 } from '../../services/whatsappConversationService';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -67,15 +72,21 @@ const STATUS_COLOR: Record<string, string> = {
 type OperatorDraftMap = Record<string, {
   isActive: boolean;
   maxActiveConversations: number;
-  idleTimeoutMinutes: number;
-  closeWarningMinutes: number;
   flowKeys: string[];
+  useCustomCapacity?: boolean;
 }>;
 
 const formatCpf = (value?: string | null) => {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.length !== 11) return value || 'Não informado';
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+const formatAppointmentType = (value?: string | null) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'EXAME' || normalized === 'EXAM') return 'Exame';
+  if (normalized === 'CONSULTA' || normalized === 'CONSULTATION') return 'Consulta';
+  return value || 'Atendimento';
 };
 
 const isMediaMessage = (message: string) => /^\[(Imagem|Documento|Vídeo|Áudio) recebido\]/i.test(String(message || '').trim());
@@ -89,11 +100,6 @@ const isEventMessage = (message: HumanConversationMessage) => (
     || String((message.metadata as any)?.event || '').trim().length > 0
   )
 );
-
-const getCapacityPreset = (value: number) => {
-  if (value === 1 || value === 3 || value === 5) return String(value);
-  return 'custom';
-};
 
 const bubbleStyles = (message: HumanConversationMessage, colorScheme: 'light' | 'dark' | 'auto') => {
   if (message.authorType === 'PATIENT') {
@@ -143,6 +149,8 @@ export function Conversations() {
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operatorDrafts, setOperatorDrafts] = useState<OperatorDraftMap>({});
+  const [conversationSettingsDraft, setConversationSettingsDraft] = useState<HumanConversationSettings | null>(null);
+  const [expandedOperators, setExpandedOperators] = useState<Record<string, boolean>>({});
 
   const conversationsQuery = useQuery({
     queryKey: [...queryKeys.whatsappConversations, status, search, flowKey || '', mineOnly ? 'mine' : 'all'],
@@ -190,7 +198,7 @@ export function Conversations() {
   });
 
   useEffect(() => {
-    const operators = operatorsQuery.data || [];
+    const operators = operatorsQuery.data?.items || [];
     setOperatorDrafts((current) => {
       const next = { ...current };
       for (const operator of operators) {
@@ -198,15 +206,20 @@ export function Conversations() {
           next[operator.userId] = {
             isActive: operator.isActive,
             maxActiveConversations: operator.maxActiveConversations,
-            idleTimeoutMinutes: operator.idleTimeoutMinutes,
-            closeWarningMinutes: operator.closeWarningMinutes,
             flowKeys: operator.flowKeys,
+            useCustomCapacity: ![1, 3, 5].includes(operator.maxActiveConversations),
           };
         }
       }
       return next;
     });
   }, [operatorsQuery.data]);
+
+  useEffect(() => {
+    if (operatorsQuery.data?.settings && !conversationSettingsDraft) {
+      setConversationSettingsDraft(operatorsQuery.data.settings);
+    }
+  }, [conversationSettingsDraft, operatorsQuery.data]);
 
   useEffect(() => {
     if (!viewportRef.current) return;
@@ -270,6 +283,18 @@ export function Conversations() {
     },
   });
 
+  const saveSettingsMutation = useMutation({
+    mutationFn: (payload: { idleTimeoutMinutes: number; closeWarningMinutes: number }) => whatsappConversationService.saveSettings(payload),
+    onSuccess: async (data) => {
+      setConversationSettingsDraft(data);
+      notifications.show({ title: 'Configuração salva', message: 'Os tempos globais do atendimento foram atualizados.', color: 'green' });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationOperators });
+    },
+    onError: (error: any) => {
+      notifications.show({ title: 'Erro ao salvar', message: error?.response?.data?.error || error?.message || 'Não foi possível salvar a configuração.', color: 'red' });
+    },
+  });
+
   const flowOptions = (flowsQuery.data || []).map((flow: HumanConversationFlow) => ({
     value: flow.key,
     label: flow.label,
@@ -282,6 +307,7 @@ export function Conversations() {
   };
 
   const selectedPatient = messagesQuery.data?.patient || null;
+  const selectedPatientAppointments = messagesQuery.data?.appointments || { next: null, recent: [] };
   const rawMessages = messagesQuery.data?.items || [];
   const currentConversation = messagesQuery.data?.conversation || selectedConversation;
 
@@ -311,6 +337,24 @@ export function Conversations() {
     if (item.humanStatus === 'ASSIGNED') return 'Assumir atendimento';
     return 'Assumir';
   };
+
+  const renderAppointmentCard = (appointment: HumanConversationPatientAppointment, title?: string) => (
+    <Paper key={`${title || 'appointment'}-${appointment.id}`} withBorder radius="md" p="sm">
+      {title ? <Text size="xs" c="dimmed" mb={6}>{title}</Text> : null}
+      <Text fw={600}>
+        {formatAppointmentType(appointment.type)}
+        {appointment.specialty ? ` • ${appointment.specialty}` : ''}
+      </Text>
+      <Text size="sm" c="dimmed">
+        {appointment.date ? dayjs(appointment.date).format('DD/MM/YYYY') : 'Data não informada'}
+        {appointment.time ? ` às ${appointment.time}` : ''}
+      </Text>
+      <Text size="sm">{appointment.doctorName || 'Profissional não informado'}</Text>
+      <Text size="xs" c="dimmed">
+        {appointment.convenio || 'Convênio não informado'} • {appointment.status || 'Status não informado'}
+      </Text>
+    </Paper>
+  );
 
   const renderPatientInfo = (patient: HumanConversationPatientInfo | null) => (
     <Stack gap="xs">
@@ -355,6 +399,24 @@ export function Conversations() {
       <Box>
         <Text size="xs" c="dimmed">Observações</Text>
         <Text style={{ whiteSpace: 'pre-wrap' }}>{patient?.observations || 'Nenhuma observação cadastrada'}</Text>
+      </Box>
+
+      <Divider my="xs" />
+
+      <Box>
+        <Text fw={600} mb="xs">Próximo agendamento</Text>
+        {selectedPatientAppointments.next
+          ? renderAppointmentCard(selectedPatientAppointments.next, 'Próximo')
+          : <Text size="sm" c="dimmed">Nenhum próximo agendamento encontrado.</Text>}
+      </Box>
+
+      <Box>
+        <Text fw={600} mb="xs">Últimos atendimentos</Text>
+        <Stack gap="xs">
+          {selectedPatientAppointments.recent.length
+            ? selectedPatientAppointments.recent.map((appointment, index) => renderAppointmentCard(appointment, `${index + 1}. Mais recente`))
+            : <Text size="sm" c="dimmed">Nenhum atendimento anterior encontrado.</Text>}
+        </Stack>
       </Box>
     </Stack>
   );
@@ -685,127 +747,180 @@ export function Conversations() {
         size="xl"
       >
         <Stack gap="sm">
-          {(operatorsQuery.data || []).map((operator) => {
+          {conversationSettingsDraft ? (
+            <Paper withBorder radius="lg" p="md">
+              <Stack gap="md">
+                <Box>
+                  <Text fw={700}>Configuração geral do atendimento</Text>
+                  <Text size="sm" c="dimmed">Esses tempos valem para toda a operação de conversas desta filial.</Text>
+                </Box>
+                <SimpleGrid cols={{ base: 1, md: 2 }}>
+                  <NumberInput
+                    label="Aviso de ociosidade"
+                    description="Minutos sem resposta do paciente para enviar o aviso"
+                    min={1}
+                    value={conversationSettingsDraft.idleTimeoutMinutes}
+                    onChange={(value) => setConversationSettingsDraft((current) => current ? ({
+                      ...current,
+                      idleTimeoutMinutes: Number(value || 25),
+                    }) : current)}
+                  />
+                  <NumberInput
+                    label="Prazo para encerrar"
+                    description="Minutos após o aviso para encerrar automaticamente"
+                    min={1}
+                    value={conversationSettingsDraft.closeWarningMinutes}
+                    onChange={(value) => setConversationSettingsDraft((current) => current ? ({
+                      ...current,
+                      closeWarningMinutes: Number(value || 5),
+                    }) : current)}
+                  />
+                </SimpleGrid>
+                <Group justify="flex-end">
+                  <Button
+                    onClick={() => conversationSettingsDraft && saveSettingsMutation.mutate({
+                      idleTimeoutMinutes: conversationSettingsDraft.idleTimeoutMinutes,
+                      closeWarningMinutes: conversationSettingsDraft.closeWarningMinutes,
+                    })}
+                    loading={saveSettingsMutation.isPending}
+                  >
+                    Salvar configuração geral
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          ) : null}
+
+          {(operatorsQuery.data?.items || []).map((operator) => {
             const draft = operatorDrafts[operator.userId] || {
               isActive: operator.isActive,
               maxActiveConversations: operator.maxActiveConversations,
-              idleTimeoutMinutes: operator.idleTimeoutMinutes,
-              closeWarningMinutes: operator.closeWarningMinutes,
               flowKeys: operator.flowKeys,
+              useCustomCapacity: ![1, 3, 5].includes(operator.maxActiveConversations),
             };
 
-            const capacityPreset = getCapacityPreset(draft.maxActiveConversations);
+            const isExpanded = Boolean(expandedOperators[operator.userId]);
 
             return (
               <Paper key={operator.userId} withBorder radius="lg" p="md">
                 <Stack gap="md">
-                  <Group justify="space-between" align="flex-start">
+                  <Group justify="space-between" align="flex-start" wrap="nowrap">
                     <Box>
                       <Text fw={700}>{operator.userName}</Text>
                       <Text size="sm" c="dimmed">{operator.userEmail}</Text>
                       <Text size="xs" c="dimmed">Ativas agora: {operator.activeConversationCount}</Text>
                     </Box>
-                    <Switch
-                      checked={draft.isActive}
-                      onChange={(event) => setOperatorDrafts((current) => ({
-                        ...current,
-                        [operator.userId]: {
-                          ...draft,
-                          isActive: event.currentTarget.checked,
-                        },
-                      }))}
-                      label="Ativo"
-                    />
+                    <Group gap="xs" align="center" wrap="nowrap">
+                      <Switch
+                        checked={draft.isActive}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setOperatorDrafts((current) => ({
+                            ...current,
+                            [operator.userId]: {
+                              ...draft,
+                              isActive: checked,
+                            },
+                          }));
+                        }}
+                        label="Ativo"
+                      />
+                      <ActionIcon
+                        variant="light"
+                        onClick={() => setExpandedOperators((current) => ({
+                          ...current,
+                          [operator.userId]: !current[operator.userId],
+                        }))}
+                        aria-label={isExpanded ? 'Recolher operador' : 'Expandir operador'}
+                      >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </ActionIcon>
+                    </Group>
                   </Group>
 
-                  <Stack gap="xs">
-                    <Text size="sm" fw={600}>Capacidade simultânea</Text>
-                    <SegmentedControl
-                      value={capacityPreset}
-                      onChange={(value) => setOperatorDrafts((current) => ({
-                        ...current,
-                        [operator.userId]: {
-                          ...draft,
-                          maxActiveConversations: value === 'custom' ? draft.maxActiveConversations : Number(value),
-                        },
-                      }))}
-                      data={[
-                        { value: '1', label: '1' },
-                        { value: '3', label: '3' },
-                        { value: '5', label: '5' },
-                        { value: 'custom', label: 'Personalizado' },
-                      ]}
-                    />
-                    {capacityPreset === 'custom' ? (
-                      <NumberInput
-                        label="Capacidade personalizada"
-                        min={1}
-                        value={draft.maxActiveConversations}
+                  <Collapse in={isExpanded}>
+                    <Stack gap="md">
+                      <Stack gap="xs">
+                        <Text size="sm" fw={600}>Capacidade simultânea</Text>
+                        <Group gap="xs">
+                          {[1, 3, 5].map((preset) => (
+                            <Button
+                              key={preset}
+                              variant={!draft.useCustomCapacity && draft.maxActiveConversations === preset ? 'filled' : 'light'}
+                              onClick={() => setOperatorDrafts((current) => ({
+                                ...current,
+                                [operator.userId]: {
+                                  ...draft,
+                                  maxActiveConversations: preset,
+                                  useCustomCapacity: false,
+                                },
+                              }))}
+                            >
+                              {preset}
+                            </Button>
+                          ))}
+                          <Button
+                            variant={draft.useCustomCapacity ? 'filled' : 'light'}
+                            onClick={() => setOperatorDrafts((current) => ({
+                              ...current,
+                              [operator.userId]: {
+                                ...draft,
+                                maxActiveConversations: Math.max(1, Number(draft.maxActiveConversations || 1)),
+                                useCustomCapacity: true,
+                              },
+                            }))}
+                          >
+                            Personalizado
+                          </Button>
+                        </Group>
+                        {draft.useCustomCapacity ? (
+                          <TextInput
+                            label="Capacidade personalizada"
+                            description="Digite quantas conversas simultâneas esse operador pode assumir"
+                            inputMode="numeric"
+                            value={String(draft.maxActiveConversations || '')}
+                            onChange={(event) => {
+                              const digits = event.currentTarget.value.replace(/\D/g, '');
+                              setOperatorDrafts((current) => ({
+                                ...current,
+                                [operator.userId]: {
+                                  ...draft,
+                                  maxActiveConversations: Math.max(1, Number(digits || 1)),
+                                  useCustomCapacity: true,
+                                },
+                              }));
+                            }}
+                          />
+                        ) : null}
+                      </Stack>
+
+                      <MultiSelect
+                        label="Fluxos atendidos"
+                        placeholder="Selecione os fluxos do operador"
+                        data={flowOptions}
+                        value={draft.flowKeys}
                         onChange={(value) => setOperatorDrafts((current) => ({
                           ...current,
                           [operator.userId]: {
                             ...draft,
-                            maxActiveConversations: Number(value || 1),
+                            flowKeys: value,
                           },
                         }))}
+                        searchable
+                        maxDropdownHeight={240}
+                        comboboxProps={{ withinPortal: false }}
+                        styles={{
+                          pillsList: { minHeight: 44, alignItems: 'center' },
+                        }}
                       />
-                    ) : null}
-                  </Stack>
 
-                  <SimpleGrid cols={{ base: 1, md: 2 }}>
-                    <NumberInput
-                      label="Aviso de ociosidade"
-                      description="Minutos sem resposta do paciente para encerramento"
-                      min={1}
-                      value={draft.idleTimeoutMinutes}
-                      onChange={(value) => setOperatorDrafts((current) => ({
-                        ...current,
-                        [operator.userId]: {
-                          ...draft,
-                          idleTimeoutMinutes: Number(value || 25),
-                        },
-                      }))}
-                    />
-                    <NumberInput
-                      label="Prazo para encerrar"
-                      description="Minutos após o aviso para encerrar automaticamente"
-                      min={1}
-                      value={draft.closeWarningMinutes}
-                      onChange={(value) => setOperatorDrafts((current) => ({
-                        ...current,
-                        [operator.userId]: {
-                          ...draft,
-                          closeWarningMinutes: Number(value || 5),
-                        },
-                      }))}
-                    />
-                  </SimpleGrid>
-
-                  <MultiSelect
-                    label="Fluxos atendidos"
-                    placeholder="Selecione os fluxos do operador"
-                    data={flowOptions}
-                    value={draft.flowKeys}
-                    onChange={(value) => setOperatorDrafts((current) => ({
-                      ...current,
-                      [operator.userId]: {
-                        ...draft,
-                        flowKeys: value,
-                      },
-                    }))}
-                    searchable
-                    maxDropdownHeight={240}
-                    comboboxProps={{ withinPortal: false }}
-                    styles={{
-                      pillsList: { minHeight: 44, alignItems: 'center' },
-                    }}
-                  />
-
-                  <Group justify="flex-end">
-                    <Button onClick={() => handleSaveOperator(operator)} loading={saveOperatorMutation.isPending}>
-                      Salvar operador
-                    </Button>
-                  </Group>
+                      <Group justify="flex-end">
+                        <Button onClick={() => handleSaveOperator(operator)} loading={saveOperatorMutation.isPending}>
+                          Salvar operador
+                        </Button>
+                      </Group>
+                    </Stack>
+                  </Collapse>
                 </Stack>
               </Paper>
             );
