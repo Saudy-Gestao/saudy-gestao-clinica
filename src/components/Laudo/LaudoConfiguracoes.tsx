@@ -442,7 +442,7 @@ export function LaudoConfiguracoes() {
               <ChevronLeft size={24} />
             </ActionIcon>
             <Box>
-              <Title order={3} c={DARK_BLUE}>Configurações de Laudo</Title>
+              <Title order={3} c="var(--mantine-color-text)">Configurações de Laudo</Title>
               <Text c="dimmed" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM</Text>
             </Box>
           </Group>
