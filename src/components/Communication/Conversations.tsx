@@ -32,6 +32,7 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronUp,
+  Download,
   Info,
   MessageCircle,
   PanelLeftClose,
@@ -310,6 +311,7 @@ export function Conversations() {
   const [expandedOperators, setExpandedOperators] = useState<Record<string, boolean>>({});
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; fileName?: string | null } | null>(null);
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
 
   const conversationsQuery = useQuery({
     queryKey: [...queryKeys.whatsappConversations, status, search, flowKey || '', mineOnly ? 'mine' : 'all'],
@@ -1450,19 +1452,52 @@ export function Conversations() {
         onClose={() => {
           setImageModalOpen(false);
           setSelectedImage(null);
+          setIsImageZoomed(false);
         }}
         title={selectedImage?.fileName || 'Imagem'}
         size="xl"
         centered
       >
         {selectedImage ? (
-          <Box style={{ textAlign: 'center' }}>
-            <img
-              src={selectedImage.url}
-              alt={selectedImage.fileName || 'Imagem'}
-              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
-            />
-          </Box>
+          <Stack gap="md">
+            <Box style={{ textAlign: 'center', overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
+              <img
+                src={selectedImage.url}
+                alt={selectedImage.fileName || 'Imagem'}
+                onClick={() => setIsImageZoomed(!isImageZoomed)}
+                style={{
+                  maxWidth: isImageZoomed ? 'none' : '100%',
+                  width: isImageZoomed ? 'auto' : '100%',
+                  height: isImageZoomed ? 'auto' : 'auto',
+                  maxHeight: isImageZoomed ? 'none' : 'calc(100vh - 300px)',
+                  objectFit: 'contain',
+                  cursor: 'zoom-in',
+                  transition: 'all 0.3s ease',
+                  ...(isImageZoomed ? { cursor: 'zoom-out' } : {}),
+                }}
+              />
+            </Box>
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">
+                {isImageZoomed ? 'Clique na imagem para diminuir' : 'Clique na imagem para ampliar'}
+              </Text>
+              <Button
+                leftSection={<Download size={16} />}
+                variant="light"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = selectedImage.url;
+                  link.download = selectedImage.fileName || 'imagem.jpg';
+                  link.target = '_blank';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+              >
+                Baixar imagem
+              </Button>
+            </Group>
+          </Stack>
         ) : null}
       </Modal>
     </Box>
