@@ -150,7 +150,7 @@ const resolveMediaUrl = (value?: string | null) => {
   return `${origin}${path}`;
 };
 
-const extractMediaMetadata = (message: HumanConversationMessage, mediaUrlsCache: Record<string, string> = {}) => {
+const extractMediaMetadata = (message: HumanConversationMessage) => {
   const metadata = parseMetadataObject(message.metadata);
   
   // Log metadata for debugging
@@ -165,7 +165,7 @@ const extractMediaMetadata = (message: HumanConversationMessage, mediaUrlsCache:
     'id',
   ]);
   
-  let rawUrl = findMetadataString(metadata, [
+  const rawUrl = findMetadataString(metadata, [
     'mediaUrl',
     'media_url',
     'url',
@@ -189,11 +189,6 @@ const extractMediaMetadata = (message: HumanConversationMessage, mediaUrlsCache:
     'link',
     'href',
   ]) || extractFirstUrlFromText(message.message);
-  
-  // Se não tem URL mas tem mediaId, tentar buscar do cache
-  if (!rawUrl && mediaId && mediaUrlsCache[mediaId]) {
-    rawUrl = mediaUrlsCache[mediaId];
-  }
 
   const mimeType = findMetadataString(metadata, [
     'mimeType',
@@ -313,7 +308,6 @@ export function Conversations() {
   const [operatorDrafts, setOperatorDrafts] = useState<OperatorDraftMap>({});
   const [conversationSettingsDraft, setConversationSettingsDraft] = useState<HumanConversationSettings | null>(null);
   const [expandedOperators, setExpandedOperators] = useState<Record<string, boolean>>({});
-  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
 
   const conversationsQuery = useQuery({
     queryKey: [...queryKeys.whatsappConversations, status, search, flowKey || '', mineOnly ? 'mine' : 'all'],
@@ -558,44 +552,6 @@ export function Conversations() {
     }
   }, [protocolSearch, protocolLookup]);
 
-  // Fetch media URLs for messages that have mediaId but no mediaUrl
-  useEffect(() => {
-    const fetchMissingMediaUrls = async () => {
-      const messagesToFetch = currentMessages.filter((msg) => {
-        const metadata = parseMetadataObject(msg.metadata);
-        const mediaId = findMetadataString(metadata, ['mediaId', 'media_id', 'id']);
-        const mediaUrl = findMetadataString(metadata, ['mediaUrl', 'media_url', 'url']);
-        return mediaId && !mediaUrl && !mediaUrls[mediaId];
-      });
-
-      for (const msg of messagesToFetch) {
-        const metadata = parseMetadataObject(msg.metadata);
-        const mediaId = findMetadataString(metadata, ['mediaId', 'media_id', 'id']);
-        if (!mediaId) continue;
-
-        try {
-          const response = await fetch(`${getApiBaseUrl()}/care/whatsapp/media/${mediaId}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.url) {
-              setMediaUrls((prev) => ({ ...prev, [mediaId]: data.url }));
-            }
-          }
-        } catch (error) {
-          console.error('[Media] Failed to fetch URL for mediaId:', mediaId, error);
-        }
-      }
-    };
-
-    if (currentMessages.length > 0) {
-      void fetchMissingMediaUrls();
-    }
-  }, [currentMessages]);
-
   const isValidProtocolFormat = (value: string) => {
     const trimmed = value.trim();
     // Matches patterns like: WA-20260410-2014ED, WA-20260410-123456, etc.
@@ -741,7 +697,7 @@ export function Conversations() {
   );
 
   const renderMessageContent = (message: HumanConversationMessage) => {
-    const media = extractMediaMetadata(message, mediaUrls);
+    const media = extractMediaMetadata(message);
     const cleanText = String(message.message || '').trim();
     const isMediaIndicator = isMediaMessage(cleanText);
     const hasMediaUrl = Boolean(media.url);
@@ -798,9 +754,10 @@ export function Conversations() {
   };
 
   return (
-    <Box p={0} style={{ height: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Header />
-      <Stack gap="md" px="md" pt="sm" style={{ flex: 1, overflow: 'hidden' }}>
+      <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Stack gap="md" px="md" py="md" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Group justify="space-between" align="center">
           <Box>
             <Text fw={700} size="xl">Conversas</Text>
@@ -821,9 +778,8 @@ export function Conversations() {
             display: 'grid',
             gridTemplateColumns: sidebarCollapsed ? '84px minmax(0, 1fr)' : 'minmax(320px, 420px) minmax(0, 1fr)',
             gap: '16px',
-            alignItems: 'stretch',
             flex: 1,
-            overflow: 'hidden',
+            minHeight: 0,
           }}
         >
           <Paper withBorder p={sidebarCollapsed ? 'xs' : 'md'} radius="lg" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -1151,7 +1107,8 @@ export function Conversations() {
             )}
           </Paper>
         </Box>
-      </Stack>
+        </Stack>
+      </Box>
 
       <Modal
         opened={operatorsModalOpen}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -179,6 +179,7 @@ export function SettingsPage() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
+  const isMountedRef = useRef(true);
   const [activeTab, setActiveTab] = useState<string | null>('company');
   
   // Get user's company from logged user
@@ -366,6 +367,14 @@ export function SettingsPage() {
   };
 
   // --- Effects ---
+
+  // Track if component is mounted to prevent setState on unmounted component
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const prefill = getStoredCompanyPrefill();
