@@ -39,6 +39,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCcw,
+  Search,
   Send,
   Settings,
   UserCheck,
@@ -58,6 +59,7 @@ import whatsappConversationService, {
   type HumanConversationProtocolSummary,
   type HumanConversationSettings,
 } from '../../services/whatsappConversationService';
+import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 
 const STATUS_LABEL: Record<string, string> = {
   QUEUED: 'Na fila',
@@ -257,6 +259,8 @@ export function Conversations() {
   const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const currentUserQuery = useCurrentUserProfileQuery();
+  const currentUserId = String((currentUserQuery.data as any)?.id || '');
 
   const [status, setStatus] = useState<string>('QUEUED');
   const [search, setSearch] = useState('');
@@ -264,6 +268,7 @@ export function Conversations() {
   const [mineOnly, setMineOnly] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messageDraft, setMessageDraft] = useState('');
+  const [messageSearch, setMessageSearch] = useState('');
   const [operatorsModalOpen, setOperatorsModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
@@ -465,6 +470,16 @@ export function Conversations() {
     [rawMessages],
   );
 
+  const filteredMessages = useMemo(() => {
+    const searchTerm = messageSearch.trim().toLowerCase();
+    if (!searchTerm) return currentMessages;
+    return currentMessages.filter((message) => {
+      const text = String(message.message || '').toLowerCase();
+      const authorName = String(message.authorName || '').toLowerCase();
+      return text.includes(searchTerm) || authorName.includes(searchTerm);
+    });
+  }, [currentMessages, messageSearch]);
+
   const openProtocolModal = () => {
     setProtocolModalOpen(true);
     setProtocolNumberInput(String(currentConversation?.humanProtocolNumber || '').trim());
@@ -513,6 +528,10 @@ export function Conversations() {
     if (item.humanStatus === 'QUEUED') return 'Assumir da fila';
     if (item.humanStatus === 'ASSIGNED') return 'Assumir atendimento';
     return 'Assumir';
+  };
+
+  const isAlreadyAssignedToMe = (item: HumanConversationItem) => {
+    return item.humanStatus === 'ASSIGNED' && item.humanAssignedUserId === currentUserId;
   };
 
   const renderAppointmentCard = (appointment: HumanConversationPatientAppointment, title?: string) => (
@@ -600,28 +619,32 @@ export function Conversations() {
 
   const renderMessageContent = (message: HumanConversationMessage) => {
     const media = extractMediaMetadata(message);
-    const hasMedia = Boolean(media.url) && (media.isImage || media.isVideo || media.isAudio || media.isDocument || isMediaMessage(message.message));
     const cleanText = String(message.message || '').trim();
-    const shouldShowText = cleanText.length > 0 && !isMediaMessage(cleanText);
+    const isMediaIndicator = isMediaMessage(cleanText);
+    const hasMediaUrl = Boolean(media.url);
+    const shouldShowText = cleanText.length > 0 && !isMediaIndicator;
 
     return (
       <Stack gap={6}>
-        {media.isImage && media.url ? (
+        {media.isImage && hasMediaUrl ? (
           <Box>
             <img
               src={media.url}
               alt={media.fileName || 'Imagem enviada'}
               style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
           </Box>
         ) : null}
-        {media.isVideo && media.url ? (
+        {media.isVideo && hasMediaUrl ? (
           <video src={media.url} controls style={{ width: '100%', borderRadius: 8 }} />
         ) : null}
-        {media.isAudio && media.url ? (
+        {media.isAudio && hasMediaUrl ? (
           <audio src={media.url} controls style={{ width: '100%' }} />
         ) : null}
-        {media.isDocument && media.url ? (
+        {media.isDocument && hasMediaUrl ? (
           <Button
             size="xs"
             variant="light"
@@ -633,8 +656,8 @@ export function Conversations() {
             {media.fileName ? `Abrir documento: ${media.fileName}` : 'Abrir documento'}
           </Button>
         ) : null}
-        {hasMedia && !media.url ? (
-          <Badge variant="light" color="indigo">Mídia recebida (sem URL de visualização)</Badge>
+        {isMediaIndicator && !hasMediaUrl ? (
+          <Badge variant="light" color="yellow">Mídia recebida • Aguardando processamento</Badge>
         ) : null}
         {media.caption ? (
           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{media.caption}</Text>
@@ -700,7 +723,8 @@ export function Conversations() {
                   </Group>
                   <TextInput
                     label="Buscar"
-                    placeholder="Paciente, telefone, protocolo ou mensagem"
+                    placeholder="Paciente, telefone ou protocolo"
+                    leftSection={<Search size={16} />}
                     value={search}
                     onChange={(event) => setSearch(event.currentTarget.value)}
                   />
@@ -839,7 +863,7 @@ export function Conversations() {
                     <Button variant="light" leftSection={<FileClock size={14} />} onClick={openProtocolModal}>
                       Protocolo
                     </Button>
-                    {selectedConversation.humanStatus !== 'CLOSED' ? (
+                    {selectedConversation.humanStatus !== 'CLOSED' && !isAlreadyAssignedToMe(selectedConversation) ? (
                       <Button
                         leftSection={<UserCheck size={14} />}
                         onClick={() => claimMutation.mutate(selectedConversation.id)}
@@ -888,9 +912,17 @@ export function Conversations() {
                   </Group>
                 </Card>
 
-                <ScrollArea h={430} offsetScrollbars viewportRef={viewportRef}>
+                <TextInput
+                  placeholder="Buscar mensagens neste atendimento"
+                  leftSection={<Search size={16} />}
+                  value={messageSearch}
+                  onChange={(event) => setMessageSearch(event.currentTarget.value)}
+                  mb="sm"
+                />
+
+                <ScrollArea h={380} offsetScrollbars viewportRef={viewportRef}>
                   <Stack gap="sm" pr="xs">
-                    {currentMessages.map((message) => {
+                    {filteredMessages.map((message) => {
                       const styles = bubbleStyles(message, colorScheme);
                       const messageState = message.providerMessageId
                         ? messageStatusMap.get(message.providerMessageId) || 'SENT'
@@ -909,9 +941,6 @@ export function Conversations() {
                           <Text size="xs" c="dimmed" mb={4}>
                             {message.authorName || message.authorType} • {dayjs(message.createdAt).format('DD/MM/YYYY HH:mm')}
                           </Text>
-                          {isMediaMessage(message.message) ? (
-                            <Badge variant="light" color="indigo" mb={6}>Mídia / documento</Badge>
-                          ) : null}
                           {renderMessageContent(message)}
                           {message.authorType === 'OPERATOR' && messageState ? (
                             <Group justify="flex-end" gap={4} mt={8}>
@@ -1169,28 +1198,29 @@ export function Conversations() {
         size="lg"
       >
         <Stack gap="sm">
-          <Group align="flex-end">
-            <TextInput
-              style={{ flex: 1 }}
-              label="Número do protocolo"
-              placeholder="Digite o protocolo para consultar"
-              value={protocolNumberInput}
-              onChange={(event) => setProtocolNumberInput(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  void handleLookupProtocol();
-                }
-              }}
-            />
-            <Button
-              leftSection={<FileClock size={14} />}
-              onClick={() => void handleLookupProtocol()}
-              loading={protocolLookupLoading}
-            >
-              Buscar
-            </Button>
-          </Group>
+          <TextInput
+            label="Número do protocolo"
+            placeholder="Digite o protocolo para consultar"
+            leftSection={<Search size={16} />}
+            value={protocolNumberInput}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setProtocolNumberInput(value);
+              // Auto-search when a valid protocol is typed
+              if (value.trim().length > 0) {
+                void handleLookupProtocol();
+              } else {
+                setProtocolLookup(null);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void handleLookupProtocol();
+              }
+            }}
+            rightSection={protocolLookupLoading ? <RefreshCcw size={14} className="animate-spin" /> : null}
+          />
 
           <Group grow>
             <Box>
@@ -1210,19 +1240,21 @@ export function Conversations() {
           <ScrollArea h={360}>
             <Stack gap="xs">
               {!protocolLookup ? (
-                <Text size="sm" c="dimmed">Digite um protocolo e clique em Buscar para ver apenas o trecho desse atendimento.</Text>
+                <Text size="sm" c="dimmed">Digite um protocolo para ver apenas o trecho desse atendimento.</Text>
               ) : null}
-              {protocolLookup && protocolLookup.items.length === 0 ? (
+              {protocolLookup && protocolLookup.items.filter((msg) => !isDeliveryEvent(msg) && !isEventMessage(msg)).length === 0 ? (
                 <Text size="sm" c="dimmed">Nenhuma mensagem encontrada para esse protocolo.</Text>
               ) : null}
-              {(protocolLookup?.items || []).map((message) => (
-                <Paper key={message.id} withBorder radius="md" p="sm">
-                  <Text size="xs" c="dimmed" mb={4}>
-                    {dayjs(message.createdAt).format('DD/MM/YYYY HH:mm')} • {message.authorName || message.authorType}
-                  </Text>
-                  {renderMessageContent(message)}
-                </Paper>
-              ))}
+              {(protocolLookup?.items || [])
+                .filter((msg) => !isDeliveryEvent(msg) && !isEventMessage(msg))
+                .map((message) => (
+                  <Paper key={message.id} withBorder radius="md" p="sm">
+                    <Text size="xs" c="dimmed" mb={4}>
+                      {dayjs(message.createdAt).format('DD/MM/YYYY HH:mm')} • {message.authorName || message.authorType}
+                    </Text>
+                    {renderMessageContent(message)}
+                  </Paper>
+                ))}
             </Stack>
           </ScrollArea>
         </Stack>
