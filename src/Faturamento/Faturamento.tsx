@@ -4,55 +4,22 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Popover, Grid, Badge, Skeleton, Checkbox, SimpleGrid, Tabs } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Plus, ChevronLeft, User, ExternalLink, Calendar as CalendarIcon, Pencil, FileCode2 } from 'lucide-react';
+import { Plus, ChevronLeft, Calendar as CalendarIcon, Pencil, FileCode2 } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../themes/theme';
 import { DatePicker } from '@mantine/dates';
 import { formatDateInput } from '../utils/formatters';
 import ResultModal from '../components/common/ResultModal';
+import { Header } from '../components/Header/Header';
 import { useInvoicesQuery } from '../hooks/useInvoicesQuery';
 import { queryKeys } from '../lib/queryKeys';
 import { FloatingInput } from '../components/common/FloatingInput';
 import { FloatingSelect } from '../components/common/FloatingSelect';
 import { FloatingTextarea } from '../components/common/FloatingTextarea';
 import { FloatingNumberInput } from '../components/common/FloatingNumberInput';
+import { resolveApiErrorMessage } from '../lib/apiError';
 import tissBatchService from '../services/tissBatchService';
 import { useTissBatchesQuery } from '../hooks/useTissBatchesQuery';
-
-export function Header() {
-  const isMobile = useMediaQuery('(max-width: 799px)');
-
-  const currentTime = new Date();
-  const timeStr = currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const day = currentTime.getDate().toString().padStart(2, '0');
-  const month = currentTime.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
-  const year = currentTime.getFullYear();
-  const dateStr = `${day} de ${month}, ${year}`;
-
-  return (
-    <Box bg={DARK_BLUE} c="white" py="md" px="xl">
-      <Group justify="space-between">
-        <Group>
-          <Box bg="white" w={40} h={40} style={{ borderRadius: 8 }} />
-          <Text fw={500} size="lg">Logo Clínica</Text>
-        </Group>
-
-        <Group gap="xl">
-          {!isMobile && <Text size="sm">{timeStr} | {dateStr}</Text>}
-          <Group gap="xs">
-            <ActionIcon variant="subtle" color="white" size="sm">
-              <User size={16} color="white" />
-            </ActionIcon>
-            <Text c="white" size="xs">|</Text>
-            <ActionIcon variant="subtle" color="white" size="sm">
-              <ExternalLink size={16} color="white" />
-            </ActionIcon>
-          </Group>
-        </Group>
-      </Group>
-    </Box>
-  );
-}
 
 interface InvoiceRow {
   id: string | number;
@@ -248,7 +215,7 @@ export function Faturamento() {
   useEffect(() => {
     if (!invoicesError) return;
     const err: any = invoicesError;
-    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar faturas';
+    const msg = resolveApiErrorMessage(err, 'Erro ao carregar faturas');
     showNotification({ title: 'Erro', message: msg, color: 'red' });
   }, [invoicesError]);
 
@@ -341,7 +308,7 @@ export function Faturamento() {
       setSelectedInvoiceIds([]);
       setTissModalOpen(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao criar lote TISS';
+      const msg = resolveApiErrorMessage(err, 'Falha ao criar lote TISS');
       showNotification({ title: 'Erro ao criar lote TISS', message: msg, color: 'red' });
     } finally {
       setCreatingTissBatch(false);
@@ -362,7 +329,7 @@ export function Faturamento() {
       window.URL.revokeObjectURL(url);
       await queryClient.invalidateQueries({ queryKey: queryKeys.tissBatches });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Não foi possível gerar o XML do lote.';
+      const msg = resolveApiErrorMessage(err, 'Não foi possível gerar o XML do lote.');
       showNotification({ title: 'Erro ao gerar XML', message: msg, color: 'red' });
     } finally {
       setDownloadingBatchId(null);
@@ -392,7 +359,7 @@ export function Faturamento() {
       setProtocolBatchId(null);
       setProtocolNumberInput('');
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao registrar protocolo';
+      const msg = resolveApiErrorMessage(err, 'Falha ao registrar protocolo');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSavingProtocol(false);
@@ -438,7 +405,7 @@ export function Faturamento() {
       setReturnBatchId(null);
       setReturnRows([]);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao registrar retorno';
+      const msg = resolveApiErrorMessage(err, 'Falha ao registrar retorno');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setSavingReturn(false);
@@ -454,7 +421,7 @@ export function Faturamento() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tissBatches });
       showNotification({ title: 'Reapresentação criada', message: 'Novo lote criado para guias glosadas/parciais.', color: 'green' });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha ao reapresentar lote';
+      const msg = resolveApiErrorMessage(err, 'Falha ao reapresentar lote');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     } finally {
       setRepresentingBatchId(null);
@@ -590,7 +557,7 @@ export function Faturamento() {
         setShowInvoiceSuccess(true);
         await queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
       } catch (err: any) {
-        const msg = err?.response?.data?.message || err?.response?.data?.details || err?.message || 'Erro ao atualizar fatura';
+        const msg = resolveApiErrorMessage(err, 'Erro ao atualizar fatura');
         setInvoiceErrorTitle('Erro ao atualizar fatura');
         setInvoiceErrorMessage(msg);
         setShowInvoiceError(true);
@@ -646,7 +613,7 @@ export function Faturamento() {
         setShowInvoiceSuccess(true);
         await queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
       } catch (err: any) {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao criar fatura';
+        const msg = resolveApiErrorMessage(err, 'Erro ao criar fatura');
         setInvoiceErrorTitle('Erro ao criar fatura');
         setInvoiceErrorMessage(msg);
         setShowInvoiceError(true);
@@ -663,27 +630,20 @@ export function Faturamento() {
       <Header />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} align="center">
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            size="lg"
-            onClick={() => navigate('/dashboard')}
-            style={{
-              border: '1px solid #dee2e6',
-              borderRadius: '6px',
-            }}
-          >
-            <ChevronLeft size={20} />
-          </ActionIcon>
-          <Box>
-            <Text fw={600} size={isMobile ? 'lg' : 'xl'} c="black">
-              Faturamento
-            </Text>
-            <Text size="sm" c="dimmed">
-              Cobranças e notas fiscais
-            </Text>
-          </Box>
+        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ChevronLeft size={28} />
+            </ActionIcon>
+            <Box>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
+                Faturamento
+              </Text>
+              <Text size="sm" c="dimmed">
+                Cobranças e notas fiscais
+              </Text>
+            </Box>
+          </Group>
         </Group>
 
         <Tabs value={activeWorkspace} onChange={(value) => setActiveWorkspace(value || 'invoices')}>

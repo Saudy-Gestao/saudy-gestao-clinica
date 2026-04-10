@@ -6,10 +6,10 @@ import {
   Button,
   Divider,
   Group,
-  Loader,
   Paper,
   ScrollArea,
   Select,
+  Skeleton,
   Stack,
   Text,
   Textarea,
@@ -21,6 +21,7 @@ import { ArrowLeft, LifeBuoy, Paperclip, Send, X } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import ticketService, { type TicketItem, type TicketType, type TicketStatus, type TicketMessageItem, type TicketPriority } from '../../services/ticketService';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'OPEN', label: 'Aberto' },
@@ -125,6 +126,14 @@ const adaptiveSubtleSurface = 'light-dark(var(--mantine-color-gray-0), var(--man
 const adaptiveNestedSurface = 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5))';
 const adaptiveTimelineLine = 'light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-3))';
 
+const AdminTicketDetailsSkeleton = () => (
+  <Stack gap="md">
+    <Skeleton height={120} radius="md" />
+    <Skeleton height={360} radius="md" />
+    <Skeleton height={200} radius="md" />
+  </Stack>
+);
+
 export function AdminTicketDetails() {
   const navigate = useNavigate();
   const { id = '' } = useParams();
@@ -148,11 +157,11 @@ export function AdminTicketDetails() {
       ]);
       setTicket(ticketData);
       setMessages(messageData);
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro ao carregar chamado',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível carregar os detalhes do chamado.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível carregar os detalhes do chamado.',
       });
       navigate('/adm-tickets');
     } finally {
@@ -170,12 +179,12 @@ export function AdminTicketDetails() {
     try {
       const updated = await ticketService.updateStatus(ticket.id, status as TicketStatus);
       setTicket(updated);
-      notifications.show({ title: 'Status atualizado', message: 'Status do chamado atualizado com sucesso.', color: 'green' });
-    } catch (error: any) {
-      notifications.show({
+      showSuccessToast({ title: 'Status atualizado', message: 'Status do chamado atualizado com sucesso.' });
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro ao atualizar status',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível atualizar o status.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível atualizar o status.',
       });
     } finally {
       setUpdatingStatus(false);
@@ -190,12 +199,12 @@ export function AdminTicketDetails() {
       setMessageDraft('');
       setAttachmentDraft(null);
       await loadAll();
-      notifications.show({ title: 'Atualização registrada', message: 'A atualização foi adicionada ao chamado.', color: 'green' });
-    } catch (error: any) {
-      notifications.show({
+      showSuccessToast({ title: 'Atualização registrada', message: 'A atualização foi adicionada ao chamado.' });
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro ao registrar atualização',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível enviar a atualização.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível enviar a atualização.',
       });
     } finally {
       setSendingMessage(false);
@@ -208,12 +217,12 @@ export function AdminTicketDetails() {
     try {
       const updated = await ticketService.updatePriority(ticket.id, priority as TicketPriority);
       setTicket(updated);
-      notifications.show({ title: 'Prioridade atualizada', message: 'Prioridade do chamado atualizada com sucesso.', color: 'green' });
-    } catch (error: any) {
-      notifications.show({
+      showSuccessToast({ title: 'Prioridade atualizada', message: 'Prioridade do chamado atualizada com sucesso.' });
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro ao atualizar prioridade',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível atualizar a prioridade.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível atualizar a prioridade.',
       });
     } finally {
       setUpdatingPriority(false);
@@ -240,11 +249,11 @@ export function AdminTicketDetails() {
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro ao abrir anexo',
-        message: error?.response?.data?.message || error?.message || `Não foi possível abrir ${fileName || 'o anexo'}.`,
-        color: 'red',
+        error,
+        fallback: `Não foi possível abrir ${fileName || 'o anexo'}.`,
       });
     } finally {
       setOpeningAttachmentId(null);
@@ -272,7 +281,7 @@ export function AdminTicketDetails() {
           </Paper>
 
           {loading ? (
-            <Group justify="center" py="xl"><Loader /></Group>
+            <AdminTicketDetailsSkeleton />
           ) : !ticket ? null : (
             <>
               <Paper withBorder radius="md" p="sm" style={{ background: adaptiveSubtleSurface }}>

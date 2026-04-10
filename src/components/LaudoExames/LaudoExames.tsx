@@ -34,6 +34,7 @@ import reportAuditLogService from '../../services/reportAuditLogService';
 import { useReportExamsPageDataQuery } from '../../hooks/useReportExamsPageDataQuery';
 import { useReportPreviousReportsQuery } from '../../hooks/useReportPreviousReportsQuery';
 import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQuery';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 
 type ExamStatus = 'sem_laudo' | 'em_andamento' | 'laudado' | 'revisado' | 'finalizado';
@@ -583,7 +584,7 @@ export function LaudoExames() {
       }
       showNotification({ title: 'Correção aplicada', message: 'O texto foi corrigido com sucesso.', color: 'green' });
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Erro ao corrigir o texto.';
+      const msg = resolveApiErrorMessage(err, 'Erro ao corrigir o texto.');
       showNotification({ title: 'Erro na correção', message: msg, color: 'red' });
     } finally {
       setSpellCheckLoading(false);
@@ -730,7 +731,7 @@ export function LaudoExames() {
       setRequiresReviewer(true);
       showNotification({
         title: 'Erro',
-        message: (reportPageError as any)?.response?.data?.message || (reportPageError as any)?.message || 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.',
+        message: resolveApiErrorMessage(reportPageError, 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.'),
         color: 'red',
       });
     }
@@ -982,7 +983,7 @@ export function LaudoExames() {
 
     showNotification({
       title: 'Erro ao carregar adendo',
-      message: (addendumDraftError as any)?.response?.data?.message || (addendumDraftError as any)?.message || 'Não foi possível carregar o rascunho de adendo',
+      message: resolveApiErrorMessage(addendumDraftError, 'Não foi possível carregar o rascunho de adendo'),
       color: 'red',
     });
   }, [addendumDraftError, addendumModalOpen]);
@@ -1226,7 +1227,7 @@ export function LaudoExames() {
       clearLocalStatusOverride(selectedExam.id);
       showNotification({
         title: 'Erro ao assinar',
-        message: err?.response?.data?.message || err?.message || 'Falha ao registrar assinatura',
+        message: resolveApiErrorMessage(err, 'Falha ao registrar assinatura'),
         color: 'red',
       });
       return;
@@ -1291,7 +1292,7 @@ export function LaudoExames() {
       } catch (err: any) {
         showNotification({
           title: 'Erro ao assinar adendo',
-          message: err?.response?.data?.message || err?.message || 'Não foi possível assinar o adendo',
+          message: resolveApiErrorMessage(err, 'Não foi possível assinar o adendo'),
           color: 'red',
         });
         return;
@@ -1321,7 +1322,7 @@ export function LaudoExames() {
       } catch (err: any) {
         showNotification({
           title: 'Erro ao assinar adendo',
-          message: err?.response?.data?.message || err?.message || 'Não foi possível assinar o adendo',
+          message: resolveApiErrorMessage(err, 'Não foi possível assinar o adendo'),
           color: 'red',
         });
         return;
@@ -1369,7 +1370,7 @@ export function LaudoExames() {
       clearLocalStatusOverride(selectedExam.id);
       showNotification({
         title: 'Erro ao salvar',
-        message: err?.response?.data?.message || err?.message || 'Falha ao salvar laudo',
+        message: resolveApiErrorMessage(err, 'Falha ao salvar laudo'),
         color: 'red',
       });
     } finally {
@@ -1422,7 +1423,7 @@ export function LaudoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível desfinalizar o laudo',
+        message: resolveApiErrorMessage(err, 'Não foi possível desfinalizar o laudo'),
         color: 'red',
       });
     }
@@ -1449,7 +1450,7 @@ export function LaudoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao remover adendo',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível remover o adendo',
+        message: resolveApiErrorMessage(err, 'Não foi possível remover o adendo'),
         color: 'red',
       });
     } finally {
@@ -1500,7 +1501,7 @@ export function LaudoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao salvar adendo',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível salvar o rascunho de adendo',
+        message: resolveApiErrorMessage(err, 'Não foi possível salvar o rascunho de adendo'),
         color: 'red',
       });
     } finally {
@@ -1578,7 +1579,7 @@ export function LaudoExames() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível salvar o adendo',
+        message: resolveApiErrorMessage(err, 'Não foi possível salvar o adendo'),
         color: 'red',
       });
     } finally {
@@ -1648,7 +1649,7 @@ export function LaudoExames() {
       clearLocalStatusOverride(selectedExam.id);
       showNotification({
         title: 'Erro ao atualizar laudo',
-        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar status do laudo',
+        message: resolveApiErrorMessage(err, 'Falha ao atualizar status do laudo'),
         color: 'red',
       });
       return;

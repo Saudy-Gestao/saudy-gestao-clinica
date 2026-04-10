@@ -6,9 +6,9 @@ import {
   Button,
   Divider,
   Group,
-  Loader,
   Paper,
   ScrollArea,
+  Skeleton,
   Stack,
   Text,
   Textarea,
@@ -20,6 +20,7 @@ import { ArrowLeft, LifeBuoy, Paperclip, Send, X } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import ticketService, { type TicketItem, type TicketType, type TicketStatus, type TicketMessageItem, type TicketPriority } from '../../services/ticketService';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 const statusLabels: Record<TicketStatus, string> = {
   OPEN: 'Aberto',
@@ -105,6 +106,14 @@ const formatBytes = (size?: number | null) => {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const TicketDetailsSkeleton = () => (
+  <Stack gap="md">
+    <Skeleton height={80} radius="md" />
+    <Skeleton height={160} radius="md" />
+    <Skeleton height={280} radius="md" />
+  </Stack>
+);
+
 const adaptiveSubtleSurface = 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6))';
 const adaptiveNestedSurface = 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5))';
 const adaptiveTimelineLine = 'light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-3))';
@@ -134,10 +143,10 @@ export function MyTicketDetailsPage() {
       setTicket(ticketData);
       setMessages(messageData);
     } catch (error: any) {
-      notifications.show({
+      showErrorToast({
         title: 'Erro ao carregar chamado',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível carregar os detalhes do chamado.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível carregar os detalhes do chamado.',
       });
       navigate('/meus-chamados');
     } finally {
@@ -157,12 +166,12 @@ export function MyTicketDetailsPage() {
       setMessageDraft('');
       setAttachmentDraft(null);
       await loadAll();
-      notifications.show({ title: 'Atualização registrada', message: 'Seu registro foi adicionado ao chamado.', color: 'green' });
+      showSuccessToast({ title: 'Atualização registrada', message: 'Seu registro foi adicionado ao chamado.' });
     } catch (error: any) {
-      notifications.show({
+      showErrorToast({
         title: 'Erro ao registrar atualização',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível enviar a atualização.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível enviar a atualização.',
       });
     } finally {
       setSendingMessage(false);
@@ -190,10 +199,10 @@ export function MyTicketDetailsPage() {
       window.open(url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
     } catch (error: any) {
-      notifications.show({
+      showErrorToast({
         title: 'Erro ao abrir anexo',
-        message: error?.response?.data?.message || error?.message || `Não foi possível abrir ${fileName || 'o anexo'}.`,
-        color: 'red',
+        error,
+        fallback: `Não foi possível abrir ${fileName || 'o anexo'}.`,
       });
     } finally {
       setOpeningAttachmentId(null);
@@ -206,16 +215,15 @@ export function MyTicketDetailsPage() {
     try {
       await ticketService.confirmMyTicketClose(ticket.id);
       await loadAll();
-      notifications.show({
+      showSuccessToast({
         title: 'Ticket fechado',
         message: 'Você confirmou a resolução e o ticket foi fechado.',
-        color: 'green',
       });
     } catch (error: any) {
-      notifications.show({
+      showErrorToast({
         title: 'Erro ao confirmar fechamento',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível confirmar o fechamento.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível confirmar o fechamento.',
       });
     } finally {
       setConfirmingClose(false);
@@ -245,7 +253,7 @@ export function MyTicketDetailsPage() {
           </Paper>
 
           {loading ? (
-            <Group justify="center" py="xl"><Loader /></Group>
+            <TicketDetailsSkeleton />
           ) : !ticket ? null : (
             <>
               <Paper withBorder radius="md" p="sm" style={{ background: adaptiveSubtleSurface }}>

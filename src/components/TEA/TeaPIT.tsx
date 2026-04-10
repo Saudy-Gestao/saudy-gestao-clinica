@@ -30,6 +30,7 @@ import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useTeaPitQuery } from '../../hooks/useTeaPitQuery';
 import { usePatientAppointmentsQuery } from '../../hooks/usePatientAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingDateInput } from '../common/FloatingDateInput';
@@ -250,26 +251,26 @@ export function TeaPIT() {
   useEffect(() => {
     if (!teaProfilesError) return;
     const err: any = teaProfilesError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'), color: 'red' });
   }, [teaProfilesError]);
 
   useEffect(() => {
     if (!doctorsError) return;
     const err: any = doctorsError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'), color: 'red' });
   }, [doctorsError]);
 
   useEffect(() => {
     if (!proceduresError) return;
     const err: any = proceduresError;
-    showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos', color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'), color: 'red' });
   }, [proceduresError]);
 
   useEffect(() => {
     if (!selectedTeaProfileId) return;
     if (pitError) {
       const err: any = pitError;
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao carregar PIT', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar PIT'), color: 'red' });
       return;
     }
     const pit = (pitData as any)?.item;
@@ -448,7 +449,7 @@ export function TeaPIT() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao salvar PIT',
+        message: resolveApiErrorMessage(err, 'Falha ao salvar PIT'),
         color: 'red',
       });
     } finally {
@@ -460,7 +461,7 @@ export function TeaPIT() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
+      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
         <Group mb={18} gap="md" align="flex-start">
           <ActionIcon
             variant="default"

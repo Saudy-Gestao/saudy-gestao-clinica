@@ -26,6 +26,7 @@ import preSchedulingService from '../../services/preSchedulingService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import { usePublicPreSchedulingMetaQuery } from '../../hooks/usePublicPreSchedulingMetaQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 const DOCUMENT_TYPES = [
   { value: 'DOCUMENTO_IDENTIDADE', label: 'Documento de identidade' },
@@ -93,7 +94,7 @@ export function PublicPreAgendamentoDocs() {
     }
     showNotification({
       title: 'Link inválido',
-      message: err?.response?.data?.error || err?.message || 'Não foi possível abrir esse link.',
+      message: resolveApiErrorMessage(err, 'Não foi possível abrir esse link.'),
       color: 'red',
     });
   }, [metaError]);
@@ -165,7 +166,7 @@ export function PublicPreAgendamentoDocs() {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
         title: 'Falha na validação',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível validar sua identidade.',
+        message: resolveApiErrorMessage(err, 'Não foi possível validar sua identidade.'),
         color: 'red',
       });
     } finally {
@@ -195,7 +196,7 @@ export function PublicPreAgendamentoDocs() {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
         title: 'Erro no envio',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível enviar esse arquivo.',
+        message: resolveApiErrorMessage(err, 'Não foi possível enviar esse arquivo.'),
         color: 'red',
       });
     } finally {
@@ -226,7 +227,7 @@ export function PublicPreAgendamentoDocs() {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
         title: 'Erro ao finalizar',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível finalizar o envio.',
+        message: resolveApiErrorMessage(err, 'Não foi possível finalizar o envio.'),
         color: 'red',
       });
     } finally {
@@ -281,7 +282,7 @@ export function PublicPreAgendamentoDocs() {
       if (err?.response?.status === 410) setExpired(true);
       showNotification({
         title: 'Erro ao enviar anamnese',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível enviar a anamnese.',
+        message: resolveApiErrorMessage(err, 'Não foi possível enviar a anamnese.'),
         color: 'red',
       });
     } finally {
@@ -294,7 +295,7 @@ export function PublicPreAgendamentoDocs() {
       <Stack maw={920} mx="auto" gap="md">
         <Paper p={{ base: 'md', md: 'lg' }} withBorder bg="#001F54">
           <Stack gap={4}>
-            <Text size="xl" fw={700} c="white">Pré-agendamento • Documentos e anamnese</Text>
+            <Text size="xl" fw={700} c="white">Pré-atendimento • Documentos e anamnese</Text>
             <Text c="rgba(255,255,255,0.8)" size="sm">
               Faça a validação facial para liberar os anexos e, quando houver, responder a anamnese do procedimento.
             </Text>

@@ -1,7 +1,14 @@
-import { Box, Group, Text, ActionIcon, Button } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { LogOut, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActionIcon,
+  Anchor,
+  Box,
+  Group,
+  Text,
+  TextInput,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { LogOut, Search } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import UserMenu from './UserMenu';
 import authService from '../../services/authService';
@@ -23,10 +30,11 @@ const MODULES: ModuleDefinition[] = [
   { key: 'adm-clientes', label: 'Cadastro de Cliente', route: '/cadastro-cliente', prefixes: ['/cadastro-cliente'] },
   { key: 'adm-clientes-edicao', label: 'Gestão de Clientes', route: '/adm-clientes', prefixes: ['/adm-clientes'] },
   { key: 'adm-tickets', label: 'Chamados', route: '/adm-tickets', prefixes: ['/adm-tickets'] },
-  { key: 'pre-atendimento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento'] },
+  { key: 'pre-atendimento', label: 'Autorização e Recepção', route: '/autorizacao-e-recepcao', prefixes: ['/autorizacao-e-recepcao'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
-  { key: 'pre-agendamento', label: 'Pré-agendamento', route: '/pre-agendamento', prefixes: ['/pre-agendamento'] },
+  { key: 'pre-agendamento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento', '/pre-agendamento'] },
   { key: 'consulta', label: 'Consulta', route: '/consulta', prefixes: ['/consulta'] },
+  { key: 'teleconsulta-preparacao', label: 'Teleconsulta', route: '/teleconsulta/preparacao', prefixes: ['/teleconsulta'] },
   { key: 'execucao-exames', label: 'Execução de Exames', route: '/execucao-exames', prefixes: ['/execucao-exames'] },
   { key: 'laudo', label: 'Laudo', route: '/laudo-exames', prefixes: ['/laudo'] },
   { key: 'autorizacao-convenio', label: 'Autorização Convênio', route: '/autorizacao-convenio', prefixes: ['/autorizacao-convenio'] },
@@ -44,39 +52,60 @@ const MODULES: ModuleDefinition[] = [
   { key: 'cadastro-anamnese', label: 'Cadastro de Anamnese', route: '/cadastro-anamnese', prefixes: ['/cadastro-anamnese'] },
   { key: 'cadastro-enfermagem', label: 'Cadastro de Enfermagem', route: '/cadastro-enfermagem', prefixes: ['/cadastro-enfermagem'] },
   { key: 'meus-chamados', label: 'Meus Chamados', route: '/meus-chamados', prefixes: ['/meus-chamados'] },
+  { key: 'conversas', label: 'Conversas', route: '/conversas', prefixes: ['/conversas'] },
 ];
+
+const DEFAULT_QUICK_MODULE_KEYS = ['modulo-tea', 'agendamento', 'laudo', 'pre-agendamento', 'consulta'];
 
 const resolveModuleByPath = (pathname: string): ModuleDefinition | null => {
   if (!pathname || pathname === '/dashboard') return null;
   return MODULES.find((item) => item.prefixes.some((prefix) => pathname.startsWith(prefix))) || null;
 };
 
+const toSearchToken = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 export function Header() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const navigate = useNavigate();
   const location = useLocation();
   const lastTrackedPathRef = useRef<string>('');
+
   const [quickModules, setQuickModules] = useState<ModuleUsageItem[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(() => authService.getCurrentUser());
+  const [searchText, setSearchText] = useState('');
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+
   const userKey = useMemo(
     () => String((currentUser as any)?.id || (currentUser as any)?.email || 'anonymous'),
     [currentUser],
   );
   const isAdmHubOnly = Boolean((currentUser as any)?.isAdmHubOnly);
   const homeRoute = isAdmHubOnly ? '/adm-hub' : '/dashboard';
-  const unitLabel = useMemo(() => {
-    if ((currentUser as any)?.isAdmHubOnly) return 'ADM Hub';
-    const branch = (currentUser as any)?.branch || (currentUser as any)?.sector?.branch;
-    return String(branch?.tradeName || branch?.name || 'Unidade não definida');
-  }, [currentUser]);
   const usageStorageKey = `saudy:module-usage:v1:${userKey}`;
 
-  const currentTime = new Date();
-  const timeStr = currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const day = currentTime.getDate().toString().padStart(2, '0');
-  const month = currentTime.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
-  const year = currentTime.getFullYear();
-  const dateStr = `${day} de ${month}, ${year}`;
+  const quickLinks = useMemo(() => {
+    if (quickModules.length > 0) return quickModules;
+    return DEFAULT_QUICK_MODULE_KEYS
+      .map((key) => MODULES.find((item) => item.key === key))
+      .filter(Boolean)
+      .map((item) => ({ key: item!.key, label: item!.label, route: item!.route }));
+  }, [quickModules]);
+
+  const timeStr = useMemo(() => {
+    return currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }, [currentTime]);
+
+  const dateStr = useMemo(() => {
+    const day = currentTime.getDate().toString().padStart(2, '0');
+    const month = currentTime.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, (c) => c.toUpperCase());
+    const year = currentTime.getFullYear();
+    return `${day} de ${month}, ${year}`;
+  }, [currentTime]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const refreshUser = () => setCurrentUser(authService.getCurrentUser());
@@ -132,88 +161,123 @@ export function Header() {
         .filter(Boolean) as ModuleDefinition[];
       setQuickModules(ranked.map((item) => ({ key: item.key, label: item.label, route: item.route })));
     } catch {
-      // Ignora falha de storage sem quebrar o header.
+      // Ignora falha de localStorage.
     }
   }, [location.pathname, usageStorageKey]);
 
+  const executeSearch = () => {
+    const term = searchText.trim();
+    if (!term) return;
+
+    if (term.startsWith('/')) {
+      navigate(term);
+      return;
+    }
+
+    const normalizedTerm = toSearchToken(term);
+    const matched = MODULES.find((item) => {
+      const label = toSearchToken(item.label);
+      const route = toSearchToken(item.route);
+      const key = toSearchToken(item.key);
+      return label.includes(normalizedTerm) || route.includes(normalizedTerm) || key.includes(normalizedTerm);
+    });
+
+    if (matched) {
+      navigate(matched.route);
+      return;
+    }
+
+    const fallbackPath = term.startsWith('/') ? term : `/${term}`;
+    navigate(fallbackPath);
+  };
+
   return (
-    <Box bg={DARK_BLUE} c="white" py="md" px="xl">
-      <Group justify="space-between" wrap="nowrap">
-        <Group
-          onClick={() => navigate(homeRoute)}
-          style={{ cursor: 'pointer' }}
-        >
-          <Box bg="white" w={40} h={40} style={{ borderRadius: 8, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-            <img src="/logo.png" alt="Saudy" style={{ width: 30, height: 30, objectFit: 'contain' }} />
+    <Box
+      bg={DARK_BLUE}
+      c="white"
+      px={isMobile ? 'md' : 'xl'}
+      py={isMobile ? 8 : 10}
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+    >
+      <Group justify="space-between" wrap="nowrap" gap={isMobile ? 'sm' : 'xl'}>
+        <Group onClick={() => navigate(homeRoute)} style={{ cursor: 'pointer', flexShrink: 0 }} gap="sm">
+          <Box
+            bg="white"
+            w={44}
+            h={44}
+            style={{ borderRadius: 10, display: 'grid', placeItems: 'center', overflow: 'hidden' }}
+          >
+            <img src="/logo.png" alt="Saudy" style={{ width: 28, height: 28, objectFit: 'contain' }} />
           </Box>
-          <Text fw={500} size="lg">Saudy</Text>
+          {!isMobile ? <Text fw={500} size="lg">Saudy</Text> : null}
         </Group>
 
-        {!isMobile && quickModules.length > 0 && (
-          <Group
-            gap={10}
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              overflow: 'hidden',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: 999,
-              padding: '6px 10px',
-            }}
-            wrap="nowrap"
-          >
-            <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-              <Sparkles size={14} color="rgba(255,255,255,0.92)" />
-              <Text size="xs" fw={600} c="rgba(255,255,255,0.92)">
-                Mais usados
-              </Text>
-            </Group>
-            {quickModules.map((module) => (
-              <Button
-                key={module.key}
-                size="compact-xs"
-                variant="subtle"
-                onClick={() => navigate(module.route)}
-                style={{
-                  background: 'rgba(255,255,255,0.14)',
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.18)',
+        {!isMobile ? (
+          <Box style={{ flex: 1, minWidth: 240, maxWidth: 680 }}>
+            <TextInput
+              value={searchText}
+              onChange={(event) => setSearchText(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  executeSearch();
+                }
+              }}
+              placeholder="Pesquisar palavra-chave + caminho"
+              leftSection={<Search size={18} />}
+              styles={{
+                input: {
+                  height: 38,
                   borderRadius: 999,
-                  maxWidth: 170,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontWeight: 600,
-                  transition: 'all 120ms ease',
-                }}
-              >
-                {module.label}
-              </Button>
-            ))}
-          </Group>
-        )}
+                  border: '1px solid rgba(148, 177, 255, 0.65)',
+                  background: 'rgba(5, 29, 93, 0.35)',
+                  color: '#f4f7ff',
+                  fontSize: 16,
+                },
+                section: {
+                  color: '#8baeff',
+                },
+              }}
+            />
 
-        <Group gap="xl">
-          {!isMobile && (
-            <Box ta="right">
-              <Text size="sm">{timeStr} | {dateStr}</Text>
-              <Text size="xs" c="rgba(255,255,255,0.82)">Unidade: {unitLabel}</Text>
-            </Box>
-          )}
+            <Group gap="md" mt={6} px="xs" wrap="nowrap" style={{ overflow: 'hidden' }}>
+              {quickLinks.map((module) => (
+                <Anchor
+                  key={module.key}
+                  component="button"
+                  type="button"
+                  c="rgba(129,160,238,0.88)"
+                  fz={14}
+                  fw={500}
+                  underline="never"
+                  style={{ whiteSpace: 'nowrap' }}
+                  onClick={() => navigate(module.route)}
+                >
+                  {module.label}
+                </Anchor>
+              ))}
+            </Group>
+          </Box>
+        ) : null}
+
+        <Group gap={isMobile ? 'xs' : 'xl'} style={{ flexShrink: 0 }}>
+          {!isMobile ? (
+            <Text size="md" fw={500}>{timeStr} | {dateStr}</Text>
+          ) : null}
+
           <Group gap="xs" align="center">
             <UserMenu />
-            <Text c="white" size="xs">|</Text>
+            <Text c="white" size="md">|</Text>
             <ActionIcon
               variant="subtle"
               color="white"
-              size="sm"
+              size="md"
               onClick={() => {
                 authService.logout();
                 window.location.href = '/login';
               }}
             >
-              <LogOut size={16} color="white" />
+              <LogOut size={18} color="white" />
             </ActionIcon>
           </Group>
         </Group>

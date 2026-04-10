@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,6 +14,7 @@ import {
   ActionIcon, 
   Modal, 
   Loader, 
+  Skeleton,
   MultiSelect,
   Grid,
   Badge,
@@ -22,6 +23,7 @@ import {
   NumberInput,
   TextInput,
   SimpleGrid,
+  Divider,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -42,8 +44,10 @@ import {
   Copy,
   Power,
   PowerOff,
+  RefreshCw,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 
 // Services
@@ -173,12 +177,35 @@ const formatAuditDateTime = (value?: string | null) => {
   }).format(date);
 };
 
+const SettingsPanelSkeleton = () => (
+  <Stack gap="md">
+    <Skeleton height={26} width="35%" radius="sm" />
+    <Skeleton height={16} width="60%" radius="sm" />
+    <Skeleton height={42} radius="md" />
+    <Skeleton height={42} radius="md" />
+    <Skeleton height={42} radius="md" />
+    <Skeleton height={42} radius="md" />
+    <Group justify="flex-end">
+      <Skeleton height={36} width={220} radius="md" />
+    </Group>
+  </Stack>
+);
+
+const SettingsTableSkeleton = () => (
+  <Stack gap="sm">
+    {Array.from({ length: 5 }).map((_, idx) => (
+      <Skeleton key={`settings-table-skeleton-${idx}`} height={44} radius="md" />
+    ))}
+  </Stack>
+);
+
 export function SettingsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
+  const isMountedRef = useRef(true);
   const [activeTab, setActiveTab] = useState<string | null>('company');
   
   // Get user's company from logged user
@@ -367,6 +394,14 @@ export function SettingsPage() {
 
   // --- Effects ---
 
+  // Track if component is mounted to prevent setState on unmounted component
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     const prefill = getStoredCompanyPrefill();
     if (prefill) {
@@ -474,12 +509,15 @@ export function SettingsPage() {
   }, [selectedBranchForSectors, sectorsData]);
 
   useEffect(() => {
-    if (sectors.length > 0 && !selectedSectorForUsers) {
-      setSelectedSectorForUsers(sectors[0].id);
-    } else if (sectors.length === 0) {
+    if (sectors.length === 0) {
+      setSelectedSectorForUsers(null);
+      return;
+    }
+
+    if (selectedSectorForUsers && !sectors.some((sector: any) => sector.id === selectedSectorForUsers)) {
       setSelectedSectorForUsers(null);
     }
-  }, [sectors]);
+  }, [sectors, selectedSectorForUsers]);
 
   useEffect(() => {
     let filtered = usersData || [];
@@ -495,7 +533,16 @@ export function SettingsPage() {
   }, [usersData, userCompanyId, selectedSectorForUsers, selectedBranchForSectors]);
 
   useEffect(() => {
-    setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
+    const normalizedDoctors = Array.isArray(doctorsData)
+      ? doctorsData
+      : (Array.isArray((doctorsData as any)?.items)
+        ? (doctorsData as any).items
+        : (Array.isArray((doctorsData as any)?.data?.items)
+          ? (doctorsData as any).data.items
+          : (Array.isArray((doctorsData as any)?.data)
+            ? (doctorsData as any).data
+            : [])));
+    setDoctors(normalizedDoctors);
   }, [doctorsData]);
 
   useEffect(() => {
@@ -564,7 +611,7 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       refreshLoggedUserInStorage();
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao atualizar empresa', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao atualizar empresa'), color: 'red' });
     } finally {
       setSavingCompany(false);
     }
@@ -656,7 +703,7 @@ export function SettingsPage() {
       setBranchModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar filial', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar filial'), color: 'red' });
     } finally {
       setSavingBranch(false);
     }
@@ -668,7 +715,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Filial excluída', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsBranches });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir filial', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir filial'), color: 'red' });
     }
   };
 
@@ -687,10 +734,10 @@ export function SettingsPage() {
   };
 
   const handleSaveSector = async () => {
-    if (!selectedBranchForSectors) return;
+    if (!sectorForm.branchId) return;
     
     // Validate form
-    const validation = validateSectorForm({ ...sectorForm, branchId: selectedBranchForSectors });
+    const validation = validateSectorForm(sectorForm);
     if (!validation.isValid) {
       setSectorErrors(validation.errors);
       notifications.show({ 
@@ -708,13 +755,13 @@ export function SettingsPage() {
         await sectorService.updateSector(editingSector.id, sectorForm);
         notifications.show({ title: 'Sucesso', message: 'Setor atualizado', color: 'green' });
       } else {
-        await sectorService.createSector({ ...sectorForm, branchId: selectedBranchForSectors });
+        await sectorService.createSector(sectorForm);
         notifications.show({ title: 'Sucesso', message: 'Setor criado', color: 'green' });
       }
       setSectorModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar setor', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar setor'), color: 'red' });
     } finally {
       setSavingSector(false);
     }
@@ -726,7 +773,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Setor excluído', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir setor', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir setor'), color: 'red' });
     }
   };
 
@@ -756,6 +803,26 @@ export function SettingsPage() {
     setUserModalOpen(true);
   };
 
+  const generateRandomPassword = (length = 14) => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+    let result = '';
+    for (let index = 0; index < length; index += 1) {
+      const randomIndex = Math.floor(Math.random() * chars.length);
+      result += chars[randomIndex];
+    }
+    return result;
+  };
+
+  const handleGeneratePassword = () => {
+    const generated = generateRandomPassword();
+    setUserForm((prev) => ({ ...prev, password: generated }));
+    notifications.show({
+      title: 'Senha gerada',
+      message: 'Senha aleatória preenchida. O hash é aplicado automaticamente no backend ao salvar.',
+      color: 'blue',
+    });
+  };
+
   const handleSaveUser = async () => {
     // Validate form
     const validation = validateUserForm(userForm, !!editingUser);
@@ -773,32 +840,91 @@ export function SettingsPage() {
     setSavingUser(true);
     try {
       const payload: any = { ...userForm };
-        if (!payload.doctorId) payload.doctorId = null;
-        if (!payload.password) delete payload.password;
+      if (!payload.doctorId) payload.doctorId = null;
+      if (!payload.password) delete payload.password;
+
+      payload.accessIds = Array.from(new Set(Array.isArray(userForm.accessIds) ? userForm.accessIds : []));
 
       if (editingUser) {
         await userService.updateUser(editingUser.id, payload);
         notifications.show({ title: 'Sucesso', message: 'Usuário atualizado', color: 'green' });
       } else {
-        await userService.createUser(payload);
+        const createdUser = await userService.createUser(payload);
+
+        queryClient.setQueryData(queryKeys.settingsUsers, (previous: any) => {
+          const list = Array.isArray(previous) ? previous : [];
+          if (!createdUser?.id) return list;
+          const withoutDuplicated = list.filter((user: any) => String(user?.id || '') !== String(createdUser.id));
+          return [createdUser, ...withoutDuplicated];
+        });
+
         notifications.show({ title: 'Sucesso', message: 'Usuário criado', color: 'green' });
+
+        // Garante que a tabela esteja filtrando para a filial/setor onde o usuário foi criado.
+        const createdBranchId = String(createdUser?.sector?.branchId || payload.branchId || '').trim();
+        const createdSectorId = String(createdUser?.sector?.id || payload.sectorId || '').trim();
+
+        if (createdBranchId) {
+          setSelectedBranchForSectors(createdBranchId);
+        }
+        if (createdSectorId) {
+          setSelectedSectorForUsers(createdSectorId);
+        }
       }
       setUserModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsDoctors });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar usuário', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar usuário'), color: 'red' });
     } finally {
       setSavingUser(false);
     }
   };
 
   const availableDoctorsForUserForm = (doctors || [])
-    .filter((doctor: any) => !userForm.branchId || doctor.branchId === userForm.branchId)
+    .filter((doctor: any) => {
+      if (!userForm.branchId) return true;
+
+      const doctorBranchId = String(doctor?.branchId || doctor?.branch?.id || '').trim();
+      if (doctorBranchId && doctorBranchId === userForm.branchId) return true;
+
+      const rooms = Array.isArray(doctor?.rooms) ? doctor.rooms : [];
+      const hasRoomInSelectedBranch = rooms.some((link: any) => {
+        const roomBranchId = String(link?.room?.branchId || link?.branchId || '').trim();
+        return roomBranchId === userForm.branchId;
+      });
+      if (hasRoomInSelectedBranch) return true;
+
+      // Compatibilidade com médicos antigos que não tinham branchId preenchido.
+      return !doctorBranchId && rooms.length === 0;
+    })
     .map((doctor: any) => ({
-      value: doctor.id,
-      label: `${doctor.name}${doctor.specialty ? ` • ${doctor.specialty}` : ''}`,
+      value: String(doctor.id || ''),
+      label: `${doctor.name || 'Médico sem nome'}${doctor.specialty ? ` • ${doctor.specialty}` : ''}`,
+    }))
+    .filter((item: any) => item.value);
+
+  const userAccessOptions = (accessesList || []).map((a: any) => ({ value: a.id, label: a.description }));
+
+  useEffect(() => {
+    if (!userModalOpen || !userForm.doctorId) return;
+    const selectedDoctor = (doctors || []).find((doctor: any) => String(doctor?.id || '') === String(userForm.doctorId));
+    if (!selectedDoctor) return;
+
+    const parsedBirthDate = selectedDoctor?.birthDate
+      ? new Date(selectedDoctor.birthDate).toISOString().slice(0, 10)
+      : '';
+
+    setUserForm((prev) => ({
+      ...prev,
+      name: String(selectedDoctor?.name || prev.name || ''),
+      email: String(selectedDoctor?.email || prev.email || ''),
+      phone: String(selectedDoctor?.cellphone || selectedDoctor?.phone || prev.phone || ''),
+      birthDate: parsedBirthDate || prev.birthDate,
+      address: String(selectedDoctor?.address || prev.address || ''),
     }));
+  }, [doctors, userForm.doctorId, userModalOpen]);
 
   const handleDeleteUser = async (id: string) => {
     try {
@@ -806,7 +932,7 @@ export function SettingsPage() {
       notifications.show({ title: 'Sucesso', message: 'Usuário excluído', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir usuário', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir usuário'), color: 'red' });
     }
   };
 
@@ -904,7 +1030,7 @@ export function SettingsPage() {
       await refreshLoggedUserInStorage();
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao salvar acesso', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao salvar acesso'), color: 'red' });
     } finally {
       setSavingAccess(false);
     }
@@ -912,22 +1038,13 @@ export function SettingsPage() {
 
   const handleDeleteAccess = async (id: string) => {
     try {
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      // Remover acesso do usuário (ao invés de deletar do banco)
-      if (currentUser?.id) {
-        const user = await userService.getUser(currentUser.id);
-        const updatedAccessIds = (user.accesses || [])
-          .map((a: any) => a.id)
-          .filter((accessId: string) => accessId !== id);
-        await userService.updateUser(currentUser.id, { accessIds: updatedAccessIds });
-      }
-      
-      notifications.show({ title: 'Sucesso', message: 'Acesso removido', color: 'green' });
+      await accessService.deleteAccess(id);
+      notifications.show({ title: 'Sucesso', message: 'Acesso excluído', color: 'green' });
       await refreshLoggedUserInStorage();
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
-      notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Erro ao excluir acesso', color: 'red' });
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir acesso'), color: 'red' });
     }
   };
 
@@ -950,7 +1067,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({ 
         title: 'Erro', 
-        message: error.response?.data?.error || 'Erro ao atualizar configuração', 
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar configuração'), 
         color: 'red' 
       });
     } finally {
@@ -976,7 +1093,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar configuração',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar configuração'),
         color: 'red'
       });
     } finally {
@@ -1005,7 +1122,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar tolerância',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar tolerância'),
         color: 'red'
       });
     } finally {
@@ -1061,7 +1178,7 @@ export function SettingsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.error || 'Erro ao atualizar o check-in público',
+        message: resolveApiErrorMessage(error, 'Erro ao atualizar o check-in público'),
         color: 'red',
       });
     } finally {
@@ -1105,7 +1222,7 @@ export function SettingsPage() {
     if (!error) return;
     notifications.show({
       title: 'Erro',
-      message: error.response?.data?.error || error.response?.data?.message || 'Erro ao carregar configurações',
+      message: resolveApiErrorMessage(error, 'Erro ao carregar configurações'),
       color: 'red',
     });
   }, [companiesError, branchesError, branchSettingsError, sectorsError, usersError, doctorsError, modulesError, accessesError]);
@@ -1181,14 +1298,16 @@ export function SettingsPage() {
                     <Box>
                         <SectionTitle title="Dados da Empresa" desc="Gerencie as informações principais da sua organização." />
                         
-                        {loadingCompanies ? <Loader /> : (
-                            <Stack gap="md" maw={600}>
+                        {loadingCompanies ? <SettingsPanelSkeleton /> : (
+                            <Stack gap="lg" w="100%">
+                              <Stack gap="md" w="100%">
                                 <Grid>
                                     <Grid.Col span={6}>
                                         <FloatingInput 
                                           label="CNPJ" 
                                           value={companyForm.cnpj} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, cnpj: e.currentTarget.value })} 
+                                          required
                                           error={companyErrors.cnpj}
                                         />
                                     </Grid.Col>
@@ -1205,6 +1324,7 @@ export function SettingsPage() {
                                           label="Razão Social" 
                                           value={companyForm.legalName} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, legalName: e.currentTarget.value })} 
+                                          required
                                           error={companyErrors.legalName}
                                         />
                                     </Grid.Col>
@@ -1213,6 +1333,7 @@ export function SettingsPage() {
                                           label="Nome Fantasia" 
                                           value={companyForm.tradeName} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, tradeName: e.currentTarget.value })} 
+                                          required
                                           error={companyErrors.tradeName}
                                         />
                                     </Grid.Col>
@@ -1225,9 +1346,32 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                 </Grid>
-                                <Group justify="flex-end" mt="md">
-                                    <Button leftSection={<Save size={16} />} onClick={handleSaveCompany} loading={savingCompany} bg={DARK_BLUE}>Salvar Alterações</Button>
+                                <Group justify="flex-end" mt="xs">
+                                    <Button leftSection={<Save size={16} />} onClick={handleSaveCompany} loading={savingCompany} bg={DARK_BLUE}>
+                                      Salvar Dados da Empresa
+                                    </Button>
                                 </Group>
+                              </Stack>
+
+                              <Divider />
+
+                              <Paper
+                                p="lg"
+                                radius="md"
+                                withBorder
+                                style={{
+                                  borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                  background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                }}
+                              >
+                                <Group mb="md" gap="xs">
+                                  <MessageCircle size={20} />
+                                  <Text fw={600} size="md">
+                                    Configuração WhatsApp (Padrão da Empresa)
+                                  </Text>
+                                </Group>
+                                <WhatsAppCredentials scope="COMPANY" />
+                              </Paper>
                             </Stack>
                         )}
                     </Box>
@@ -1246,7 +1390,7 @@ export function SettingsPage() {
                           </Text>
                         )}
 
-                        {loadingBranches ? <Loader /> : (
+                        {loadingBranches ? <SettingsTableSkeleton /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                                 <Table horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
@@ -1289,12 +1433,13 @@ export function SettingsPage() {
                         )}
                         <Modal opened={branchModalOpen} onClose={() => setBranchModalOpen(false)} title={editingBranch ? 'Editar Filial' : 'Nova Filial'} centered>
                              <Stack pt="lg">
-                                <FloatingInput 
-                                  label="Nome Fantasia" 
-                                  value={branchForm.tradeName} 
-                                  onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
-                                  error={branchErrors.tradeName}
-                                />
+                                    <FloatingInput 
+                                      label="Nome Fantasia" 
+                                      value={branchForm.tradeName} 
+                                      onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
+                                      required
+                                      error={branchErrors.tradeName}
+                                    />
                                 {(!editingBranch || (editingBranch && !isBranchMatriz(editingBranch))) && (
                                   <>
                                     <FloatingInput 
@@ -1334,7 +1479,7 @@ export function SettingsPage() {
                             maw={400}
                         />
 
-                        {loadingSectors ? <Loader /> : (
+                        {loadingSectors ? <SettingsTableSkeleton /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                                 <Table horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
@@ -1364,10 +1509,20 @@ export function SettingsPage() {
                         )}
                          <Modal opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar Setor' : 'Novo Setor'} centered>
                              <Stack pt="lg">
+                                <Select 
+                                  label="Filial" 
+                                  data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                  value={sectorForm.branchId}
+                                  onChange={(v) => setSectorForm({ ...sectorForm, branchId: v || '' })}
+                                  error={sectorErrors.branchId}
+                                  searchable
+                                  withAsterisk
+                                />
                                 <FloatingInput 
                                   label="Nome" 
                                   value={sectorForm.name} 
                                   onChange={(e: any) => setSectorForm({ ...sectorForm, name: e.currentTarget.value })} 
+                                  required
                                   error={sectorErrors.name}
                                 />
                                 <FloatingInput 
@@ -1400,26 +1555,26 @@ export function SettingsPage() {
                             <Select 
                                 label="Filial"
                                 placeholder="Selecione..." 
-                                data={(branches || [])
-                                  .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
-                                  .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                 value={selectedBranchForSectors}
                                 onChange={setSelectedBranchForSectors}
                                 style={{ flex: 1 }}
-                                disabled={!!loggedBranchId}
                             />
                             <Select 
                                 label="Setor"
-                                placeholder="Selecione..." 
-                                data={(sectors || []).map(s => ({ value: s.id, label: s.name }))}
-                                value={selectedSectorForUsers}
-                                onChange={setSelectedSectorForUsers}
+                                placeholder="Todos os setores" 
+                                data={[
+                                  { value: '__ALL__', label: 'Todos os setores' },
+                                  ...(sectors || []).map(s => ({ value: s.id, label: s.name })),
+                                ]}
+                                value={selectedSectorForUsers || '__ALL__'}
+                                onChange={(value) => setSelectedSectorForUsers(value === '__ALL__' ? null : value)}
                                 style={{ flex: 1 }}
                                 disabled={!selectedBranchForSectors}
                             />
                         </Group>
 
-                        {loadingUsers ? <Loader /> : (
+                        {loadingUsers ? <SettingsTableSkeleton /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                                 <Table horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
@@ -1471,15 +1626,13 @@ export function SettingsPage() {
                                 <Grid.Col span={12}>
                                     <Select
                                         label="Filial"
-                                        data={(branches || [])
-                                          .filter((b: any) => !loggedBranchId || b.id === loggedBranchId)
-                                          .map((b: any) => ({ value: b.id, label: b.tradeName }))}
+                                        data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                         value={userForm.branchId}
                                         onChange={(v) => setUserForm({ ...userForm, branchId: v || '', sectorId: '', doctorId: '' })}
                                         mb="xs"
                                         error={userErrors.branchId}
                                         searchable
-                                        disabled={!!loggedBranchId}
+                                        withAsterisk
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
@@ -1493,6 +1646,7 @@ export function SettingsPage() {
                                         mb="xs"
                                         error={userErrors.sectorId}
                                         disabled={!userForm.branchId}
+                                        withAsterisk
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
@@ -1511,7 +1665,7 @@ export function SettingsPage() {
                                 <Grid.Col span={12}>
                                     <MultiSelect 
                                         label="Acessos" 
-                                        data={(accessesList || []).map(a => ({ value: a.id, label: a.description }))}
+                                        data={userAccessOptions}
                                         value={userForm.accessIds || []}
                                         onChange={(v) => setUserForm({...userForm, accessIds: v})}
                                         searchable
@@ -1524,6 +1678,7 @@ export function SettingsPage() {
                                       label="Nome" 
                                       value={userForm.name} 
                                       onChange={(e: any) => setUserForm({...userForm, name: e.currentTarget.value})} 
+                                      required
                                       error={userErrors.name}
                                     />
                                 </Grid.Col>
@@ -1532,6 +1687,7 @@ export function SettingsPage() {
                                       label="Email" 
                                       value={userForm.email} 
                                       onChange={(e: any) => setUserForm({...userForm, email: e.currentTarget.value})} 
+                                      required
                                       error={userErrors.email}
                                     />
                                 </Grid.Col>
@@ -1541,6 +1697,18 @@ export function SettingsPage() {
                                         type="password" 
                                         value={userForm.password} 
                                         onChange={(e: any) => setUserForm({...userForm, password: e.currentTarget.value})} 
+                                        required={!editingUser}
+                                        rightSection={(
+                                          <ActionIcon
+                                            variant="subtle"
+                                            color="blue"
+                                            size="sm"
+                                            onClick={handleGeneratePassword}
+                                            title="Gerar senha aleatória"
+                                          >
+                                            <RefreshCw size={14} />
+                                          </ActionIcon>
+                                        )}
                                         error={userErrors.password}
                                     />
                                 </Grid.Col>
@@ -1558,6 +1726,7 @@ export function SettingsPage() {
                                       label="Data de Nascimento" 
                                       value={userForm.birthDate} 
                                       onChange={(e: any) => setUserForm({...userForm, birthDate: e.currentTarget.value})} 
+                                      required
                                       error={userErrors.birthDate}
                                     />
                                 </Grid.Col>
@@ -1656,13 +1825,14 @@ export function SettingsPage() {
                                   label="Descrição" 
                                   value={accessForm.description} 
                                   onChange={(e: any) => setAccessForm({ ...accessForm, description: e.currentTarget.value })} 
+                                  required
                                   error={accessErrors.description}
                                 />
                                 {loadingModules ? (
-                                  <Box style={{ textAlign: 'center', padding: '20px' }}>
-                                    <Loader size="sm" />
-                                    <Text size="sm" c="dimmed" mt="xs">Carregando módulos...</Text>
-                                  </Box>
+                                  <Stack gap="sm" py="sm">
+                                    <Skeleton height={42} radius="md" />
+                                    <Skeleton height={42} radius="md" />
+                                  </Stack>
                                 ) : (
                                   <MultiSelect
                                     label="Módulos"
@@ -1746,10 +1916,11 @@ export function SettingsPage() {
                         {selectedBranchForSettings && (
                             <>
                                 {loadingBranchSettings ? (
-                                    <Box style={{ textAlign: 'center', padding: '40px 0' }}>
-                                        <Loader size="md" />
-                                        <Text size="sm" c="dimmed" mt="md">Carregando configurações...</Text>
-                                    </Box>
+                                    <Stack gap="sm" py="sm">
+                                        <Skeleton height={82} radius="md" />
+                                        <Skeleton height={82} radius="md" />
+                                        <Skeleton height={82} radius="md" />
+                                    </Stack>
                                 ) : (
                                     <Stack gap="lg">
                                         <Paper 
@@ -2083,11 +2254,11 @@ export function SettingsPage() {
                                                     Configuração WhatsApp
                                                 </Text>
                                             </Group>
-                                            <WhatsAppCredentials />
+                                            <WhatsAppCredentials scope="BRANCH" branchId={selectedBranchForSettings} />
                                         </Paper>
 
                                         <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
-                                            💡 Dica: As configurações acima são específicas da filial selecionada.
+                                            💡 Dica: Por padrão, a filial herda as credenciais da empresa. Ative a sobrescrita apenas quando necessário.
                                         </Text>
                                     </Stack>
                                 )}

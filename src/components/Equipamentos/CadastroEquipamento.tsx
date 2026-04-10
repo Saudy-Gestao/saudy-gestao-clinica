@@ -25,6 +25,7 @@ import { ChevronLeft, CircleHelp, Pencil, Power, ScanLine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import ResultModal from '../common/ResultModal';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { FloatingNumberInput } from '../common/FloatingNumberInput';
@@ -282,15 +283,15 @@ export function CadastroEquipamento() {
   }, [branches]);
 
   useEffect(() => {
-    setLoading(equipmentsQuery.isFetching);
-  }, [equipmentsQuery.isFetching]);
+    setLoading(equipmentsQuery.isLoading && items.length === 0);
+  }, [equipmentsQuery.isLoading, items.length]);
 
   useEffect(() => {
     if (equipmentsQuery.error) {
       const err: any = equipmentsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar equipamentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar equipamentos'),
         color: 'red',
       });
     }
@@ -415,7 +416,7 @@ export function CadastroEquipamento() {
       setActiveTab('lista');
       await queryClient.invalidateQueries({ queryKey: queryKeys.medicalEquipments });
     } catch (err: any) {
-      setErrorMessage(err?.response?.data?.message || err?.message || 'Não foi possível salvar o equipamento.');
+      setErrorMessage(resolveApiErrorMessage(err, 'Não foi possível salvar o equipamento.'));
       setErrorOpen(true);
     } finally {
       setSaving(false);
@@ -431,7 +432,7 @@ export function CadastroEquipamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível atualizar o status.',
+        message: resolveApiErrorMessage(err, 'Não foi possível atualizar o status.'),
         color: 'red',
       });
     }
@@ -450,7 +451,7 @@ export function CadastroEquipamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Não foi possível testar a comunicação.',
+        message: resolveApiErrorMessage(err, 'Não foi possível testar a comunicação.'),
         color: 'red',
       });
     } finally {
@@ -461,25 +462,20 @@ export function CadastroEquipamento() {
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p="xl" maw={1400} mx="auto">
-        <Group mb={30} justify="space-between" align="center">
-          <Group gap="lg" align="center">
-            <ActionIcon
-              variant="default"
-              color="black"
-              size="xl"
-              onClick={() => navigate('/dashboard')}
-            >
+      <Box p={isMobile ? 'sm' : 'md'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
               <ChevronLeft size={28} />
             </ActionIcon>
-            <Stack gap={2}>
-              <Title order={1} fw={700} style={{ fontSize: isMobile ? '1.6rem' : '2rem' }}>
+            <Box>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Cadastro de Equipamentos
-              </Title>
-              <Text c="dimmed" size={isMobile ? 'sm' : 'lg'}>
+              </Text>
+              <Text size="sm" c="dimmed">
                 Equipamentos de exame com dados operacionais, modalidade e integração DICOM.
               </Text>
-            </Stack>
+            </Box>
           </Group>
         </Group>
 

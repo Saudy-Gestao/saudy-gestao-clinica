@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './getApiBaseUrl';
+import { resolveApiErrorMessage } from '../lib/apiError';
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
@@ -23,6 +24,25 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const normalizedMessage = resolveApiErrorMessage(error, 'Não foi possível concluir a solicitação.');
+    error.userMessage = normalizedMessage;
+    error.message = normalizedMessage;
+
+    const responseData = error?.response?.data;
+    if (responseData && typeof responseData === 'object') {
+      const hasMessage = typeof responseData.message === 'string' && responseData.message.trim();
+      const hasError = typeof responseData.error === 'string' && responseData.error.trim();
+      const hasDetail = typeof responseData.detail === 'string' && responseData.detail.trim();
+
+      if (hasMessage && !responseData.originalMessage) responseData.originalMessage = responseData.message;
+      if (hasError && !responseData.originalError) responseData.originalError = responseData.error;
+      if (hasDetail && !responseData.originalDetail) responseData.originalDetail = responseData.detail;
+
+      responseData.message = normalizedMessage;
+      responseData.error = normalizedMessage;
+      responseData.detail = normalizedMessage;
+    }
+
     const hadToken = Boolean(localStorage.getItem('token'));
     const status = error?.response?.status;
     const requestUrl = String(error?.config?.url || '');

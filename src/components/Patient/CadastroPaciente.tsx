@@ -46,6 +46,7 @@ import { FloatingTextarea } from '../common/FloatingTextarea';
 import { findExistingCpf } from '../../utils/cpfRegistry';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -529,15 +530,15 @@ export function CadastroPaciente() {
   }, []);
 
   useEffect(() => {
-    setPatientsLoading(patientsQuery.isFetching);
-  }, [patientsQuery.isFetching]);
+    setPatientsLoading(patientsQuery.isLoading && patients.length === 0);
+  }, [patients.length, patientsQuery.isLoading]);
 
   useEffect(() => {
     if (patientsQuery.error) {
       const err = patientsQuery.error as ApiError;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
         color: 'red',
       });
     }
@@ -580,7 +581,7 @@ export function CadastroPaciente() {
         const err = e as ApiError;
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+          message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
           color: 'red',
         });
       } finally {
@@ -878,7 +879,7 @@ export function CadastroPaciente() {
         setFieldErrors(serverFields);
         showNotification({ title: 'Erro', message: Object.values(serverFields)[0], color: 'red' });
       } else {
-        const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar paciente';
+        const msg = resolveApiErrorMessage(err, 'Erro ao registrar paciente');
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -907,7 +908,7 @@ export function CadastroPaciente() {
       setDeleteTarget(null);
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Erro ao excluir paciente';
+      const msg = resolveApiErrorMessage(err, 'Erro ao excluir paciente');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -925,7 +926,7 @@ export function CadastroPaciente() {
       });
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status do paciente';
+      const msg = resolveApiErrorMessage(err, 'Erro ao atualizar status do paciente');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -934,7 +935,7 @@ export function CadastroPaciente() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1000} mx="auto">
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {/* Header */}
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
@@ -1298,7 +1299,7 @@ export function CadastroPaciente() {
               <Group justify="right">
                 <Button variant="default" onClick={handleCancel}>Cancelar</Button>
                 <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving} size="md" c="white">
-                  {isEditing ? 'Salvar alteracoes' : 'Salvar'}
+                  {isEditing ? 'Salvar alterações' : 'Salvar'}
                 </Button>
               </Group>
             </Stack>

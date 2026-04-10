@@ -5,9 +5,9 @@ import {
   Box,
   Button,
   Group,
-  Loader,
   Paper,
   Select,
+  Skeleton,
   SimpleGrid,
   Stack,
   Table,
@@ -16,7 +16,6 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { LifeBuoy, MessageCircleMore, RefreshCw, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
@@ -24,6 +23,7 @@ import { DARK_BLUE } from '../../themes/theme';
 import { queryKeys } from '../../lib/queryKeys';
 import { useAdminTicketsQuery } from '../../hooks/useAdminTicketsQuery';
 import ticketService, { type TicketStatus, type TicketType, type TicketPriority, type TicketSort } from '../../services/ticketService';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 const statusOptions: Array<{ value: TicketStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'Todos os status' },
@@ -124,6 +124,14 @@ const shortTicketId = (id: string) => {
   return `${id.slice(0, 8)}...${id.slice(-4)}`;
 };
 
+const AdminTicketsSkeleton = () => (
+  <Stack gap="sm">
+    {Array.from({ length: 6 }).map((_, idx) => (
+      <Skeleton key={`admin-tickets-skeleton-${idx}`} height={48} radius="md" />
+    ))}
+  </Stack>
+);
+
 export function AdminTickets() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -158,16 +166,15 @@ export function AdminTickets() {
     try {
       await ticketService.updateStatus(ticketId, status as TicketStatus);
       await queryClient.invalidateQueries({ queryKey: queryKeys.adminTickets });
-      notifications.show({
+      showSuccessToast({
         title: 'Status atualizado',
         message: 'Ticket atualizado com sucesso.',
-        color: 'green',
       });
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro ao atualizar ticket',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível atualizar o ticket.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível atualizar o ticket.',
       });
     } finally {
       setUpdatingTicketId(null);
@@ -284,9 +291,7 @@ export function AdminTickets() {
 
           <Paper p="lg" withBorder radius="lg">
             {isLoading ? (
-              <Group justify="center" py="xl">
-                <Loader color="darkBlue" />
-              </Group>
+              <AdminTicketsSkeleton />
             ) : items.length === 0 ? (
               <Stack align="center" py="xl" gap="sm">
                 <ThemeIcon size={54} radius="xl" color="darkBlue" variant="light">

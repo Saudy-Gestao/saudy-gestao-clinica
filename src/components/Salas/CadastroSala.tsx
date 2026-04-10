@@ -37,6 +37,7 @@ import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface BranchOption {
   id: string;
@@ -340,7 +341,7 @@ export function CadastroSala() {
     const err: any = branchesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.error || err?.message || 'Erro ao carregar filiais',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar filiais'),
       color: 'red',
     });
   }, [branchesQuery.error]);
@@ -369,15 +370,15 @@ export function CadastroSala() {
   }, [branchesQuery.data, selectedBranchId]);
 
   useEffect(() => {
-    setLoading(roomsQuery.isFetching);
-  }, [roomsQuery.isFetching]);
+    setLoading(roomsQuery.isLoading && items.length === 0);
+  }, [items.length, roomsQuery.isLoading]);
 
   useEffect(() => {
     if (roomsQuery.error) {
       const err: any = roomsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.message || 'Erro ao carregar salas',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar salas'),
         color: 'red',
       });
     }
@@ -414,7 +415,7 @@ export function CadastroSala() {
     setDoctorOptions([]);
     showNotification({
       title: 'Erro ao carregar médicos',
-      message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'A lista de médicos não pôde ser carregada.',
+      message: resolveApiErrorMessage(err, 'A lista de médicos não pôde ser carregada.'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -571,7 +572,7 @@ export function CadastroSala() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.message || 'Erro ao salvar sala',
+        message: resolveApiErrorMessage(err, 'Erro ao salvar sala'),
         color: 'red',
       });
     } finally {
@@ -591,7 +592,7 @@ export function CadastroSala() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.error || err?.message || 'Erro ao excluir sala',
+        message: resolveApiErrorMessage(err, 'Erro ao excluir sala'),
         color: 'red',
       });
     } finally {

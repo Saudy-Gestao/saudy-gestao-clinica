@@ -38,6 +38,16 @@ export const formatCPF = (s: string) => {
   return v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 };
 
+export const formatCNPJ = (s: string) => {
+  const v = onlyDigits(s).slice(0, 14);
+  if (!v) return '';
+  if (v.length <= 2) return v;
+  if (v.length <= 5) return v.replace(/(\d{2})(\d+)/, '$1.$2');
+  if (v.length <= 8) return v.replace(/(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
+  if (v.length <= 12) return v.replace(/(\d{2})(\d{3})(\d{3})(\d+)/, '$1.$2.$3/$4');
+  return v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+};
+
 export const formatCEP = (s: string) => {
   const v = onlyDigits(s).slice(0, 8);
   if (!v) return '';

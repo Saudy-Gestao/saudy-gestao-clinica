@@ -1,6 +1,7 @@
 import { Box, Text, type BoxProps } from '@mantine/core';
 import { DateInput, type DateInputProps } from '@mantine/dates';
 import type { ReactNode } from 'react';
+import { withRequiredIndicator } from './requiredLabel';
 
 interface FloatingDateInputProps extends DateInputProps {
   label: ReactNode;
@@ -9,6 +10,7 @@ interface FloatingDateInputProps extends DateInputProps {
 
 export function FloatingDateInput({ label, containerProps, value, error, ...props }: FloatingDateInputProps) {
   const hasValue = value !== null && value !== undefined;
+  const requiredIndicator = Boolean((props as any).required || (props as any).withAsterisk);
 
   return (
     <Box w="100%" {...containerProps}>
@@ -25,7 +27,7 @@ export function FloatingDateInput({ label, containerProps, value, error, ...prop
           placeholder=""
           variant="unstyled"
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
+        <label style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</label>
       </Box>
       {error ? (
         <Text size="xs" c="red" mt={4}>

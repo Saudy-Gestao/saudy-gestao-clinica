@@ -9,9 +9,10 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import AuthService from '../../services/authService';
 import { validateCNPJ } from '../../utils/validations';
-import { isValidEmail, normalizeEmail } from '../../utils/formatters';
+import { formatCNPJ, formatCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
 
 export function Cadastro() {
   const navigate = useNavigate();
@@ -125,7 +126,7 @@ export function Cadastro() {
       console.error('Erro no registro:', error);
       notifications.show({
         title: 'Erro',
-        message: error.response?.data?.message || error.response?.data?.error || error.response?.data?.details || 'Erro ao criar conta',
+        message: resolveApiErrorMessage(error, 'Erro ao criar conta'),
         color: 'red',
       });
     } finally {
@@ -196,9 +197,9 @@ export function Cadastro() {
 
             <Box className="floating-field">
               <input
-                type="text"
+                type="email"
                 value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
+                onChange={(e) => handleChange('email', normalizeEmail(e.target.value))}
                 placeholder=" "
                 aria-label="E-mail"
               />
@@ -209,7 +210,7 @@ export function Cadastro() {
               <input
                 type="text"
                 value={formData.documento}
-                onChange={(e) => handleChange('documento', e.target.value)}
+                onChange={(e) => handleChange('documento', isEmpresa ? formatCNPJ(e.target.value) : formatCPF(e.target.value))}
                 placeholder=" "
                 aria-label={isEmpresa ? "CNPJ" : "CPF"}
               />
