@@ -291,6 +291,8 @@ export function Conversations() {
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
   const [protocolNumberInput, setProtocolNumberInput] = useState('');
   const [protocolLookupLoading, setProtocolLookupLoading] = useState(false);
+  const [protocolSearch, setProtocolSearch] = useState('');
+  const [protocolSearchOpen, setProtocolSearchOpen] = useState(false);
   const [protocolLookup, setProtocolLookup] = useState<{
     protocol: HumanConversationProtocolSummary | null;
     items: HumanConversationMessage[];
@@ -517,6 +519,32 @@ export function Conversations() {
     }
   }, [matchingMessageIndices, currentMatchIndex]);
 
+  // Scroll to matching message in protocol modal
+  useEffect(() => {
+    if (protocolSearch.trim() && protocolLookup?.items) {
+      const searchTerm = protocolSearch.trim().toLowerCase();
+      const filteredMessages = protocolLookup.items.filter((msg) => !isDeliveryEvent(msg) && !isEventMessage(msg));
+      const matchIndex = filteredMessages.findIndex((msg) => {
+        const messageText = String(msg.message || '').toLowerCase();
+        return messageText.includes(searchTerm);
+      });
+      
+      if (matchIndex >= 0) {
+        // Wait for next tick to ensure DOM is updated
+        setTimeout(() => {
+          const modalScrollArea = document.querySelector('[data-protocol-scroll]');
+          if (modalScrollArea) {
+            const messageElements = modalScrollArea.querySelectorAll('[data-protocol-message]');
+            const targetElement = messageElements[matchIndex] as HTMLElement;
+            if (targetElement) {
+              targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }, 100);
+      }
+    }
+  }, [protocolSearch, protocolLookup]);
+
   const isValidProtocolFormat = (value: string) => {
     const trimmed = value.trim();
     // Matches patterns like: WA-20260410-2014ED, WA-20260410-123456, etc.
@@ -706,9 +734,6 @@ export function Conversations() {
             {media.fileName ? (
               <Text size="xs" c="dimmed">Arquivo: {media.fileName}</Text>
             ) : null}
-            <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-              Verifique o console do navegador (F12) para informações de debug
-            </Text>
           </Stack>
         ) : null}
         {media.caption ? (
@@ -746,9 +771,10 @@ export function Conversations() {
             gridTemplateColumns: sidebarCollapsed ? '84px minmax(0, 1fr)' : 'minmax(320px, 420px) minmax(0, 1fr)',
             gap: '16px',
             alignItems: 'stretch',
+            height: 'calc(100vh - 180px)',
           }}
         >
-          <Paper withBorder p={sidebarCollapsed ? 'xs' : 'md'} radius="lg" style={{ minHeight: 760, overflow: 'hidden' }}>
+          <Paper withBorder p={sidebarCollapsed ? 'xs' : 'md'} radius="lg" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <Stack gap="sm">
               {!sidebarCollapsed ? (
                 <>
@@ -815,7 +841,7 @@ export function Conversations() {
                   </ActionIcon>
                 </Tooltip>
               ) : null}
-              <ScrollArea h={610} offsetScrollbars>
+              <ScrollArea style={{ flex: 1 }} offsetScrollbars>
                 <Stack gap="sm">
                   {items.map((item) => (
                     <Card
@@ -889,14 +915,14 @@ export function Conversations() {
             </Stack>
           </Paper>
 
-          <Paper withBorder p="md" radius="lg" style={{ minHeight: 760 }}>
+          <Paper withBorder p="md" radius="lg" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {!selectedConversation ? (
-              <Stack align="center" justify="center" h={700}>
+              <Stack align="center" justify="center" style={{ flex: 1 }}>
                 <MessageCircle size={36} />
                 <Text fw={600}>Selecione uma conversa</Text>
               </Stack>
             ) : (
-              <Stack gap="md" h="100%">
+              <Stack gap="md" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Group justify="space-between" align="flex-start" wrap="nowrap">
                   <Box style={{ flex: 1 }}>
                     <Group gap="xs" wrap="nowrap" align="center">
@@ -995,7 +1021,7 @@ export function Conversations() {
                   </Group>
                 ) : null}
 
-                <ScrollArea h={messageSearchOpen ? 330 : 430} offsetScrollbars viewportRef={viewportRef}>
+                <ScrollArea style={{ flex: 1 }} offsetScrollbars viewportRef={viewportRef}>
                   <Stack gap="sm" pr="xs">
                     {currentMessages.map((message, index) => {
                       const styles = bubbleStyles(message, colorScheme);
@@ -1274,34 +1300,78 @@ export function Conversations() {
 
       <Modal
         opened={protocolModalOpen}
-        onClose={() => setProtocolModalOpen(false)}
+        onClose={() => {
+          setProtocolModalOpen(false);
+          setProtocolSearch('');
+          setProtocolSearchOpen(false);
+        }}
         title="Protocolo do atendimento"
         size="lg"
       >
         <Stack gap="sm">
-          <TextInput
-            label="Número do protocolo"
-            placeholder="Digite o protocolo para consultar"
-            leftSection={<Search size={16} />}
-            value={protocolNumberInput}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              setProtocolNumberInput(value);
-              // Auto-search when typed
-              if (value.trim().length > 0) {
-                void handleLookupProtocol(value.trim());
-              } else {
-                setProtocolLookup(null);
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                void handleLookupProtocol();
-              }
-            }}
-            rightSection={protocolLookupLoading ? <RefreshCcw size={14} className="animate-spin" /> : null}
-          />
+          <Group justify="space-between" align="flex-start">
+            <TextInput
+              style={{ flex: 1 }}
+              label="Número do protocolo"
+              placeholder="Digite o protocolo para consultar"
+              leftSection={<Search size={16} />}
+              value={protocolNumberInput}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setProtocolNumberInput(value);
+                // Auto-search when typed
+                if (value.trim().length > 0) {
+                  void handleLookupProtocol(value.trim());
+                } else {
+                  setProtocolLookup(null);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleLookupProtocol();
+                }
+              }}
+              rightSection={protocolLookupLoading ? <RefreshCcw size={14} className="animate-spin" /> : null}
+            />
+            <Tooltip label="Buscar nas mensagens">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                mt={24}
+                onClick={() => {
+                  setProtocolSearchOpen(!protocolSearchOpen);
+                  if (protocolSearchOpen) {
+                    setProtocolSearch('');
+                  }
+                }}
+              >
+                <Search size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+
+          {protocolSearchOpen ? (
+            <Group gap="xs" wrap="nowrap">
+              <TextInput
+                placeholder="Digite para buscar e rolar até a mensagem"
+                leftSection={<Search size={16} />}
+                value={protocolSearch}
+                onChange={(event) => setProtocolSearch(event.currentTarget.value)}
+                style={{ flex: 1 }}
+              />
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                onClick={() => {
+                  setProtocolSearchOpen(false);
+                  setProtocolSearch('');
+                }}
+              >
+                <XCircle size={16} />
+              </ActionIcon>
+            </Group>
+          ) : null}
 
           <Group grow>
             <Box>
@@ -1318,7 +1388,7 @@ export function Conversations() {
             </Box>
           </Group>
           <Divider />
-          <ScrollArea h={360}>
+          <ScrollArea h={protocolSearchOpen ? 310 : 360} data-protocol-scroll>
             <Stack gap="xs">
               {!protocolLookup ? (
                 <Text size="sm" c="dimmed">Digite um protocolo para ver apenas o trecho desse atendimento.</Text>
@@ -1328,14 +1398,31 @@ export function Conversations() {
               ) : null}
               {(protocolLookup?.items || [])
                 .filter((msg) => !isDeliveryEvent(msg) && !isEventMessage(msg))
-                .map((message) => (
-                  <Paper key={message.id} withBorder radius="md" p="sm">
-                    <Text size="xs" c="dimmed" mb={4}>
-                      {dayjs(message.createdAt).format('DD/MM/YYYY HH:mm')} • {message.authorName || message.authorType}
-                    </Text>
-                    {renderMessageContent(message)}
-                  </Paper>
-                ))}
+                .map((message) => {
+                  const searchTerm = protocolSearch.trim().toLowerCase();
+                  const messageText = String(message.message || '').toLowerCase();
+                  const isMatch = searchTerm && messageText.includes(searchTerm);
+                  return (
+                    <Paper
+                      key={message.id}
+                      data-protocol-message
+                      withBorder
+                      radius="md"
+                      p="sm"
+                      style={{
+                        ...(isMatch ? {
+                          boxShadow: '0 0 0 2px var(--mantine-color-blue-5)',
+                          transition: 'box-shadow 0.3s ease',
+                        } : {}),
+                      }}
+                    >
+                      <Text size="xs" c="dimmed" mb={4}>
+                        {dayjs(message.createdAt).format('DD/MM/YYYY HH:mm')} • {message.authorName || message.authorType}
+                      </Text>
+                      {renderMessageContent(message)}
+                    </Paper>
+                  );
+                })}
             </Stack>
           </ScrollArea>
         </Stack>
