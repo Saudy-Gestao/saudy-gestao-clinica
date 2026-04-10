@@ -30,6 +30,7 @@ import { notifications } from '@mantine/notifications';
 import {
   Check,
   CheckCheck,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Download,
@@ -46,6 +47,7 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
+import { useNavigate } from 'react-router-dom';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { queryKeys } from '../../lib/queryKeys';
 import { getApiBaseUrl } from '../../services/getApiBaseUrl';
@@ -275,6 +277,7 @@ const bubbleStyles = (message: HumanConversationMessage, colorScheme: 'light' | 
 };
 
 export function Conversations() {
+  const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -803,10 +806,15 @@ export function Conversations() {
       <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Stack gap="md" px="md" py="md" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Group justify="space-between" align="center">
-          <Box>
-            <Text fw={700} size="xl">Conversas</Text>
-            <Text c="dimmed" size="sm">Fila humanizada do WhatsApp com protocolo, histórico, eventos e acompanhamento em tempo real.</Text>
-          </Box>
+          <Group align="center" gap="sm">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ChevronLeft size={28} />
+            </ActionIcon>
+            <Box>
+              <Text fw={700} size="xl">Conversas</Text>
+              <Text c="dimmed" size="sm">Fila humanizada do WhatsApp com protocolo, histórico, eventos e acompanhamento em tempo real.</Text>
+            </Box>
+          </Group>
           <Group gap="xs">
             <Button variant="light" leftSection={<Settings size={16} />} onClick={() => setOperatorsModalOpen(true)}>
               Operadores
