@@ -17,7 +17,7 @@ import {
   Textarea,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Copy, ExternalLink, Link as LinkIcon, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Link as LinkIcon, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
@@ -147,9 +147,7 @@ export function PreAgendamento() {
   const [preAuthNotes, setPreAuthNotes] = useState('');
   const [savingPreAuth, setSavingPreAuth] = useState(false);
 
-  const [linkOpen, setLinkOpen] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
-  const [linkResult, setLinkResult] = useState<{ publicUrl: string; message: string; to?: string | null } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewDocuments, setReviewDocuments] = useState<Array<{
@@ -253,25 +251,16 @@ export function PreAgendamento() {
     }
   };
 
-  const openSendLink = (item: PreSchedulingItem) => {
+  const handleSendLink = async (item: PreSchedulingItem) => {
     setSelectedItem(item);
-    setLinkResult(null);
-    setLinkOpen(true);
-  };
-
-  const handleSendLink = async () => {
-    if (!selectedItem) return;
     setSendingLink(true);
     try {
-      const data = await preSchedulingService.sendLink(selectedItem.appointmentId);
-      setLinkResult({
-        publicUrl: data.publicUrl,
-        message: data.whatsapp?.message || '',
-        to: data.whatsapp?.to,
-      });
+      const data = await preSchedulingService.sendLink(item.appointmentId);
       showNotification({
         title: 'Link enviado',
-        message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
+        message: data.hasAnamnesis
+          ? 'Link de documentos e anamnese gerado e enviado com sucesso.'
+          : 'Link de documentos gerado e enviado com sucesso.',
         color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
@@ -347,12 +336,6 @@ export function PreAgendamento() {
     } finally {
       setOpeningDocumentId(null);
     }
-  };
-
-  const copyToClipboard = async (value: string) => {
-    if (!value) return;
-    await navigator.clipboard.writeText(value);
-    showNotification({ title: 'Copiado', message: 'Conteúdo copiado para área de transferência.', color: 'blue' });
   };
 
   return (
@@ -492,8 +475,8 @@ export function PreAgendamento() {
                                 size="xs"
                                 variant="outline"
                                 leftSection={<LinkIcon size={14} />}
-                                disabled={item.isResolved || viewMode === 'history' || item.preSchedulingStatus === 'COMPLETED'}
-                                onClick={() => openSendLink(item)}
+                                disabled={sendingLink || item.isResolved || viewMode === 'history' || item.preSchedulingStatus === 'COMPLETED'}
+                                onClick={() => handleSendLink(item)}
                               >
                                 Enviar link
                               </Button>
@@ -540,52 +523,6 @@ export function PreAgendamento() {
             <Button variant="default" onClick={() => setPreAuthOpen(false)}>Cancelar</Button>
             <Button color="darkBlue" onClick={handlePreAuthorize} loading={savingPreAuth}>Salvar pré-autorização</Button>
           </Group>
-        </Stack>
-      </Modal>
-
-      <Modal opened={linkOpen} onClose={() => setLinkOpen(false)} title="Envio de link (WhatsApp mock)" centered size="lg">
-        <Stack>
-          <Text size="sm" c="dimmed">
-            {selectedItem?.patientName || 'Paciente'} • {selectedItem?.specialty || 'Procedimento'}
-          </Text>
-
-          {!linkResult ? (
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setLinkOpen(false)}>Cancelar</Button>
-              <Button color="darkBlue" onClick={handleSendLink} loading={sendingLink}>Gerar e enviar link</Button>
-            </Group>
-          ) : (
-            <>
-              <Paper p="sm" withBorder>
-                <Stack gap={6}>
-                  <Text size="sm" fw={600}>Link público</Text>
-                  <Group wrap="nowrap" justify="space-between">
-                    <Text size="sm" style={{ wordBreak: 'break-all' }}>{linkResult.publicUrl}</Text>
-                    <Group gap={6}>
-                      <ActionIcon variant="light" onClick={() => copyToClipboard(linkResult.publicUrl)}>
-                        <Copy size={14} />
-                      </ActionIcon>
-                      <ActionIcon variant="light" onClick={() => window.open(linkResult.publicUrl, '_blank')}>
-                        <ExternalLink size={14} />
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-                </Stack>
-              </Paper>
-
-              <Paper p="sm" withBorder>
-                <Stack gap={6}>
-                  <Text size="sm" fw={600}>Mensagem mock enviada</Text>
-                  <Text size="xs" c="dimmed">Destino: {linkResult.to || 'não informado'}</Text>
-                  <Textarea value={linkResult.message} readOnly minRows={4} autosize />
-                </Stack>
-              </Paper>
-
-              <Group justify="flex-end">
-                <Button variant="default" onClick={() => setLinkOpen(false)}>Fechar</Button>
-              </Group>
-            </>
-          )}
         </Stack>
       </Modal>
 
