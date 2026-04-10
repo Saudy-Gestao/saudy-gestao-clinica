@@ -154,12 +154,6 @@ const resolveMediaUrl = (value?: string | null) => {
 const extractMediaMetadata = (message: HumanConversationMessage) => {
   const metadata = parseMetadataObject(message.metadata);
   
-  // Log metadata for debugging
-  if (isMediaMessage(message.message)) {
-    console.log('[Media Debug] Message:', message.message);
-    console.log('[Media Debug] Full Metadata:', JSON.stringify(metadata, null, 2));
-  }
-  
   const mediaId = findMetadataString(metadata, [
     'mediaId',
     'media_id',
@@ -211,12 +205,6 @@ const extractMediaMetadata = (message: HumanConversationMessage) => {
   const caption = findMetadataString(metadata, ['caption']);
   const mediaTypeHint = findMetadataString(metadata, ['mediaType', 'media_type', 'type']).toLowerCase();
   const resolvedUrl = resolveMediaUrl(rawUrl);
-  
-  // Log resolved URL for debugging
-  if (isMediaMessage(message.message)) {
-    console.log('[Media Debug] Raw URL:', rawUrl);
-    console.log('[Media Debug] Resolved URL:', resolvedUrl);
-  }
 
   const isImage = mimeType.startsWith('image/') || mediaTypeHint.includes('image');
   const isVideo = mimeType.startsWith('video/') || mediaTypeHint.includes('video');
