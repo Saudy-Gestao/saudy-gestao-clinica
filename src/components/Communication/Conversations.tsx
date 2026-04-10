@@ -26,6 +26,7 @@ import {
   Tooltip,
   useMantineColorScheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   Check,
@@ -278,6 +279,8 @@ const bubbleStyles = (message: HumanConversationMessage, colorScheme: 'light' | 
 
 export function Conversations() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 799px)');
+  const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -804,26 +807,27 @@ export function Conversations() {
     <Box style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Header />
       <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Stack gap="md" px="md" py="md" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Group justify="space-between" align="center">
-          <Group align="center" gap="sm">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={700} size="xl">Conversas</Text>
-              <Text c="dimmed" size="sm">Fila humanizada do WhatsApp com protocolo, histórico, eventos e acompanhamento em tempo real.</Text>
-            </Box>
-          </Group>
-          <Group gap="xs">
-            <Button variant="light" leftSection={<Settings size={16} />} onClick={() => setOperatorsModalOpen(true)}>
-              Operadores
-            </Button>
-            <ActionIcon variant="light" size="lg" onClick={() => refreshAll()} disabled={conversationsQuery.isFetching || messagesQuery.isFetching}>
-              <RefreshCcw size={16} />
-            </ActionIcon>
-          </Group>
-        </Group>
+        <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <Stack gap="md" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Group justify="space-between" align="center" wrap="wrap">
+              <Group align="center" gap="sm">
+                <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+                  <ChevronLeft size={28} />
+                </ActionIcon>
+                <Box>
+                  <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Conversas</Text>
+                  <Text c="dimmed" size="sm">Fila humanizada do WhatsApp com protocolo, histórico, eventos e acompanhamento em tempo real.</Text>
+                </Box>
+              </Group>
+              <Group gap="xs">
+                <Button variant="light" leftSection={<Settings size={16} />} onClick={() => setOperatorsModalOpen(true)}>
+                  Operadores
+                </Button>
+                <ActionIcon variant="light" size="lg" onClick={() => refreshAll()} disabled={conversationsQuery.isFetching || messagesQuery.isFetching}>
+                  <RefreshCcw size={16} />
+                </ActionIcon>
+              </Group>
+            </Group>
 
         <Box
           style={{
@@ -1159,7 +1163,8 @@ export function Conversations() {
             )}
           </Paper>
         </Box>
-        </Stack>
+          </Stack>
+        </Box>
       </Box>
 
       <Modal

@@ -881,7 +881,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     <Box bg={pageBg} style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
+      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
         <Group mb={14}>
           <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
             Voltar

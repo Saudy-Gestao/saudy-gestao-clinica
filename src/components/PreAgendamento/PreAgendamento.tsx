@@ -410,7 +410,7 @@ export function PreAgendamento() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p="xl">
+      <Box p="xl" maw={1400} mx="auto">
         <Group justify="space-between" align="center" mb="md" wrap="wrap">
           <Group>
             <ActionIcon variant="default" size="lg" onClick={() => navigate('/dashboard')}>

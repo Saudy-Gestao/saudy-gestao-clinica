@@ -17,6 +17,7 @@ import {
   Title,
   useMantineColorScheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -113,6 +114,8 @@ const shouldShowOptions = (responseType?: string) => (
 
 export function CadastroAnamnese() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 799px)');
+  const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
 
@@ -324,15 +327,15 @@ export function CadastroAnamnese() {
   return (
     <Box>
       <Header />
-      <Box p={24}>
-        <Group justify="space-between" align="center" mb="lg">
-          <Group>
-            <ActionIcon size={44} variant="default" onClick={() => navigate(-1)} aria-label="Voltar">
-              <ChevronLeft size={22} />
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group justify="space-between" align="center" mb={isMobile ? 20 : 30}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')} aria-label="Voltar">
+              <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Title order={2}>Cadastro de Anamnese</Title>
-              <Text c="dimmed">Perguntas estruturadas por procedimento</Text>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Anamnese</Text>
+              <Text size="sm" c="dimmed">Perguntas estruturadas por procedimento</Text>
             </Box>
           </Group>
 

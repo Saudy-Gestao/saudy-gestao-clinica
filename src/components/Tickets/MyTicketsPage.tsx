@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ActionIcon,
   Badge,
   Box,
   Button,
@@ -12,13 +13,11 @@ import {
   Table,
   Text,
   TextInput,
-  ThemeIcon,
-  Title,
 } from '@mantine/core';
-import { LifeBuoy, MessageCircleMore, Search } from 'lucide-react';
+import { useMediaQuery } from '@mantine/hooks';
+import { ChevronLeft, MessageCircleMore, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
-import { DARK_BLUE } from '../../themes/theme';
 import { type TicketPriority, type TicketStatus, type TicketType } from '../../services/ticketService';
 
 const statusOptions: Array<{ value: TicketStatus | 'ALL'; label: string }> = [
@@ -107,6 +106,7 @@ const MyTicketsSkeleton = () => (
 
 export function MyTicketsPage() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 799px)');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'ALL'>('ALL');
   const [typeFilter, setTypeFilter] = useState<TicketType | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
@@ -126,27 +126,23 @@ export function MyTicketsPage() {
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p="xl" maw={1400} mx="auto">
+      <Box p={isMobile ? 'sm' : 'md'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Stack gap="xl">
-          <Paper
-            p="xl"
-            radius="lg"
-            style={{
-              background: `linear-gradient(135deg, ${DARK_BLUE} 0%, #16357f 100%)`,
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}
-          >
-            <Group gap="sm">
-              <ThemeIcon size={46} radius="md" variant="light" color="white">
-                <LifeBuoy size={22} />
-              </ThemeIcon>
-              <Stack gap={2}>
-                <Title order={2} c="white">Meus Chamados</Title>
-                <Text c="rgba(255,255,255,0.84)">Acompanhe os tickets que você abriu e os status da análise interna.</Text>
-              </Stack>
+          <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Group align="center">
+              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+                <ChevronLeft size={28} />
+              </ActionIcon>
+              <Box>
+                <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
+                  Meus Chamados
+                </Text>
+                <Text size="sm" c="dimmed">
+                  Acompanhe os tickets que você abriu e os status da análise interna.
+                </Text>
+              </Box>
             </Group>
-          </Paper>
+          </Group>
 
           <Paper p="lg" withBorder radius="lg">
             <Group align="flex-end" gap="md">

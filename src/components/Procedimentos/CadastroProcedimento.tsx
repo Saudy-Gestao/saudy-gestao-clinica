@@ -574,21 +574,16 @@ export function CadastroProcedimento() {
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p="xl" maw={1400} mx="auto">
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Stack gap="md">
-          <Group justify="space-between" align="flex-start" wrap="wrap">
-            <Group gap="sm">
-              <ActionIcon
-                variant="default"
-                size="xl"
-                onClick={() => navigate('/dashboard')}
-                style={{ borderColor: DARK_BLUE }}
-              >
-                <ChevronLeft size={20} />
+          <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Group align="center">
+              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+                <ChevronLeft size={28} />
               </ActionIcon>
               <Box>
-                <Title order={2} fw={600}>Cadastro de Procedimentos</Title>
-                <Text c="dimmed">Procedimentos, modalidades, precos e convenios aceitos.</Text>
+                <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Procedimentos</Text>
+                <Text size="sm" c="dimmed">Procedimentos, modalidades, preços e convênios aceitos.</Text>
               </Box>
             </Group>
           </Group>

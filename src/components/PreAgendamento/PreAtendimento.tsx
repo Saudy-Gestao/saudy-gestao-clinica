@@ -1378,14 +1378,20 @@ export function PreAtendimento() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30}>
-          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
-            <ChevronLeft size={28} />
-          </ActionIcon>
-          <Box>
-            <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Autorização e Recepção</Text>
-            <Text size="sm" c="dimmed">Pacientes chamados para atendimento na recepção</Text>
-          </Box>
+        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ChevronLeft size={28} />
+            </ActionIcon>
+            <Box>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
+                Autorização e Recepção
+              </Text>
+              <Text size="sm" c="dimmed">
+                Pacientes chamados para atendimento na recepção
+              </Text>
+            </Box>
+          </Group>
         </Group>
 
         {/* Search Section */}

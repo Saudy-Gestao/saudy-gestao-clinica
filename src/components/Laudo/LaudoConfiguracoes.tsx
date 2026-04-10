@@ -78,6 +78,7 @@ export function LaudoConfiguracoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
 
@@ -435,14 +436,14 @@ export function LaudoConfiguracoes() {
   return (
     <Box style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p={isMobile ? 'sm' : 'xl'} maw={1300} mx="auto">
-        <Group justify="space-between" mb="md" align="center" wrap="wrap">
-          <Group>
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group justify="space-between" mb={isMobile ? 20 : 30} align="center" wrap="wrap">
+          <Group align="center">
             <ActionIcon variant="default" size="xl" onClick={() => navigate('/laudo-exames')}>
-              <ChevronLeft size={24} />
+              <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Title order={3} c="var(--mantine-color-text)">Configurações de Laudo</Title>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Configurações de Laudo</Text>
               <Text c="dimmed" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM</Text>
             </Box>
           </Group>

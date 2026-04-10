@@ -935,7 +935,7 @@ export function CadastroPaciente() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1000} mx="auto">
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {/* Header */}
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
