@@ -43,6 +43,7 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface Agendamento {
   id: string;
@@ -59,6 +60,7 @@ interface Agendamento {
   data: string;
   hora: string;
   tipoConsulta: string;
+  modalidadeAtendimento: 'Presencial' | 'Teleconsulta';
   status: string;
   observacoes: string;
   totem?: number;
@@ -78,6 +80,7 @@ interface NovoAgendamento {
   hora: string;
   profissional: string;
   tipoConsulta: string;
+  modalidadeAtendimento: 'Presencial' | 'Teleconsulta';
   informacoes: string;
 }
 
@@ -107,6 +110,7 @@ interface ProcedureMeta {
   doctorNames: string[];
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
+  supportsTeleconsultation: boolean;
 }
 
 interface SuggestedProcedureSchedule {
@@ -157,6 +161,7 @@ const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   hora: '',
   profissional: '',
   tipoConsulta: 'CONSULTA',
+  modalidadeAtendimento: 'Presencial',
   informacoes: '',
 };
 
@@ -172,6 +177,32 @@ const INITIAL_PENDING_PATIENT: PendingPatientRegistration = {
 const PARTICULAR_INSURANCE_LABEL = 'Particular';
 const PARTICULAR_STATUS_LABEL = 'Particular';
 const NOT_APPLICABLE_LABEL = 'Não se aplica';
+const TELECONSULT_MODALITY = 'Telemedicina';
+const TELECONSULTATION_SPECIALTY_FLAG = '__TELECONSULTA__';
+const TELECONSULTATION_OBSERVATION_MARKER = '[MODALIDADE: TELECONSULTA]';
+
+const stripTeleconsultationMarker = (value?: string | null): string => String(value || '')
+  .split('\n')
+  .map((line) => line.trim())
+  .filter((line) => line && line !== TELECONSULTATION_OBSERVATION_MARKER)
+  .join('\n')
+  .trim();
+
+const getAppointmentModalityFromObservation = (value?: string | null): 'Presencial' | 'Teleconsulta' => {
+  const normalized = String(value || '').toUpperCase();
+  return normalized.includes(TELECONSULTATION_OBSERVATION_MARKER) ? 'Teleconsulta' : 'Presencial';
+};
+
+const buildAppointmentObservations = (
+  value: string,
+  modality: 'Presencial' | 'Teleconsulta',
+): string | undefined => {
+  const base = stripTeleconsultationMarker(value);
+  if (modality === 'Teleconsulta') {
+    return base ? `${TELECONSULTATION_OBSERVATION_MARKER}\n${base}` : TELECONSULTATION_OBSERVATION_MARKER;
+  }
+  return base || undefined;
+};
 
 const resolvePatientInsuranceName = (patient: any): string => {
   const insuranceName = String(
@@ -412,6 +443,13 @@ const formatDateForApi = (value: Date | null): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatTypedDateValue = (value: string): string => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 const onlyDigits = (value?: string | null): string => String(value || '').replace(/\D/g, '');
 const addDays = (date: Date, amount: number): Date => dayjs(date).add(amount, 'day').toDate();
 const getTodayStart = (): Date => dayjs().startOf('day').toDate();
@@ -570,8 +608,9 @@ export function Agendamento() {
     data: normalizeDateOnly(it.date || it.data || ''),
     hora: it.time || it.hora || '',
     tipoConsulta: it.type || it.tipoConsulta || 'CONSULTA',
+    modalidadeAtendimento: getAppointmentModalityFromObservation(it.observations || it.observacoes || ''),
     status: normalizeAppointmentStatus(it.status),
-    observacoes: it.observations || it.observacoes || '',
+    observacoes: stripTeleconsultationMarker(it.observations || it.observacoes || ''),
     totem: it.totem ?? undefined,
     durationMinutes: Number.isFinite(Number(it.durationMinutes)) ? Number(it.durationMinutes) : null,
   });
@@ -658,7 +697,7 @@ export function Agendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Nao foi possivel abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Nao foi possivel abrir o anexo.'),
         color: 'red',
       });
     } finally {
@@ -700,7 +739,7 @@ export function Agendamento() {
       const err: any = appointmentsQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar agendamentos'),
         color: 'red',
       });
     }
@@ -718,27 +757,27 @@ export function Agendamento() {
   }, [appointmentsQuery.data]);
 
   useEffect(() => {
-    setPatientsLoading(patientsQuery.isFetching);
-  }, [patientsQuery.isFetching]);
+    setPatientsLoading(patientsQuery.isLoading && patientOptions.length === 0);
+  }, [patientOptions.length, patientsQuery.isLoading]);
 
   useEffect(() => {
-    setInsurancesLoading(insurancesQuery.isFetching);
-  }, [insurancesQuery.isFetching]);
+    setInsurancesLoading(insurancesQuery.isLoading && insuranceOptions.length === 0);
+  }, [insuranceOptions.length, insurancesQuery.isLoading]);
 
   useEffect(() => {
-    setDoctorsLoading(doctorsQuery.isFetching);
-  }, [doctorsQuery.isFetching]);
+    setDoctorsLoading(doctorsQuery.isLoading && doctorOptions.length === 0);
+  }, [doctorOptions.length, doctorsQuery.isLoading]);
 
   useEffect(() => {
-    setProceduresLoading(proceduresCatalogQuery.isFetching);
-  }, [proceduresCatalogQuery.isFetching]);
+    setProceduresLoading(proceduresCatalogQuery.isLoading && procedureOptions.length === 0);
+  }, [procedureOptions.length, proceduresCatalogQuery.isLoading]);
 
   useEffect(() => {
     if (!patientsQuery.error) return;
     const err: any = patientsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
       color: 'red',
     });
   }, [patientsQuery.error]);
@@ -748,7 +787,7 @@ export function Agendamento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -758,7 +797,7 @@ export function Agendamento() {
     const err: any = doctorsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar médicos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -768,7 +807,7 @@ export function Agendamento() {
     const err: any = proceduresCatalogQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'),
       color: 'red',
     });
   }, [proceduresCatalogQuery.error]);
@@ -898,6 +937,13 @@ export function Agendamento() {
         acceptedInsurances: Array.isArray(item.acceptedInsurances)
           ? item.acceptedInsurances.map((insurance: any) => String(insurance || '').trim()).filter(Boolean)
           : [],
+        supportsTeleconsultation:
+          normalizeProcedureAppointmentType(item.appointmentType) === 'CONSULTA'
+          && (
+            Array.isArray(item.modalities)
+              ? item.modalities.some((modality: any) => String(modality || '').trim() === TELECONSULT_MODALITY)
+              : Boolean(item.supportsTeleconsultation)
+          ),
       };
       return acc;
     }, {});
@@ -984,6 +1030,7 @@ export function Agendamento() {
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
       tipoConsulta: agendamento.tipoConsulta,
+      modalidadeAtendimento: agendamento.modalidadeAtendimento || 'Presencial',
       informacoes: agendamento.observacoes,
     });
     const specialties = agendamento.especialidade
@@ -1024,6 +1071,7 @@ export function Agendamento() {
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
       tipoConsulta: agendamento.tipoConsulta,
+      modalidadeAtendimento: agendamento.modalidadeAtendimento || 'Presencial',
       informacoes: agendamento.observacoes,
     });
     const specialties = agendamento.especialidade
@@ -1238,7 +1286,7 @@ export function Agendamento() {
         : null;
       showNotification({
         title: 'Erro ao finalizar cadastro',
-        message: String(firstFieldError || err?.response?.data?.message || err?.message || 'Não foi possível criar o paciente antes do agendamento.'),
+        message: String(firstFieldError || resolveApiErrorMessage(err, 'Não foi possível criar o paciente antes do agendamento.')),
         color: 'red',
       });
       return null;
@@ -1315,7 +1363,10 @@ export function Agendamento() {
           date: formatDateForApi(novoAgendamento.data),
           time: novoAgendamento.hora,
           type: resolvedAppointmentType,
-          observations: novoAgendamento.informacoes || undefined,
+          observations: buildAppointmentObservations(
+            novoAgendamento.informacoes || '',
+            novoAgendamento.modalidadeAtendimento,
+          ),
         };
         await appointmentService.update(editingAgendamentoId, {
           ...basePayload,
@@ -1346,7 +1397,7 @@ export function Agendamento() {
         setSavingAgendamento(false);
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar agendamento',
+          message: resolveApiErrorMessage(err, 'Erro ao atualizar agendamento'),
           color: 'red',
         });
         return;
@@ -1372,7 +1423,10 @@ export function Agendamento() {
               date: formatDateForApi(suggestion.date),
               time: suggestion.time,
               type: deriveAppointmentType([suggestion.procedure], novoAgendamento.tipoConsulta),
-              observations: novoAgendamento.informacoes || undefined,
+              observations: buildAppointmentObservations(
+                novoAgendamento.informacoes || '',
+                novoAgendamento.modalidadeAtendimento,
+              ),
               status: 'AGENDADO',
               totem: Math.floor(Math.random() * 100) + 1,
               rescheduledFromAppointmentId: rescheduleSourceId || undefined,
@@ -1396,7 +1450,10 @@ export function Agendamento() {
             date: formatDateForApi(novoAgendamento.data),
             time: novoAgendamento.hora,
             type: resolvedAppointmentType,
-            observations: novoAgendamento.informacoes || undefined,
+            observations: buildAppointmentObservations(
+              novoAgendamento.informacoes || '',
+              novoAgendamento.modalidadeAtendimento,
+            ),
             status: 'AGENDADO',
             totem: Math.floor(Math.random() * 100) + 1,
             rescheduledFromAppointmentId: rescheduleSourceId || undefined,
@@ -1428,7 +1485,7 @@ export function Agendamento() {
         setSavingAgendamento(false);
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao criar agendamento',
+          message: resolveApiErrorMessage(err, 'Erro ao criar agendamento'),
           color: 'red',
         });
         return;
@@ -1450,7 +1507,7 @@ export function Agendamento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status',
+        message: resolveApiErrorMessage(err, 'Erro ao atualizar status'),
         color: 'red',
       });
     }
@@ -1552,7 +1609,8 @@ export function Agendamento() {
       hora: appt.time || '',
       profissional: appt.doctorName || '',
       tipoConsulta: appt.type || '',
-      informacoes: appt.observations || '',
+      modalidadeAtendimento: getAppointmentModalityFromObservation(appt.observations || ''),
+      informacoes: stripTeleconsultationMarker(appt.observations || ''),
     });
     setSelectedSpecialties(specialties);
     setIsEditing(true);
@@ -1572,6 +1630,21 @@ export function Agendamento() {
 
   const schedulingDate = viewedDate || novoAgendamento.data || dataHoraFiltro || new Date();
   const resolvedAppointmentType = deriveAppointmentType(selectedSpecialties, novoAgendamento.tipoConsulta);
+  const selectedDoctorMeta = novoAgendamento.profissional ? doctorMetaByName[novoAgendamento.profissional] : undefined;
+  const selectedDoctorSupportsTeleconsultation = Boolean(
+    selectedDoctorMeta
+    && Array.isArray(selectedDoctorMeta.specialties)
+    && selectedDoctorMeta.specialties.some((item) => String(item) === TELECONSULTATION_SPECIALTY_FLAG),
+  );
+  const selectedProceduresSupportTeleconsultation = Boolean(
+    selectedSpecialties.length > 0
+    && selectedSpecialties.every((name) => Boolean(procedureMetaByName[name]?.supportsTeleconsultation)),
+  );
+  const canScheduleAsTeleconsultation = Boolean(
+    resolvedAppointmentType === 'CONSULTA'
+    && selectedProceduresSupportTeleconsultation
+    && selectedDoctorSupportsTeleconsultation,
+  );
   const isMultiProcedureFlow = selectedSpecialties.length > 1;
   const anchorSelection = manualProcedureSelections[0] || null;
   const getSelectableProceduresForSlot = (doctorName: string, time: string, date: Date) => {
@@ -1674,13 +1747,13 @@ export function Agendamento() {
   const reviewTimeValue = reviewPrimaryManualSelection?.time || reviewPrimarySuggestedSelection?.time || novoAgendamento.hora || '';
   const reviewProfessionalValue = reviewPrimaryManualSelection?.doctorName || reviewPrimarySuggestedSelection?.doctorName || novoAgendamento.profissional || '';
   const insuranceSelectData = canEditInsuranceFields ? insuranceOptions : [];
-  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : '';
+  const insuranceSelectValue = canEditInsuranceFields ? novoAgendamento.convenio : PARTICULAR_INSURANCE_LABEL;
   const insuranceSelectPlaceholder = !canEditInsuranceFields
     ? 'Selecione um paciente primeiro'
     : (insurancesLoading ? 'Carregando convênios...' : 'Selecione o convênio');
   const insuranceCardNumberValue = canEditInsuranceFields ? novoAgendamento.convenioNumber : NOT_APPLICABLE_LABEL;
   const insuranceValidityValue = canEditInsuranceFields ? novoAgendamento.convenioValidUntil : NOT_APPLICABLE_LABEL;
-  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : '';
+  const insuranceStatusValue = canEditInsuranceFields ? novoAgendamento.convenioStatus : NOT_APPLICABLE_LABEL;
   const hasAnySelectedSchedule = Boolean(
     novoAgendamento.hora
     || manualProcedureSelections.length
@@ -1745,6 +1818,12 @@ export function Agendamento() {
     ) &&
     (!isManualPatientFlow || pendingPatientReadyForCreation),
   );
+
+  useEffect(() => {
+    if (!canScheduleAsTeleconsultation && novoAgendamento.modalidadeAtendimento === 'Teleconsulta') {
+      setNovoAgendamento((prev) => ({ ...prev, modalidadeAtendimento: 'Presencial' }));
+    }
+  }, [canScheduleAsTeleconsultation, novoAgendamento.modalidadeAtendimento]);
   
   const safeSchedulerDoctors = Array.isArray(schedulerDoctors) ? schedulerDoctors : [];
   const doctorSlotsByName = safeSchedulerDoctors.reduce<Record<string, string[]>>((acc, doctorName) => {
@@ -2626,6 +2705,7 @@ export function Agendamento() {
               <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
                 <FloatingSelect
                   label="Tipo do convênio*"
+                  alwaysFloatLabel
                   placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
                   value={insuranceSelectValue}
@@ -2641,22 +2721,25 @@ export function Agendamento() {
                     });
                   }}
                   searchable
-                  clearable
+                  clearable={canEditInsuranceFields && Boolean(insuranceSelectValue)}
                   disabled={insurancesLoading}
                   nothingFoundMessage="Nenhum convênio encontrado"
                 />
                 <FloatingInput
                   label="Número da carteirinha"
+                  alwaysFloatLabel
                   value={insuranceCardNumberValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioNumber: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Data de validade"
+                  alwaysFloatLabel
                   value={insuranceValidityValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioValidUntil: e.currentTarget.value })}
                 />
                 <FloatingInput
                   label="Status"
+                  alwaysFloatLabel
                   value={insuranceStatusValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioStatus: e.currentTarget.value })}
                 />
@@ -2679,6 +2762,13 @@ export function Agendamento() {
                   label="Data da marcação"
                   placeholder="Selecione a data"
                   value={novoAgendamento.data}
+                  onInput={(event) => {
+                    const input = event.currentTarget;
+                    const formatted = formatTypedDateValue(input.value);
+                    if (input.value !== formatted) {
+                      input.value = formatted;
+                    }
+                  }}
                   onChange={(value) => {
                     const rawDate = value ? new Date(value) : null;
                     const nextDate = rawDate
@@ -3178,6 +3268,22 @@ export function Agendamento() {
               <FloatingInput label="Convênio" value={novoAgendamento.convenio || ''} readOnly />
               <FloatingInput label="Procedimento" value={selectedProcedureSummary.join(', ')} readOnly />
               <FloatingInput label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
+              <FloatingSelect
+                label="Modalidade"
+                data={[
+                  { value: 'Presencial', label: 'Presencial' },
+                  ...(canScheduleAsTeleconsultation ? [{ value: 'Teleconsulta', label: 'Teleconsulta' }] : []),
+                ]}
+                value={novoAgendamento.modalidadeAtendimento}
+                onChange={(value) => setNovoAgendamento((prev) => ({
+                  ...prev,
+                  modalidadeAtendimento: value === 'Teleconsulta' ? 'Teleconsulta' : 'Presencial',
+                }))}
+                disabled={!canScheduleAsTeleconsultation}
+                description={!canScheduleAsTeleconsultation
+                  ? 'Teleconsulta disponível apenas quando procedimento e médico estão habilitados.'
+                  : undefined}
+              />
               <FloatingInput label="Data" value={reviewDateValue ? dayjs(reviewDateValue).format('DD/MM/YYYY') : ''} readOnly />
               <FloatingInput label="Horário" value={reviewTimeValue} readOnly />
               <FloatingInput label="Profissional respons." value={reviewProfessionalValue} readOnly />
@@ -3862,6 +3968,7 @@ export function Agendamento() {
                 { label: 'Convenio', value: detailAppointment.convenio || 'Nao informado' },
                 { label: 'Data', value: detailAppointment.data ? dayjs(detailAppointment.data).format('DD/MM/YYYY') : 'Nao informada' },
                 { label: 'Horario', value: detailAppointment.hora || 'Nao informado' },
+                { label: 'Modalidade', value: detailAppointment.modalidadeAtendimento || 'Presencial' },
                 { label: 'Profissional', value: detailAppointment.medicoNome || 'Nao informado' },
                 { label: 'Status', value: detailAppointment.status || 'Nao informado' },
               ].map((item) => (

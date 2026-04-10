@@ -1,0 +1,327 @@
+.page {
+  min-height: calc(100vh - 80px);
+  padding: 14px 20px 12px;
+}
+
+.pageDark {
+  background: linear-gradient(180deg, #050f34 0%, #020726 100%);
+  color: #f3f6ff;
+}
+
+.pageLight {
+  background: #e8e8e8;
+  color: #1f2330;
+}
+
+.wrapper {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 46px;
+  line-height: 1.1;
+  font-weight: 800;
+  margin-bottom: 14px;
+  letter-spacing: 0;
+}
+
+.doctorCard {
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.doctorCardDark {
+  background: rgba(8, 38, 111, 0.92);
+  border: 1px solid rgba(179, 204, 255, 0.14);
+  color: #f0f4ff;
+}
+
+.doctorCardLight {
+  background: rgba(242, 242, 242, 0.92);
+  border: 1px solid #cfcfcf;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  color: #262a33;
+}
+
+.surfaceDark {
+  background: #08266f;
+  border: 1px solid rgba(179, 204, 255, 0.12);
+  color: #f0f4ff;
+}
+
+.surfaceLight {
+  background: #f1f1f1;
+  border: 1px solid #cccccc;
+  color: #262a33;
+}
+
+.doctorLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: linear-gradient(140deg, #63d6ff 0%, #2454ff 70%);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  color: #f8fbff;
+  font-weight: 800;
+}
+
+.doctorLabel {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 700;
+}
+
+.doctorName {
+  margin: 2px 0;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.doctorSpecialty {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.schedule {
+  text-align: right;
+}
+
+.scheduleLabel {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.scheduleTime {
+  margin: 2px 0 0;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mainGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1.04fr;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+}
+
+.rightColumn {
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  height: 100%;
+}
+
+.rightPanel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.panel {
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.videoBox {
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 16 / 9;
+}
+
+.videoDark {
+  background: #020a24;
+}
+
+.videoLight {
+  background: #1a1c22;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.videoFallback {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #d4def7;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cameraActions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.controlHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.controlTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+}
+
+.progressTrack {
+  margin-top: 10px;
+  width: 100%;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 180ms ease;
+}
+
+.progressGreen {
+  background: #55cb22;
+}
+
+.progressYellow {
+  background: #f2c322;
+}
+
+.progressRed {
+  background: #eb4d4b;
+}
+
+.deviceLabel {
+  margin-top: 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.connectionCard {
+  margin-top: 0;
+}
+
+.connectionRow {
+  margin-top: 9px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ingressarRow {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tipsRow {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 14px;
+}
+
+.tipCard {
+  border-radius: 10px;
+  min-height: 88px;
+  display: grid;
+  place-items: center;
+  padding: 8px 12px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.tipDark {
+  background: linear-gradient(180deg, rgba(30, 57, 125, 0.86) 0%, rgba(18, 37, 86, 0.9) 100%);
+  border: 1px solid rgba(153, 188, 255, 0.28);
+  box-shadow:
+    0 8px 20px rgba(3, 10, 30, 0.35),
+    inset 0 1px 0 rgba(200, 220, 255, 0.14);
+  color: #f2f6ff;
+}
+
+.tipLight {
+  background: #f3f3f3;
+  border: 1px solid #bfc2c8;
+  box-shadow:
+    0 4px 12px rgba(20, 26, 40, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  color: #22242a;
+}
+
+.tipText {
+  margin-top: 4px;
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+@media (max-width: 1440px) {
+  .title { font-size: 36px; }
+  .doctorName { font-size: 20px; }
+  .doctorSpecialty { font-size: 13px; }
+  .scheduleTime { font-size: 18px; }
+  .controlTitle { font-size: 14px; }
+  .connectionRow { font-size: 13px; }
+}
+
+@media (max-width: 1100px) {
+  .page { padding: 12px; }
+  .mainGrid { grid-template-columns: 1fr; }
+  .rightColumn { grid-template-rows: none; }
+  .doctorCard { flex-direction: column; align-items: flex-start; }
+  .schedule { text-align: left; }
+  .title { font-size: 30px; }
+  .doctorName { font-size: 18px; }
+  .doctorSpecialty { font-size: 12px; }
+  .scheduleTime { font-size: 17px; }
+  .tipsRow { grid-template-columns: 1fr; gap: 8px; }
+}

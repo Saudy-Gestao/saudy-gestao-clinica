@@ -26,6 +26,7 @@ import { formatCPF } from '../../utils/formatters';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaReportQuery } from '../../hooks/useTeaReportQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingDateInput } from '../common/FloatingDateInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 
@@ -108,7 +109,7 @@ export function TeaRelatorios() {
     const err: any = teaProfilesError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes TEA',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'),
       color: 'red',
     });
   }, [teaProfilesError]);
@@ -118,7 +119,7 @@ export function TeaRelatorios() {
     const err: any = reportError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Erro ao carregar relatório',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar relatório'),
       color: 'red',
     });
   }, [reportError, selectedTeaProfileId]);
@@ -138,7 +139,7 @@ export function TeaRelatorios() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
+      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
         <Group mb={14} gap="md" align="flex-start">
           <ActionIcon
             variant="default"

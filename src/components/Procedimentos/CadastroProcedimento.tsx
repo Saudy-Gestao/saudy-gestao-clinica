@@ -37,6 +37,7 @@ import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 
 interface ProcedureForm {
   name: string;
@@ -48,6 +49,7 @@ interface ProcedureForm {
   acceptedInsurances: string[];
   acceptedSubInsurances: Record<string, string[]>;
   durationMinutes?: number | null;
+  supportsTeleconsultation: boolean;
   modalities: string[];
   doctorIds: string[];
   procedureMaterials: { inventoryItemId: string; quantity: number }[];
@@ -61,6 +63,7 @@ interface ProcedureItem {
   tussTableCode?: string;
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
+  supportsTeleconsultation: boolean;
   modalities: string[];
   doctorIds: string[];
   doctorsCount: number;
@@ -78,10 +81,13 @@ const INITIAL_FORM: ProcedureForm = {
   acceptedInsurances: [],
   acceptedSubInsurances: {},
   durationMinutes: null,
+  supportsTeleconsultation: false,
   modalities: [],
   doctorIds: [],
   procedureMaterials: [],
 };
+
+const TELECONSULT_MODALITY = 'Telemedicina';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -142,7 +148,6 @@ export function CadastroProcedimento() {
 
   const modalityOptions = [
     { value: 'Presencial', label: 'Presencial' },
-    { value: 'Telemedicina', label: 'Telemedicina' },
     { value: 'Domiciliar', label: 'Domiciliar' },
     { value: 'Emergencial', label: 'Emergencial' },
   ];
@@ -168,15 +173,15 @@ export function CadastroProcedimento() {
   );
 
   useEffect(() => {
-    setProceduresLoading(proceduresQuery.isFetching);
-  }, [proceduresQuery.isFetching]);
+    setProceduresLoading(proceduresQuery.isLoading && procedures.length === 0);
+  }, [procedures.length, proceduresQuery.isLoading]);
 
   useEffect(() => {
     if (proceduresQuery.error) {
       const err: any = proceduresQuery.error;
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimentos',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar procedimentos'),
         color: 'red',
       });
     }
@@ -192,7 +197,10 @@ export function CadastroProcedimento() {
       tussTableCode: String(it.tussTableCode || '').trim() || undefined,
       acceptsInsurance: Boolean(it.acceptsInsurance),
       acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
-      modalities: Array.isArray(it.modalities) ? it.modalities : [],
+      supportsTeleconsultation: Array.isArray(it.modalities) ? it.modalities.includes(TELECONSULT_MODALITY) : false,
+      modalities: Array.isArray(it.modalities)
+        ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
+        : [],
       doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
       materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
       isActive: Boolean(it.isActive ?? true),
@@ -210,7 +218,7 @@ export function CadastroProcedimento() {
     const err: any = doctorsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar medicos',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar medicos'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -253,7 +261,7 @@ export function CadastroProcedimento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -295,7 +303,7 @@ export function CadastroProcedimento() {
     const err: any = inventoryItemsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar materiais do estoque',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar materiais do estoque'),
       color: 'red',
     });
   }, [inventoryItemsQuery.error]);
@@ -357,7 +365,10 @@ export function CadastroProcedimento() {
         acceptsInsurance: form.acceptsInsurance,
         acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
         acceptedSubInsurances: form.acceptsInsurance ? form.acceptedSubInsurances : {},
-        modalities: form.modalities,
+        modalities: [
+          ...form.modalities.filter((modality) => modality !== TELECONSULT_MODALITY),
+          ...(form.appointmentType === 'CONSULTA' && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
+        ],
         doctors,
         procedureMaterials: form.procedureMaterials,
       };
@@ -383,7 +394,7 @@ export function CadastroProcedimento() {
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
     } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Erro ao salvar procedimento';
+      const message = resolveApiErrorMessage(err, 'Erro ao salvar procedimento');
       setErrorMessage(message);
       setShowErrorModal(true);
     } finally {
@@ -507,7 +518,7 @@ export function CadastroProcedimento() {
         color: 'green',
       });
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao atualizar status';
+      const msg = resolveApiErrorMessage(err, 'Erro ao atualizar status');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -534,7 +545,10 @@ export function CadastroProcedimento() {
         acceptsInsurance: Boolean(data.acceptsInsurance),
         acceptedInsurances: Array.isArray(data.acceptedInsurances) ? data.acceptedInsurances : [],
         acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},
-        modalities: Array.isArray(data.modalities) ? data.modalities : [],
+        supportsTeleconsultation: Array.isArray(data.modalities) ? data.modalities.includes(TELECONSULT_MODALITY) : false,
+        modalities: Array.isArray(data.modalities)
+          ? data.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
+          : [],
         doctorIds,
         procedureMaterials: Array.isArray(data?.materials)
           ? data.materials
@@ -551,7 +565,7 @@ export function CadastroProcedimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar procedimento',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar procedimento'),
         color: 'red',
       });
     }
@@ -560,21 +574,16 @@ export function CadastroProcedimento() {
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p="xl" maw={1400} mx="auto">
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Stack gap="md">
-          <Group justify="space-between" align="flex-start" wrap="wrap">
-            <Group gap="sm">
-              <ActionIcon
-                variant="default"
-                size="xl"
-                onClick={() => navigate('/dashboard')}
-                style={{ borderColor: DARK_BLUE }}
-              >
-                <ChevronLeft size={20} />
+          <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Group align="center">
+              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+                <ChevronLeft size={28} />
               </ActionIcon>
               <Box>
-                <Title order={2} fw={600}>Cadastro de Procedimentos</Title>
-                <Text c="dimmed">Procedimentos, modalidades, precos e convenios aceitos.</Text>
+                <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Procedimentos</Text>
+                <Text size="sm" c="dimmed">Procedimentos, modalidades, preços e convênios aceitos.</Text>
               </Box>
             </Group>
           </Group>
@@ -614,6 +623,7 @@ export function CadastroProcedimento() {
                     onChange={(value) => setForm((prev) => ({
                       ...prev,
                       appointmentType: value === 'EXAME' ? 'EXAME' : 'CONSULTA',
+                      supportsTeleconsultation: value === 'EXAME' ? false : prev.supportsTeleconsultation,
                     }))}
                     allowDeselect={false}
                   />
@@ -657,6 +667,15 @@ export function CadastroProcedimento() {
                     label="Aceita convenio"
                     checked={form.acceptsInsurance}
                     onChange={(e) => handleAcceptsInsuranceChange(e?.currentTarget?.checked ?? !form.acceptsInsurance)}
+                  />
+                  <Switch
+                    label="Suporta teleconsulta"
+                    checked={form.supportsTeleconsultation}
+                    disabled={form.appointmentType !== 'CONSULTA'}
+                    onChange={(event) => {
+                      const checked = event.currentTarget.checked;
+                      setForm((prev) => ({ ...prev, supportsTeleconsultation: checked }));
+                    }}
                   />
                   {form.acceptsInsurance && form.acceptedInsurances.length > 0 && (
                     <Group gap="xs" align="center">
@@ -893,6 +912,11 @@ export function CadastroProcedimento() {
                                   <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
                                     {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
                                   </Badge>
+                                  {item.supportsTeleconsultation && (
+                                    <Badge color="indigo" variant="light" size="sm">
+                                      Teleconsulta
+                                    </Badge>
+                                  )}
                                   <Badge color={item.acceptsInsurance ? 'teal' : 'gray'} variant="light" size="sm">
                                     {item.acceptsInsurance ? 'Aceita convênio' : 'Particular'}
                                   </Badge>
@@ -979,9 +1003,16 @@ export function CadastroProcedimento() {
                                 </Table.Td>
                                 {!isTablet && (
                                   <Table.Td>
-                                    <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
-                                      {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
-                                    </Badge>
+                                    <Group gap={6}>
+                                      <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
+                                        {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                      </Badge>
+                                      {item.supportsTeleconsultation && (
+                                        <Badge color="indigo" variant="light" size="sm">
+                                          Teleconsulta
+                                        </Badge>
+                                      )}
+                                    </Group>
                                   </Table.Td>
                                 )}
                                 {!isTablet && (

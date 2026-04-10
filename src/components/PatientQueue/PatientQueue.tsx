@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Box, Group, Text, Paper, Button, Stack, Loader, Center, Badge } from '@mantine/core';
+import { Box, Group, Text, Paper, Button, Stack, Skeleton, Center, Badge } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
 import { Play, ChevronRight, ArrowRight, Clock } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import preAttendanceService from '../../services/preAttendanceService';
 import { usePatientQueueQuery, type QueuePatient } from '../../hooks/usePatientQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 interface PatientQueueProps {
   limit?: number;
@@ -28,13 +28,20 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
 
   useEffect(() => {
     if (!error) return;
-    const err: any = error;
-    showNotification({
+    showErrorToast({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar fila',
-      color: 'red',
+      error,
+      fallback: 'Erro ao carregar fila',
     });
   }, [error]);
+
+  const QueueSkeleton = () => (
+    <Stack gap="sm">
+      {Array.from({ length: 4 }).map((_, idx) => (
+        <Skeleton key={`queue-skeleton-${idx}`} height={82} radius="md" />
+      ))}
+    </Stack>
+  );
 
   if (loading) {
     return (
@@ -42,9 +49,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
         <Group justify="space-between" mb="md">
           <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         </Group>
-        <Center h={200}>
-          <Loader size="lg" />
-        </Center>
+        <QueueSkeleton />
       </Box>
     );
   }
@@ -82,18 +87,17 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.patientQueue });
 
-      showNotification({
+      showSuccessToast({
         title: 'Paciente chamado',
         message: `${patient.name} foi encaminhado para Autorização e Recepção.`,
-        color: 'green',
       });
 
-      navigate('/pre-atendimento');
+      navigate('/autorizacao-e-recepcao');
     } catch (err: any) {
-      showNotification({
+      showErrorToast({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao chamar paciente',
-        color: 'red',
+        error: err,
+        fallback: 'Erro ao chamar paciente',
       });
     } finally {
       setCallingId(null);

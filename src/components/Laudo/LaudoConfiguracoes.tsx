@@ -24,6 +24,7 @@ import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import reportTemplateService from '../../services/reportTemplateService';
@@ -77,6 +78,7 @@ export function LaudoConfiguracoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
+  const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
 
@@ -281,7 +283,7 @@ export function LaudoConfiguracoes() {
     const err: any = settingsError;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar configuracoes do laudo',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar configuracoes do laudo'),
       color: 'red',
     });
   }, [settingsError]);
@@ -302,7 +304,7 @@ export function LaudoConfiguracoes() {
       setRequiresReviewer((prev) => !prev);
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Falha ao atualizar configuracao de revisor',
+        message: resolveApiErrorMessage(err, 'Falha ao atualizar configuracao de revisor'),
         color: 'red',
       });
     } finally {
@@ -365,7 +367,7 @@ export function LaudoConfiguracoes() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Padrao de laudo salvo com sucesso.', color: 'green' });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar padrao.', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar padrao.'), color: 'red' });
     }
   };
 
@@ -394,7 +396,7 @@ export function LaudoConfiguracoes() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Frase de laudo salva com sucesso.', color: 'green' });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar frase.', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar frase.'), color: 'red' });
     }
   };
 
@@ -427,21 +429,21 @@ export function LaudoConfiguracoes() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
       showNotification({ title: 'Sucesso', message: 'Item da fila salvo com sucesso.', color: 'green' });
     } catch (err: any) {
-      showNotification({ title: 'Erro', message: err?.response?.data?.message || err?.message || 'Erro ao salvar item da fila.', color: 'red' });
+      showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar item da fila.'), color: 'red' });
     }
   };
 
   return (
     <Box style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p={isMobile ? 'sm' : 'xl'} maw={1300} mx="auto">
-        <Group justify="space-between" mb="md" align="center" wrap="wrap">
-          <Group>
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group justify="space-between" mb={isMobile ? 20 : 30} align="center" wrap="wrap">
+          <Group align="center">
             <ActionIcon variant="default" size="xl" onClick={() => navigate('/laudo-exames')}>
-              <ChevronLeft size={24} />
+              <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Title order={3} c={DARK_BLUE}>Configurações de Laudo</Title>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Configurações de Laudo</Text>
               <Text c="dimmed" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM</Text>
             </Box>
           </Group>

@@ -299,7 +299,7 @@ export function TeaHome() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : 'md'} w="100%">
+      <Box p={isMobile ? 'sm' : 'md'} maw={1400} mx="auto" w="100%">
         <Group mb={isMobile ? 12 : 14} gap="xs" align="center" wrap="nowrap">
           <ActionIcon variant="default" color="dark" size={isMobile ? 'lg' : 48} onClick={() => navigate('/dashboard')}>
             <ChevronLeft size={isMobile ? 18 : 18} />

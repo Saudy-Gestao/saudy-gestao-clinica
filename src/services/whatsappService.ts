@@ -1,5 +1,7 @@
 import api from './api';
 
+export type WhatsAppConfigScope = 'COMPANY' | 'BRANCH';
+
 export interface WhatsAppConfig {
   id: string;
   branchId: string;
@@ -8,6 +10,8 @@ export interface WhatsAppConfig {
   fromNumber: string;
   appId?: string | null;
   isActive: boolean;
+  inheritFromCompany?: boolean;
+  sourceScope?: WhatsAppConfigScope;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,18 +75,48 @@ export interface AvailableVariable {
 export default {
   // ===== Config =====
   
-  async getConfig(): Promise<WhatsAppConfig | null> {
-    const res = await api.get('/care/whatsapp/config');
+  async getConfig(options?: {
+    scope?: WhatsAppConfigScope;
+    branchId?: string;
+  }): Promise<WhatsAppConfig | null> {
+    const scope = options?.scope || 'BRANCH';
+    const params: Record<string, unknown> = { scope };
+    if (options?.branchId) params.branchId = options.branchId;
+
+    const res = await api.get('/care/whatsapp/config', { params });
     return res.data;
   },
 
-  async saveConfig(data: { accountSid: string; authToken?: string; fromNumber: string; appId?: string; isActive?: boolean }): Promise<WhatsAppConfig> {
-    const res = await api.post('/care/whatsapp/config', data);
+  async saveConfig(data: {
+    accountSid: string;
+    authToken?: string;
+    fromNumber: string;
+    appId?: string;
+    isActive?: boolean;
+  }, options?: {
+    scope?: WhatsAppConfigScope;
+    branchId?: string;
+    inheritFromCompany?: boolean;
+  }): Promise<WhatsAppConfig> {
+    const scope = options?.scope || 'BRANCH';
+    const params: Record<string, unknown> = { scope };
+    if (options?.branchId) params.branchId = options.branchId;
+
+    const res = await api.post('/care/whatsapp/config', {
+      ...data,
+      inheritFromCompany: Boolean(options?.inheritFromCompany),
+    }, { params });
     return res.data;
   },
 
-  async deleteConfig(): Promise<void> {
-    await api.delete('/care/whatsapp/config');
+  async deleteConfig(options?: {
+    scope?: WhatsAppConfigScope;
+    branchId?: string;
+  }): Promise<void> {
+    const scope = options?.scope || 'BRANCH';
+    const params: Record<string, unknown> = { scope };
+    if (options?.branchId) params.branchId = options.branchId;
+    await api.delete('/care/whatsapp/config', { params });
   },
 
   // ===== Templates =====

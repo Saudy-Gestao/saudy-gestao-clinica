@@ -33,6 +33,7 @@ import { DARK_BLUE } from '../themes/theme';
 import ResultModal from '../components/common/ResultModal';
 import financeService from '../services/financeService';
 import { useFinanceEntriesQuery } from '../hooks/useFinanceEntriesQuery';
+import { resolveApiErrorMessage } from '../lib/apiError';
 import { queryKeys } from '../lib/queryKeys';
 
 interface Lancamento {
@@ -134,7 +135,7 @@ export function Financeiro() {
   useEffect(() => {
     if (!entriesError) return;
     const err: any = entriesError;
-    const msg = err?.response?.data?.message || err?.message || 'Erro ao carregar lançamentos';
+    const msg = resolveApiErrorMessage(err, 'Erro ao carregar lançamentos');
     setLancamentoErrorMessage(msg);
     setShowLancamentoError(true);
   }, [entriesError]);
@@ -197,7 +198,7 @@ export function Financeiro() {
       handleModalClose();
       await queryClient.invalidateQueries({ queryKey: queryKeys.financeEntries });
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erro ao criar lançamento';
+      const msg = resolveApiErrorMessage(e, 'Erro ao criar lançamento');
       setLancamentoErrorMessage(msg);
       setShowLancamentoError(true);
     } finally {
@@ -312,7 +313,7 @@ export function Financeiro() {
       await financeService.updateEntry(id, { status: 'PAID' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.financeEntries });
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erro ao processar pagamento';
+      const msg = resolveApiErrorMessage(e, 'Erro ao processar pagamento');
       setLancamentoErrorMessage(msg);
       setShowLancamentoError(true);
     } finally {

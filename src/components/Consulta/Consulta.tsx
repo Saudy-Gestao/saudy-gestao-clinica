@@ -18,9 +18,11 @@ import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
 import consultationService from '../../services/consultationService';
+import teleconsultationLinkService from '../../services/teleconsultationLinkService';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF } from '../../utils/formatters';
 
 interface ConsultationRow {
@@ -33,6 +35,7 @@ interface ConsultationRow {
   agenda: string;
   statusFluxo: string;
   appointmentType: string;
+  isTeleconsultation: boolean;
   triageRequired: boolean;
 }
 
@@ -56,7 +59,19 @@ const getAppointmentTypeLabel = (value?: string | null) => {
   return 'Consulta';
 };
 
-const getClinicalActionConfig = (status: string) => {
+const getClinicalActionConfig = (row: ConsultationRow) => {
+  if (row.isTeleconsultation) {
+    return {
+      label: 'Iniciar teleconsulta',
+      color: 'green',
+      variant: 'filled' as const,
+      icon: <Play size={14} />,
+      nextStatus: null as string | null,
+      isTeleconsultationAction: true,
+    };
+  }
+
+  const status = row.statusFluxo;
   if (status === WAITING_STATUS) {
     return {
       label: 'Chamar',
@@ -64,6 +79,7 @@ const getClinicalActionConfig = (status: string) => {
       variant: 'filled' as const,
       icon: <PhoneCall size={14} />,
       nextStatus: CALLED_STATUS,
+      isTeleconsultationAction: false,
     };
   }
 
@@ -74,6 +90,7 @@ const getClinicalActionConfig = (status: string) => {
       variant: 'filled' as const,
       icon: <Play size={14} />,
       nextStatus: IN_PROGRESS_STATUS,
+      isTeleconsultationAction: false,
     };
   }
 
@@ -84,6 +101,7 @@ const getClinicalActionConfig = (status: string) => {
       variant: 'light' as const,
       icon: <CheckCircle2 size={14} />,
       nextStatus: DONE_STATUS,
+      isTeleconsultationAction: false,
     };
   }
 
@@ -120,6 +138,7 @@ export function Consulta() {
     agenda: it.agenda || '-',
     statusFluxo: it.queue || WAITING_STATUS,
     appointmentType: String(it.appointmentType || it.appointment?.type || ''),
+    isTeleconsultation: Boolean(it.isTeleconsultation),
     triageRequired: Boolean(it.triageRequired),
   });
 
@@ -181,7 +200,73 @@ export function Consulta() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status do atendimento',
+        message: resolveApiErrorMessage(err, 'Erro ao atualizar status do atendimento'),
+        color: 'red',
+      });
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const startTeleconsultation = async (row: ConsultationRow) => {
+    if (!row.appointmentId) {
+      showNotification({
+        title: 'Não foi possível iniciar',
+        message: 'Consulta sem agendamento vinculado.',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setLoadingId(row.id);
+      await consultationService.update(row.id, { queue: IN_PROGRESS_STATUS, queueType: CLINICAL_QUEUE_TYPE });
+      const result = await teleconsultationLinkService.sendWhatsAppLinkByAppointment(row.appointmentId, {
+        sendPatientMessage: false,
+      });
+
+      const doctorUrlRaw = String(result?.links?.doctorUrl || '').trim();
+      if (!doctorUrlRaw) {
+        throw new Error('Link do médico não retornado.');
+      }
+
+      const doctorUrl = new URL(doctorUrlRaw, window.location.origin);
+      const token = doctorUrl.searchParams.get('token');
+      if (!token) {
+        throw new Error('Token do médico não encontrado no link.');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+      window.location.assign(`/teleconsulta/preparacao?token=${encodeURIComponent(token)}`);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Não foi possível iniciar a teleconsulta.',
+        color: 'red',
+      });
+      setLoadingId(null);
+    }
+  };
+
+  const finalizeTeleconsultation = async (row: ConsultationRow) => {
+    try {
+      setLoadingId(row.id);
+
+      if (row.statusFluxo !== IN_PROGRESS_STATUS) {
+        await consultationService.update(row.id, { queue: IN_PROGRESS_STATUS, queueType: CLINICAL_QUEUE_TYPE });
+      }
+
+      await consultationService.update(row.id, { queue: DONE_STATUS, queueType: CLINICAL_QUEUE_TYPE });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+      showNotification({
+        title: 'Teleconsulta finalizada',
+        message: `${row.nomeCompleto} foi marcado como atendimento concluído.`,
+        color: 'green',
+      });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Erro ao finalizar teleconsulta',
         color: 'red',
       });
     } finally {
@@ -239,7 +324,7 @@ export function Consulta() {
             <Table.Tbody>
               {filtered.length > 0 ? filtered.map((row) => {
                 const badge = statusBadge(row.statusFluxo);
-                const action = getClinicalActionConfig(row.statusFluxo);
+                const action = getClinicalActionConfig(row);
                 return (
                   <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                     <Table.Td>
@@ -298,10 +383,30 @@ export function Consulta() {
                             variant={action.variant}
                             color={action.color}
                             leftSection={action.icon}
-                            onClick={() => updateClinicalStatus(row, action.nextStatus)}
+                            onClick={() => {
+                              if (action.isTeleconsultationAction) {
+                                void startTeleconsultation(row);
+                                return;
+                              }
+                              if (action.nextStatus) {
+                                void updateClinicalStatus(row, action.nextStatus);
+                              }
+                            }}
                             loading={loadingId === row.id}
                           >
                             {action.label}
+                          </Button>
+                        )}
+                        {row.isTeleconsultation && (
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="teal"
+                            leftSection={<CheckCircle2 size={14} />}
+                            onClick={() => { void finalizeTeleconsultation(row); }}
+                            loading={loadingId === row.id}
+                          >
+                            Finalizar teleconsulta
                           </Button>
                         )}
                       </Group>

@@ -3,18 +3,17 @@ import {
   Box,
   Button,
   Group,
-  Loader,
   NumberInput,
   Paper,
   Radio,
   Select,
+  Skeleton,
   SimpleGrid,
   Stack,
   Text,
   TextInput,
   Title,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import { ArrowLeft, Building2, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
@@ -24,6 +23,8 @@ import { useSettingsCompaniesQuery } from '../../hooks/useSettingsCompaniesQuery
 import { queryKeys } from '../../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { validateCompanyForm } from '../../utils/validations';
+import { formatCNPJ, formatPhone, onlyDigits } from '../../utils/formatters';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 type CompanyModuleType = 'padrao' | 'tea' | 'apenas-tea';
 
@@ -46,6 +47,23 @@ const EMPTY_FORM: AdminCompanyForm = {
   module_type: 'padrao',
   additionalBranchesAllowed: 0,
 };
+
+const AdminClientFormSkeleton = () => (
+  <Stack gap="md">
+    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+      <Skeleton height={64} radius="md" />
+      <Skeleton height={64} radius="md" />
+      <Skeleton height={64} radius="md" />
+      <Skeleton height={64} radius="md" />
+    </SimpleGrid>
+    <Skeleton height={64} radius="md" />
+    <Skeleton height={94} radius="md" />
+    <Skeleton height={152} radius="md" />
+    <Group justify="flex-end">
+      <Skeleton height={36} width={170} radius="md" />
+    </Group>
+  </Stack>
+);
 
 export function AdminClients() {
   const navigate = useNavigate();
@@ -95,10 +113,10 @@ export function AdminClients() {
     const validation = validateCompanyForm(form);
     if (!validation.isValid) {
       setErrors(validation.errors);
-      notifications.show({
+      showErrorToast({
         title: 'Erro de validação',
-        message: 'Corrija os campos destacados antes de salvar.',
-        color: 'red',
+        error: undefined,
+        fallback: 'Corrija os campos destacados antes de salvar.',
       });
       return;
     }
@@ -108,17 +126,16 @@ export function AdminClients() {
 
     try {
       await companyService.updateCompany(selectedCompanyId, form);
-      notifications.show({
+      showSuccessToast({
         title: 'Sucesso',
         message: 'Cliente atualizado com sucesso.',
-        color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsCompanies });
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Erro',
-        message: error?.response?.data?.error || 'Erro ao atualizar cliente.',
-        color: 'red',
+        error,
+        fallback: 'Erro ao atualizar cliente.',
       });
     } finally {
       setSaving(false);
@@ -157,9 +174,7 @@ export function AdminClients() {
               />
 
               {isLoading ? (
-                <Group justify="center" py="xl">
-                  <Loader />
-                </Group>
+                <AdminClientFormSkeleton />
               ) : !selectedCompanyId ? (
                 <Text c="dimmed">Nenhum cliente disponível para edição.</Text>
               ) : (
@@ -168,25 +183,28 @@ export function AdminClients() {
                     <TextInput
                       label="CNPJ"
                       value={form.cnpj}
-                      onChange={(event) => setForm((current) => ({ ...current, cnpj: event.currentTarget.value }))}
+                      onChange={(event) => setForm((current) => ({ ...current, cnpj: formatCNPJ(event.currentTarget.value) }))}
+                      required
                       error={errors.cnpj}
                     />
                     <TextInput
                       label="Telefone"
                       value={form.phone}
-                      onChange={(event) => setForm((current) => ({ ...current, phone: event.currentTarget.value }))}
+                      onChange={(event) => setForm((current) => ({ ...current, phone: formatPhone(onlyDigits(event.currentTarget.value)) }))}
                       error={errors.phone}
                     />
                     <TextInput
                       label="Razão Social"
                       value={form.legalName}
                       onChange={(event) => setForm((current) => ({ ...current, legalName: event.currentTarget.value }))}
+                      required
                       error={errors.legalName}
                     />
                     <TextInput
                       label="Nome Fantasia"
                       value={form.tradeName}
                       onChange={(event) => setForm((current) => ({ ...current, tradeName: event.currentTarget.value }))}
+                      required
                       error={errors.tradeName}
                     />
                   </SimpleGrid>

@@ -37,11 +37,14 @@ import invoiceService from '../../services/invoiceService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import consultationService from '../../services/consultationService';
 import convenioAuthorizationService, { type ConvenioAuthorizationAttachment } from '../../services/convenioAuthorizationService';
-import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils/formatters';
+import teleconsultationLinkService, { type TeleconsultationEligibility } from '../../services/teleconsultationLinkService';
+import { formatCPF, formatDateInput, formatPhone, normalizeEmail, onlyDigits } from '../../utils/formatters';
 import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useReceptionQueueQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { resolveApiErrorMessage } from '../../lib/apiError';
+import { Header } from '../Header/Header';
 import type { ChangeEvent } from 'react';
 
 interface Patient extends NovoPatiente {
@@ -137,7 +140,7 @@ const normalizeAppointmentIdForApi = (value?: string) => {
 
 const isConsultationAppointmentFkError = (error: any) => {
   const details = String(error?.response?.data?.details || '');
-  const message = String(error?.response?.data?.error || error?.message || '');
+  const message = String(resolveApiErrorMessage(error, ''));
   return details.includes('consultations_appointmentId_fkey')
     || message.toLowerCase().includes('foreign key constraint');
 };
@@ -173,6 +176,9 @@ export function PreAtendimento() {
   const [checklistAttachmentsLoading, setChecklistAttachmentsLoading] = useState(false);
   const [checklistAttachmentUploading, setChecklistAttachmentUploading] = useState(false);
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [teleconsultationEligibility, setTeleconsultationEligibility] = useState<TeleconsultationEligibility | null>(null);
+  const [teleconsultationEligibilityLoading, setTeleconsultationEligibilityLoading] = useState(false);
+  const [teleconsultationSendingLink, setTeleconsultationSendingLink] = useState(false);
   const [checklistData, setChecklistData] = useState({
     dadosConferidos: false,
     contatoConferido: false,
@@ -277,6 +283,9 @@ export function PreAtendimento() {
     setChecklistAttachmentsLoading(false);
     setChecklistAttachmentUploading(false);
     setOpeningAttachmentId(null);
+    setTeleconsultationEligibility(null);
+    setTeleconsultationEligibilityLoading(false);
+    setTeleconsultationSendingLink(false);
     setFacialValidationOpen(false);
     setFacialValidationLoading(false);
     setFacialValidationVerified(false);
@@ -345,10 +354,11 @@ export function PreAtendimento() {
         color: 'green',
       });
       await loadChecklistAttachments(checklistPatient.appointmentId);
+      await loadTeleconsultationEligibility(checklistPreAttendanceId);
     } catch (err: any) {
       showNotification({
         title: 'Erro ao anexar',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Falha ao anexar documento',
+        message: resolveApiErrorMessage(err, 'Falha ao anexar documento'),
         color: 'red',
       });
     } finally {
@@ -366,11 +376,28 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro ao abrir anexo',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Não foi possível abrir o anexo.',
+        message: resolveApiErrorMessage(err, 'Não foi possível abrir o anexo.'),
         color: 'red',
       });
     } finally {
       setOpeningAttachmentId(null);
+    }
+  };
+
+  const loadTeleconsultationEligibility = async (preAttendanceId?: string | null) => {
+    if (!preAttendanceId) {
+      setTeleconsultationEligibility(null);
+      return;
+    }
+
+    try {
+      setTeleconsultationEligibilityLoading(true);
+      const eligibility = await teleconsultationLinkService.getPreAttendanceEligibility(preAttendanceId);
+      setTeleconsultationEligibility(eligibility);
+    } catch {
+      setTeleconsultationEligibility(null);
+    } finally {
+      setTeleconsultationEligibilityLoading(false);
     }
   };
 
@@ -453,7 +480,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+        message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
         color: 'red',
       });
     }
@@ -595,19 +622,19 @@ export function PreAtendimento() {
   }, [receptionQueueQuery.data]);
 
   useEffect(() => {
-    setPatientsLoading(patientsQuery.isFetching);
-  }, [patientsQuery.isFetching]);
+    setPatientsLoading(patientsQuery.isLoading && patients.length === 0);
+  }, [patients.length, patientsQuery.isLoading]);
 
   useEffect(() => {
-    setInsurancesLoading(insurancesQuery.isFetching);
-  }, [insurancesQuery.isFetching]);
+    setInsurancesLoading(insurancesQuery.isLoading && insuranceOptions.length === 0);
+  }, [insuranceOptions.length, insurancesQuery.isLoading]);
 
   useEffect(() => {
     if (!patientsQuery.error) return;
     const err: any = patientsQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar pacientes',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes'),
       color: 'red',
     });
   }, [patientsQuery.error]);
@@ -617,7 +644,7 @@ export function PreAtendimento() {
     const err: any = insurancesQuery.error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar convênios',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
       color: 'red',
     });
   }, [insurancesQuery.error]);
@@ -746,7 +773,7 @@ export function PreAtendimento() {
       } catch (err: any) {
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar paciente',
+          message: resolveApiErrorMessage(err, 'Erro ao atualizar paciente'),
           color: 'red',
         });
         return;
@@ -799,7 +826,7 @@ export function PreAtendimento() {
       } catch (err: any) {
         showNotification({
           title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao cadastrar paciente',
+          message: resolveApiErrorMessage(err, 'Erro ao cadastrar paciente'),
           color: 'red',
         });
         return;
@@ -925,6 +952,7 @@ export function PreAtendimento() {
     }));
     setChecklistStep(0);
     setChecklistOpen(true);
+    await loadTeleconsultationEligibility(targetPatient.id);
     await loadChecklistAttachments(enrichedPatient.appointmentId || basePatient.appointmentId);
   };
 
@@ -988,7 +1016,7 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao iniciar checklist',
+        message: resolveApiErrorMessage(err, 'Erro ao iniciar checklist'),
         color: 'red',
       });
     } finally {
@@ -996,7 +1024,7 @@ export function PreAtendimento() {
     }
   };
 
-  const handleFinishChecklist = async () => {
+  const handleFinishChecklist = async (sendTeleconsultationLink = false) => {
     if (!checklistPatient || !checklistPreAttendanceId || !hasValidPreAttendanceId(checklistPreAttendanceId)) {
       showNotification({
         title: 'Pré-atendimento inválido',
@@ -1007,6 +1035,9 @@ export function PreAtendimento() {
     }
     try {
       setChecklistLoading(true);
+      if (sendTeleconsultationLink) {
+        setTeleconsultationSendingLink(true);
+      }
       let generatedInvoice: any = null;
       const checklistPatientBirthDate = parseDisplayDateToApi(checklistPatient.dataNascimento);
       const checklistPatientGender = normalizeChecklistGenderForApi(checklistPatient.sexo);
@@ -1122,6 +1153,29 @@ export function PreAtendimento() {
 
       await loadReceptionPatients();
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+
+      if (sendTeleconsultationLink && checklistPreAttendanceId) {
+        try {
+          const sendResult = await teleconsultationLinkService.sendWhatsAppLink(checklistPreAttendanceId, {
+            notes: checklistData.observacoes || undefined,
+          });
+          const sentTo = sendResult.whatsapp?.to || sendResult.whatsappMock?.to;
+          showNotification({
+            title: 'Link de teleconsulta enviado',
+            message: sentTo
+              ? `Link enviado para ${sentTo}.`
+              : 'Link gerado e envio concluído.',
+            color: 'green',
+          });
+        } catch (teleError: any) {
+          showNotification({
+            title: 'Checklist concluído, mas link não enviado',
+            message: teleError?.response?.data?.error || teleError?.response?.data?.message || teleError?.message || 'Não foi possível enviar o link da teleconsulta.',
+            color: 'yellow',
+          });
+        }
+      }
+
       setChecklistOpen(false);
       resetChecklist();
 
@@ -1135,11 +1189,12 @@ export function PreAtendimento() {
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: err?.response?.data?.message || err?.message || 'Erro ao concluir checklist',
+        message: resolveApiErrorMessage(err, 'Erro ao concluir checklist'),
         color: 'red',
       });
     } finally {
       setChecklistLoading(false);
+      setTeleconsultationSendingLink(false);
     }
   };
 
@@ -1211,7 +1266,7 @@ export function PreAtendimento() {
       await invalidateReceptionQueue();
       showNotification({
         title: 'Erro na validação facial',
-        message: error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Não foi possível validar a identidade do paciente.',
+        message: resolveApiErrorMessage(error, 'Não foi possível validar a identidade do paciente.'),
         color: 'red',
       });
     } finally {
@@ -1321,15 +1376,22 @@ export function PreAtendimento() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30}>
-          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
-            <ChevronLeft size={28} />
-          </ActionIcon>
-          <Box>
-            <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Autorização e Recepção</Text>
-            <Text size="sm" c="dimmed">Pacientes chamados para atendimento na recepção</Text>
-          </Box>
+        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ChevronLeft size={28} />
+            </ActionIcon>
+            <Box>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
+                Autorização e Recepção
+              </Text>
+              <Text size="sm" c="dimmed">
+                Pacientes chamados para atendimento na recepção
+              </Text>
+            </Box>
+          </Group>
         </Group>
 
         {/* Search Section */}
@@ -1558,7 +1620,7 @@ export function PreAtendimento() {
                 type="email"
                 label="E-mail"
                 value={novoPaciente.email}
-                onChange={(e) => setNovoPaciente({ ...novoPaciente, email: e.currentTarget.value })}
+                onChange={(e) => setNovoPaciente({ ...novoPaciente, email: normalizeEmail(e.currentTarget.value) })}
               />
 
               <FloatingInput
@@ -1876,8 +1938,9 @@ export function PreAtendimento() {
                         <Grid.Col span={isMobile ? 12 : 2}>
                           <TextInput
                             label="E-mail"
+                            type="email"
                             value={checklistPatient?.email || ''}
-                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('email', event.currentTarget.value)}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('email', normalizeEmail(event.currentTarget.value))}
                           />
                         </Grid.Col>
                       </Grid>
@@ -2186,6 +2249,21 @@ export function PreAtendimento() {
                       )}
                     </Group>
 
+                    {teleconsultationEligibilityLoading ? (
+                      <Text size="sm" c="dimmed">Validando elegibilidade da teleconsulta...</Text>
+                    ) : teleconsultationEligibility?.isTeleconsultation ? (
+                      <Stack gap={4}>
+                        <Badge variant="light" color={teleconsultationEligibility.canSendLink ? 'green' : 'yellow'}>
+                          Teleconsulta
+                        </Badge>
+                        {!teleconsultationEligibility.canSendLink && teleconsultationEligibility.reasons.length > 0 && (
+                          <Text size="xs" c="dimmed">
+                            {teleconsultationEligibility.reasons.join(' ')}
+                          </Text>
+                        )}
+                      </Stack>
+                    ) : null}
+
                   </Stack>
                 </Box>
               </Stack>
@@ -2193,9 +2271,19 @@ export function PreAtendimento() {
           )}
 
           <Group justify="flex-end">
+            {teleconsultationEligibility?.isTeleconsultation && (
+              <Button
+                variant="light"
+                onClick={() => handleFinishChecklist(true)}
+                disabled={!canCompleteChecklist() || checklistLoading || teleconsultationSendingLink || !teleconsultationEligibility.canSendLink}
+                loading={checklistLoading || teleconsultationSendingLink}
+              >
+                Confirmar e enviar link
+              </Button>
+            )}
             <Button
               bg={DARK_BLUE}
-              onClick={handleFinishChecklist}
+              onClick={() => handleFinishChecklist(false)}
               disabled={!canCompleteChecklist() || checklistLoading}
               loading={checklistLoading}
             >

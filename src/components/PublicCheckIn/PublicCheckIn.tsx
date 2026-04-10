@@ -22,12 +22,14 @@ import {
 } from '@mantine/core';
 import { Camera, CircleAlert, ClipboardCheck, LogIn, LogOut, RefreshCcw, ShieldCheck, UserRoundCheck } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
 import publicCheckInService, { type PublicCheckInResponse } from '../../services/publicCheckInService';
 import { usePublicBranchInfoQuery } from '../../hooks/usePublicBranchInfoQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import publicCheckInSessionService from '../../services/publicCheckInSessionService';
+import { normalizeEmail } from '../../utils/formatters';
 
 const DARK_SURFACE = '#0F1838';
 const CARD_SURFACE = '#162552';
@@ -547,7 +549,8 @@ export function PublicCheckIn() {
       setBranchLookupError(null);
       return;
     }
-    setBranchLookupError(t.branchLookupError);
+    const error: any = branchInfoError;
+    setBranchLookupError(resolveApiErrorMessage(error, t.branchLookupError));
   }, [branchId, branchInfoError, isAuthenticated, t]);
 
   const handleLogin = async () => {
@@ -578,7 +581,7 @@ export function PublicCheckIn() {
     } catch (error: any) {
       showNotification({
         title: t.loginErrorTitle,
-        message: error?.response?.data?.message || t.loginErrorMessage,
+      message: resolveApiErrorMessage(error, t.loginErrorMessage),
         color: 'red',
       });
     } finally {
@@ -809,7 +812,7 @@ export function PublicCheckIn() {
     } catch (error: any) {
       showNotification({
         title: t.faceRegisterErrorTitle,
-        message: error?.response?.data?.message || error?.message || t.faceRegisterErrorMessage,
+      message: resolveApiErrorMessage(error, t.faceRegisterErrorMessage),
         color: 'red',
       });
       setFacialCaptureOpen(true);
@@ -893,10 +896,11 @@ export function PublicCheckIn() {
                 <Stack gap="md">
                   <TextInput
                     label={t.loginEmailLabel}
+                    type="email"
                     labelProps={{ style: { color: 'white' } }}
                     placeholder={t.loginEmailPlaceholder}
                     value={loginEmail}
-                    onChange={(event) => setLoginEmail(event.currentTarget.value)}
+                    onChange={(event) => setLoginEmail(normalizeEmail(event.currentTarget.value))}
                     styles={{
                       input: {
                         background: 'rgba(255,255,255,0.04)',
@@ -954,12 +958,19 @@ export function PublicCheckIn() {
                 <Button
                   size="md"
                   radius="xl"
-                  variant="subtle"
-                  color="gray"
+                  variant="light"
+                  color="blue"
+                  leftSection={<Camera size={18} />}
                   onClick={handleStartFirstTimeFlow}
                   disabled={processing || firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
                   fullWidth
+                  styles={{
+                    root: {
+                      border: '1px solid rgba(120, 148, 255, 0.42)',
+                    },
+                  }}
                 >
+                  {t.firstTimeButton}
                   {t.firstTimeButton}
                 </Button>
               </>

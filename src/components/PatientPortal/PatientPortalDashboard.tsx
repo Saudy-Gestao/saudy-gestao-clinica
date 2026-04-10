@@ -11,6 +11,7 @@ import {
   Modal,
   Paper,
   Select,
+  Skeleton,
   SimpleGrid,
   Stack,
   Tabs,
@@ -33,6 +34,7 @@ import patientPortalService, {
 import patientPortalAuthService from '../../services/patientPortalAuthService';
 import { formatCPF } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 import './patient-portal.css';
 
 const formatDateTime = (date?: string | null, time?: string | null) => {
@@ -242,6 +244,36 @@ function SkeletonCards({ count = 3 }: { count?: number }) {
   );
 }
 
+function PatientPortalDashboardSkeleton() {
+  return (
+    <Box className="patient-portal-dashboard-page">
+      <Box className="patient-portal-dashboard-bg" />
+      <Stack className="patient-portal-dashboard-shell" gap="lg">
+        <Paper className="patient-portal-hero-card" withBorder>
+          <Stack gap="md">
+            <Skeleton height={20} width={130} radius="xl" />
+            <Skeleton height={34} width="45%" radius="md" />
+            <Skeleton height={16} width="60%" radius="md" />
+          </Stack>
+        </Paper>
+        <SimpleGrid cols={{ base: 1, sm: 3 }}>
+          <Skeleton height={110} radius="md" />
+          <Skeleton height={110} radius="md" />
+          <Skeleton height={110} radius="md" />
+        </SimpleGrid>
+        <Paper className="patient-portal-content-card" withBorder>
+          <Stack p="md" gap="sm">
+            <Skeleton height={36} radius="md" />
+            <Skeleton height={98} radius="md" />
+            <Skeleton height={98} radius="md" />
+            <Skeleton height={98} radius="md" />
+          </Stack>
+        </Paper>
+      </Stack>
+    </Box>
+  );
+}
+
 export function PatientPortalDashboard() {
   const { isDark, toggleTheme } = usePatientPortalTheme();
   const [loading, setLoading] = useState(true);
@@ -372,11 +404,11 @@ export function PatientPortalDashboard() {
         message: 'Não foi possível abrir o fluxo de preparo/anamnese para esta consulta.',
         color: 'yellow',
       });
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Falha ao abrir preparo',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível abrir o link de preparo/anamnese.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível abrir o link de preparo/anamnese.',
       });
     } finally {
       setOpeningPreSchedulingFor(null);
@@ -403,16 +435,15 @@ export function PatientPortalDashboard() {
         loadDocuments(),
         loadDeliveryHistory(),
       ]);
-      notifications.show({
+      showSuccessToast({
         title: 'Perfil alterado',
         message: 'Os dados do portal foram atualizados para o perfil selecionado.',
-        color: 'green',
       });
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Falha ao trocar perfil',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível alterar o perfil ativo.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível alterar o perfil ativo.',
       });
     } finally {
       setSwitchingProfileTo(null);
@@ -430,11 +461,11 @@ export function PatientPortalDashboard() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Falha no download',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível baixar o PDF do laudo.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível baixar o PDF do laudo.',
       });
     }
   };
@@ -465,11 +496,11 @@ export function PatientPortalDashboard() {
         link.remove();
       }
       window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Falha ao abrir documento',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível abrir este documento.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível abrir este documento.',
       });
     } finally {
       setOpeningDocumentId(null);
@@ -491,19 +522,18 @@ export function PatientPortalDashboard() {
         preferredDate: preferredDeliveryDate || undefined,
         notes: deliveryNotes || undefined,
       });
-      notifications.show({
+      showSuccessToast({
         title: 'Solicitação registrada',
         message: 'Pedido de entrega física enviado para a clínica.',
-        color: 'green',
       });
       setReportDeliveryModalOpen(false);
       setSelectedReport(null);
       await Promise.all([loadReports(), loadDeliveryHistory()]);
-    } catch (error: any) {
-      notifications.show({
+    } catch (error: unknown) {
+      showErrorToast({
         title: 'Falha na solicitação',
-        message: error?.response?.data?.error || error?.message || 'Não foi possível solicitar a entrega física.',
-        color: 'red',
+        error,
+        fallback: 'Não foi possível solicitar a entrega física.',
       });
     } finally {
       setRequestingDeliveryFor(null);
@@ -515,11 +545,11 @@ export function PatientPortalDashboard() {
       setLoading(true);
       try {
         await Promise.all([loadSummary(), loadProfiles(), loadUpcoming()]);
-      } catch (error: any) {
-        notifications.show({
+      } catch (error: unknown) {
+        showErrorToast({
           title: 'Erro ao carregar portal',
-          message: error?.response?.data?.error || error?.message || 'Não foi possível carregar seus dados.',
-          color: 'red',
+          error,
+          fallback: 'Não foi possível carregar seus dados.',
         });
       } finally {
         setLoading(false);
@@ -546,14 +576,7 @@ export function PatientPortalDashboard() {
   };
 
   if (loading && !summary) {
-    return (
-      <Box className="patient-portal-loading">
-        <Group>
-          <Loader color="blue" />
-          <Text c="dimmed">Carregando seu portal...</Text>
-        </Group>
-      </Box>
-    );
+    return <PatientPortalDashboardSkeleton />;
   }
 
   return (

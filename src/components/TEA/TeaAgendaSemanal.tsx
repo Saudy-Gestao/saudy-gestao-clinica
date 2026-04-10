@@ -18,6 +18,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { Header } from '../Header/Header';
 import { useTeaWeeklyAgendaQuery, type TeaAgendaItem } from '../../hooks/useTeaWeeklyAgendaQuery';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 
@@ -168,7 +169,7 @@ export function TeaAgendaSemanal() {
     const err: any = error;
     showNotification({
       title: 'Erro',
-      message: err?.response?.data?.message || err?.message || 'Erro ao carregar agenda semanal TEA',
+      message: resolveApiErrorMessage(err, 'Erro ao carregar agenda semanal TEA'),
       color: 'red',
     });
   }, [error]);
@@ -177,7 +178,7 @@ export function TeaAgendaSemanal() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
+      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
         <Group mb={18} gap="md" align="flex-start">
           <ActionIcon
             variant="default"

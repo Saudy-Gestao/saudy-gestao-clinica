@@ -1,12 +1,12 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { MantineProvider } from '@mantine/core';
-import { useLocalStorage } from '@mantine/hooks';
 import { Notifications } from '@mantine/notifications';
 import { DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/pt-br';
 import { theme } from './themes/theme';
 import authService from './services/authService';
+import { APP_COLOR_SCHEME_EVENT, getAppColorScheme, type AppColorScheme } from './utils/appColorScheme';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
@@ -23,6 +23,9 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
 import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
+import { TeleconsultaPreparation } from './components/Teleconsulta/TeleconsultaPreparation';
+import { TeleconsultaPatientWaiting } from './components/Teleconsulta/TeleconsultaPatientWaiting';
+import { TeleconsultaFinished } from './components/Teleconsulta/TeleconsultaFinished';
 import { ExecucaoExames } from './components/Exames/ExecucaoExames';
 import { LaudoConfiguracoes } from './components/Laudo/LaudoConfiguracoes';
 import { LaudoExames } from './components/LaudoExames/LaudoExames';
@@ -45,6 +48,7 @@ import { CadastroEnfermagem } from './components/Enfermagem/CadastroEnfermagem';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
 import { WhatsAppPage } from './components/Settings/WhatsAppPage';
+import { Conversations } from './components/Communication/Conversations';
 import { TeaEvolucao } from './components/TEA/TeaEvolucao';
 import { TeaPIT } from './components/TEA/TeaPIT';
 import { TeaRelatorios } from './components/TEA/TeaRelatorios';
@@ -60,6 +64,7 @@ import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
 import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogin';
 import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
 import patientPortalAuthService from './services/patientPortalAuthService';
+import { isDoctorUser } from './utils/userRole';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -67,8 +72,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
+  const currentUser = authService.getCurrentUser() as any;
   const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
+  const doctorView = isDoctorUser(currentUser);
   const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {
@@ -78,6 +84,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAllowedForAdmOnly = admAllowedPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
   if (isAdmOnly && !isAllowedForAdmOnly) {
     return <Navigate to="/adm-hub" replace />;
+  }
+
+  if (doctorView && location.pathname === '/settings') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -92,11 +102,13 @@ function PatientPortalProtectedRoute({ children }: { children: React.ReactNode }
   return <>{children}</>;
 }
 
+function LegacyPreSchedulingDocsRedirect() {
+  const { token } = useParams();
+  return <Navigate to={`/pre-atendimento/documentos/${encodeURIComponent(String(token || ''))}`} replace />;
+}
+
 function App() {
-  const [colorScheme] = useLocalStorage<'light' | 'dark'>({
-    key: 'mantine-color-scheme',
-    defaultValue: 'light',
-  });
+  const [colorScheme, setColorScheme] = useState<AppColorScheme>(getAppColorScheme);
   const [, setAuthVersion] = useState(0);
   const isAuthenticated = authService.isAuthenticated();
   const currentUser = authService.getCurrentUser() as { isAdmHubOnly?: boolean } | null;
@@ -113,6 +125,20 @@ function App() {
     return () => {
       window.removeEventListener('auth:changed', onAuthChanged);
       window.removeEventListener('patient-auth:changed', onAuthChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncColorScheme = () => {
+      setColorScheme(getAppColorScheme());
+    };
+
+    window.addEventListener(APP_COLOR_SCHEME_EVENT, syncColorScheme as EventListener);
+    window.addEventListener('storage', syncColorScheme);
+
+    return () => {
+      window.removeEventListener(APP_COLOR_SCHEME_EVENT, syncColorScheme as EventListener);
+      window.removeEventListener('storage', syncColorScheme);
     };
   }, []);
 
@@ -166,7 +192,8 @@ function App() {
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route path="/check-in" element={<PublicCheckIn />} />
           <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
-          <Route path="/pre-agendamento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
+          <Route path="/pre-atendimento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
+          <Route path="/pre-agendamento/documentos/:token" element={<LegacyPreSchedulingDocsRedirect />} />
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
@@ -187,21 +214,37 @@ function App() {
             path="/settings" 
             element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} 
           />
-          <Route 
-            path="/pre-atendimento" 
-            element={<ProtectedRoute><PreAtendimento /></ProtectedRoute>} 
+          <Route
+            path="/pre-atendimento"
+            element={<ProtectedRoute><PreAgendamento /></ProtectedRoute>}
+          />
+          <Route
+            path="/pre-agendamento"
+            element={<Navigate to="/pre-atendimento" replace />}
+          />
+          <Route
+            path="/autorizacao-e-recepcao"
+            element={<ProtectedRoute><PreAtendimento /></ProtectedRoute>}
           />
           <Route 
             path="/agendamento" 
             element={<ProtectedRoute><Agendamento /></ProtectedRoute>} 
           />
-          <Route
-            path="/pre-agendamento"
-            element={<ProtectedRoute><PreAgendamento /></ProtectedRoute>}
-          />
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
+          />
+          <Route
+            path="/teleconsulta/preparacao"
+            element={<TeleconsultaPreparation />}
+          />
+          <Route
+            path="/teleconsulta/paciente/espera"
+            element={<TeleconsultaPatientWaiting />}
+          />
+          <Route
+            path="/teleconsulta/finalizada"
+            element={<TeleconsultaFinished />}
           />
           <Route
             path="/execucao-exames"
@@ -274,6 +317,10 @@ function App() {
           <Route
             path="/cadastro-enfermagem"
             element={<ProtectedRoute><CadastroEnfermagem /></ProtectedRoute>}
+          />
+          <Route
+            path="/conversas"
+            element={<ProtectedRoute><Conversations /></ProtectedRoute>}
           />
           <Route
             path="/whatsapp"

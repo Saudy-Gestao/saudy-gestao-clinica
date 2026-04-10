@@ -6,6 +6,55 @@ const publicApi = axios.create({
   baseURL: getApiBaseUrl(),
 });
 
+const normalizeAppOrigin = (value?: string | null) => String(value || '').trim().replace(/\/$/, '');
+
+const replaceUrlOrigin = (value: string, targetOrigin: string) => {
+  if (!value || !targetOrigin || typeof window === 'undefined') return value;
+
+  try {
+    const parsed = new URL(value);
+    if (
+      parsed.hostname === 'localhost'
+      || parsed.hostname === '127.0.0.1'
+      || parsed.origin === normalizeAppOrigin(getApiBaseUrl())
+    ) {
+      return `${targetOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
+};
+
+const normalizePreSchedulingSendLinkResponse = <T extends {
+  publicUrl?: string;
+  whatsapp?: {
+    message?: string;
+  };
+}>(data: T): T => {
+  if (!data || typeof window === 'undefined') return data;
+
+  const targetOrigin = normalizeAppOrigin(window.location.origin);
+  const normalizedPublicUrl = data.publicUrl ? replaceUrlOrigin(data.publicUrl, targetOrigin) : data.publicUrl;
+
+  let normalizedWhatsappMessage = data.whatsapp?.message;
+  if (normalizedWhatsappMessage && data.publicUrl && normalizedPublicUrl && normalizedPublicUrl !== data.publicUrl) {
+    normalizedWhatsappMessage = normalizedWhatsappMessage.split(data.publicUrl).join(normalizedPublicUrl);
+  }
+
+  return {
+    ...data,
+    publicUrl: normalizedPublicUrl,
+    whatsapp: data.whatsapp
+      ? {
+          ...data.whatsapp,
+          message: normalizedWhatsappMessage,
+        }
+      : data.whatsapp,
+  };
+};
+
 export type PreSchedulingStatus =
   | 'PENDING'
   | 'PRE_AUTHORIZED'
@@ -22,6 +71,7 @@ export interface PreSchedulingItem {
   patientName: string;
   patientCpf?: string;
   patientPhone?: string | null;
+  source?: 'COMMON' | 'BOT' | string;
   doctorName?: string | null;
   specialty?: string | null;
   convenio?: string | null;
@@ -40,6 +90,8 @@ export interface PreSchedulingItem {
   anamnesisAnswersCount?: number;
   tokenAvailable?: boolean;
   isResolved?: boolean;
+  isTeleconsultation?: boolean;
+  teleconsultationLinkSent?: boolean;
 }
 
 export interface PublicPreSchedulingMeta {
@@ -119,16 +171,19 @@ const preSchedulingService = {
 
   async sendLink(appointmentId: string, payload?: { notes?: string }) {
     const response = await api.post(`/care/pre-scheduling/${appointmentId}/send-link`, payload || {});
-    return response.data as {
+    return normalizePreSchedulingSendLinkResponse(response.data as {
       message: string;
       publicUrl: string;
       hasAnamnesis?: boolean;
-      whatsappMock: {
-        provider: 'mock';
+      whatsapp: {
+        provider: 'mock' | 'gupshup';
         to?: string | null;
         message: string;
+        status?: string;
+        messageId?: string | null;
+        error?: string | null;
       };
-    };
+    });
   },
 
   async getDocuments(appointmentId: string) {
@@ -166,6 +221,15 @@ const preSchedulingService = {
     return response.data as {
       message: string;
       status: PreSchedulingStatus;
+    };
+  },
+
+  async manualFinalize(appointmentId: string) {
+    const response = await api.post(`/care/pre-scheduling/${appointmentId}/manual-finalize`);
+    return response.data as {
+      message: string;
+      status: PreSchedulingStatus;
+      completedAt?: string | null;
     };
   },
 

@@ -16,6 +16,7 @@ import { notifications } from '@mantine/notifications';
 import { CircleHelp, LoaderCircle, MessageSquarePlus, Send } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import ticketService, { type TicketType } from '../../services/ticketService';
+import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingSelect } from './FloatingSelect';
 import { FloatingTextarea } from './FloatingTextarea';
 
@@ -50,7 +51,7 @@ const TYPE_OPTIONS: Array<{ value: TicketType; label: string }> = [
   { value: 'IMPROVEMENT', label: 'Melhoria' },
 ];
 
-const HIDDEN_PATH_PREFIXES = ['/login', '/cadastro', '/esqueci-a-senha', '/adm', '/adm-register', '/check-in', '/pre-agendamento/documentos'];
+const HIDDEN_PATH_PREFIXES = ['/login', '/cadastro', '/esqueci-a-senha', '/adm', '/adm-register', '/check-in', '/pre-atendimento/documentos', '/pre-agendamento/documentos'];
 
 const isAuthenticated = () => Boolean(localStorage.getItem('token'));
 
@@ -119,7 +120,7 @@ export function TicketFab() {
     } catch (error: any) {
       notifications.show({
         title: 'Erro ao abrir chamado',
-        message: error?.response?.data?.message || error?.message || 'Não foi possível enviar o ticket.',
+        message: resolveApiErrorMessage(error, 'Não foi possível enviar o ticket.'),
         color: 'red',
       });
     } finally {
