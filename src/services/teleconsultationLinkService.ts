@@ -65,6 +65,18 @@ export interface TeleconsultationSignalEvent {
   createdAt: string;
 }
 
+export interface TeleconsultationPersistedMessage {
+  id: string;
+  fromRole: 'PATIENT' | 'DOCTOR' | string;
+  kind: 'text' | 'file';
+  text?: string | null;
+  fileName?: string | null;
+  fileMimeType?: string | null;
+  fileSizeBytes?: number | null;
+  fileDataUrl?: string | null;
+  createdAt: string;
+}
+
 const teleconsultationLinkService = {
   async getPreAttendanceEligibility(preAttendanceId: string) {
     const response = await api.get(`/care/teleconsultation-links/pre-attendance/${preAttendanceId}/eligibility`);
@@ -103,6 +115,13 @@ const teleconsultationLinkService = {
       params: { token, lastEventId, limit },
     });
     return response.data as { events: TeleconsultationSignalEvent[]; lastEventId: number };
+  },
+
+  async listPublicMessages(token: string, limit = 100) {
+    const response = await publicApi.get('/care/teleconsultation-links/public/messages', {
+      params: { token, limit },
+    });
+    return response.data as { items: TeleconsultationPersistedMessage[] };
   },
 };
 
