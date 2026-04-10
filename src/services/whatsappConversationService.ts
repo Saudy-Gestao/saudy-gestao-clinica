@@ -182,7 +182,7 @@ const whatsappConversationService = {
           startedAt: fallback.conversation?.humanProtocolStartedAt || null,
           closedAt: fallback.conversation?.humanProtocolClosedAt || null,
         },
-        items: metadataFiltered.length > 0 ? metadataFiltered : (fallback.items || []),
+        items: metadataFiltered,
       };
     }
   },

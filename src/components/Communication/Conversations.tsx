@@ -317,8 +317,15 @@ export function Conversations() {
   }, [items, selectedConversation]);
 
   const messagesQuery = useQuery({
-    queryKey: [...queryKeys.whatsappConversations, 'messages', selectedConversation?.id || ''],
-    queryFn: () => whatsappConversationService.getMessages(selectedConversation!.id),
+    queryKey: [
+      ...queryKeys.whatsappConversations,
+      'messages',
+      selectedConversation?.id || '',
+      selectedConversation?.humanProtocolNumber || '',
+    ],
+    queryFn: () => whatsappConversationService.getMessages(selectedConversation!.id, {
+      protocolNumber: selectedConversation?.humanProtocolNumber || undefined,
+    }),
     enabled: Boolean(selectedConversation?.id),
     refetchInterval: selectedConversation?.id ? 5_000 : false,
   });
