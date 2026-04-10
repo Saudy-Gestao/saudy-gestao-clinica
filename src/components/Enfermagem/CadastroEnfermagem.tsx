@@ -15,7 +15,6 @@ import {
   Switch,
   Table,
   Text,
-  Title,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';

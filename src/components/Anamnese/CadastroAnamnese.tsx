@@ -14,7 +14,6 @@ import {
   Switch,
   Table,
   Text,
-  Title,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
