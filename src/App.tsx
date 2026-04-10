@@ -145,7 +145,16 @@ function App() {
   return (
     <MantineProvider theme={theme} forceColorScheme={colorScheme}>
       <DatesProvider settings={{ locale: 'pt-br' }}>
-        <Notifications position="top-right" />
+        <Notifications
+          position="top-right"
+          autoClose={5000}
+          transitionDuration={260}
+          zIndex={4200}
+          limit={5}
+          classNames={{
+            notification: 'saudy-toast',
+          }}
+        />
         <BrowserRouter>
           <Routes>
           <Route 
