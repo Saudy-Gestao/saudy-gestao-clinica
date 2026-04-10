@@ -513,7 +513,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     } catch (err: any) {
       const details = err?.response?.data?.fields
         ? Object.values(err.response.data.fields).join(' | ')
-        : (err?.response?.data?.details || resolveApiErrorMessage(err));
+        : (err?.response?.data?.details || resolveApiErrorMessage(err, 'Falha ao salvar dados TEA'));
 
       showNotification({
         title: 'Erro ao salvar',
