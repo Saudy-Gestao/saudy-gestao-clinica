@@ -226,6 +226,23 @@ export function TeleconsultaPatientWaiting() {
     enteringCallRef.current = false;
   };
 
+  const resetPeerForReconnect = () => {
+    if (peerRef.current) {
+      peerRef.current.ontrack = null;
+      peerRef.current.onicecandidate = null;
+      peerRef.current.close();
+      peerRef.current = null;
+    }
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    remoteStreamRef.current = null;
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
+    setRemoteConnected(false);
+  };
+
   const resolveConsultationIdByAppointment = async () => {
     if (consultationIdRef.current) return consultationIdRef.current;
     const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
@@ -258,7 +275,7 @@ export function TeleconsultaPatientWaiting() {
   const ensurePeerConnection = async () => {
     if (peerRef.current) return peerRef.current;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
+    const stream = localStreamRef.current || await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: { echoCancellation: true, noiseSuppression: true },
     });
@@ -430,9 +447,10 @@ export function TeleconsultaPatientWaiting() {
 
     if (type === 'ready' && isDoctorRole) {
       setPatientJoined(true);
-      if (inCall && peerRef.current) {
-        const offer = await peerRef.current.createOffer();
-        await peerRef.current.setLocalDescription(offer);
+      if (inCall) {
+        const peer = await ensurePeerConnection();
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
         await teleconsultationLinkService.sendPublicSignal(token, {
           type: 'offer',
           toRole: 'PATIENT',
@@ -483,6 +501,7 @@ export function TeleconsultaPatientWaiting() {
 
     if (type === 'patient-left') {
       if (isDoctorRole) {
+        resetPeerForReconnect();
         setRemoteConnected(false);
         showNotification({
           title: 'Paciente saiu da chamada',
