@@ -747,9 +747,9 @@ export function Conversations() {
   };
 
   return (
-    <Box p={0}>
+    <Box p={0} style={{ height: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Header />
-      <Stack gap="md" px="md" pb="md" pt="sm">
+      <Stack gap="md" px="md" pt="sm" style={{ flex: 1, overflow: 'hidden' }}>
         <Group justify="space-between" align="center">
           <Box>
             <Text fw={700} size="xl">Conversas</Text>
@@ -771,7 +771,8 @@ export function Conversations() {
             gridTemplateColumns: sidebarCollapsed ? '84px minmax(0, 1fr)' : 'minmax(320px, 420px) minmax(0, 1fr)',
             gap: '16px',
             alignItems: 'stretch',
-            height: 'calc(100vh - 180px)',
+            flex: 1,
+            overflow: 'hidden',
           }}
         >
           <Paper withBorder p={sidebarCollapsed ? 'xs' : 'md'} radius="lg" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
