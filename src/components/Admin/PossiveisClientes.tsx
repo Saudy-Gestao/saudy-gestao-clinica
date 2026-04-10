@@ -5,9 +5,9 @@ import {
   Box,
   Button,
   Group,
-  Loader,
   Paper,
   Select,
+  Skeleton,
   SimpleGrid,
   Stack,
   Table,
@@ -16,15 +16,14 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import { Building2, Mail, MessageSquareText, Phone, RefreshCw, Search } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Header } from '../Header/Header';
-import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import { useAdminLeadsQuery } from '../../hooks/useAdminLeadsQuery';
 import leadService, { type LeadItem, type LeadStatus } from '../../services/leadService';
 import { queryKeys } from '../../lib/queryKeys';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 const statusOptions = [
   { value: 'ALL', label: 'Todos os status' },
@@ -61,6 +60,14 @@ const formatDateTime = (value?: string) => {
 
 const normalizePhone = (value?: string | null) => String(value || '').replace(/\D/g, '');
 
+const AdminLeadsSkeleton = () => (
+  <Stack gap="sm">
+    {Array.from({ length: 6 }).map((_, idx) => (
+      <Skeleton key={`admin-leads-skeleton-${idx}`} height={48} radius="md" />
+    ))}
+  </Stack>
+);
+
 export function PossiveisClientes() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<'ALL' | LeadStatus>('ALL');
@@ -87,16 +94,15 @@ export function PossiveisClientes() {
     try {
       await leadService.updateStatus(leadId, status as LeadStatus);
       await queryClient.invalidateQueries({ queryKey: queryKeys.adminLeads });
-      notifications.show({
+      showSuccessToast({
         title: 'Lead atualizado',
         message: 'O status do possível cliente foi atualizado.',
-        color: 'green',
       });
     } catch (error: unknown) {
-      notifications.show({
+      showErrorToast({
         title: 'Erro ao atualizar lead',
-        message: resolveApiErrorMessage(error, 'Não foi possível salvar o novo status.'),
-        color: 'red',
+        error,
+        fallback: 'Não foi possível salvar o novo status.',
       });
     } finally {
       setUpdatingLeadId(null);
@@ -201,9 +207,7 @@ export function PossiveisClientes() {
 
           <Paper p="lg" withBorder radius="lg">
             {isLoading ? (
-              <Group justify="center" py="xl">
-                <Loader color="darkBlue" />
-              </Group>
+              <AdminLeadsSkeleton />
             ) : items.length === 0 ? (
               <Stack align="center" py="xl" gap="sm">
                 <ThemeIcon size={54} radius="xl" color="darkBlue" variant="light">

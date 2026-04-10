@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ActionIcon, Box, Button, Flex, Group, Loader, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Box, Button, Flex, Group, Loader, Skeleton, Text, Tooltip } from '@mantine/core';
 import { ArrowLeft, FileText, ScanLine } from 'lucide-react';
 import cornerstone from 'cornerstone-core';
 import { DicomViewer } from './DicomViewer';
@@ -328,10 +328,10 @@ export function DicomViewerPage() {
         {/* Área do viewer */}
         <Box style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#000' }}>
           {loadingStudy ? (
-            <Flex h="100%" align="center" justify="center" direction="column" gap="md">
-              <Loader color="blue" size="lg" />
-              <Text c="dimmed">Carregando exame...</Text>
-            </Flex>
+            <Box p="lg">
+              <Skeleton height={28} width="30%" radius="sm" mb="md" />
+              <Skeleton height="calc(100vh - 210px)" radius="md" />
+            </Box>
           ) : error ? (
             <Flex h="100%" align="center" justify="center" direction="column" gap="md">
               <Text c="red" size="lg">

@@ -5,7 +5,7 @@ import {
   Box,
   Button,
   Group,
-  Loader,
+  Skeleton,
   Paper,
   Select,
   Stack,
@@ -97,6 +97,14 @@ const humanizeKey = (value?: string | null) => {
 
 const shortTicketId = (id: string) => (id.length <= 14 ? id : `${id.slice(0, 8)}...${id.slice(-4)}`);
 
+const MyTicketsSkeleton = () => (
+  <Stack gap="sm">
+    {Array.from({ length: 6 }).map((_, idx) => (
+      <Skeleton key={`my-tickets-skeleton-${idx}`} height={48} radius="md" />
+    ))}
+  </Stack>
+);
+
 export function MyTicketsPage() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'ALL'>('ALL');
@@ -169,9 +177,7 @@ export function MyTicketsPage() {
 
           <Paper p="lg" withBorder radius="lg">
             {isLoading ? (
-              <Group justify="center" py="xl">
-                <Loader color="darkBlue" />
-              </Group>
+              <MyTicketsSkeleton />
             ) : items.length === 0 ? (
               <Stack align="center" py="xl" gap="sm">
                 <Text fw={600}>Você ainda não possui chamados</Text>
