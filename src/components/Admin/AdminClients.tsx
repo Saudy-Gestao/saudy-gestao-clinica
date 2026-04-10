@@ -25,6 +25,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { validateCompanyForm } from '../../utils/validations';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { formatCNPJ, formatPhone, onlyDigits } from '../../utils/formatters';
 
 type CompanyModuleType = 'padrao' | 'tea' | 'apenas-tea';
 
@@ -169,25 +170,28 @@ export function AdminClients() {
                     <TextInput
                       label="CNPJ"
                       value={form.cnpj}
-                      onChange={(event) => setForm((current) => ({ ...current, cnpj: event.currentTarget.value }))}
+                      onChange={(event) => setForm((current) => ({ ...current, cnpj: formatCNPJ(event.currentTarget.value) }))}
+                      required
                       error={errors.cnpj}
                     />
                     <TextInput
                       label="Telefone"
                       value={form.phone}
-                      onChange={(event) => setForm((current) => ({ ...current, phone: event.currentTarget.value }))}
+                      onChange={(event) => setForm((current) => ({ ...current, phone: formatPhone(onlyDigits(event.currentTarget.value)) }))}
                       error={errors.phone}
                     />
                     <TextInput
                       label="Razão Social"
                       value={form.legalName}
                       onChange={(event) => setForm((current) => ({ ...current, legalName: event.currentTarget.value }))}
+                      required
                       error={errors.legalName}
                     />
                     <TextInput
                       label="Nome Fantasia"
                       value={form.tradeName}
                       onChange={(event) => setForm((current) => ({ ...current, tradeName: event.currentTarget.value }))}
+                      required
                       error={errors.tradeName}
                     />
                   </SimpleGrid>

@@ -21,7 +21,7 @@ import { notifications, showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import companyService from '../../services/companyService';
-import { isValidEmail, normalizeEmail } from '../../utils/formatters';
+import { formatCNPJ, formatPhone, isValidEmail, normalizeEmail, onlyDigits } from '../../utils/formatters';
 import { Header } from '../Header/Header';
 
 const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
@@ -286,8 +286,8 @@ export function CadastroCliente() {
             <Stepper active={active} onStepClick={setActive}>
             <Stepper.Step description="Informações do cliente">
               <Stack>
-                <TextInput label="Nome do administrador" value={adminName} onChange={(e: ChangeEvent<HTMLInputElement>) => setAdminName(e.currentTarget.value)} />
-                <TextInput label="E-mail" value={adminEmail} onChange={(e: ChangeEvent<HTMLInputElement>) => setAdminEmail(e.currentTarget.value)} />
+                <TextInput label="Nome do administrador" value={adminName} onChange={(e: ChangeEvent<HTMLInputElement>) => setAdminName(e.currentTarget.value)} required />
+                <TextInput label="E-mail" type="email" value={adminEmail} onChange={(e: ChangeEvent<HTMLInputElement>) => setAdminEmail(normalizeEmail(e.currentTarget.value))} required />
 
                 <Group align="flex-end">
                   <PasswordInput
@@ -320,9 +320,9 @@ export function CadastroCliente() {
 
             <Stepper.Step description="Informações da empresa">
               <Stack>
-                <TextInput label="CNPJ" value={cnpj} onChange={(e: ChangeEvent<HTMLInputElement>) => setCnpj(e.currentTarget.value)} />
-                <TextInput label="Telefone" value={companyPhone} onChange={(e: ChangeEvent<HTMLInputElement>) => setCompanyPhone(e.currentTarget.value)} />
-                <TextInput label="Razão social" value={razaoSocial} onChange={(e: ChangeEvent<HTMLInputElement>) => setRazaoSocial(e.currentTarget.value)} />
+                <TextInput label="CNPJ" value={cnpj} onChange={(e: ChangeEvent<HTMLInputElement>) => setCnpj(formatCNPJ(e.currentTarget.value))} required />
+                <TextInput label="Telefone" value={companyPhone} onChange={(e: ChangeEvent<HTMLInputElement>) => setCompanyPhone(formatPhone(onlyDigits(e.currentTarget.value)))} />
+                <TextInput label="Razão social" value={razaoSocial} onChange={(e: ChangeEvent<HTMLInputElement>) => setRazaoSocial(e.currentTarget.value)} required />
                 <TextInput label="Nome fantasia" value={nomeFantasia} onChange={(e: ChangeEvent<HTMLInputElement>) => setNomeFantasia(e.currentTarget.value)} />
                 <TextInput label="Endereço" value={address} onChange={(e: ChangeEvent<HTMLInputElement>) => setAddress(e.currentTarget.value)} />
               </Stack>

@@ -1256,6 +1256,7 @@ export function SettingsPage() {
                                           label="CNPJ" 
                                           value={companyForm.cnpj} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, cnpj: e.currentTarget.value })} 
+                                          required
                                           error={companyErrors.cnpj}
                                         />
                                     </Grid.Col>
@@ -1272,6 +1273,7 @@ export function SettingsPage() {
                                           label="Razão Social" 
                                           value={companyForm.legalName} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, legalName: e.currentTarget.value })} 
+                                          required
                                           error={companyErrors.legalName}
                                         />
                                     </Grid.Col>
@@ -1280,6 +1282,7 @@ export function SettingsPage() {
                                           label="Nome Fantasia" 
                                           value={companyForm.tradeName} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, tradeName: e.currentTarget.value })} 
+                                          required
                                           error={companyErrors.tradeName}
                                         />
                                     </Grid.Col>
@@ -1379,12 +1382,13 @@ export function SettingsPage() {
                         )}
                         <Modal opened={branchModalOpen} onClose={() => setBranchModalOpen(false)} title={editingBranch ? 'Editar Filial' : 'Nova Filial'} centered>
                              <Stack pt="lg">
-                                <FloatingInput 
-                                  label="Nome Fantasia" 
-                                  value={branchForm.tradeName} 
-                                  onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
-                                  error={branchErrors.tradeName}
-                                />
+                                    <FloatingInput 
+                                      label="Nome Fantasia" 
+                                      value={branchForm.tradeName} 
+                                      onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
+                                      required
+                                      error={branchErrors.tradeName}
+                                    />
                                 {(!editingBranch || (editingBranch && !isBranchMatriz(editingBranch))) && (
                                   <>
                                     <FloatingInput 
@@ -1454,18 +1458,20 @@ export function SettingsPage() {
                         )}
                          <Modal opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar Setor' : 'Novo Setor'} centered>
                              <Stack pt="lg">
-                                <Select
-                                  label="Filial"
+                                <Select 
+                                  label="Filial" 
                                   data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                   value={sectorForm.branchId}
                                   onChange={(v) => setSectorForm({ ...sectorForm, branchId: v || '' })}
                                   error={sectorErrors.branchId}
                                   searchable
+                                  withAsterisk
                                 />
                                 <FloatingInput 
                                   label="Nome" 
                                   value={sectorForm.name} 
                                   onChange={(e: any) => setSectorForm({ ...sectorForm, name: e.currentTarget.value })} 
+                                  required
                                   error={sectorErrors.name}
                                 />
                                 <FloatingInput 
@@ -1575,6 +1581,7 @@ export function SettingsPage() {
                                         mb="xs"
                                         error={userErrors.branchId}
                                         searchable
+                                        withAsterisk
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
@@ -1588,6 +1595,7 @@ export function SettingsPage() {
                                         mb="xs"
                                         error={userErrors.sectorId}
                                         disabled={!userForm.branchId}
+                                        withAsterisk
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
@@ -1619,6 +1627,7 @@ export function SettingsPage() {
                                       label="Nome" 
                                       value={userForm.name} 
                                       onChange={(e: any) => setUserForm({...userForm, name: e.currentTarget.value})} 
+                                      required
                                       error={userErrors.name}
                                     />
                                 </Grid.Col>
@@ -1627,6 +1636,7 @@ export function SettingsPage() {
                                       label="Email" 
                                       value={userForm.email} 
                                       onChange={(e: any) => setUserForm({...userForm, email: e.currentTarget.value})} 
+                                      required
                                       error={userErrors.email}
                                     />
                                 </Grid.Col>
@@ -1636,6 +1646,7 @@ export function SettingsPage() {
                                         type="password" 
                                         value={userForm.password} 
                                         onChange={(e: any) => setUserForm({...userForm, password: e.currentTarget.value})} 
+                                        required={!editingUser}
                                         rightSection={(
                                           <ActionIcon
                                             variant="subtle"
@@ -1664,6 +1675,7 @@ export function SettingsPage() {
                                       label="Data de Nascimento" 
                                       value={userForm.birthDate} 
                                       onChange={(e: any) => setUserForm({...userForm, birthDate: e.currentTarget.value})} 
+                                      required
                                       error={userErrors.birthDate}
                                     />
                                 </Grid.Col>
@@ -1762,6 +1774,7 @@ export function SettingsPage() {
                                   label="Descrição" 
                                   value={accessForm.description} 
                                   onChange={(e: any) => setAccessForm({ ...accessForm, description: e.currentTarget.value })} 
+                                  required
                                   error={accessErrors.description}
                                 />
                                 {loadingModules ? (

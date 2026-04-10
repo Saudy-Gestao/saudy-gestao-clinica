@@ -29,6 +29,7 @@ import publicCheckInService, { type PublicCheckInResponse } from '../../services
 import { usePublicBranchInfoQuery } from '../../hooks/usePublicBranchInfoQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import publicCheckInSessionService from '../../services/publicCheckInSessionService';
+import { normalizeEmail } from '../../utils/formatters';
 
 const DARK_SURFACE = '#0F1838';
 const CARD_SURFACE = '#162552';
@@ -428,10 +429,11 @@ export function PublicCheckIn() {
                 <Stack gap="md">
                   <TextInput
                     label="Email do usuário"
+                    type="email"
                     labelProps={{ style: { color: 'white' } }}
                     placeholder="usuario@clinica.com"
                     value={loginEmail}
-                    onChange={(event) => setLoginEmail(event.currentTarget.value)}
+                    onChange={(event) => setLoginEmail(normalizeEmail(event.currentTarget.value))}
                     styles={{
                       input: {
                         background: 'rgba(255,255,255,0.04)',

@@ -38,7 +38,7 @@ import facialRecognitionService from '../../services/facialRecognitionService';
 import consultationService from '../../services/consultationService';
 import convenioAuthorizationService, { type ConvenioAuthorizationAttachment } from '../../services/convenioAuthorizationService';
 import teleconsultationLinkService, { type TeleconsultationEligibility } from '../../services/teleconsultationLinkService';
-import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils/formatters';
+import { formatCPF, formatDateInput, formatPhone, normalizeEmail, onlyDigits } from '../../utils/formatters';
 import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useReceptionQueueQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
@@ -1612,7 +1612,7 @@ export function PreAtendimento() {
                 type="email"
                 label="E-mail"
                 value={novoPaciente.email}
-                onChange={(e) => setNovoPaciente({ ...novoPaciente, email: e.currentTarget.value })}
+                onChange={(e) => setNovoPaciente({ ...novoPaciente, email: normalizeEmail(e.currentTarget.value) })}
               />
 
               <FloatingInput
@@ -1930,8 +1930,9 @@ export function PreAtendimento() {
                         <Grid.Col span={isMobile ? 12 : 2}>
                           <TextInput
                             label="E-mail"
+                            type="email"
                             value={checklistPatient?.email || ''}
-                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('email', event.currentTarget.value)}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('email', normalizeEmail(event.currentTarget.value))}
                           />
                         </Grid.Col>
                       </Grid>
