@@ -971,7 +971,6 @@ export function PublicCheckIn() {
                   }}
                 >
                   {t.firstTimeButton}
-                  {t.firstTimeButton}
                 </Button>
               </>
             )}
