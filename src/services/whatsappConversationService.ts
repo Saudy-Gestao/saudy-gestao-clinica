@@ -45,6 +45,12 @@ export interface HumanConversationMessage {
   createdAt: string;
 }
 
+export interface HumanConversationProtocolSummary {
+  number: string;
+  startedAt?: string | null;
+  closedAt?: string | null;
+}
+
 export interface HumanConversationPatientInfo {
   id: string;
   name?: string | null;
@@ -132,7 +138,7 @@ const whatsappConversationService = {
     return res.data?.items || [];
   },
 
-  async getMessages(conversationId: string): Promise<{
+  async getMessages(conversationId: string, params?: { protocolNumber?: string }): Promise<{
     conversation: HumanConversationItem;
     patient?: HumanConversationPatientInfo | null;
     appointments?: {
@@ -141,8 +147,44 @@ const whatsappConversationService = {
     };
     items: HumanConversationMessage[];
   }> {
-    const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`);
+    const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`, { params });
     return res.data;
+  },
+
+  async getProtocolHistory(conversationId: string, protocolNumber: string): Promise<{
+    conversation?: HumanConversationItem;
+    protocol?: HumanConversationProtocolSummary | null;
+    items: HumanConversationMessage[];
+  }> {
+    const normalizedProtocol = String(protocolNumber || '').trim();
+    if (!normalizedProtocol) {
+      return { items: [] };
+    }
+
+    try {
+      const res = await api.get(`/care/whatsapp/conversations/${conversationId}/protocols/${encodeURIComponent(normalizedProtocol)}`);
+      return {
+        conversation: res.data?.conversation,
+        protocol: res.data?.protocol || null,
+        items: res.data?.items || [],
+      };
+    } catch {
+      const fallback = await this.getMessages(conversationId, { protocolNumber: normalizedProtocol });
+      const metadataFiltered = (fallback.items || []).filter((message) => {
+        const value = String((message.metadata as any)?.protocolNumber || '').trim();
+        return value === normalizedProtocol;
+      });
+
+      return {
+        conversation: fallback.conversation,
+        protocol: {
+          number: normalizedProtocol,
+          startedAt: fallback.conversation?.humanProtocolStartedAt || null,
+          closedAt: fallback.conversation?.humanProtocolClosedAt || null,
+        },
+        items: metadataFiltered.length > 0 ? metadataFiltered : (fallback.items || []),
+      };
+    }
   },
 
   async claimConversation(conversationId: string) {

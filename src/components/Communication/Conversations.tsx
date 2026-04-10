@@ -47,6 +47,7 @@ import {
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { queryKeys } from '../../lib/queryKeys';
+import { getApiBaseUrl } from '../../services/getApiBaseUrl';
 import whatsappConversationService, {
   type HumanConversationFlow,
   type HumanConversationItem,
@@ -54,6 +55,7 @@ import whatsappConversationService, {
   type HumanConversationOperatorConfig,
   type HumanConversationPatientAppointment,
   type HumanConversationPatientInfo,
+  type HumanConversationProtocolSummary,
   type HumanConversationSettings,
 } from '../../services/whatsappConversationService';
 
@@ -84,12 +86,71 @@ const formatCpf = (value?: string | null) => {
 
 const formatAppointmentType = (value?: string | null) => {
   const normalized = String(value || '').trim().toUpperCase();
-  if (normalized === 'EXAME' || normalized === 'EXAM') return 'Exame';
-  if (normalized === 'CONSULTA' || normalized === 'CONSULTATION') return 'Consulta';
-  return value || 'Atendimento';
+  if (normalized.includes('EXAME') || normalized.includes('EXAM')) return 'Exame';
+  return 'Consulta';
 };
 
 const isMediaMessage = (message: string) => /^\[(Imagem|Documento|Vídeo|Áudio) recebido\]/i.test(String(message || '').trim());
+const resolveMediaUrl = (value?: string | null) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
+  const origin = String(getApiBaseUrl() || window.location.origin || '').replace(/\/$/, '');
+  const path = raw.startsWith('/') ? raw : `/${raw}`;
+  return `${origin}${path}`;
+};
+
+const extractMediaMetadata = (message: HumanConversationMessage) => {
+  const metadata = (message.metadata || {}) as Record<string, unknown>;
+  const rawUrl = [
+    metadata.mediaUrl,
+    metadata.url,
+    metadata.fileUrl,
+    metadata.downloadUrl,
+    metadata.attachmentUrl,
+    metadata.documentUrl,
+    metadata.imageUrl,
+    metadata.videoUrl,
+    metadata.audioUrl,
+    metadata.path,
+  ].find((value) => typeof value === 'string' && String(value).trim().length > 0) as string | undefined;
+
+  const mimeType = String(
+    metadata.mimeType
+    || metadata.mimetype
+    || metadata.contentType
+    || '',
+  ).trim().toLowerCase();
+
+  const fileName = String(
+    metadata.fileName
+    || metadata.filename
+    || metadata.originalName
+    || metadata.name
+    || '',
+  ).trim();
+
+  const caption = String(metadata.caption || '').trim();
+  const mediaTypeHint = String(metadata.mediaType || metadata.type || '').trim().toLowerCase();
+  const resolvedUrl = resolveMediaUrl(rawUrl);
+
+  const isImage = mimeType.startsWith('image/') || mediaTypeHint.includes('image');
+  const isVideo = mimeType.startsWith('video/') || mediaTypeHint.includes('video');
+  const isAudio = mimeType.startsWith('audio/') || mediaTypeHint.includes('audio');
+  const isDocument = Boolean(resolvedUrl) && !isImage && !isVideo && !isAudio;
+
+  return {
+    url: resolvedUrl,
+    mimeType,
+    fileName,
+    caption,
+    isImage,
+    isVideo,
+    isAudio,
+    isDocument,
+  };
+};
+
 const isDeliveryEvent = (message: HumanConversationMessage) => {
   const event = String((message.metadata as any)?.event || '').trim().toUpperCase();
   return event === 'SENT' || event === 'DELIVERED' || event === 'READ';
@@ -147,6 +208,12 @@ export function Conversations() {
   const [operatorsModalOpen, setOperatorsModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
+  const [protocolNumberInput, setProtocolNumberInput] = useState('');
+  const [protocolLookupLoading, setProtocolLookupLoading] = useState(false);
+  const [protocolLookup, setProtocolLookup] = useState<{
+    protocol: HumanConversationProtocolSummary | null;
+    items: HumanConversationMessage[];
+  } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operatorDrafts, setOperatorDrafts] = useState<OperatorDraftMap>({});
   const [conversationSettingsDraft, setConversationSettingsDraft] = useState<HumanConversationSettings | null>(null);
@@ -332,6 +399,50 @@ export function Conversations() {
     [rawMessages],
   );
 
+  const openProtocolModal = () => {
+    setProtocolModalOpen(true);
+    setProtocolNumberInput(String(currentConversation?.humanProtocolNumber || '').trim());
+    setProtocolLookup(null);
+  };
+
+  const handleLookupProtocol = async () => {
+    const conversationId = selectedConversation?.id;
+    const protocolNumber = String(protocolNumberInput || '').trim();
+    if (!conversationId) return;
+    if (!protocolNumber) {
+      notifications.show({
+        title: 'Informe o protocolo',
+        message: 'Digite o número do protocolo para buscar o histórico.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setProtocolLookupLoading(true);
+    try {
+      const data = await whatsappConversationService.getProtocolHistory(conversationId, protocolNumber);
+      setProtocolLookup({
+        protocol: data.protocol || { number: protocolNumber },
+        items: data.items || [],
+      });
+      if (!(data.items || []).length) {
+        notifications.show({
+          title: 'Protocolo sem mensagens',
+          message: `Nenhuma mensagem encontrada para o protocolo ${protocolNumber}.`,
+          color: 'yellow',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro ao buscar protocolo',
+        message: error?.response?.data?.error || error?.message || 'Não foi possível buscar o protocolo informado.',
+        color: 'red',
+      });
+    } finally {
+      setProtocolLookupLoading(false);
+    }
+  };
+
   const queueButtonLabel = (item: HumanConversationItem) => {
     if (item.humanStatus === 'QUEUED') return 'Assumir da fila';
     if (item.humanStatus === 'ASSIGNED') return 'Assumir atendimento';
@@ -420,6 +531,54 @@ export function Conversations() {
       </Box>
     </Stack>
   );
+
+  const renderMessageContent = (message: HumanConversationMessage) => {
+    const media = extractMediaMetadata(message);
+    const hasMedia = Boolean(media.url) && (media.isImage || media.isVideo || media.isAudio || media.isDocument || isMediaMessage(message.message));
+    const cleanText = String(message.message || '').trim();
+    const shouldShowText = cleanText.length > 0 && !isMediaMessage(cleanText);
+
+    return (
+      <Stack gap={6}>
+        {media.isImage && media.url ? (
+          <Box>
+            <img
+              src={media.url}
+              alt={media.fileName || 'Imagem enviada'}
+              style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }}
+            />
+          </Box>
+        ) : null}
+        {media.isVideo && media.url ? (
+          <video src={media.url} controls style={{ width: '100%', borderRadius: 8 }} />
+        ) : null}
+        {media.isAudio && media.url ? (
+          <audio src={media.url} controls style={{ width: '100%' }} />
+        ) : null}
+        {media.isDocument && media.url ? (
+          <Button
+            size="xs"
+            variant="light"
+            component="a"
+            href={media.url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {media.fileName ? `Abrir documento: ${media.fileName}` : 'Abrir documento'}
+          </Button>
+        ) : null}
+        {hasMedia && !media.url ? (
+          <Badge variant="light" color="indigo">Mídia recebida (sem URL de visualização)</Badge>
+        ) : null}
+        {media.caption ? (
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{media.caption}</Text>
+        ) : null}
+        {shouldShowText ? (
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{message.message}</Text>
+        ) : null}
+      </Stack>
+    );
+  };
 
   return (
     <Box p={0}>
@@ -611,7 +770,7 @@ export function Conversations() {
                     </Group>
                   </Box>
                   <Group gap="xs">
-                    <Button variant="light" leftSection={<FileClock size={14} />} onClick={() => setProtocolModalOpen(true)}>
+                    <Button variant="light" leftSection={<FileClock size={14} />} onClick={openProtocolModal}>
                       Protocolo
                     </Button>
                     {selectedConversation.humanStatus !== 'CLOSED' ? (
@@ -687,7 +846,7 @@ export function Conversations() {
                           {isMediaMessage(message.message) ? (
                             <Badge variant="light" color="indigo" mb={6}>Mídia / documento</Badge>
                           ) : null}
-                          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{message.message}</Text>
+                          {renderMessageContent(message)}
                           {message.authorType === 'OPERATOR' && messageState ? (
                             <Group justify="flex-end" gap={4} mt={8}>
                               {messageState === 'SENT' ? (
@@ -944,29 +1103,58 @@ export function Conversations() {
         size="lg"
       >
         <Stack gap="sm">
+          <Group align="flex-end">
+            <TextInput
+              style={{ flex: 1 }}
+              label="Número do protocolo"
+              placeholder="Digite o protocolo para consultar"
+              value={protocolNumberInput}
+              onChange={(event) => setProtocolNumberInput(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleLookupProtocol();
+                }
+              }}
+            />
+            <Button
+              leftSection={<FileClock size={14} />}
+              onClick={() => void handleLookupProtocol()}
+              loading={protocolLookupLoading}
+            >
+              Buscar
+            </Button>
+          </Group>
+
           <Group grow>
             <Box>
               <Text size="xs" c="dimmed">Número</Text>
-              <Text fw={700}>{currentConversation?.humanProtocolNumber || 'Não gerado'}</Text>
+              <Text fw={700}>{protocolLookup?.protocol?.number || '-'}</Text>
             </Box>
             <Box>
               <Text size="xs" c="dimmed">Início</Text>
-              <Text>{currentConversation?.humanProtocolStartedAt ? dayjs(currentConversation.humanProtocolStartedAt).format('DD/MM/YYYY HH:mm') : 'Não informado'}</Text>
+              <Text>{protocolLookup?.protocol?.startedAt ? dayjs(protocolLookup.protocol.startedAt).format('DD/MM/YYYY HH:mm') : 'Não informado'}</Text>
             </Box>
             <Box>
               <Text size="xs" c="dimmed">Fim</Text>
-              <Text>{currentConversation?.humanProtocolClosedAt ? dayjs(currentConversation.humanProtocolClosedAt).format('DD/MM/YYYY HH:mm') : 'Em aberto'}</Text>
+              <Text>{protocolLookup?.protocol?.closedAt ? dayjs(protocolLookup.protocol.closedAt).format('DD/MM/YYYY HH:mm') : 'Em aberto'}</Text>
             </Box>
           </Group>
           <Divider />
           <ScrollArea h={360}>
             <Stack gap="xs">
-              {currentMessages.map((message) => (
+              {!protocolLookup ? (
+                <Text size="sm" c="dimmed">Digite um protocolo e clique em Buscar para ver apenas o trecho desse atendimento.</Text>
+              ) : null}
+              {protocolLookup && protocolLookup.items.length === 0 ? (
+                <Text size="sm" c="dimmed">Nenhuma mensagem encontrada para esse protocolo.</Text>
+              ) : null}
+              {(protocolLookup?.items || []).map((message) => (
                 <Paper key={message.id} withBorder radius="md" p="sm">
                   <Text size="xs" c="dimmed" mb={4}>
                     {dayjs(message.createdAt).format('DD/MM/YYYY HH:mm')} • {message.authorName || message.authorType}
                   </Text>
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{message.message}</Text>
+                  {renderMessageContent(message)}
                 </Paper>
               ))}
             </Stack>
