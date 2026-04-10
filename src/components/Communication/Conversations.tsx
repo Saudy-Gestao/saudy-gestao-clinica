@@ -928,7 +928,7 @@ export function Conversations() {
                 <Text fw={600}>Selecione uma conversa</Text>
               </Stack>
             ) : (
-              <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Stack gap="md" style={{ flex: 1, minHeight: 0 }}>
                 <Group justify="space-between" align="flex-start" wrap="nowrap">
                   <Box style={{ flex: 1 }}>
                     <Group gap="xs" wrap="nowrap" align="center">
@@ -1101,7 +1101,7 @@ export function Conversations() {
                     Atendimento encerrado
                   </Badge>
                 )}
-              </Box>
+              </Stack>
             )}
           </Paper>
         </Box>
