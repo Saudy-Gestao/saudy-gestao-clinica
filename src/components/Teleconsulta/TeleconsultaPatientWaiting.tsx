@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocalStorage } from '@mantine/hooks';
 import { Box, Button, Group, Text } from '@mantine/core';
 import { LampDesk, MicOff, PhoneOff, Send, SignalHigh } from 'lucide-react';
@@ -35,6 +35,7 @@ const PREPARED_SESSION_KEY_PREFIX = 'teleconsulta:prepared:';
 const CLINICAL_QUEUE_TYPE = 'Fila clínica';
 const IN_PROGRESS_STATUS = 'Em atendimento';
 const DONE_STATUS = 'Atendimento concluído';
+const MAX_CHAT_FILE_BYTES = 2 * 1024 * 1024;
 
 const normalizeCollection = (data: any) => (
   Array.isArray(data)
@@ -58,8 +59,23 @@ export function TeleconsultaPatientWaiting() {
   const [inCall, setInCall] = useState(false);
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [signalingReady, setSignalingReady] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{
+    id: string;
+    fromRole: string;
+    kind: 'text' | 'file';
+    text?: string;
+    fileName?: string;
+    fileMimeType?: string;
+    fileDataUrl?: string;
+    fileSizeBytes?: number;
+    createdAt: string;
+  }>>([]);
+  const [sendingChat, setSendingChat] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const chatBodyRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
@@ -73,6 +89,33 @@ export function TeleconsultaPatientWaiting() {
     if (!token) return;
     sessionStorage.removeItem(`${PREPARED_SESSION_KEY_PREFIX}${token}`);
   };
+  const redirectPatientToFinished = () => {
+    clearPreparedSession();
+    navigate('/teleconsulta/finalizada', { replace: true });
+  };
+  const appendChatMessage = (message: {
+    id: string;
+    fromRole: string;
+    kind: 'text' | 'file';
+    text?: string;
+    fileName?: string;
+    fileMimeType?: string;
+    fileDataUrl?: string;
+    fileSizeBytes?: number;
+    createdAt: string;
+  }) => {
+    setChatMessages((prev) => {
+      const alreadyExists = prev.some((item) =>
+        item.createdAt === message.createdAt
+        && item.fromRole === message.fromRole
+        && item.kind === message.kind
+        && (item.text || '') === (message.text || '')
+        && (item.fileName || '') === (message.fileName || ''),
+      );
+      if (alreadyExists) return prev;
+      return [...prev, message];
+    });
+  };
 
   useEffect(() => {
     if (!token) {
@@ -85,6 +128,22 @@ export function TeleconsultaPatientWaiting() {
       .then((data) => {
         if (!active) return;
         setTokenMeta(data);
+        void teleconsultationLinkService.listPublicMessages(token, 200)
+          .then((history) => {
+            if (!active) return;
+            setChatMessages((history.items || []).map((item) => ({
+              id: String(item.id),
+              fromRole: String(item.fromRole || ''),
+              kind: item.kind === 'file' ? 'file' : 'text',
+              text: item.text || undefined,
+              fileName: item.fileName || undefined,
+              fileMimeType: item.fileMimeType || undefined,
+              fileDataUrl: item.fileDataUrl || undefined,
+              fileSizeBytes: typeof item.fileSizeBytes === 'number' ? item.fileSizeBytes : undefined,
+              createdAt: String(item.createdAt || new Date().toISOString()),
+            })));
+          })
+          .catch(() => undefined);
       })
       .catch((error: any) => {
         if (!active) return;
@@ -133,9 +192,9 @@ export function TeleconsultaPatientWaiting() {
     return () => window.removeEventListener('teleconsulta:doctor-joined', onDoctorJoined);
   }, []);
 
-  const stopMediaAndPeer = (sendHangup = false) => {
-    if (sendHangup && token) {
-      void teleconsultationLinkService.sendPublicSignal(token, { type: 'hangup', toRole: 'ALL' }).catch(() => undefined);
+  const stopMediaAndPeer = (signalType?: 'hangup' | 'patient-left') => {
+    if (signalType && token) {
+      void teleconsultationLinkService.sendPublicSignal(token, { type: signalType, toRole: 'ALL' }).catch(() => undefined);
     }
 
     if (peerRef.current) {
@@ -262,7 +321,7 @@ export function TeleconsultaPatientWaiting() {
       }
     } catch (error: any) {
       setInCall(false);
-      stopMediaAndPeer(false);
+      stopMediaAndPeer();
       showNotification({
         title: 'Falha ao iniciar chamada',
         message: error?.message || 'Não foi possível iniciar a teleconsulta.',
@@ -276,8 +335,12 @@ export function TeleconsultaPatientWaiting() {
   const finalizeDoctorConsultation = async () => {
     if (!isDoctorRole) return;
     try {
-      await updateConsultationQueue(IN_PROGRESS_STATUS);
-      await updateConsultationQueue(DONE_STATUS);
+      try {
+        await updateConsultationQueue(DONE_STATUS);
+      } catch {
+        await updateConsultationQueue(IN_PROGRESS_STATUS);
+        await updateConsultationQueue(DONE_STATUS);
+      }
       clearPreparedSession();
       navigate('/consulta', { replace: true });
     } catch (error: any) {
@@ -289,11 +352,47 @@ export function TeleconsultaPatientWaiting() {
     }
   };
 
-  const handleSignalEvent = async (event: { type: string; payload?: any; fromRole?: string }) => {
+  const handleSignalEvent = async (event: { id?: number; type: string; payload?: any; fromRole?: string; createdAt?: string }) => {
     const type = String(event?.type || '').toLowerCase();
+    const fromRole = String(event?.fromRole || '').toUpperCase();
 
     if (type === 'doctor-joined' && !isDoctorRole) {
       setDoctorJoined(true);
+      return;
+    }
+
+    if (type === 'chat-message') {
+      const text = String(event?.payload?.text || '').trim();
+      if (!text) return;
+      appendChatMessage({
+        id: `signal-${String(event?.id || Date.now())}`,
+        fromRole: fromRole || 'UNKNOWN',
+        kind: 'text',
+        text,
+        fileName: undefined,
+        fileMimeType: undefined,
+        fileDataUrl: undefined,
+        fileSizeBytes: undefined,
+        createdAt: String(event?.payload?.createdAt || event?.createdAt || new Date().toISOString()),
+      });
+      return;
+    }
+
+    if (type === 'chat-file') {
+      const fileName = String(event?.payload?.fileName || '').trim();
+      const fileDataUrl = String(event?.payload?.fileDataUrl || '').trim();
+      if (!fileName || !fileDataUrl) return;
+      appendChatMessage({
+        id: `signal-${String(event?.id || Date.now())}`,
+        fromRole: fromRole || 'UNKNOWN',
+        kind: 'file',
+        text: undefined,
+        fileName,
+        fileMimeType: String(event?.payload?.fileMimeType || 'application/octet-stream'),
+        fileDataUrl,
+        fileSizeBytes: Number(event?.payload?.fileSizeBytes || 0),
+        createdAt: String(event?.payload?.createdAt || event?.createdAt || new Date().toISOString()),
+      });
       return;
     }
 
@@ -339,19 +438,27 @@ export function TeleconsultaPatientWaiting() {
       return;
     }
 
+    if (type === 'patient-left') {
+      if (isDoctorRole) {
+        setRemoteConnected(false);
+        showNotification({
+          title: 'Paciente saiu da chamada',
+          message: 'Aguardando retorno do paciente ou finalize a teleconsulta.',
+          color: 'yellow',
+        });
+      }
+      return;
+    }
+
     if (type === 'hangup') {
-      stopMediaAndPeer(false);
+      stopMediaAndPeer();
       setInCall(false);
       if (isDoctorRole) {
         clearPreparedSession();
         navigate('/consulta', { replace: true });
         return;
       }
-      showNotification({
-        title: 'Consulta encerrada',
-        message: 'A outra ponta finalizou a teleconsulta.',
-        color: 'blue',
-      });
+      redirectPatientToFinished();
     }
   };
 
@@ -411,10 +518,15 @@ export function TeleconsultaPatientWaiting() {
 
   useEffect(() => {
     return () => {
-      stopMediaAndPeer(false);
+      stopMediaAndPeer();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!chatBodyRef.current) return;
+    chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+  }, [chatMessages]);
 
   const diffSeconds = useMemo(
     () => Math.floor((scheduledAt.getTime() - now.getTime()) / 1000),
@@ -451,6 +563,141 @@ export function TeleconsultaPatientWaiting() {
   const ringColor = counterpartReady ? '#58d82e' : isOverdue ? '#ff4c4c' : status.color;
   const timeText = counterpartReady ? 'PRONTO' : formatClock(diffSeconds, isOverdue);
   const canJoinConsultation = isDoctorRole || (counterpartReady && withinWindow);
+  const chatCounterpartName = isDoctorRole ? patientName : doctorName;
+
+  const formatChatTime = (iso: string) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const sendChatMessage = async () => {
+    const text = chatInput.trim();
+    if (!token || !text || sendingChat) return;
+
+    const nowIso = new Date().toISOString();
+    setSendingChat(true);
+    try {
+      await teleconsultationLinkService.sendPublicSignal(token, {
+        type: 'chat-message',
+        toRole: 'ALL',
+        payload: { text, createdAt: nowIso },
+      });
+      appendChatMessage({
+        id: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        fromRole: tokenRole || (isDoctorRole ? 'DOCTOR' : 'PATIENT'),
+        kind: 'text',
+        text,
+        fileName: undefined,
+        fileMimeType: undefined,
+        fileDataUrl: undefined,
+        fileSizeBytes: undefined,
+        createdAt: nowIso,
+      });
+      setChatInput('');
+    } catch {
+      showNotification({
+        title: 'Falha ao enviar mensagem',
+        message: 'Não foi possível enviar no chat agora.',
+        color: 'red',
+      });
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
+  const renderFilePreview = (message: {
+    fileDataUrl?: string;
+    fileMimeType?: string;
+    fileName?: string;
+  }) => {
+    const fileUrl = String(message.fileDataUrl || '');
+    const mime = String(message.fileMimeType || '').toLowerCase();
+    if (!fileUrl) return null;
+
+    if (mime.startsWith('image/')) {
+      return (
+        <img
+          src={fileUrl}
+          alt={message.fileName || 'Imagem enviada no chat'}
+          className={styles.chatFilePreviewImage}
+        />
+      );
+    }
+
+    if (mime === 'application/pdf') {
+      return (
+        <iframe
+          title={message.fileName || 'PDF enviado no chat'}
+          src={fileUrl}
+          className={styles.chatFilePreviewPdf}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const handlePickFileClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file || !token) return;
+
+    if (file.size > MAX_CHAT_FILE_BYTES) {
+      showNotification({
+        title: 'Arquivo muito grande',
+        message: 'Limite de 2MB por arquivo no chat de pré-consulta.',
+        color: 'red',
+      });
+      return;
+    }
+
+    setSendingChat(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+        reader.readAsDataURL(file);
+      });
+
+      await teleconsultationLinkService.sendPublicSignal(token, {
+        type: 'chat-file',
+        toRole: 'ALL',
+        payload: {
+          fileName: file.name,
+          fileMimeType: file.type || 'application/octet-stream',
+          fileSizeBytes: file.size,
+          fileDataUrl: dataUrl,
+          createdAt: nowIso,
+        },
+      });
+      appendChatMessage({
+        id: `local-file-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        fromRole: tokenRole || (isDoctorRole ? 'DOCTOR' : 'PATIENT'),
+        kind: 'file',
+        text: undefined,
+        fileName: file.name,
+        fileMimeType: file.type || 'application/octet-stream',
+        fileDataUrl: dataUrl,
+        fileSizeBytes: file.size,
+        createdAt: nowIso,
+      });
+    } catch {
+      showNotification({
+        title: 'Falha ao enviar arquivo',
+        message: 'Não foi possível enviar o arquivo no chat.',
+        color: 'red',
+      });
+    } finally {
+      setSendingChat(false);
+    }
+  };
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
@@ -485,12 +732,16 @@ export function TeleconsultaPatientWaiting() {
                   variant="light"
                   leftSection={<PhoneOff size={16} />}
                   onClick={() => {
-                    stopMediaAndPeer(true);
+                    stopMediaAndPeer(isDoctorRole ? 'hangup' : 'patient-left');
                     setInCall(false);
-                    void finalizeDoctorConsultation();
+                    if (isDoctorRole) {
+                      void finalizeDoctorConsultation();
+                      return;
+                    }
+                    redirectPatientToFinished();
                   }}
                 >
-                  Encerrar chamada
+                  {isDoctorRole ? 'Encerrar e finalizar consulta' : 'Sair da teleconsulta'}
                 </Button>
               </Group>
               <Box style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -543,19 +794,73 @@ export function TeleconsultaPatientWaiting() {
               <Box className={`${styles.chatCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
                 <Box className={`${styles.chatHeader} ${isDark ? styles.chatHeaderDark : styles.chatHeaderLight}`}>
                   <p className={styles.chatTitle}>Chat</p>
-                  <p className={styles.chatDoctor}>{doctorName}</p>
+                  <p className={styles.chatDoctor}>{chatCounterpartName}</p>
                 </Box>
 
-                <Box className={styles.chatBody}>
+                <Box className={styles.chatBody} ref={chatBodyRef}>
                   <Box className={`${styles.chatBubble} ${isDark ? styles.chatBubbleDark : styles.chatBubbleLight}`}>
                     Olá! Este é o canal de pré-consulta. Você pode enviar documentos, exames ou dúvidas para {doctorName} antes da chamada começar.
                   </Box>
+                  {chatMessages.map((message) => {
+                    const ownMessage = (message.fromRole === 'DOCTOR') === isDoctorRole;
+                    return (
+                      <Box key={message.id} className={`${styles.chatMessageRow} ${ownMessage ? styles.chatMessageOwn : styles.chatMessageOther}`}>
+                        <Box className={`${styles.chatMessageBubble} ${ownMessage ? styles.chatMessageBubbleOwn : styles.chatMessageBubbleOther}`}>
+                          <Text size="xs" fw={700} className={styles.chatMessageAuthor}>
+                            {ownMessage ? 'Você' : chatCounterpartName}
+                          </Text>
+                          {message.kind === 'file' ? (
+                            <>
+                              {renderFilePreview(message)}
+                              <a
+                                href={message.fileDataUrl}
+                                download={message.fileName}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={styles.chatFileLink}
+                              >
+                                [arquivo] {message.fileName}
+                              </a>
+                            </>
+                          ) : (
+                            <Text size="sm">{message.text}</Text>
+                          )}
+                          <Text size="xs" c="dimmed" ta="right">{formatChatTime(message.createdAt)}</Text>
+                        </Box>
+                      </Box>
+                    );
+                  })}
                 </Box>
 
                 <Box className={styles.chatInputRow}>
-                  <button type="button" className={`${styles.inputBtn} ${isDark ? styles.inputBtnDark : styles.inputBtnLight}`}>+</button>
-                  <input className={`${styles.inputField} ${isDark ? styles.inputFieldDark : styles.inputFieldLight}`} placeholder="Mensagem" />
-                  <button type="button" className={`${styles.inputBtn} ${isDark ? styles.inputBtnDark : styles.inputBtnLight}`}><Send size={20} /></button>
+                  <button type="button" className={`${styles.inputBtn} ${isDark ? styles.inputBtnDark : styles.inputBtnLight}`} onClick={handlePickFileClick}>
+                    +
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={(event) => { void handleFileSelected(event); }}
+                  />
+                  <input
+                    className={`${styles.inputField} ${isDark ? styles.inputFieldDark : styles.inputFieldLight}`}
+                    placeholder="Mensagem"
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.currentTarget.value.slice(0, 500))}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      void sendChatMessage();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={`${styles.inputBtn} ${isDark ? styles.inputBtnDark : styles.inputBtnLight}`}
+                    onClick={() => { void sendChatMessage(); }}
+                    disabled={sendingChat || !chatInput.trim()}
+                  >
+                    <Send size={20} />
+                  </button>
                 </Box>
               </Box>
             </Box>
