@@ -54,6 +54,7 @@ export function TeleconsultaPatientWaiting() {
   });
   const [now, setNow] = useState<Date>(() => new Date());
   const [doctorJoined, setDoctorJoined] = useState(false);
+  const [doctorInConsultation, setDoctorInConsultation] = useState(false);
   const [patientJoined, setPatientJoined] = useState(false);
   const [tokenMeta, setTokenMeta] = useState<TeleconsultationPublicTokenMeta | null>(null);
   const [inCall, setInCall] = useState(false);
@@ -82,6 +83,8 @@ export function TeleconsultaPatientWaiting() {
   const pollingRef = useRef<number | null>(null);
   const lastEventIdRef = useRef<number>(0);
   const enteringCallRef = useRef(false);
+  const pendingOfferRef = useRef<any | null>(null);
+  const pendingIceCandidatesRef = useRef<any[]>([]);
   const consultationIdRef = useRef<string | null>(null);
   const isDark = colorScheme === 'dark';
   const token = params.get('token') || '';
@@ -216,6 +219,8 @@ export function TeleconsultaPatientWaiting() {
       remoteVideoRef.current.srcObject = null;
     }
     remoteStreamRef.current = null;
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
 
     setRemoteConnected(false);
     enteringCallRef.current = false;
@@ -292,6 +297,31 @@ export function TeleconsultaPatientWaiting() {
     return peer;
   };
 
+  const acceptPendingOfferIfAny = async () => {
+    if (!pendingOfferRef.current) return;
+    const peer = await ensurePeerConnection();
+    const offer = pendingOfferRef.current;
+    pendingOfferRef.current = null;
+
+    await peer.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    await teleconsultationLinkService.sendPublicSignal(token, {
+      type: 'answer',
+      toRole: 'DOCTOR',
+      payload: answer,
+    });
+
+    for (const candidatePayload of pendingIceCandidatesRef.current) {
+      try {
+        await peer.addIceCandidate(new RTCIceCandidate(candidatePayload));
+      } catch {
+        // Ignora candidato inválido.
+      }
+    }
+    pendingIceCandidatesRef.current = [];
+  };
+
   const enterConsultation = async () => {
     if (!token || enteringCallRef.current) return;
     enteringCallRef.current = true;
@@ -305,6 +335,7 @@ export function TeleconsultaPatientWaiting() {
       const peer = await ensurePeerConnection();
 
       if (isDoctorRole) {
+        setDoctorInConsultation(true);
         const offer = await peer.createOffer();
         await peer.setLocalDescription(offer);
         await teleconsultationLinkService.sendPublicSignal(token, {
@@ -313,6 +344,7 @@ export function TeleconsultaPatientWaiting() {
           payload: offer,
         });
       } else {
+        await acceptPendingOfferIfAny();
         await teleconsultationLinkService.sendPublicSignal(token, {
           type: 'ready',
           toRole: 'DOCTOR',
@@ -411,7 +443,13 @@ export function TeleconsultaPatientWaiting() {
     }
 
     if (type === 'offer') {
-      if (!inCall) setInCall(true);
+      setDoctorInConsultation(true);
+
+      if (!isDoctorRole && !inCall) {
+        pendingOfferRef.current = event.payload;
+        return;
+      }
+
       const peer = await ensurePeerConnection();
       await peer.setRemoteDescription(new RTCSessionDescription(event.payload));
       const answer = await peer.createAnswer();
@@ -435,6 +473,11 @@ export function TeleconsultaPatientWaiting() {
       } catch {
         // Ignora candidatos inválidos enquanto a chamada estabiliza.
       }
+      return;
+    }
+
+    if (type === 'ice' && event.payload) {
+      pendingIceCandidatesRef.current.push(event.payload);
       return;
     }
 
@@ -539,6 +582,10 @@ export function TeleconsultaPatientWaiting() {
   const counterpartReady = isDoctorRole ? patientJoined : doctorJoined;
 
   const status = useMemo(() => {
+    if (!isDoctorRole && doctorInConsultation) {
+      return { label: 'Médico na consulta', color: '#58d82e' };
+    }
+
     if (counterpartReady) {
       return { label: 'Tudo pronto!', color: '#58d82e' };
     }
@@ -552,17 +599,18 @@ export function TeleconsultaPatientWaiting() {
     }
 
     return { label: 'Em preparação', color: '#7b90ff' };
-  }, [counterpartReady, diffSeconds, isOverdue]);
+  }, [counterpartReady, diffSeconds, doctorInConsultation, isDoctorRole, isOverdue]);
 
   const ringProgress = useMemo(() => {
+    if (!isDoctorRole && doctorInConsultation) return 1;
     if (counterpartReady) return 1;
     if (isOverdue) return Math.min(Math.abs(diffSeconds) / 600, 1);
     return Math.max(0, Math.min(1, (600 - Math.max(diffSeconds, 0)) / 600));
-  }, [counterpartReady, diffSeconds, isOverdue]);
+  }, [counterpartReady, diffSeconds, doctorInConsultation, isDoctorRole, isOverdue]);
 
-  const ringColor = counterpartReady ? '#58d82e' : isOverdue ? '#ff4c4c' : status.color;
-  const timeText = counterpartReady ? 'PRONTO' : formatClock(diffSeconds, isOverdue);
-  const canJoinConsultation = isDoctorRole || (counterpartReady && withinWindow);
+  const ringColor = (!isDoctorRole && doctorInConsultation) ? '#58d82e' : counterpartReady ? '#58d82e' : isOverdue ? '#ff4c4c' : status.color;
+  const timeText = (!isDoctorRole && doctorInConsultation) ? 'PRONTO' : counterpartReady ? 'PRONTO' : formatClock(diffSeconds, isOverdue);
+  const canJoinConsultation = isDoctorRole || (doctorInConsultation && withinWindow);
   const chatCounterpartName = isDoctorRole ? patientName : doctorName;
 
   const formatChatTime = (iso: string) => {
@@ -732,6 +780,10 @@ export function TeleconsultaPatientWaiting() {
                   variant="light"
                   leftSection={<PhoneOff size={16} />}
                   onClick={() => {
+                    if (!isDoctorRole) {
+                      const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
+                      if (!confirmed) return;
+                    }
                     stopMediaAndPeer(isDoctorRole ? 'hangup' : 'patient-left');
                     setInCall(false);
                     if (isDoctorRole) {
@@ -877,6 +929,12 @@ export function TeleconsultaPatientWaiting() {
               {isDoctorRole ? 'Entrar na Teleconsulta' : 'Entrar na Consulta'}
             </Button>
           </Box>
+
+          {!isDoctorRole && doctorInConsultation && !inCall ? (
+            <Text mt={8} c={isDark ? 'green.3' : 'green.8'} ta="right">
+              O médico já está na consulta. Clique em "Entrar na Consulta" para participar.
+            </Text>
+          ) : null}
 
           <Box className={styles.tipsRow}>
             <Box className={`${styles.tipCard} ${isDark ? styles.tipCardDark : styles.tipCardLight}`}>
