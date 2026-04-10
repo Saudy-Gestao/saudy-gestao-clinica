@@ -51,6 +51,7 @@ export function WorkflowSections() {
       'pre agendamento': 'pre-agendamento',
       'pre-atendimento': 'pre-atendimento',
       'pre atendimento': 'pre-atendimento',
+      'autorizacao e recepcao': 'pre-atendimento',
       'consulta': 'consulta',
       'teleconsulta': 'consulta',
       'execucao de exames': 'execucao-exames',
@@ -148,8 +149,8 @@ export function WorkflowSections() {
       title: 'Jornada do Paciente',
       items: [
         { icon: Calendar, label: 'Agendamento', desc: 'Consultas e exames', route: '/agendamento', moduleName: 'agendamento' },
-        { icon: CalendarCheck, label: 'Pré-atendimento', desc: 'Pré-autorização e documentos', route: '/pre-agendamento', moduleName: 'pre-agendamento' },
-        { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Check-in, checklist e recepção', route: '/pre-atendimento', moduleName: 'pre-atendimento' },
+        { icon: CalendarCheck, label: 'Pré-atendimento', desc: 'Pré-autorização e documentos', route: '/pre-atendimento', moduleName: 'pre-agendamento', fallbackModuleNames: ['pre-atendimento'] },
+        { icon: UserPlus, label: 'Autorização e Recepção', desc: 'Check-in, checklist e recepção', route: '/autorizacao-e-recepcao', moduleName: 'pre-atendimento', fallbackModuleNames: ['autorizacao-e-recepcao'] },
       ]
     },
     {

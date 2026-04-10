@@ -417,7 +417,7 @@ export function PreAgendamento() {
               <ChevronLeft size={18} />
             </ActionIcon>
             <Box>
-              <Text fw={700} size="lg" c="var(--mantine-color-text)">Pré-agendamento</Text>
+              <Text fw={700} size="lg" c="var(--mantine-color-text)">Pré-atendimento</Text>
               <Text size="sm" c="dimmed">Fila de confirmados para pré-autorização e coleta de documentos.</Text>
             </Box>
           </Group>

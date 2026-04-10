@@ -295,7 +295,7 @@ export function PublicPreAgendamentoDocs() {
       <Stack maw={920} mx="auto" gap="md">
         <Paper p={{ base: 'md', md: 'lg' }} withBorder bg="#001F54">
           <Stack gap={4}>
-            <Text size="xl" fw={700} c="white">Pré-agendamento • Documentos e anamnese</Text>
+            <Text size="xl" fw={700} c="white">Pré-atendimento • Documentos e anamnese</Text>
             <Text c="rgba(255,255,255,0.8)" size="sm">
               Faça a validação facial para liberar os anexos e, quando houver, responder a anamnese do procedimento.
             </Text>

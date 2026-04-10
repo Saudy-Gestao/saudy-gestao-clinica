@@ -92,7 +92,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
         message: `${patient.name} foi encaminhado para Autorização e Recepção.`,
       });
 
-      navigate('/pre-atendimento');
+      navigate('/autorizacao-e-recepcao');
     } catch (err: any) {
       showErrorToast({
         title: 'Erro',
