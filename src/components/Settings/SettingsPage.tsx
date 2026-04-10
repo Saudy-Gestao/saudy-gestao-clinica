@@ -14,6 +14,7 @@ import {
   ActionIcon, 
   Modal, 
   Loader, 
+  Skeleton,
   MultiSelect,
   Grid,
   Badge,
@@ -175,6 +176,28 @@ const formatAuditDateTime = (value?: string | null) => {
     timeStyle: 'short',
   }).format(date);
 };
+
+const SettingsPanelSkeleton = () => (
+  <Stack gap="md">
+    <Skeleton height={26} width="35%" radius="sm" />
+    <Skeleton height={16} width="60%" radius="sm" />
+    <Skeleton height={42} radius="md" />
+    <Skeleton height={42} radius="md" />
+    <Skeleton height={42} radius="md" />
+    <Skeleton height={42} radius="md" />
+    <Group justify="flex-end">
+      <Skeleton height={36} width={220} radius="md" />
+    </Group>
+  </Stack>
+);
+
+const SettingsTableSkeleton = () => (
+  <Stack gap="sm">
+    {Array.from({ length: 5 }).map((_, idx) => (
+      <Skeleton key={`settings-table-skeleton-${idx}`} height={44} radius="md" />
+    ))}
+  </Stack>
+);
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -1247,7 +1270,7 @@ export function SettingsPage() {
                     <Box>
                         <SectionTitle title="Dados da Empresa" desc="Gerencie as informações principais da sua organização." />
                         
-                        {loadingCompanies ? <Loader /> : (
+                        {loadingCompanies ? <SettingsPanelSkeleton /> : (
                             <Stack gap="lg" w="100%">
                               <Stack gap="md" w="100%">
                                 <Grid>
@@ -1339,7 +1362,7 @@ export function SettingsPage() {
                           </Text>
                         )}
 
-                        {loadingBranches ? <Loader /> : (
+                        {loadingBranches ? <SettingsTableSkeleton /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                                 <Table horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
@@ -1428,7 +1451,7 @@ export function SettingsPage() {
                             maw={400}
                         />
 
-                        {loadingSectors ? <Loader /> : (
+                        {loadingSectors ? <SettingsTableSkeleton /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                                 <Table horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
@@ -1523,7 +1546,7 @@ export function SettingsPage() {
                             />
                         </Group>
 
-                        {loadingUsers ? <Loader /> : (
+                        {loadingUsers ? <SettingsTableSkeleton /> : (
                             <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
                                 <Table horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
@@ -1778,10 +1801,10 @@ export function SettingsPage() {
                                   error={accessErrors.description}
                                 />
                                 {loadingModules ? (
-                                  <Box style={{ textAlign: 'center', padding: '20px' }}>
-                                    <Loader size="sm" />
-                                    <Text size="sm" c="dimmed" mt="xs">Carregando módulos...</Text>
-                                  </Box>
+                                  <Stack gap="sm" py="sm">
+                                    <Skeleton height={42} radius="md" />
+                                    <Skeleton height={42} radius="md" />
+                                  </Stack>
                                 ) : (
                                   <MultiSelect
                                     label="Módulos"
@@ -1865,10 +1888,11 @@ export function SettingsPage() {
                         {selectedBranchForSettings && (
                             <>
                                 {loadingBranchSettings ? (
-                                    <Box style={{ textAlign: 'center', padding: '40px 0' }}>
-                                        <Loader size="md" />
-                                        <Text size="sm" c="dimmed" mt="md">Carregando configurações...</Text>
-                                    </Box>
+                                    <Stack gap="sm" py="sm">
+                                        <Skeleton height={82} radius="md" />
+                                        <Skeleton height={82} radius="md" />
+                                        <Skeleton height={82} radius="md" />
+                                    </Stack>
                                 ) : (
                                     <Stack gap="lg">
                                         <Paper 

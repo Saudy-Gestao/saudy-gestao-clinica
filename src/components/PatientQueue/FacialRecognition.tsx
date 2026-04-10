@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Stack, Paper, Title, ActionIcon, Loader, Center, Badge, Card, SimpleGrid } from '@mantine/core';
+import { Box, Group, Text, Button, Stack, Paper, Title, ActionIcon, Center, Badge, Card, SimpleGrid, Skeleton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Camera, User } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { resolveApiErrorMessage } from '../../lib/apiError';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
 import { usePatientTodayAppointmentsQuery } from '../../hooks/usePatientTodayAppointmentsQuery';
+import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 export function FacialRecognition() {
   const navigate = useNavigate();
@@ -35,17 +34,16 @@ export function FacialRecognition() {
 
       setRecognitionResult(result);
       
-      showNotification({
+      showSuccessToast({
         title: 'Reconhecimento bem-sucedido',
         message: `Bem-vindo(a), ${result.patient.name}!`,
-        color: 'green',
       });
     } catch (error: any) {
       console.error('Erro no reconhecimento facial:', error);
-      showNotification({
+      showErrorToast({
         title: 'Erro no reconhecimento',
-        message: resolveApiErrorMessage(error, 'Não foi possível reconhecer o paciente. Tente novamente.'),
-        color: 'red',
+        error,
+        fallback: 'Não foi possível reconhecer o paciente. Tente novamente.',
       });
     } finally {
       setRecognizing(false);
@@ -91,6 +89,14 @@ export function FacialRecognition() {
     };
     return statusMap[status] || status;
   };
+
+  const AppointmentsSkeleton = () => (
+    <Stack gap="md">
+      <Skeleton height={74} radius="md" />
+      <Skeleton height={74} radius="md" />
+      <Skeleton height={74} radius="md" />
+    </Stack>
+  );
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
@@ -203,9 +209,7 @@ export function FacialRecognition() {
                 <Title order={4} mb="md">Consultas de Hoje</Title>
 
                 {loadingAppointments ? (
-                  <Center p="xl">
-                    <Loader size="lg" />
-                  </Center>
+                  <AppointmentsSkeleton />
                 ) : appointments.length === 0 ? (
                   <Center p="xl">
                     <Stack align="center" gap="xs">

@@ -10,9 +10,9 @@ import {
   Badge,
   Tabs,
   SimpleGrid,
+  Skeleton,
   Card,
   Divider,
-  Loader,
   Center,
   ScrollArea,
   Avatar,
@@ -29,10 +29,9 @@ import {
   CreditCard,
   Heart,
 } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { resolveApiErrorMessage } from '../../lib/apiError';
 import { usePatientSummaryQuery } from '../../hooks/usePatientSummaryQuery';
 import { DARK_BLUE } from '../../themes/theme';
+import { showErrorToast } from '../../lib/toast';
 
 interface PatientInfoModalProps {
   opened: boolean;
@@ -57,11 +56,10 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
 
   useEffect(() => {
     if (!error) return;
-    const err: any = error;
-    showNotification({
+    showErrorToast({
       title: 'Erro',
-      message: resolveApiErrorMessage(err, 'Não foi possível carregar os dados do paciente.'),
-      color: 'red',
+      error,
+      fallback: 'Não foi possível carregar os dados do paciente.',
     });
   }, [error]);
 
@@ -105,6 +103,14 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
     return `${day}/${month}/${year}`;
   };
 
+  const PatientSummarySkeleton = () => (
+    <Stack gap="lg">
+      <Skeleton height={180} radius="md" />
+      <Skeleton height={180} radius="md" />
+      <Skeleton height={160} radius="md" />
+    </Stack>
+  );
+
   return (
     <Modal
       opened={opened}
@@ -126,9 +132,7 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
       scrollAreaComponent={ScrollArea.Autosize}
     >
       {isLoading ? (
-        <Center p="xl">
-          <Loader size="lg" />
-        </Center>
+        <PatientSummarySkeleton />
       ) : (
         <Stack gap="lg">
           <Paper p="md" withBorder radius="md">
