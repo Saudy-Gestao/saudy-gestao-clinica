@@ -28,7 +28,6 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  AlertCircle,
   Check,
   CheckCheck,
   ChevronDown,
@@ -94,8 +93,9 @@ const formatAppointmentType = (value?: string | null) => {
 const isMediaMessage = (message: string) => /^\[(Imagem|Documento|Vídeo|Áudio) recebido\]/i.test(String(message || '').trim());
 const extractFirstUrlFromText = (value?: string | null) => {
   const text = String(value || '');
-  const match = text.match(/https?:\/\/[^\s]+/i);
-  return match ? match[0] : '';
+  // Match URLs in the format: (http://...) or just http://...
+  const match = text.match(/\(?(https?:\/\/[^\s\)]+)\)?/i);
+  return match ? match[1] : '';
 };
 
 const parseMetadataObject = (value: unknown): Record<string, unknown> => {
@@ -152,6 +152,13 @@ const resolveMediaUrl = (value?: string | null) => {
 
 const extractMediaMetadata = (message: HumanConversationMessage) => {
   const metadata = parseMetadataObject(message.metadata);
+  
+  // Log metadata for debugging
+  if (isMediaMessage(message.message)) {
+    console.log('[Media Debug] Message:', message.message);
+    console.log('[Media Debug] Full Metadata:', JSON.stringify(metadata, null, 2));
+  }
+  
   const rawUrl = findMetadataString(metadata, [
     'mediaUrl',
     'media_url',
@@ -171,6 +178,10 @@ const extractMediaMetadata = (message: HumanConversationMessage) => {
     'audioUrl',
     'audio_url',
     'path',
+    'mediaPath',
+    'media_path',
+    'link',
+    'href',
   ]) || extractFirstUrlFromText(message.message);
 
   const mimeType = findMetadataString(metadata, [
@@ -193,6 +204,12 @@ const extractMediaMetadata = (message: HumanConversationMessage) => {
   const caption = findMetadataString(metadata, ['caption']);
   const mediaTypeHint = findMetadataString(metadata, ['mediaType', 'media_type', 'type']).toLowerCase();
   const resolvedUrl = resolveMediaUrl(rawUrl);
+  
+  // Log resolved URL for debugging
+  if (isMediaMessage(message.message)) {
+    console.log('[Media Debug] Raw URL:', rawUrl);
+    console.log('[Media Debug] Resolved URL:', resolvedUrl);
+  }
 
   const isImage = mimeType.startsWith('image/') || mediaTypeHint.includes('image');
   const isVideo = mimeType.startsWith('video/') || mediaTypeHint.includes('video');
@@ -268,6 +285,7 @@ export function Conversations() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messageDraft, setMessageDraft] = useState('');
   const [messageSearch, setMessageSearch] = useState('');
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [operatorsModalOpen, setOperatorsModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
@@ -378,6 +396,7 @@ export function Conversations() {
     mutationFn: (conversationId: string) => whatsappConversationService.claimConversation(conversationId),
     onSuccess: async () => {
       notifications.show({ title: 'Conversa assumida', message: 'O atendimento foi assumido e a saudação automática já foi enviada.', color: 'green' });
+      setStatus('ASSIGNED'); // Redirect to "Em atendimento" tab
       await refreshAll();
     },
     onError: (error: any) => {
@@ -469,15 +488,34 @@ export function Conversations() {
     [rawMessages],
   );
 
-  const filteredMessages = useMemo(() => {
+  // Find matching messages for scroll
+  const matchingMessageIndices = useMemo(() => {
     const searchTerm = messageSearch.trim().toLowerCase();
-    if (!searchTerm) return currentMessages;
-    return currentMessages.filter((message) => {
+    if (!searchTerm) return [];
+    const indices: number[] = [];
+    currentMessages.forEach((message, index) => {
       const text = String(message.message || '').toLowerCase();
       const authorName = String(message.authorName || '').toLowerCase();
-      return text.includes(searchTerm) || authorName.includes(searchTerm);
+      if (text.includes(searchTerm) || authorName.includes(searchTerm)) {
+        indices.push(index);
+      }
     });
+    return indices;
   }, [currentMessages, messageSearch]);
+
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
+  // Scroll to matching message when search changes
+  useEffect(() => {
+    if (matchingMessageIndices.length > 0 && viewportRef.current) {
+      const targetIndex = matchingMessageIndices[currentMatchIndex % matchingMessageIndices.length];
+      const messageElements = viewportRef.current.querySelectorAll('[data-message-index]');
+      const targetElement = messageElements[targetIndex] as HTMLElement;
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [matchingMessageIndices, currentMatchIndex]);
 
   const isValidProtocolFormat = (value: string) => {
     const trimmed = value.trim();
@@ -663,7 +701,15 @@ export function Conversations() {
           </Button>
         ) : null}
         {isMediaIndicator && !hasMediaUrl ? (
-          <Badge variant="light" color="yellow">Mídia recebida • Aguardando processamento</Badge>
+          <Stack gap={4}>
+            <Badge variant="light" color="yellow">Mídia recebida • Aguardando processamento</Badge>
+            {media.fileName ? (
+              <Text size="xs" c="dimmed">Arquivo: {media.fileName}</Text>
+            ) : null}
+            <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              Verifique o console do navegador (F12) para informações de debug
+            </Text>
+          </Stack>
         ) : null}
         {media.caption ? (
           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{media.caption}</Text>
@@ -873,6 +919,21 @@ export function Conversations() {
                     </Group>
                   </Box>
                   <Group gap="xs">
+                    <Tooltip label="Buscar mensagens">
+                      <ActionIcon
+                        variant="light"
+                        size="lg"
+                        onClick={() => {
+                          setMessageSearchOpen(!messageSearchOpen);
+                          if (messageSearchOpen) {
+                            setMessageSearch('');
+                            setCurrentMatchIndex(0);
+                          }
+                        }}
+                      >
+                        <Search size={16} />
+                      </ActionIcon>
+                    </Tooltip>
                     {selectedConversation.humanStatus !== 'CLOSED' && !isAlreadyAssignedToMe(selectedConversation) ? (
                       <Button
                         leftSection={<UserCheck size={14} />}
@@ -896,56 +957,66 @@ export function Conversations() {
                   </Group>
                 </Group>
 
-                <Card
-                  radius="lg"
-                  withBorder
-                  padding="md"
-                  style={{
-                    background: colorScheme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)',
-                  }}
-                >
-                  <Group justify="space-between" align="center">
-                    <Box>
-                      <Text fw={600}>Resumo rápido</Text>
-                      <Text size="sm" c="dimmed">
-                        {selectedConversation.humanAssignedUserName
-                          ? `Em atendimento com ${selectedConversation.humanAssignedUserName}`
-                          : 'Aguardando alguém assumir na fila'}
-                      </Text>
-                    </Box>
-                    {selectedConversation.humanStatus === 'QUEUED' ? (
-                      <Group gap={6}>
-                        <AlertCircle size={16} />
-                        <Text size="sm">Conversa aguardando atendimento humano</Text>
-                      </Group>
-                    ) : null}
+                {messageSearchOpen ? (
+                  <Group gap="xs" wrap="nowrap">
+                    <TextInput
+                      placeholder="Digite para buscar e rolar até a mensagem"
+                      leftSection={<Search size={16} />}
+                      value={messageSearch}
+                      onChange={(event) => {
+                        setMessageSearch(event.currentTarget.value);
+                        setCurrentMatchIndex(0);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && matchingMessageIndices.length > 0) {
+                          setCurrentMatchIndex((prev) => (prev + 1) % matchingMessageIndices.length);
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                      rightSection={
+                        matchingMessageIndices.length > 0 ? (
+                          <Text size="xs" c="dimmed">
+                            {currentMatchIndex + 1}/{matchingMessageIndices.length}
+                          </Text>
+                        ) : null
+                      }
+                    />
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      onClick={() => {
+                        setMessageSearchOpen(false);
+                        setMessageSearch('');
+                        setCurrentMatchIndex(0);
+                      }}
+                    >
+                      <XCircle size={16} />
+                    </ActionIcon>
                   </Group>
-                </Card>
+                ) : null}
 
-                <TextInput
-                  placeholder="Buscar mensagens neste atendimento"
-                  leftSection={<Search size={16} />}
-                  value={messageSearch}
-                  onChange={(event) => setMessageSearch(event.currentTarget.value)}
-                  mb="sm"
-                />
-
-                <ScrollArea h={380} offsetScrollbars viewportRef={viewportRef}>
+                <ScrollArea h={messageSearchOpen ? 330 : 430} offsetScrollbars viewportRef={viewportRef}>
                   <Stack gap="sm" pr="xs">
-                    {filteredMessages.map((message) => {
+                    {currentMessages.map((message, index) => {
                       const styles = bubbleStyles(message, colorScheme);
                       const messageState = message.providerMessageId
                         ? messageStatusMap.get(message.providerMessageId) || 'SENT'
                         : null;
+                      const isMatch = matchingMessageIndices.includes(index);
                       return (
                         <Paper
                           key={message.id}
+                          data-message-index={index}
                           p="sm"
                           withBorder
                           radius="md"
                           style={{
                             ...styles,
                             maxWidth: isEventMessage(message) ? '70%' : '82%',
+                            ...(isMatch && messageSearch ? {
+                              boxShadow: '0 0 0 2px var(--mantine-color-blue-5)',
+                              transition: 'box-shadow 0.3s ease',
+                            } : {}),
                           }}
                         >
                           <Text size="xs" c="dimmed" mb={4}>
