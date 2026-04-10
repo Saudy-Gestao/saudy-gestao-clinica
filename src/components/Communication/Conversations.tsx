@@ -150,7 +150,7 @@ const resolveMediaUrl = (value?: string | null) => {
   return `${origin}${path}`;
 };
 
-const extractMediaMetadata = (message: HumanConversationMessage) => {
+const extractMediaMetadata = (message: HumanConversationMessage, mediaUrlsCache: Record<string, string> = {}) => {
   const metadata = parseMetadataObject(message.metadata);
   
   // Log metadata for debugging
@@ -159,7 +159,13 @@ const extractMediaMetadata = (message: HumanConversationMessage) => {
     console.log('[Media Debug] Full Metadata:', JSON.stringify(metadata, null, 2));
   }
   
-  const rawUrl = findMetadataString(metadata, [
+  const mediaId = findMetadataString(metadata, [
+    'mediaId',
+    'media_id',
+    'id',
+  ]);
+  
+  let rawUrl = findMetadataString(metadata, [
     'mediaUrl',
     'media_url',
     'url',
@@ -183,6 +189,11 @@ const extractMediaMetadata = (message: HumanConversationMessage) => {
     'link',
     'href',
   ]) || extractFirstUrlFromText(message.message);
+  
+  // Se não tem URL mas tem mediaId, tentar buscar do cache
+  if (!rawUrl && mediaId && mediaUrlsCache[mediaId]) {
+    rawUrl = mediaUrlsCache[mediaId];
+  }
 
   const mimeType = findMetadataString(metadata, [
     'mimeType',
@@ -225,6 +236,7 @@ const extractMediaMetadata = (message: HumanConversationMessage) => {
     isVideo,
     isAudio,
     isDocument,
+    mediaId,
   };
 };
 
@@ -301,6 +313,7 @@ export function Conversations() {
   const [operatorDrafts, setOperatorDrafts] = useState<OperatorDraftMap>({});
   const [conversationSettingsDraft, setConversationSettingsDraft] = useState<HumanConversationSettings | null>(null);
   const [expandedOperators, setExpandedOperators] = useState<Record<string, boolean>>({});
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
 
   const conversationsQuery = useQuery({
     queryKey: [...queryKeys.whatsappConversations, status, search, flowKey || '', mineOnly ? 'mine' : 'all'],
@@ -545,6 +558,44 @@ export function Conversations() {
     }
   }, [protocolSearch, protocolLookup]);
 
+  // Fetch media URLs for messages that have mediaId but no mediaUrl
+  useEffect(() => {
+    const fetchMissingMediaUrls = async () => {
+      const messagesToFetch = currentMessages.filter((msg) => {
+        const metadata = parseMetadataObject(msg.metadata);
+        const mediaId = findMetadataString(metadata, ['mediaId', 'media_id', 'id']);
+        const mediaUrl = findMetadataString(metadata, ['mediaUrl', 'media_url', 'url']);
+        return mediaId && !mediaUrl && !mediaUrls[mediaId];
+      });
+
+      for (const msg of messagesToFetch) {
+        const metadata = parseMetadataObject(msg.metadata);
+        const mediaId = findMetadataString(metadata, ['mediaId', 'media_id', 'id']);
+        if (!mediaId) continue;
+
+        try {
+          const response = await fetch(`${getApiBaseUrl()}/care/whatsapp/media/${mediaId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.url) {
+              setMediaUrls((prev) => ({ ...prev, [mediaId]: data.url }));
+            }
+          }
+        } catch (error) {
+          console.error('[Media] Failed to fetch URL for mediaId:', mediaId, error);
+        }
+      }
+    };
+
+    if (currentMessages.length > 0) {
+      void fetchMissingMediaUrls();
+    }
+  }, [currentMessages]);
+
   const isValidProtocolFormat = (value: string) => {
     const trimmed = value.trim();
     // Matches patterns like: WA-20260410-2014ED, WA-20260410-123456, etc.
@@ -690,7 +741,7 @@ export function Conversations() {
   );
 
   const renderMessageContent = (message: HumanConversationMessage) => {
-    const media = extractMediaMetadata(message);
+    const media = extractMediaMetadata(message, mediaUrls);
     const cleanText = String(message.message || '').trim();
     const isMediaIndicator = isMediaMessage(cleanText);
     const hasMediaUrl = Boolean(media.url);
