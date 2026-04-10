@@ -491,13 +491,19 @@ export function PublicCheckIn() {
                 <Button
                   size="md"
                   radius="xl"
-                  variant="subtle"
-                  color="gray"
+                  variant="light"
+                  color="blue"
+                  leftSection={<Camera size={18} />}
                   onClick={handleStartFirstTimeFlow}
                   disabled={processing || firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
                   fullWidth
+                  styles={{
+                    root: {
+                      border: '1px solid rgba(120, 148, 255, 0.42)',
+                    },
+                  }}
                 >
-                  Primeira vez? Cadastre seu rosto
+                  Primeira vez? Clique para cadastrar seu rosto
                 </Button>
               </>
             )}
