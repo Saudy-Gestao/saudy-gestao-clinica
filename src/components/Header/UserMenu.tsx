@@ -5,6 +5,8 @@ import { notifications } from '@mantine/notifications';
 import { useLocalStorage } from '@mantine/hooks';
 import { useNavigate } from 'react-router-dom';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
+import authService from '../../services/authService';
+import { isDoctorUser } from '../../utils/userRole';
 
 export function UserMenu() {
   const navigate = useNavigate();
@@ -17,6 +19,8 @@ export function UserMenu() {
   const isDark = colorScheme === 'dark';
   const { data: myTicketsData } = useMyTicketsQuery();
   const unreadCount = Number(myTicketsData?.unreadCount || 0);
+  const currentUser = authService.getCurrentUser() as any;
+  const doctorView = isDoctorUser(currentUser);
 
   const navigateAfterMenuClose = (path: string) => {
     setOpened(false);
@@ -42,9 +46,11 @@ export function UserMenu() {
         >
           Perfil
         </Menu.Item>
-        <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
-          Configuracoes
-        </Menu.Item>
+        {!doctorView ? (
+          <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
+            Configuracoes
+          </Menu.Item>
+        ) : null}
         <Menu.Item
           icon={<LifeBuoy size={16} />}
           onClick={() => navigateAfterMenuClose('/meus-chamados')}

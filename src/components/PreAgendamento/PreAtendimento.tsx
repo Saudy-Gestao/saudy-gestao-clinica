@@ -37,6 +37,7 @@ import invoiceService from '../../services/invoiceService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import consultationService from '../../services/consultationService';
 import convenioAuthorizationService, { type ConvenioAuthorizationAttachment } from '../../services/convenioAuthorizationService';
+import teleconsultationLinkService, { type TeleconsultationEligibility } from '../../services/teleconsultationLinkService';
 import { formatCPF, formatDateInput, formatPhone, onlyDigits } from '../../utils/formatters';
 import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useReceptionQueueQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
@@ -173,6 +174,9 @@ export function PreAtendimento() {
   const [checklistAttachmentsLoading, setChecklistAttachmentsLoading] = useState(false);
   const [checklistAttachmentUploading, setChecklistAttachmentUploading] = useState(false);
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [teleconsultationEligibility, setTeleconsultationEligibility] = useState<TeleconsultationEligibility | null>(null);
+  const [teleconsultationEligibilityLoading, setTeleconsultationEligibilityLoading] = useState(false);
+  const [teleconsultationSendingLink, setTeleconsultationSendingLink] = useState(false);
   const [checklistData, setChecklistData] = useState({
     dadosConferidos: false,
     contatoConferido: false,
@@ -277,6 +281,9 @@ export function PreAtendimento() {
     setChecklistAttachmentsLoading(false);
     setChecklistAttachmentUploading(false);
     setOpeningAttachmentId(null);
+    setTeleconsultationEligibility(null);
+    setTeleconsultationEligibilityLoading(false);
+    setTeleconsultationSendingLink(false);
     setFacialValidationOpen(false);
     setFacialValidationLoading(false);
     setFacialValidationVerified(false);
@@ -345,6 +352,7 @@ export function PreAtendimento() {
         color: 'green',
       });
       await loadChecklistAttachments(checklistPatient.appointmentId);
+      await loadTeleconsultationEligibility(checklistPreAttendanceId);
     } catch (err: any) {
       showNotification({
         title: 'Erro ao anexar',
@@ -371,6 +379,23 @@ export function PreAtendimento() {
       });
     } finally {
       setOpeningAttachmentId(null);
+    }
+  };
+
+  const loadTeleconsultationEligibility = async (preAttendanceId?: string | null) => {
+    if (!preAttendanceId) {
+      setTeleconsultationEligibility(null);
+      return;
+    }
+
+    try {
+      setTeleconsultationEligibilityLoading(true);
+      const eligibility = await teleconsultationLinkService.getPreAttendanceEligibility(preAttendanceId);
+      setTeleconsultationEligibility(eligibility);
+    } catch {
+      setTeleconsultationEligibility(null);
+    } finally {
+      setTeleconsultationEligibilityLoading(false);
     }
   };
 
@@ -925,6 +950,7 @@ export function PreAtendimento() {
     }));
     setChecklistStep(0);
     setChecklistOpen(true);
+    await loadTeleconsultationEligibility(targetPatient.id);
     await loadChecklistAttachments(enrichedPatient.appointmentId || basePatient.appointmentId);
   };
 
@@ -996,7 +1022,7 @@ export function PreAtendimento() {
     }
   };
 
-  const handleFinishChecklist = async () => {
+  const handleFinishChecklist = async (sendTeleconsultationLink = false) => {
     if (!checklistPatient || !checklistPreAttendanceId || !hasValidPreAttendanceId(checklistPreAttendanceId)) {
       showNotification({
         title: 'Pré-atendimento inválido',
@@ -1007,6 +1033,9 @@ export function PreAtendimento() {
     }
     try {
       setChecklistLoading(true);
+      if (sendTeleconsultationLink) {
+        setTeleconsultationSendingLink(true);
+      }
       let generatedInvoice: any = null;
       const checklistPatientBirthDate = parseDisplayDateToApi(checklistPatient.dataNascimento);
       const checklistPatientGender = normalizeChecklistGenderForApi(checklistPatient.sexo);
@@ -1122,6 +1151,28 @@ export function PreAtendimento() {
 
       await loadReceptionPatients();
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+
+      if (sendTeleconsultationLink && checklistPreAttendanceId) {
+        try {
+          const sendResult = await teleconsultationLinkService.sendWhatsAppLink(checklistPreAttendanceId, {
+            notes: checklistData.observacoes || undefined,
+          });
+          showNotification({
+            title: 'Link de teleconsulta enviado',
+            message: sendResult.whatsappMock?.to
+              ? `Link enviado (mock) para ${sendResult.whatsappMock.to}.`
+              : 'Link gerado e envio (mock) concluído.',
+            color: 'green',
+          });
+        } catch (teleError: any) {
+          showNotification({
+            title: 'Checklist concluído, mas link não enviado',
+            message: teleError?.response?.data?.error || teleError?.response?.data?.message || teleError?.message || 'Não foi possível enviar o link da teleconsulta.',
+            color: 'yellow',
+          });
+        }
+      }
+
       setChecklistOpen(false);
       resetChecklist();
 
@@ -1140,6 +1191,7 @@ export function PreAtendimento() {
       });
     } finally {
       setChecklistLoading(false);
+      setTeleconsultationSendingLink(false);
     }
   };
 
@@ -2186,6 +2238,21 @@ export function PreAtendimento() {
                       )}
                     </Group>
 
+                    {teleconsultationEligibilityLoading ? (
+                      <Text size="sm" c="dimmed">Validando elegibilidade da teleconsulta...</Text>
+                    ) : teleconsultationEligibility?.isTeleconsultation ? (
+                      <Stack gap={4}>
+                        <Badge variant="light" color={teleconsultationEligibility.canSendLink ? 'green' : 'yellow'}>
+                          Teleconsulta
+                        </Badge>
+                        {!teleconsultationEligibility.canSendLink && teleconsultationEligibility.reasons.length > 0 && (
+                          <Text size="xs" c="dimmed">
+                            {teleconsultationEligibility.reasons.join(' ')}
+                          </Text>
+                        )}
+                      </Stack>
+                    ) : null}
+
                   </Stack>
                 </Box>
               </Stack>
@@ -2193,9 +2260,19 @@ export function PreAtendimento() {
           )}
 
           <Group justify="flex-end">
+            {teleconsultationEligibility?.isTeleconsultation && (
+              <Button
+                variant="light"
+                onClick={() => handleFinishChecklist(true)}
+                disabled={!canCompleteChecklist() || checklistLoading || teleconsultationSendingLink || !teleconsultationEligibility.canSendLink}
+                loading={checklistLoading || teleconsultationSendingLink}
+              >
+                Confirmar e enviar link
+              </Button>
+            )}
             <Button
               bg={DARK_BLUE}
-              onClick={handleFinishChecklist}
+              onClick={() => handleFinishChecklist(false)}
               disabled={!canCompleteChecklist() || checklistLoading}
               loading={checklistLoading}
             >

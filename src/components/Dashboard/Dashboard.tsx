@@ -9,6 +9,9 @@ import { WorkflowSections } from '../WorkflowSections/WorkflowSections';
 import { FacialCapture } from '../common/FacialCapture';
 import { PatientInfoModal } from './PatientInfoModal';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
+import authService from '../../services/authService';
+import { isDoctorUser } from '../../utils/userRole';
+import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 
 export function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -21,6 +24,9 @@ export function Dashboard() {
     nome: string;
     cpf: string;
   } | null>(null);
+  const { data: profileUser } = useCurrentUserProfileQuery();
+  const currentUser = (profileUser || authService.getCurrentUser()) as any;
+  const doctorView = isDoctorUser(currentUser);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000); // Atualiza a cada minuto
@@ -112,28 +118,30 @@ export function Dashboard() {
             <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
           </Stack>
 
-          <Button
-            size="lg"
-            leftSection={<Camera size={20} strokeWidth={2} />}
-            onClick={() => setFacialCaptureOpen(true)}
-            loading={recognizing}
-            variant="default"
-            radius="md"
-            styles={{
-              root: {
-                fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: 'var(--mantine-color-default-hover)',
+          {!doctorView ? (
+            <Button
+              size="lg"
+              leftSection={<Camera size={20} strokeWidth={2} />}
+              onClick={() => setFacialCaptureOpen(true)}
+              loading={recognizing}
+              variant="default"
+              radius="md"
+              styles={{
+                root: {
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: 'var(--mantine-color-default-hover)',
+                  },
                 },
-              },
-            }}
-          >
-            Identificar Paciente
-          </Button>
+              }}
+            >
+              Identificar Paciente
+            </Button>
+          ) : null}
         </Group>
 
-        <StatsCards />
-        <PatientQueue limit={3} />
+        <StatsCards user={currentUser} />
+        {!doctorView ? <PatientQueue limit={3} /> : null}
         <WorkflowSections />
       </Box>
 

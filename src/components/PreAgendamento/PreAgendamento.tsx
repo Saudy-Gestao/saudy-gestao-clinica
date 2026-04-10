@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Group,
+  Menu,
   Modal,
   Paper,
   SegmentedControl,
@@ -17,13 +18,14 @@ import {
   Textarea,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Copy, ExternalLink, Link as LinkIcon, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Copy, ExternalLink, FileSearch, Link as LinkIcon, MoreVertical, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import preSchedulingService, { type PreSchedulingItem, type PreSchedulingStatus } from '../../services/preSchedulingService';
+import teleconsultationLinkService from '../../services/teleconsultationLinkService';
 import { formatCPF } from '../../utils/formatters';
 import { usePreSchedulingsQuery } from '../../hooks/usePreSchedulingsQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -148,6 +150,7 @@ export function PreAgendamento() {
   const [savingPreAuth, setSavingPreAuth] = useState(false);
 
   const [linkOpen, setLinkOpen] = useState(false);
+  const [linkMode, setLinkMode] = useState<'DOCS' | 'TELECONSULTA'>('DOCS');
   const [sendingLink, setSendingLink] = useState(false);
   const [linkResult, setLinkResult] = useState<{ publicUrl: string; message: string; to?: string | null } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -178,6 +181,7 @@ export function PreAgendamento() {
   } | null>(null);
   const [savingReview, setSavingReview] = useState(false);
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null);
+  const [manualFinalizingId, setManualFinalizingId] = useState<string | null>(null);
   const preSchedulingsQuery = usePreSchedulingsQuery({
     search,
     status: statusFilter,
@@ -253,28 +257,36 @@ export function PreAgendamento() {
     }
   };
 
-  const openSendLink = (item: PreSchedulingItem) => {
+  const openSendLink = (item: PreSchedulingItem, mode: 'DOCS' | 'TELECONSULTA' = 'DOCS') => {
     setSelectedItem(item);
+    setLinkMode(mode);
     setLinkResult(null);
     setLinkOpen(true);
   };
 
-  const handleSendLink = async () => {
+  const handleSendLink = async (mode: 'DOCS' | 'TELECONSULTA' = linkMode) => {
     if (!selectedItem) return;
     setSendingLink(true);
     try {
-      const data = await preSchedulingService.sendLink(selectedItem.appointmentId);
+      const data: any = mode === 'TELECONSULTA'
+        ? await teleconsultationLinkService.sendWhatsAppLinkByAppointment(selectedItem.appointmentId)
+        : await preSchedulingService.sendLink(selectedItem.appointmentId);
       setLinkResult({
-        publicUrl: data.publicUrl,
+        publicUrl: data.publicUrl || data.links?.patientUrl,
         message: data.whatsappMock?.message || '',
         to: data.whatsappMock?.to,
       });
       showNotification({
         title: 'Link enviado (mock)',
-        message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
+        message: mode === 'TELECONSULTA'
+          ? 'Link de teleconsulta gerado com sucesso.'
+          : (data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.'),
         color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
+      if (mode === 'TELECONSULTA') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+      }
     } catch (err: any) {
       showNotification({
         title: 'Erro ao enviar link',
@@ -327,6 +339,27 @@ export function PreAgendamento() {
       });
     } finally {
       setSavingReview(false);
+    }
+  };
+
+  const handleManualFinalize = async (item: PreSchedulingItem) => {
+    setManualFinalizingId(item.appointmentId);
+    try {
+      const data = await preSchedulingService.manualFinalize(item.appointmentId);
+      showNotification({
+        title: 'Finalização concluída',
+        message: data?.message || 'Fluxo finalizado manualmente com sucesso.',
+        color: 'green',
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao finalizar',
+        message: err?.response?.data?.error || err?.message || 'Não foi possível finalizar manualmente.',
+        color: 'red',
+      });
+    } finally {
+      setManualFinalizingId(null);
     }
   };
 
@@ -454,6 +487,11 @@ export function PreAgendamento() {
                                 >
                                   {item.source === 'BOT' ? 'BOT' : 'COMUM'}
                                 </Badge>
+                                {item.isTeleconsultation && (
+                                  <Badge size="xs" variant="light" color="cyan">
+                                    TELECONSULTA
+                                  </Badge>
+                                )}
                               </Group>
                               <Text size="xs" c="dimmed">{formatCPF(item.patientCpf || '') || '-'}</Text>
                             </Stack>
@@ -478,34 +516,76 @@ export function PreAgendamento() {
                             </Badge>
                           </Table.Td>
                           <Table.Td>
-                            <Group gap="xs" wrap="nowrap">
-                              <Button
-                                size="xs"
-                                variant="light"
-                                leftSection={<ShieldCheck size={14} />}
-                                disabled={item.isResolved || viewMode === 'history'}
-                                onClick={() => openPreAuthorize(item)}
-                              >
-                                Pré-autorizar
-                              </Button>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                leftSection={<LinkIcon size={14} />}
-                                disabled={item.isResolved || viewMode === 'history' || item.preSchedulingStatus === 'COMPLETED'}
-                                onClick={() => openSendLink(item)}
-                              >
-                                Enviar link
-                              </Button>
-                              <Button
-                                size="xs"
-                                variant="default"
-                                disabled={!item.docsCount}
-                                onClick={() => openReview(item)}
-                              >
-                                Revisar docs
-                              </Button>
-                            </Group>
+                            <Menu shadow="md" width={220} position="bottom-end" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                {(() => {
+                                  const isPreAuthorized = Boolean(item.preAuthorizedAt);
+                                  const status = item.preSchedulingStatus;
+                                  const canReviewDocs = Boolean(item.docsCount);
+                                  const isCanceled = status === 'CANCELED';
+                                  const isCompleted = status === 'COMPLETED';
+                                  const canManualFinalize = Boolean(item.isTeleconsultation) && isPreAuthorized && !isCanceled && !item.isResolved;
+
+                                  return (
+                                    <>
+                                <Menu.Item
+                                  leftSection={<ShieldCheck size={14} />}
+                                  disabled={item.isResolved || viewMode === 'history' || isPreAuthorized || isCanceled}
+                                  onClick={() => openPreAuthorize(item)}
+                                >
+                                  Pré-autorizar
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<LinkIcon size={14} />}
+                                  disabled={
+                                    viewMode === 'history'
+                                    || isCanceled
+                                    || isCompleted
+                                  }
+                                  onClick={() => openSendLink(item, 'DOCS')}
+                                >
+                                  Enviar link docs
+                                </Menu.Item>
+                                {item.isTeleconsultation && (
+                                  <Menu.Item
+                                    leftSection={<LinkIcon size={14} />}
+                                    disabled={
+                                      viewMode === 'history'
+                                      || !isPreAuthorized
+                                      || isCanceled
+                                      || Boolean(item.teleconsultationLinkSent)
+                                    }
+                                    onClick={() => openSendLink(item, 'TELECONSULTA')}
+                                  >
+                                    Enviar link teleconsulta
+                                  </Menu.Item>
+                                )}
+                                <Menu.Item
+                                  leftSection={<FileSearch size={14} />}
+                                  disabled={!canReviewDocs}
+                                  onClick={() => openReview(item)}
+                                >
+                                  Revisar docs
+                                </Menu.Item>
+                                {item.isTeleconsultation && (
+                                  <Menu.Item
+                                    leftSection={<CheckCircle2 size={14} />}
+                                    disabled={!canManualFinalize || manualFinalizingId === item.appointmentId}
+                                    onClick={() => handleManualFinalize(item)}
+                                  >
+                                    Finalizar manualmente
+                                  </Menu.Item>
+                                )}
+                                    </>
+                                  );
+                                })()}
+                              </Menu.Dropdown>
+                            </Menu>
                           </Table.Td>
                         </Table.Tr>
                       ))
@@ -543,7 +623,13 @@ export function PreAgendamento() {
         </Stack>
       </Modal>
 
-      <Modal opened={linkOpen} onClose={() => setLinkOpen(false)} title="Envio de link (WhatsApp mock)" centered size="lg">
+      <Modal
+        opened={linkOpen}
+        onClose={() => setLinkOpen(false)}
+        title={linkMode === 'TELECONSULTA' ? 'Envio de link de teleconsulta (WhatsApp mock)' : 'Envio de link de documentos (WhatsApp mock)'}
+        centered
+        size="lg"
+      >
         <Stack>
           <Text size="sm" c="dimmed">
             {selectedItem?.patientName || 'Paciente'} • {selectedItem?.specialty || 'Procedimento'}
@@ -552,7 +638,13 @@ export function PreAgendamento() {
           {!linkResult ? (
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setLinkOpen(false)}>Cancelar</Button>
-              <Button color="darkBlue" onClick={handleSendLink} loading={sendingLink}>Gerar e enviar link</Button>
+              <Button
+                color="darkBlue"
+                onClick={() => handleSendLink(linkMode)}
+                loading={sendingLink}
+              >
+                Gerar e enviar link
+              </Button>
             </Group>
           ) : (
             <>

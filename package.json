@@ -6,6 +6,7 @@
   "description": "Sistema de gestão clínica Saudy",
   "scripts": {
     "dev": "vite",
+    "dev:network": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

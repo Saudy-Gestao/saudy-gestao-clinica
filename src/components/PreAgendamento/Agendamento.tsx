@@ -59,6 +59,7 @@ interface Agendamento {
   data: string;
   hora: string;
   tipoConsulta: string;
+  modalidadeAtendimento: 'Presencial' | 'Teleconsulta';
   status: string;
   observacoes: string;
   totem?: number;
@@ -78,6 +79,7 @@ interface NovoAgendamento {
   hora: string;
   profissional: string;
   tipoConsulta: string;
+  modalidadeAtendimento: 'Presencial' | 'Teleconsulta';
   informacoes: string;
 }
 
@@ -107,6 +109,7 @@ interface ProcedureMeta {
   doctorNames: string[];
   acceptsInsurance: boolean;
   acceptedInsurances: string[];
+  supportsTeleconsultation: boolean;
 }
 
 interface SuggestedProcedureSchedule {
@@ -157,6 +160,7 @@ const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   hora: '',
   profissional: '',
   tipoConsulta: 'CONSULTA',
+  modalidadeAtendimento: 'Presencial',
   informacoes: '',
 };
 
@@ -172,6 +176,32 @@ const INITIAL_PENDING_PATIENT: PendingPatientRegistration = {
 const PARTICULAR_INSURANCE_LABEL = 'Particular';
 const PARTICULAR_STATUS_LABEL = 'Particular';
 const NOT_APPLICABLE_LABEL = 'Não se aplica';
+const TELECONSULT_MODALITY = 'Telemedicina';
+const TELECONSULTATION_SPECIALTY_FLAG = '__TELECONSULTA__';
+const TELECONSULTATION_OBSERVATION_MARKER = '[MODALIDADE: TELECONSULTA]';
+
+const stripTeleconsultationMarker = (value?: string | null): string => String(value || '')
+  .split('\n')
+  .map((line) => line.trim())
+  .filter((line) => line && line !== TELECONSULTATION_OBSERVATION_MARKER)
+  .join('\n')
+  .trim();
+
+const getAppointmentModalityFromObservation = (value?: string | null): 'Presencial' | 'Teleconsulta' => {
+  const normalized = String(value || '').toUpperCase();
+  return normalized.includes(TELECONSULTATION_OBSERVATION_MARKER) ? 'Teleconsulta' : 'Presencial';
+};
+
+const buildAppointmentObservations = (
+  value: string,
+  modality: 'Presencial' | 'Teleconsulta',
+): string | undefined => {
+  const base = stripTeleconsultationMarker(value);
+  if (modality === 'Teleconsulta') {
+    return base ? `${TELECONSULTATION_OBSERVATION_MARKER}\n${base}` : TELECONSULTATION_OBSERVATION_MARKER;
+  }
+  return base || undefined;
+};
 
 const resolvePatientInsuranceName = (patient: any): string => {
   const insuranceName = String(
@@ -570,8 +600,9 @@ export function Agendamento() {
     data: normalizeDateOnly(it.date || it.data || ''),
     hora: it.time || it.hora || '',
     tipoConsulta: it.type || it.tipoConsulta || 'CONSULTA',
+    modalidadeAtendimento: getAppointmentModalityFromObservation(it.observations || it.observacoes || ''),
     status: normalizeAppointmentStatus(it.status),
-    observacoes: it.observations || it.observacoes || '',
+    observacoes: stripTeleconsultationMarker(it.observations || it.observacoes || ''),
     totem: it.totem ?? undefined,
     durationMinutes: Number.isFinite(Number(it.durationMinutes)) ? Number(it.durationMinutes) : null,
   });
@@ -898,6 +929,13 @@ export function Agendamento() {
         acceptedInsurances: Array.isArray(item.acceptedInsurances)
           ? item.acceptedInsurances.map((insurance: any) => String(insurance || '').trim()).filter(Boolean)
           : [],
+        supportsTeleconsultation:
+          normalizeProcedureAppointmentType(item.appointmentType) === 'CONSULTA'
+          && (
+            Array.isArray(item.modalities)
+              ? item.modalities.some((modality: any) => String(modality || '').trim() === TELECONSULT_MODALITY)
+              : Boolean(item.supportsTeleconsultation)
+          ),
       };
       return acc;
     }, {});
@@ -984,6 +1022,7 @@ export function Agendamento() {
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
       tipoConsulta: agendamento.tipoConsulta,
+      modalidadeAtendimento: agendamento.modalidadeAtendimento || 'Presencial',
       informacoes: agendamento.observacoes,
     });
     const specialties = agendamento.especialidade
@@ -1024,6 +1063,7 @@ export function Agendamento() {
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
       tipoConsulta: agendamento.tipoConsulta,
+      modalidadeAtendimento: agendamento.modalidadeAtendimento || 'Presencial',
       informacoes: agendamento.observacoes,
     });
     const specialties = agendamento.especialidade
@@ -1315,7 +1355,10 @@ export function Agendamento() {
           date: formatDateForApi(novoAgendamento.data),
           time: novoAgendamento.hora,
           type: resolvedAppointmentType,
-          observations: novoAgendamento.informacoes || undefined,
+          observations: buildAppointmentObservations(
+            novoAgendamento.informacoes || '',
+            novoAgendamento.modalidadeAtendimento,
+          ),
         };
         await appointmentService.update(editingAgendamentoId, {
           ...basePayload,
@@ -1372,7 +1415,10 @@ export function Agendamento() {
               date: formatDateForApi(suggestion.date),
               time: suggestion.time,
               type: deriveAppointmentType([suggestion.procedure], novoAgendamento.tipoConsulta),
-              observations: novoAgendamento.informacoes || undefined,
+              observations: buildAppointmentObservations(
+                novoAgendamento.informacoes || '',
+                novoAgendamento.modalidadeAtendimento,
+              ),
               status: 'AGENDADO',
               totem: Math.floor(Math.random() * 100) + 1,
               rescheduledFromAppointmentId: rescheduleSourceId || undefined,
@@ -1396,7 +1442,10 @@ export function Agendamento() {
             date: formatDateForApi(novoAgendamento.data),
             time: novoAgendamento.hora,
             type: resolvedAppointmentType,
-            observations: novoAgendamento.informacoes || undefined,
+            observations: buildAppointmentObservations(
+              novoAgendamento.informacoes || '',
+              novoAgendamento.modalidadeAtendimento,
+            ),
             status: 'AGENDADO',
             totem: Math.floor(Math.random() * 100) + 1,
             rescheduledFromAppointmentId: rescheduleSourceId || undefined,
@@ -1552,7 +1601,8 @@ export function Agendamento() {
       hora: appt.time || '',
       profissional: appt.doctorName || '',
       tipoConsulta: appt.type || '',
-      informacoes: appt.observations || '',
+      modalidadeAtendimento: getAppointmentModalityFromObservation(appt.observations || ''),
+      informacoes: stripTeleconsultationMarker(appt.observations || ''),
     });
     setSelectedSpecialties(specialties);
     setIsEditing(true);
@@ -1572,6 +1622,21 @@ export function Agendamento() {
 
   const schedulingDate = viewedDate || novoAgendamento.data || dataHoraFiltro || new Date();
   const resolvedAppointmentType = deriveAppointmentType(selectedSpecialties, novoAgendamento.tipoConsulta);
+  const selectedDoctorMeta = novoAgendamento.profissional ? doctorMetaByName[novoAgendamento.profissional] : undefined;
+  const selectedDoctorSupportsTeleconsultation = Boolean(
+    selectedDoctorMeta
+    && Array.isArray(selectedDoctorMeta.specialties)
+    && selectedDoctorMeta.specialties.some((item) => String(item) === TELECONSULTATION_SPECIALTY_FLAG),
+  );
+  const selectedProceduresSupportTeleconsultation = Boolean(
+    selectedSpecialties.length > 0
+    && selectedSpecialties.every((name) => Boolean(procedureMetaByName[name]?.supportsTeleconsultation)),
+  );
+  const canScheduleAsTeleconsultation = Boolean(
+    resolvedAppointmentType === 'CONSULTA'
+    && selectedProceduresSupportTeleconsultation
+    && selectedDoctorSupportsTeleconsultation,
+  );
   const isMultiProcedureFlow = selectedSpecialties.length > 1;
   const anchorSelection = manualProcedureSelections[0] || null;
   const getSelectableProceduresForSlot = (doctorName: string, time: string, date: Date) => {
@@ -1745,6 +1810,12 @@ export function Agendamento() {
     ) &&
     (!isManualPatientFlow || pendingPatientReadyForCreation),
   );
+
+  useEffect(() => {
+    if (!canScheduleAsTeleconsultation && novoAgendamento.modalidadeAtendimento === 'Teleconsulta') {
+      setNovoAgendamento((prev) => ({ ...prev, modalidadeAtendimento: 'Presencial' }));
+    }
+  }, [canScheduleAsTeleconsultation, novoAgendamento.modalidadeAtendimento]);
   
   const safeSchedulerDoctors = Array.isArray(schedulerDoctors) ? schedulerDoctors : [];
   const doctorSlotsByName = safeSchedulerDoctors.reduce<Record<string, string[]>>((acc, doctorName) => {
@@ -3178,6 +3249,22 @@ export function Agendamento() {
               <FloatingInput label="Convênio" value={novoAgendamento.convenio || ''} readOnly />
               <FloatingInput label="Procedimento" value={selectedProcedureSummary.join(', ')} readOnly />
               <FloatingInput label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
+              <FloatingSelect
+                label="Modalidade"
+                data={[
+                  { value: 'Presencial', label: 'Presencial' },
+                  ...(canScheduleAsTeleconsultation ? [{ value: 'Teleconsulta', label: 'Teleconsulta' }] : []),
+                ]}
+                value={novoAgendamento.modalidadeAtendimento}
+                onChange={(value) => setNovoAgendamento((prev) => ({
+                  ...prev,
+                  modalidadeAtendimento: value === 'Teleconsulta' ? 'Teleconsulta' : 'Presencial',
+                }))}
+                disabled={!canScheduleAsTeleconsultation}
+                description={!canScheduleAsTeleconsultation
+                  ? 'Teleconsulta disponível apenas quando procedimento e médico estão habilitados.'
+                  : undefined}
+              />
               <FloatingInput label="Data" value={reviewDateValue ? dayjs(reviewDateValue).format('DD/MM/YYYY') : ''} readOnly />
               <FloatingInput label="Horário" value={reviewTimeValue} readOnly />
               <FloatingInput label="Profissional respons." value={reviewProfessionalValue} readOnly />
@@ -3862,6 +3949,7 @@ export function Agendamento() {
                 { label: 'Convenio', value: detailAppointment.convenio || 'Nao informado' },
                 { label: 'Data', value: detailAppointment.data ? dayjs(detailAppointment.data).format('DD/MM/YYYY') : 'Nao informada' },
                 { label: 'Horario', value: detailAppointment.hora || 'Nao informado' },
+                { label: 'Modalidade', value: detailAppointment.modalidadeAtendimento || 'Presencial' },
                 { label: 'Profissional', value: detailAppointment.medicoNome || 'Nao informado' },
                 { label: 'Status', value: detailAppointment.status || 'Nao informado' },
               ].map((item) => (

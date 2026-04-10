@@ -1,17 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import userService from '../services/userService';
+import accessService from '../services/accessService';
 import { queryKeys } from '../lib/queryKeys';
 
-export const fetchSettingsAccesses = async () => {
-  const userStr = localStorage.getItem('user');
-  if (!userStr) return [];
-
-  const user = JSON.parse(userStr);
-  if (!user?.id) return [];
-
-  const freshUser = await userService.getUser(user.id);
-  return freshUser.accesses || [];
-};
+export const fetchSettingsAccesses = async () => accessService.listAccesses();
 
 export const useSettingsAccessesQuery = () => useQuery({
   queryKey: queryKeys.settingsAccesses,
