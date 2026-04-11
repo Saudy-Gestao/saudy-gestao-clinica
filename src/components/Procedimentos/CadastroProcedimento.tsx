@@ -26,6 +26,7 @@ import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import procedureService from '../../services/procedureService';
+import inventoryService from '../../services/inventoryService';
 import ResultModal from '../common/ResultModal';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
@@ -53,6 +54,15 @@ interface ProcedureForm {
   modalities: string[];
   doctorIds: string[];
   procedureMaterials: { inventoryItemId: string; quantity: number }[];
+  procedureKitBindings: ProcedureKitBindingForm[];
+}
+
+interface ProcedureKitBindingForm {
+  id: string;
+  inventoryKitId: string;
+  inventoryKitName: string;
+  insuranceName?: string | null;
+  isActive: boolean;
 }
 
 interface ProcedureItem {
@@ -85,6 +95,7 @@ const INITIAL_FORM: ProcedureForm = {
   modalities: [],
   doctorIds: [],
   procedureMaterials: [],
+  procedureKitBindings: [],
 };
 
 const TELECONSULT_MODALITY = 'Telemedicina';
@@ -128,6 +139,11 @@ export function CadastroProcedimento() {
   const [materialDirectory, setMaterialDirectory] = useState<Record<string, { name: string; code?: string; unit?: string }>>({});
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [selectedMaterialQuantity, setSelectedMaterialQuantity] = useState<number | ''>(1);
+  const [inventoryKitOptions, setInventoryKitOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [inventoryKitLabelById, setInventoryKitLabelById] = useState<Record<string, string>>({});
+  const [selectedBindingKitId, setSelectedBindingKitId] = useState<string | null>(null);
+  const [selectedBindingInsurance, setSelectedBindingInsurance] = useState<string | null>(null);
+  const [loadingKits, setLoadingKits] = useState(false);
   const proceduresQuery = useProceduresAdminQuery();
   const doctorsQuery = useDoctorsAdminQuery();
   const insurancesQuery = useInsurancesAdminQuery();
@@ -336,6 +352,41 @@ export function CadastroProcedimento() {
     );
   }, [inventoryItemsQuery.data]);
 
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      setLoadingKits(true);
+      try {
+        const data: any = await inventoryService.getKits({ limit: 500, offset: 0 });
+        const list = Array.isArray(data?.items) ? data.items : [];
+        if (!mounted) return;
+        const options = list
+          .filter((item: any) => item?.id && item?.isActive !== false)
+          .map((item: any) => ({ value: String(item.id), label: String(item.name || 'Kit') }))
+          .sort((a: any, b: any) => a.label.localeCompare(b.label));
+        setInventoryKitOptions(options);
+        setInventoryKitLabelById(
+          options.reduce((acc: Record<string, string>, item: any) => {
+            acc[item.value] = item.label;
+            return acc;
+          }, {}),
+        );
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro',
+          message: resolveApiErrorMessage(err, 'Erro ao carregar kits de insumos'),
+          color: 'red',
+        });
+      } finally {
+        if (mounted) setLoadingKits(false);
+      }
+    };
+    void run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       showNotification({
@@ -371,6 +422,11 @@ export function CadastroProcedimento() {
         ],
         doctors,
         procedureMaterials: form.procedureMaterials,
+        procedureKitBindings: form.procedureKitBindings.map((binding) => ({
+          inventoryKitId: binding.inventoryKitId,
+          insuranceName: binding.insuranceName || null,
+          isActive: Boolean(binding.isActive),
+        })),
       };
 
       if (editingProcedureId) {
@@ -380,6 +436,8 @@ export function CadastroProcedimento() {
         setForm(INITIAL_FORM);
         setSelectedMaterialId(null);
         setSelectedMaterialQuantity(1);
+        setSelectedBindingKitId(null);
+        setSelectedBindingInsurance(null);
         setActiveTab('lista');
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
@@ -390,6 +448,8 @@ export function CadastroProcedimento() {
         setForm(INITIAL_FORM);
         setSelectedMaterialId(null);
         setSelectedMaterialQuantity(1);
+        setSelectedBindingKitId(null);
+        setSelectedBindingInsurance(null);
         setProcedureQuery('');
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
@@ -408,12 +468,16 @@ export function CadastroProcedimento() {
       setForm(INITIAL_FORM);
       setSelectedMaterialId(null);
       setSelectedMaterialQuantity(1);
+      setSelectedBindingKitId(null);
+      setSelectedBindingInsurance(null);
       setActiveTab('lista');
       return;
     }
     setForm(INITIAL_FORM);
     setSelectedMaterialId(null);
     setSelectedMaterialQuantity(1);
+    setSelectedBindingKitId(null);
+    setSelectedBindingInsurance(null);
     navigate('/dashboard');
   };
 
@@ -422,6 +486,9 @@ export function CadastroProcedimento() {
       ...prev,
       acceptsInsurance: checked,
       acceptedInsurances: checked ? prev.acceptedInsurances : [],
+      procedureKitBindings: checked
+        ? prev.procedureKitBindings
+        : prev.procedureKitBindings.filter((binding) => !binding.insuranceName),
     }));
     setCustomInsuranceInput('');
     if (checked) {
@@ -505,6 +572,66 @@ export function CadastroProcedimento() {
     }));
   };
 
+  const createBindingId = () => `binding-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const handleAddKitBinding = () => {
+    if (!selectedBindingKitId) {
+      showNotification({
+        title: 'Kit obrigatório',
+        message: 'Selecione um kit para vincular.',
+        color: 'red',
+      });
+      return;
+    }
+
+    const insuranceName = String(selectedBindingInsurance || '').trim() || null;
+    if (insuranceName && !form.acceptsInsurance) {
+      showNotification({
+        title: 'Convênio desabilitado',
+        message: 'Ative "Aceita convênio" para criar vínculo por convênio.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const duplicate = form.procedureKitBindings.some((binding) =>
+      binding.inventoryKitId === selectedBindingKitId
+      && String(binding.insuranceName || '').trim().toLowerCase() === String(insuranceName || '').toLowerCase(),
+    );
+    if (duplicate) {
+      showNotification({
+        title: 'Vínculo duplicado',
+        message: 'Esse kit já está vinculado para este convênio.',
+        color: 'red',
+      });
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      procedureKitBindings: [
+        ...prev.procedureKitBindings,
+        {
+          id: createBindingId(),
+          inventoryKitId: selectedBindingKitId,
+          inventoryKitName: inventoryKitLabelById[selectedBindingKitId] || selectedBindingKitId,
+          insuranceName,
+          isActive: true,
+        },
+      ],
+    }));
+
+    setSelectedBindingKitId(null);
+    setSelectedBindingInsurance(null);
+  };
+
+  const handleRemoveKitBinding = (bindingId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      procedureKitBindings: prev.procedureKitBindings.filter((binding) => binding.id !== bindingId),
+    }));
+  };
+
   const handleToggleActive = async (item: ProcedureItem) => {
     try {
       await procedureService.updateProcedure(item.id, {
@@ -558,10 +685,27 @@ export function CadastroProcedimento() {
               }))
               .filter((item: { inventoryItemId: string; quantity: number }) => item.inventoryItemId && Number.isFinite(item.quantity) && item.quantity > 0)
           : [],
+        procedureKitBindings: Array.isArray(data?.kitBindings)
+          ? data.kitBindings
+              .map((binding: any, index: number) => {
+                const inventoryKitId = String(binding?.inventoryKitId || binding?.inventoryKit?.id || '').trim();
+                if (!inventoryKitId) return null;
+                return {
+                  id: String(binding?.id || `binding-loaded-${index}`),
+                  inventoryKitId,
+                  inventoryKitName: String(binding?.inventoryKit?.name || inventoryKitLabelById[inventoryKitId] || inventoryKitId),
+                  insuranceName: String(binding?.insuranceName || '').trim() || null,
+                  isActive: binding?.isActive === undefined ? true : Boolean(binding.isActive),
+                };
+              })
+              .filter(Boolean) as ProcedureKitBindingForm[]
+          : [],
       });
 
       setEditingProcedureId(procedureId);
       setActiveTab('cadastro');
+      setSelectedBindingKitId(null);
+      setSelectedBindingInsurance(null);
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -793,6 +937,72 @@ export function CadastroProcedimento() {
                     </Table.Tbody>
                   </Table>
                 </Box>
+
+                <SectionTitle>Kits de insumos (por procedimento/convênio)</SectionTitle>
+                <Text size="sm" c="dimmed" mb="sm">
+                  O cadastro do kit é feito no módulo Estoque. Aqui você apenas vincula os kits ao procedimento (padrão e por convênio).
+                </Text>
+
+                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="md">
+                  <FloatingSelect
+                    label="Kit do estoque"
+                    placeholder="Selecione o kit"
+                    data={[
+                      ...inventoryKitOptions,
+                    ]}
+                    value={selectedBindingKitId}
+                    onChange={setSelectedBindingKitId}
+                    rightSection={loadingKits ? <Loader size={16} /> : undefined}
+                    searchable
+                  />
+                  <FloatingSelect
+                    label="Convênio (opcional)"
+                    data={[
+                      { value: '__NONE__', label: 'Sem convênio (padrão)' },
+                      ...form.acceptedInsurances.map((insurance) => ({ value: insurance, label: insurance })),
+                    ]}
+                    value={selectedBindingInsurance ?? '__NONE__'}
+                    onChange={(value) => setSelectedBindingInsurance(value && value !== '__NONE__' ? String(value) : null)}
+                    disabled={!form.acceptsInsurance && form.acceptedInsurances.length === 0}
+                    searchable
+                  />
+                  <Group align="end">
+                    <Button variant="default" fullWidth onClick={handleAddKitBinding}>
+                      Vincular kit
+                    </Button>
+                  </Group>
+                </SimpleGrid>
+
+                <Stack gap="md" mt="md">
+                  {form.procedureKitBindings.length === 0 ? (
+                    <Paper withBorder radius="md" p="md">
+                      <Text size="sm" c="dimmed" ta="center">
+                        Nenhum kit vinculado ao procedimento.
+                      </Text>
+                    </Paper>
+                  ) : (
+                    form.procedureKitBindings.map((binding) => (
+                      <Paper key={binding.id} withBorder radius="md" p="md">
+                        <Group justify="space-between" align="center" mb="sm" wrap="wrap">
+                          <Group gap="xs">
+                            <Text fw={600}>{binding.inventoryKitName}</Text>
+                            <Badge color={binding.insuranceName ? 'teal' : 'blue'} variant="light">
+                              {binding.insuranceName ? `Convênio: ${binding.insuranceName}` : 'Vínculo padrão'}
+                            </Badge>
+                          </Group>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            onClick={() => handleRemoveKitBinding(binding.id)}
+                            title="Remover vínculo"
+                          >
+                            <X size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Paper>
+                    ))
+                  )}
+                </Stack>
 
                 <Group justify="space-between" mt="xl" wrap="wrap">
                   <Button variant="default" onClick={handleCancel} fullWidth={isMobile}>
