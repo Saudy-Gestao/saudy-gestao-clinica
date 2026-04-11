@@ -9,16 +9,18 @@ import {
   Menu,
   Modal,
   Paper,
-  SegmentedControl,
   Skeleton,
   Stack,
   Table,
   Text,
   TextInput,
   Textarea,
+  UnstyledButton,
+  SimpleGrid,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, FileSearch, Link as LinkIcon, MoreVertical, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, FileSearch, History, Link as LinkIcon, MoreVertical, ShieldCheck, BriefcaseBusiness } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
@@ -142,7 +144,8 @@ export function PreAgendamento() {
   const [items, setItems] = useState<PreSchedulingItem[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'queue' | 'history'>('queue');
+  const [viewMode, setViewMode] = useState<'hub' | 'queue' | 'history'>('hub');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [preAuthOpen, setPreAuthOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PreSchedulingItem | null>(null);
@@ -406,69 +409,164 @@ export function PreAgendamento() {
           </Group>
         </Group>
 
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+        <Paper
+          p="md"
+          withBorder={viewMode !== 'hub'}
+          style={viewMode !== 'hub' ? { borderColor: 'var(--mantine-color-default-border)' } : undefined}
+        >
           <Stack gap="md">
-            <Group justify="space-between" wrap="wrap">
-              <SegmentedControl
-                value={viewMode}
-                onChange={(value) => setViewMode(value as 'queue' | 'history')}
-                data={[
-                  { label: 'Fila de trabalho', value: 'queue' },
-                  { label: 'Histórico', value: 'history' },
-                ]}
-              />
-              <Text size="sm" c="dimmed">
-                {viewMode === 'queue'
-                  ? 'Mostrando somente itens pendentes de ação'
-                  : 'Mostrando itens concluídos (auditoria)'}
-              </Text>
-            </Group>
+            {viewMode === 'hub' ? (
+              <Box
+                style={{
+                  minHeight: '52vh',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+                  <UnstyledButton
+                    onClick={() => setViewMode('queue')}
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 16,
+                      padding: '24px',
+                      background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                      textAlign: 'left',
+                      minHeight: 220,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Stack gap={8}>
+                      <Group gap="xs">
+                        <Box
+                          w={34}
+                          h={34}
+                          style={{
+                            borderRadius: 10,
+                            background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BriefcaseBusiness size={16} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                        </Box>
+                        <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Fila de trabalho</Text>
+                      </Group>
+                      <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                        Itens pendentes para pré-autorização, envio de links e revisão de documentos.
+                      </Text>
+                    </Stack>
+                  </UnstyledButton>
 
-            <Group grow align="flex-end">
-              <FloatingInput
-                label="Buscar"
-                alwaysFloatLabel
-                placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
-                value={search}
-                onChange={(e) => setSearch(e.currentTarget.value)}
-                containerProps={{ style: { minHeight: 64 } }}
-              />
-              <FloatingSelect
-                label="Status"
-                alwaysFloatLabel
-                data={statusOptions}
-                clearable
-                value={statusFilter}
-                onChange={setStatusFilter}
-                containerProps={{ style: { minHeight: 64 } }}
-              />
-            </Group>
-
-            {loading && items.length === 0 ? (
-              <PreSchedulingTableSkeleton />
+                  <UnstyledButton
+                    onClick={() => setViewMode('history')}
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 16,
+                      padding: '24px',
+                      background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                      textAlign: 'left',
+                      minHeight: 220,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Stack gap={8}>
+                      <Group gap="xs">
+                        <Box
+                          w={34}
+                          h={34}
+                          style={{
+                            borderRadius: 10,
+                            background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <History size={16} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                        </Box>
+                        <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Histórico</Text>
+                      </Group>
+                      <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                        Auditoria dos fluxos concluídos, links enviados e revisões finalizadas.
+                      </Text>
+                    </Stack>
+                  </UnstyledButton>
+                </SimpleGrid>
+              </Box>
             ) : (
-              <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
-                <Table verticalSpacing="sm" horizontalSpacing="md">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Paciente</Table.Th>
-                      <Table.Th>Agendamento</Table.Th>
-                      <Table.Th>Médico</Table.Th>
-                      <Table.Th>Convênio</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Docs</Table.Th>
-                      <Table.Th>Ações</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {items.length === 0 ? (
-                      <Table.Tr>
-                        <Table.Td colSpan={7}>
-                          <Text c="dimmed" ta="center" py="md">Nenhum agendamento confirmado encontrado.</Text>
-                        </Table.Td>
-                      </Table.Tr>
-                    ) : (
-                      items.map((item) => (
+              <Group justify="space-between" wrap="wrap">
+                <Group gap="xs">
+                  <Button
+                    variant="default"
+                    leftSection={<ChevronLeft size={16} />}
+                    onClick={() => setViewMode('hub')}
+                  >
+                    Voltar
+                  </Button>
+                  <Text fw={700}>
+                    {viewMode === 'queue' ? 'Fila de trabalho' : 'Histórico'}
+                  </Text>
+                </Group>
+                <Text size="sm" c="dimmed">
+                  {viewMode === 'queue'
+                    ? 'Mostrando somente itens pendentes de ação'
+                    : 'Mostrando itens concluídos (auditoria)'}
+                </Text>
+              </Group>
+            )}
+
+            {viewMode === 'hub' ? null : (
+              <>
+                <Group grow align="flex-end">
+                  <FloatingInput
+                    label="Buscar"
+                    alwaysFloatLabel
+                    placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
+                    value={search}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                    containerProps={{ style: { minHeight: 64 } }}
+                  />
+                  <FloatingSelect
+                    label="Status"
+                    alwaysFloatLabel
+                    data={statusOptions}
+                    clearable
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    containerProps={{ style: { minHeight: 64 } }}
+                  />
+                </Group>
+
+                {loading && items.length === 0 ? (
+                  <PreSchedulingTableSkeleton />
+                ) : (
+                  <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                    <Table verticalSpacing="sm" horizontalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Paciente</Table.Th>
+                          <Table.Th>Agendamento</Table.Th>
+                          <Table.Th>Médico</Table.Th>
+                          <Table.Th>Convênio</Table.Th>
+                          <Table.Th>Status</Table.Th>
+                          <Table.Th>Docs</Table.Th>
+                          <Table.Th>Ações</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {items.length === 0 ? (
+                          <Table.Tr>
+                            <Table.Td colSpan={7}>
+                              <Text c="dimmed" ta="center" py="md">Nenhum agendamento confirmado encontrado.</Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ) : (
+                          items.map((item) => (
                         <Table.Tr key={item.appointmentId}>
                           <Table.Td>
                             <Stack gap={4}>
@@ -582,12 +680,14 @@ export function PreAgendamento() {
                               </Menu.Dropdown>
                             </Menu>
                           </Table.Td>
-                        </Table.Tr>
-                      ))
-                    )}
-                  </Table.Tbody>
-                </Table>
-              </Box>
+                          </Table.Tr>
+                        ))
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </Box>
+                )}
+              </>
             )}
           </Stack>
         </Paper>

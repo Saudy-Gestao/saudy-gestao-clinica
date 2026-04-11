@@ -474,7 +474,7 @@ export function Agendamento() {
   const schedulerRef = useRef<HTMLDivElement | null>(null);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [searchValue, setSearchValue] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('marcacao');
+  const [activeTab, setActiveTab] = useState<string>('hub');
   const [, setSchedulingStep] = useState<number>(0);
   const [activeSchedulePeriod, setActiveSchedulePeriod] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
@@ -2541,11 +2541,114 @@ export function Agendamento() {
           </Box>
         </Group>
 
-        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'marcacao')} variant="default">
-          <Tabs.List mb="lg">
-            <Tabs.Tab value="marcacao">Marcação</Tabs.Tab>
-            <Tabs.Tab value="agendados">Agenda</Tabs.Tab>
-          </Tabs.List>
+        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'hub')} variant="default">
+          {activeTab !== 'hub' && (
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {activeTab === 'marcacao' ? 'Realizar marcação' : 'Visualizar agenda'}
+                </Text>
+              </Group>
+            </Group>
+          )}
+
+          <Tabs.Panel value="hub">
+            <Box
+              style={{
+                minHeight: isMobile ? 'auto' : '58vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <SimpleGrid
+                cols={{ base: 1, md: 2 }}
+                spacing="xl"
+                style={{ width: '100%', maxWidth: 900 }}
+              >
+              <UnstyledButton
+                onClick={() => setActiveTab('marcacao')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Plus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Realizar marcação</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Cadastrar novo agendamento com paciente, procedimento, profissional e horário.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('agendados')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Calendar size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Visualizar agenda</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Consultar agenda, filtrar atendimentos e acompanhar horários já marcados.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+              </SimpleGrid>
+            </Box>
+          </Tabs.Panel>
 
           <Tabs.Panel value="marcacao">
 
