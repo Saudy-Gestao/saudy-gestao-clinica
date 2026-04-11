@@ -160,7 +160,7 @@ export function TeaEvolucaoTemplates() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
+      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
         <Group mb={18} gap="md" align="flex-start">
           <ActionIcon
             variant="default"

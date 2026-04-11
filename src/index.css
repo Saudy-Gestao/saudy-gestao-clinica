@@ -52,6 +52,174 @@ body {
   --tea-pre-shadow: 0 20px 54px rgba(1, 4, 15, 0.4);
 }
 
+@keyframes saudy-toast-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, -8px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes saudy-toast-timer {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.saudy-toast {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(88, 123, 224, 0.35);
+  background:
+    radial-gradient(120% 170% at 100% 0%, rgba(93, 142, 255, 0.18) 0%, rgba(14, 25, 57, 0) 50%),
+    linear-gradient(180deg, rgba(21, 40, 86, 0.96) 0%, rgba(14, 29, 66, 0.96) 100%);
+  box-shadow:
+    0 16px 40px rgba(4, 12, 33, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(6px);
+  animation: saudy-toast-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.saudy-toast::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #5b8cff 0%, #7bd7ff 100%);
+}
+
+.saudy-toast::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  transform-origin: left;
+  background: linear-gradient(90deg, rgba(123, 215, 255, 0.94) 0%, rgba(91, 140, 255, 0.94) 100%);
+  animation: saudy-toast-timer 5000ms linear forwards;
+}
+
+.saudy-toast:hover::after {
+  animation-play-state: paused;
+}
+
+.saudy-toast[data-color='blue'] {
+  border-color: rgba(101, 149, 255, 0.58);
+  background:
+    radial-gradient(130% 180% at 100% 0%, rgba(100, 158, 255, 0.3) 0%, rgba(14, 25, 57, 0) 54%),
+    linear-gradient(180deg, rgba(24, 45, 94, 0.98) 0%, rgba(14, 30, 71, 0.98) 100%);
+  box-shadow:
+    0 16px 40px rgba(10, 30, 80, 0.45),
+    0 0 0 1px rgba(116, 165, 255, 0.12) inset;
+}
+
+.saudy-toast[data-color='green'],
+.saudy-toast[data-color='teal'] {
+  border-color: rgba(77, 188, 122, 0.6);
+  background:
+    radial-gradient(130% 180% at 100% 0%, rgba(95, 216, 143, 0.32) 0%, rgba(9, 22, 28, 0) 52%),
+    linear-gradient(180deg, rgba(19, 56, 47, 0.97) 0%, rgba(14, 39, 40, 0.97) 100%);
+  box-shadow:
+    0 16px 40px rgba(11, 46, 35, 0.46),
+    0 0 0 1px rgba(142, 234, 168, 0.1) inset;
+}
+
+.saudy-toast[data-color='red'] {
+  border-color: rgba(239, 94, 104, 0.62);
+  background:
+    radial-gradient(130% 180% at 100% 0%, rgba(255, 120, 133, 0.3) 0%, rgba(39, 13, 22, 0) 54%),
+    linear-gradient(180deg, rgba(74, 21, 33, 0.98) 0%, rgba(56, 17, 29, 0.98) 100%);
+  box-shadow:
+    0 16px 40px rgba(62, 15, 25, 0.45),
+    0 0 0 1px rgba(255, 156, 163, 0.12) inset;
+}
+
+.saudy-toast[data-color='yellow'],
+.saudy-toast[data-color='orange'] {
+  border-color: rgba(240, 178, 74, 0.64);
+  background:
+    radial-gradient(130% 180% at 100% 0%, rgba(255, 202, 103, 0.31) 0%, rgba(50, 28, 8, 0) 54%),
+    linear-gradient(180deg, rgba(83, 51, 17, 0.97) 0%, rgba(60, 37, 15, 0.97) 100%);
+  box-shadow:
+    0 16px 40px rgba(64, 39, 12, 0.45),
+    0 0 0 1px rgba(255, 226, 143, 0.11) inset;
+}
+
+.saudy-toast[data-color='green']::before,
+.saudy-toast[data-color='teal']::before {
+  background: linear-gradient(180deg, #42c079 0%, #8deaa8 100%);
+}
+
+.saudy-toast[data-color='red']::before {
+  background: linear-gradient(180deg, #ef5e68 0%, #ff9ca3 100%);
+}
+
+.saudy-toast[data-color='yellow']::before,
+.saudy-toast[data-color='orange']::before {
+  background: linear-gradient(180deg, #f0b24a 0%, #ffe28f 100%);
+}
+
+.saudy-toast[data-color='green']::after,
+.saudy-toast[data-color='teal']::after {
+  background: linear-gradient(90deg, rgba(141, 234, 168, 0.96) 0%, rgba(66, 192, 121, 0.96) 100%);
+}
+
+.saudy-toast[data-color='red']::after {
+  background: linear-gradient(90deg, rgba(255, 156, 163, 0.96) 0%, rgba(239, 94, 104, 0.96) 100%);
+}
+
+.saudy-toast[data-color='yellow']::after,
+.saudy-toast[data-color='orange']::after {
+  background: linear-gradient(90deg, rgba(255, 226, 143, 0.97) 0%, rgba(240, 178, 74, 0.97) 100%);
+}
+
+.saudy-toast .mantine-Notification-icon {
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16) inset;
+}
+
+.saudy-toast[data-color='green'] .mantine-Notification-icon,
+.saudy-toast[data-color='teal'] .mantine-Notification-icon {
+  background: rgba(66, 192, 121, 0.25);
+  color: #8deaa8;
+}
+
+.saudy-toast[data-color='red'] .mantine-Notification-icon {
+  background: rgba(239, 94, 104, 0.23);
+  color: #ffb2b8;
+}
+
+.saudy-toast[data-color='yellow'] .mantine-Notification-icon,
+.saudy-toast[data-color='orange'] .mantine-Notification-icon {
+  background: rgba(240, 178, 74, 0.24);
+  color: #ffe28f;
+}
+
+.saudy-toast .mantine-Notification-title {
+  color: #f3f7ff;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.saudy-toast .mantine-Notification-description {
+  color: rgba(232, 240, 255, 0.9);
+  line-height: 1.4;
+}
+
+.saudy-toast .mantine-Notification-closeButton {
+  color: rgba(232, 240, 255, 0.85);
+}
+
+.saudy-toast .mantine-Notification-closeButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .tea-pre-reserva-page {
   min-height: 100vh;
   background: var(--tea-pre-bg);

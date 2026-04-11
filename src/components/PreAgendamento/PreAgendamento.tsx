@@ -18,7 +18,7 @@ import {
   Textarea,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, Copy, ExternalLink, FileSearch, Link as LinkIcon, MoreVertical, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, FileSearch, Link as LinkIcon, MoreVertical, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
@@ -150,13 +150,6 @@ export function PreAgendamento() {
   const [preAuthNotes, setPreAuthNotes] = useState('');
   const [savingPreAuth, setSavingPreAuth] = useState(false);
 
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkMode, setLinkMode] = useState<'DOCS' | 'TELECONSULTA'>('DOCS');
-  const [linkResult, setLinkResult] = useState<{
-    publicUrl: string;
-    message: string;
-    to?: string;
-  } | null>(null);
   const [sendingLink, setSendingLink] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -262,37 +255,38 @@ export function PreAgendamento() {
     }
   };
 
-  const openSendLink = (item: PreSchedulingItem, mode: 'DOCS' | 'TELECONSULTA' = 'DOCS') => {
-    setSelectedItem(item);
-    setLinkMode(mode);
-    setLinkResult(null);
-    setLinkOpen(true);
-  };
-
-  const handleSendLink = async (mode: 'DOCS' | 'TELECONSULTA' = linkMode) => {
-    if (!selectedItem) return;
+  const handleSendTeleconsultationLinkDirect = async (item: PreSchedulingItem) => {
     setSendingLink(true);
     try {
-      const data: any = mode === 'TELECONSULTA'
-        ? await teleconsultationLinkService.sendWhatsAppLinkByAppointment(selectedItem.appointmentId)
-        : await preSchedulingService.sendLink(selectedItem.appointmentId);
-      const whatsappData = data.whatsapp || data.whatsappMock || null;
-      setLinkResult({
-        publicUrl: data.publicUrl || data.links?.patientUrl,
-        message: whatsappData?.message || '',
-        to: whatsappData?.to,
-      });
+      await teleconsultationLinkService.sendWhatsAppLinkByAppointment(item.appointmentId);
       showNotification({
         title: 'Link enviado',
-        message: mode === 'TELECONSULTA'
-          ? 'Link de teleconsulta gerado com sucesso.'
-          : (data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.'),
+        message: 'Link de teleconsulta gerado com sucesso.',
         color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
-      if (mode === 'TELECONSULTA') {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
-      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao enviar link',
+        message: resolveApiErrorMessage(err, 'Não foi possível enviar o link da teleconsulta.'),
+        color: 'red',
+      });
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
+  const handleSendLinkDirect = async (item: PreSchedulingItem) => {
+    setSendingLink(true);
+    try {
+      const data: any = await preSchedulingService.sendLink(item.appointmentId);
+      showNotification({
+        title: 'Link enviado',
+        message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
+        color: 'green',
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
     } catch (err: any) {
       showNotification({
         title: 'Erro ao enviar link',
@@ -301,24 +295,6 @@ export function PreAgendamento() {
       });
     } finally {
       setSendingLink(false);
-    }
-  };
-
-  const copyToClipboard = async (value: string) => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      showNotification({
-        title: 'Copiado',
-        message: 'Link copiado para a área de transferência.',
-        color: 'green',
-      });
-    } catch {
-      showNotification({
-        title: 'Falha ao copiar',
-        message: 'Não foi possível copiar o link.',
-        color: 'red',
-      });
     }
   };
 
@@ -410,7 +386,7 @@ export function PreAgendamento() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p="xl">
+      <Box p="xl" maw={1400} mx="auto">
         <Group justify="space-between" align="center" mb="md" wrap="wrap">
           <Group>
             <ActionIcon variant="default" size="lg" onClick={() => navigate('/dashboard')}>
@@ -565,7 +541,7 @@ export function PreAgendamento() {
                                     || isCanceled
                                     || isCompleted
                                   }
-                                  onClick={() => openSendLink(item, 'DOCS')}
+                                  onClick={() => handleSendLinkDirect(item)}
                                 >
                                   Enviar link docs
                                 </Menu.Item>
@@ -576,9 +552,10 @@ export function PreAgendamento() {
                                       viewMode === 'history'
                                       || !isPreAuthorized
                                       || isCanceled
+                                      || sendingLink
                                       || Boolean(item.teleconsultationLinkSent)
                                     }
-                                    onClick={() => openSendLink(item, 'TELECONSULTA')}
+                                    onClick={() => handleSendTeleconsultationLinkDirect(item)}
                                   >
                                     Enviar link teleconsulta
                                   </Menu.Item>
@@ -641,63 +618,6 @@ export function PreAgendamento() {
         </Stack>
       </Modal>
 
-      <Modal
-        opened={linkOpen}
-        onClose={() => setLinkOpen(false)}
-        title={linkMode === 'TELECONSULTA' ? 'Envio de link de teleconsulta (WhatsApp)' : 'Envio de link de documentos (WhatsApp mock)'}
-        centered
-        size="lg"
-      >
-        <Stack>
-          <Text size="sm" c="dimmed">
-            {selectedItem?.patientName || 'Paciente'} • {selectedItem?.specialty || 'Procedimento'}
-          </Text>
-
-          {!linkResult ? (
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setLinkOpen(false)}>Cancelar</Button>
-              <Button
-                color="darkBlue"
-                onClick={() => handleSendLink(linkMode)}
-                loading={sendingLink}
-              >
-                Gerar e enviar link
-              </Button>
-            </Group>
-          ) : (
-            <>
-              <Paper p="sm" withBorder>
-                <Stack gap={6}>
-                  <Text size="sm" fw={600}>Link público</Text>
-                  <Group wrap="nowrap" justify="space-between">
-                    <Text size="sm" style={{ wordBreak: 'break-all' }}>{linkResult.publicUrl}</Text>
-                    <Group gap={6}>
-                      <ActionIcon variant="light" onClick={() => copyToClipboard(linkResult.publicUrl)}>
-                        <Copy size={14} />
-                      </ActionIcon>
-                      <ActionIcon variant="light" onClick={() => window.open(linkResult.publicUrl, '_blank')}>
-                        <ExternalLink size={14} />
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-                </Stack>
-              </Paper>
-
-              <Paper p="sm" withBorder>
-                <Stack gap={6}>
-                  <Text size="sm" fw={600}>Mensagem mock enviada</Text>
-                  <Text size="xs" c="dimmed">Destino: {linkResult.to || 'não informado'}</Text>
-                  <Textarea value={linkResult.message} readOnly minRows={4} autosize />
-                </Stack>
-              </Paper>
-
-              <Group justify="flex-end">
-                <Button variant="default" onClick={() => setLinkOpen(false)}>Fechar</Button>
-              </Group>
-            </>
-          )}
-        </Stack>
-      </Modal>
       <Modal opened={reviewOpen} onClose={() => setReviewOpen(false)} title="Revisar envio do paciente" centered size="lg">
         <Stack>
           <Text size="sm" c="dimmed">

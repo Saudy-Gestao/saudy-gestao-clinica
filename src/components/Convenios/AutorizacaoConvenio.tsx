@@ -14,14 +14,12 @@ import {
   Table,
   Text,
   Modal,
-  useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { ChevronLeft, ShieldCheck, Upload } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import convenioAuthorizationService, {
@@ -76,8 +74,7 @@ export function AutorizacaoConvenio() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
-  const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-text)' : DARK_BLUE;
+  const isTablet = useMediaQuery('(max-width: 1279px)');
 
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
@@ -319,15 +316,15 @@ export function AutorizacaoConvenio() {
         </Stack>
       </Modal>
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group justify="space-between" align="center" mb="md" wrap="wrap">
-          <Group>
-            <ActionIcon variant="default" size="lg" onClick={() => navigate('/dashboard')}>
-              <ChevronLeft size={18} />
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
+        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={700} size="lg" c={titleColor}>Autorização de Convênio</Text>
-              <Text size="sm" c="dimmed">Central de autorização de Agendamentos e TEA</Text>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Autorização de Convênio</Text>
+              <Text size="sm" c="dimmed">Central de autorização de agendamentos e TEA</Text>
             </Box>
           </Group>
         </Group>

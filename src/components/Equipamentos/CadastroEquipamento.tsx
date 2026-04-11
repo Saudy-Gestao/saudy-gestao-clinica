@@ -462,25 +462,20 @@ export function CadastroEquipamento() {
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
-      <Box p="xl" maw={1400} mx="auto">
-        <Group mb={30} justify="space-between" align="center">
-          <Group gap="lg" align="center">
-            <ActionIcon
-              variant="default"
-              color="black"
-              size="xl"
-              onClick={() => navigate('/dashboard')}
-            >
+      <Box p={isMobile ? 'sm' : 'md'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Group align="center">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
               <ChevronLeft size={28} />
             </ActionIcon>
-            <Stack gap={2}>
-              <Title order={1} fw={700} style={{ fontSize: isMobile ? '1.6rem' : '2rem' }}>
+            <Box>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
                 Cadastro de Equipamentos
-              </Title>
-              <Text c="dimmed" size={isMobile ? 'sm' : 'lg'}>
+              </Text>
+              <Text size="sm" c="dimmed">
                 Equipamentos de exame com dados operacionais, modalidade e integração DICOM.
               </Text>
-            </Stack>
+            </Box>
           </Group>
         </Group>
 

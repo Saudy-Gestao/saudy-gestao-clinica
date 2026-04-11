@@ -15,7 +15,6 @@ import {
   Switch,
   Table,
   Text,
-  Title,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -147,6 +146,7 @@ export function CadastroEnfermagem() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const isTablet = useMediaQuery('(max-width: 1279px)');
 
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -359,15 +359,15 @@ export function CadastroEnfermagem() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p="xl" maw={1400} mx="auto">
-        <Group mb="xl" justify="space-between" align="center">
-          <Group>
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
+          <Group align="center">
             <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Title order={2}>Cadastro de Enfermagem</Title>
-              <Text c="dimmed">Triagens e preparos por procedimento para exames.</Text>
+              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Enfermagem</Text>
+              <Text size="sm" c="dimmed">Triagens e preparos por procedimento para exames.</Text>
             </Box>
           </Group>
           <Button bg={DARK_BLUE} leftSection={<Plus size={16} />} onClick={openCreate}>
