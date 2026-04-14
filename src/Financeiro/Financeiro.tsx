@@ -8,7 +8,6 @@ import {
   Modal,
   Stack,
   Table,
-  Tabs,
   Badge,
   Grid,
   Paper,
@@ -18,9 +17,11 @@ import {
   ActionIcon,
   Menu,
   Skeleton,
+  SimpleGrid,
+  UnstyledButton,
   useMantineColorScheme,
 } from '@mantine/core';
-import { Calendar as CalendarIcon, MoreVertical, ChevronLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, MoreVertical, ChevronLeft, CircleDollarSign, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatDateInput } from '../utils/formatters';
 import { DatePicker } from '@mantine/dates';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +36,7 @@ import financeService from '../services/financeService';
 import { useFinanceEntriesQuery } from '../hooks/useFinanceEntriesQuery';
 import { resolveApiErrorMessage } from '../lib/apiError';
 import { queryKeys } from '../lib/queryKeys';
+import { PaginatedGrid } from '../components/common/PaginatedGrid';
 
 interface Lancamento {
   id: string;
@@ -57,8 +59,10 @@ export function Financeiro() {
   const isDark = colorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
-  const [activeTab, setActiveTab] = useState<string | null>('todos');
+  const [activeSubModule, setActiveSubModule] = useState<'hub' | 'todos' | 'receita' | 'despesas'>('hub');
   const [searchValue, setSearchValue] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [modalOpened, setModalOpened] = useState(false);
   const [popoverOpened, setPopoverOpened] = useState(false);
   const [dateInput, setDateInput] = useState('');
@@ -234,6 +238,10 @@ export function Financeiro() {
 
   const [payingIds, setPayingIds] = useState<string[]>([]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [activeSubModule, searchValue]);
+
   const filteredLancamentos = lancamentos.filter((lancamento) => {
     const term = searchValue.trim().toLowerCase();
 
@@ -245,9 +253,9 @@ export function Financeiro() {
     const despesaKeys = ['despesa', 'despesas', 'expense', 'expenses', 'out'];
 
     let matchesTab = true;
-    if (activeTab === 'receita') {
+    if (activeSubModule === 'receita') {
       matchesTab = receitaKeys.some((k) => tipo.includes(k));
-    } else if (activeTab === 'despesas') {
+    } else if (activeSubModule === 'despesas') {
       matchesTab = despesaKeys.some((k) => tipo.includes(k));
     }
 
@@ -261,7 +269,19 @@ export function Financeiro() {
     return nome.includes(term) || cpf.includes(term) || tipo.includes(term);
   });
 
-  const rows = filteredLancamentos.map((lancamento) => (
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredLancamentos.length / pageSize));
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [filteredLancamentos.length, page, pageSize]);
+
+  const paginatedLancamentos = useMemo(
+    () => filteredLancamentos.slice((page - 1) * pageSize, page * pageSize),
+    [filteredLancamentos, page, pageSize],
+  );
+
+  const rows = paginatedLancamentos.map((lancamento) => (
     <Table.Tr key={lancamento.id}>
       <Table.Td>
         <Avatar color="darkBlue" radius="xl" size="md">
@@ -280,28 +300,30 @@ export function Financeiro() {
       <Table.Td>{lancamento.desconto > 0 ? `${lancamento.desconto}%` : '-'}</Table.Td>
       <Table.Td fw={600}>R${lancamento.valorTotal.toFixed(2)}</Table.Td>
       <Table.Td>{lancamento.metodoPagamento || '-'}</Table.Td>
-      <Table.Td>
-        <Menu position="bottom-end" shadow="md">
-          <Menu.Target>
-            <ActionIcon variant="subtle" color="darkBlue">
-              <MoreVertical size={18} />
-            </ActionIcon>
-          </Menu.Target>
-              <Menu.Dropdown
-                style={isDark ? {
-                  backgroundColor: 'var(--mantine-color-default)',
-                  borderColor: 'var(--mantine-color-default-border)',
-                } : undefined}
-              >
-            <Menu.Item
-              color="green"
-              disabled={(String(lancamento.status || '').toUpperCase() === 'PAID') || payingIds.includes(lancamento.id)}
-              onClick={() => handlePay(lancamento.id)}
+      <Table.Td style={{ textAlign: 'center' }}>
+        <Group justify="center">
+          <Menu position="bottom-end" shadow="md">
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="darkBlue">
+                <MoreVertical size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown
+              style={isDark ? {
+                backgroundColor: 'var(--mantine-color-default)',
+                borderColor: 'var(--mantine-color-default-border)',
+              } : undefined}
             >
-              {payingIds.includes(lancamento.id) ? 'Pagar...' : 'Pagar'}
-            </Menu.Item>
-          </Menu.Dropdown>
-        </Menu>
+              <Menu.Item
+                color="green"
+                disabled={(String(lancamento.status || '').toUpperCase() === 'PAID') || payingIds.includes(lancamento.id)}
+                onClick={() => handlePay(lancamento.id)}
+              >
+                {payingIds.includes(lancamento.id) ? 'Pagar...' : 'Pagar'}
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
       </Table.Td>
     </Table.Tr>
   ));
@@ -320,6 +342,12 @@ export function Financeiro() {
       setPayingIds((p) => p.filter((x) => x !== id));
     }
   };
+
+  const subModuleLabel = activeSubModule === 'receita'
+    ? 'Receitas'
+    : activeSubModule === 'despesas'
+      ? 'Despesas'
+      : 'Todos os lançamentos';
 
   return (
     <Box style={{ minHeight: '100vh', backgroundColor: 'var(--mantine-color-body)' }}>
@@ -347,109 +375,198 @@ export function Financeiro() {
             </Box>
           </Group>
 
-          <Group align="center" gap="md" wrap={isMobile ? 'wrap' : 'nowrap'}>
-            <Tabs value={activeTab} onChange={setActiveTab} style={{ flexGrow: isMobile ? 1 : 0 }}>
-              <Tabs.List
-                style={{
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: 0,
-                  padding: 0,
-                }}
-              >
-                <Tabs.Tab value="todos">Todos</Tabs.Tab>
-                <Tabs.Tab value="receita">Receita</Tabs.Tab>
-                <Tabs.Tab value="despesas">Despesas</Tabs.Tab>
-              </Tabs.List>
-            </Tabs>
-
-            <FloatingInput
-              label="Buscar lançamentos"
-              placeholder="Buscar paciente por nome ou CPF..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.currentTarget.value)}
-              containerProps={{ style: { flex: 1, minWidth: isMobile ? '100%' : 240 } }}
-            />
-
-            <Button
-              onClick={() => setModalOpened(true)}
-              fullWidth={isMobile}
-              style={{
-                backgroundColor: DARK_BLUE,
-                color: '#ffffff',
-                borderRadius: 10,
-                paddingLeft: 18,
-                paddingRight: 18,
-              }}
-            >
-              + Novo lançamento
-            </Button>
-          </Group>
         </Container>
       </Box>
 
       {/* Content */}
       <Container size="xl" py={isMobile ? 'md' : 'xl'}>
-
-        {/* Tabela */}
-        {entriesLoading ? (
-          <Paper
-            style={{
-              borderRadius: '8px',
-              padding: 24,
-              backgroundColor: 'var(--mantine-color-default)',
-              border: '1px solid var(--mantine-color-default-border)',
-            }}
-          >
-            <Stack gap="sm">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <Stack key={index} gap="sm">
-                  <Skeleton height={18} width="30%" radius="xl" />
-                  <Skeleton height={16} width="100%" radius="xl" />
+        {activeSubModule === 'hub' ? (
+          <Box py={isMobile ? 'xs' : 'md'}>
+            <SimpleGrid cols={{ base: 1, md: 3 }} spacing="xl" style={{ width: '100%' }}>
+              <UnstyledButton
+                onClick={() => setActiveSubModule('todos')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 140 : 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CircleDollarSign size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Todos</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>
+                    Visualize todos os lançamentos financeiros em um único painel.
+                  </Text>
                 </Stack>
-              ))}
-            </Stack>
-          </Paper>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveSubModule('receita')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 140 : 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <TrendingUp size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Receita</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>
+                    Acompanhe apenas entradas financeiras e recebimentos.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveSubModule('despesas')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 140 : 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <TrendingDown size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Despesas</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>
+                    Filtre e gerencie pagamentos e saídas financeiras.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
         ) : (
-          <Paper
-            style={{
-              borderRadius: '8px',
-              overflowX: 'auto',
-              backgroundColor: 'var(--mantine-color-default)',
-              border: '1px solid var(--mantine-color-default-border)',
-            }}
-          >
-            <Table striped highlightOnHover>
-              <Table.Thead style={{ backgroundColor: 'var(--mantine-color-body)' }}>
-                <Table.Tr>
-                  <Table.Th c="dimmed"></Table.Th>
-                  <Table.Th c="dimmed">Nome</Table.Th>
-                  <Table.Th c="dimmed">Data/Hora</Table.Th>
-                  <Table.Th c="dimmed">Tipo</Table.Th>
-                  <Table.Th c="dimmed">Status</Table.Th>
-                  <Table.Th c="dimmed">Valor</Table.Th>
-                  <Table.Th c="dimmed">Desconto</Table.Th>
-                  <Table.Th c="dimmed">Valor Total</Table.Th>
-                  <Table.Th c="dimmed">Método Pagamento</Table.Th>
-                  <Table.Th c="dimmed">Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {rows.length > 0 ? rows : (
-                  <Table.Tr>
-                    <Table.Td colSpan={10}>
-                      <Stack align="center" py="xl" gap={6}>
-                        <Text fw={600}>Nenhum lançamento encontrado</Text>
-                        <Text c="dimmed" size="sm" ta="center">
-                          Cadastre um novo lançamento ou ajuste os filtros para localizar registros financeiros.
-                        </Text>
-                      </Stack>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveSubModule('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>{subModuleLabel}</Text>
+              </Group>
+            </Group>
+
+            <Group align="center" gap="md" wrap={isMobile ? 'wrap' : 'nowrap'} mb="md">
+              <FloatingInput
+                label="Buscar lançamentos"
+                placeholder="Buscar paciente por nome ou CPF..."
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.currentTarget.value)}
+                containerProps={{ style: { flex: 1, minWidth: isMobile ? '100%' : 240 } }}
+              />
+
+              <Button
+                onClick={() => setModalOpened(true)}
+                fullWidth={isMobile}
+                style={{
+                  backgroundColor: DARK_BLUE,
+                  color: '#ffffff',
+                  borderRadius: 10,
+                  paddingLeft: 18,
+                  paddingRight: 18,
+                }}
+              >
+                + Novo lançamento
+              </Button>
+            </Group>
+
+            {/* Tabela */}
+            {entriesLoading ? (
+              <Paper
+                style={{
+                  borderRadius: '8px',
+                  padding: 24,
+                  backgroundColor: 'var(--mantine-color-default)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                }}
+              >
+                <Stack gap="sm">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Stack key={index} gap="sm">
+                      <Skeleton height={18} width="30%" radius="xl" />
+                      <Skeleton height={16} width="100%" radius="xl" />
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+            ) : (
+              <PaginatedGrid
+                totalItems={filteredLancamentos.length}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead style={{ backgroundColor: 'var(--mantine-color-body)' }}>
+                    <Table.Tr>
+                      <Table.Th c="dimmed"></Table.Th>
+                      <Table.Th c="dimmed">Nome</Table.Th>
+                      <Table.Th c="dimmed">Data/Hora</Table.Th>
+                      <Table.Th c="dimmed">Tipo</Table.Th>
+                      <Table.Th c="dimmed">Status</Table.Th>
+                      <Table.Th c="dimmed">Valor</Table.Th>
+                      <Table.Th c="dimmed">Desconto</Table.Th>
+                      <Table.Th c="dimmed">Valor Total</Table.Th>
+                      <Table.Th c="dimmed">Método Pagamento</Table.Th>
+                      <Table.Th c="dimmed" style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {rows.length > 0 ? rows : (
+                      <Table.Tr>
+                        <Table.Td colSpan={10}>
+                          <Stack align="center" py="xl" gap={6}>
+                            <Text fw={600}>Nenhum lançamento encontrado</Text>
+                            <Text c="dimmed" size="sm" ta="center">
+                              Cadastre um novo lançamento ou ajuste os filtros para localizar registros financeiros.
+                            </Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
+            )}
+          </>
         )}
       </Container>
 

@@ -13,14 +13,15 @@ import {
   SimpleGrid,
   Loader,
   Table,
-  Tabs,
   Badge,
   Modal,
   Skeleton,
-  useMantineColorScheme
+  Menu,
+  UnstyledButton,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Power, Pencil, X } from 'lucide-react';
+import { ChevronLeft, Power, Pencil, X, UserPlus, Users, MoreVertical } from 'lucide-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -39,6 +40,7 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 interface ProcedureForm {
   name: string;
@@ -113,7 +115,7 @@ export function CadastroProcedimento() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const { colorScheme } = useMantineColorScheme();
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [form, setForm] = useState<ProcedureForm>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
@@ -131,10 +133,12 @@ export function CadastroProcedimento() {
   const [lastCreatedName, setLastCreatedName] = useState<string | null>(null);
   const [lastSaveAction, setLastSaveAction] = useState<'create' | 'update'>('create');
   const [editingProcedureId, setEditingProcedureId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('cadastro');
+  const [activeTab, setActiveTab] = useState<'hub' | 'cadastro' | 'lista'>('hub');
   const [customInsuranceInput, setCustomInsuranceInput] = useState('');
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [procedurePage, setProcedurePage] = useState(1);
+  const [procedurePageSize, setProcedurePageSize] = useState(10);
   const [materialOptions, setMaterialOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [materialDirectory, setMaterialDirectory] = useState<Record<string, { name: string; code?: string; unit?: string }>>({});
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
@@ -162,6 +166,16 @@ export function CadastroProcedimento() {
     return procedures.filter((item) => item.name.toLowerCase().includes(q));
   }, [procedures, procedureQuery]);
 
+  const paginatedProcedures = useMemo(() => {
+    const start = (procedurePage - 1) * procedurePageSize;
+    return filteredProcedures.slice(start, start + procedurePageSize);
+  }, [filteredProcedures, procedurePage, procedurePageSize]);
+
+  const procedureTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredProcedures.length / procedurePageSize)),
+    [filteredProcedures.length, procedurePageSize],
+  );
+
   const modalityOptions = [
     { value: 'Presencial', label: 'Presencial' },
     { value: 'Domiciliar', label: 'Domiciliar' },
@@ -187,6 +201,16 @@ export function CadastroProcedimento() {
     }, {}),
     [insuranceCatalog],
   );
+
+  useEffect(() => {
+    setProcedurePage(1);
+  }, [procedureQuery, procedurePageSize, procedures.length]);
+
+  useEffect(() => {
+    if (procedurePage > procedureTotalPages) {
+      setProcedurePage(procedureTotalPages);
+    }
+  }, [procedurePage, procedureTotalPages]);
 
   useEffect(() => {
     setProceduresLoading(proceduresQuery.isLoading && procedures.length === 0);
@@ -732,14 +756,110 @@ export function CadastroProcedimento() {
             </Group>
           </Group>
 
-          <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'cadastro')} keepMounted={false}>
-            <Tabs.List>
-              <Tabs.Tab value="cadastro">Cadastrar</Tabs.Tab>
-              <Tabs.Tab value="lista">Cadastrados</Tabs.Tab>
-            </Tabs.List>
+          {activeTab === 'hub' ? (
+            <Box
+              style={{
+                minHeight: isMobile ? 'auto' : '58vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+                <UnstyledButton
+                  onClick={() => setActiveTab('cadastro')}
+                  style={{
+                    border: '1px solid var(--mantine-color-default-border)',
+                    borderRadius: 16,
+                    padding: isMobile ? '18px' : '24px',
+                    background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                    textAlign: 'left',
+                    transition: 'all 120ms ease',
+                    minHeight: isMobile ? 170 : 260,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Stack gap={8}>
+                    <Group gap="xs">
+                      <Box
+                        w={34}
+                        h={34}
+                        style={{
+                          borderRadius: 10,
+                          background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <UserPlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      </Box>
+                      <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar procedimento</Text>
+                    </Group>
+                    <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                      Registre procedimentos com regras clínicas, convênios, médicos e materiais vinculados.
+                    </Text>
+                  </Stack>
+                </UnstyledButton>
 
-            <Tabs.Panel value="cadastro" pt="md">
-              <Paper p="lg">
+                <UnstyledButton
+                  onClick={() => setActiveTab('lista')}
+                  style={{
+                    border: '1px solid var(--mantine-color-default-border)',
+                    borderRadius: 16,
+                    padding: isMobile ? '18px' : '24px',
+                    background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                    textAlign: 'left',
+                    transition: 'all 120ms ease',
+                    minHeight: isMobile ? 170 : 260,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Stack gap={8}>
+                    <Group gap="xs">
+                      <Box
+                        w={34}
+                        h={34}
+                        style={{
+                          borderRadius: 10,
+                          background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Users size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      </Box>
+                      <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Procedimentos cadastrados</Text>
+                    </Group>
+                    <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                      Consulte, edite e ative/desative procedimentos já cadastrados.
+                    </Text>
+                  </Stack>
+                </UnstyledButton>
+              </SimpleGrid>
+            </Box>
+          ) : (
+            <>
+              <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+                <Group gap="xs">
+                  <Button
+                    variant="default"
+                    leftSection={<ChevronLeft size={16} />}
+                    onClick={() => setActiveTab('hub')}
+                  >
+                    Voltar
+                  </Button>
+                  <Text fw={600}>
+                    {activeTab === 'cadastro' ? 'Cadastrar procedimento' : 'Procedimentos cadastrados'}
+                  </Text>
+                </Group>
+              </Group>
+
+              {activeTab === 'cadastro' ? (
+                <Paper p="lg">
                 {editingProcedureId && (
                   <Text size="sm" c="dimmed" mb="md">
                     Editando procedimento. Ajuste os dados e salve as alterações.
@@ -1015,9 +1135,7 @@ export function CadastroProcedimento() {
                   </Button>
                 </Group>
               </Paper>
-            </Tabs.Panel>
-
-            <Tabs.Panel value="lista" pt="md">
+              ) : (
               <Paper p="lg">
                 <Group justify="space-between" mb="md" wrap="wrap">
                   <SectionTitle>Procedimentos cadastrados</SectionTitle>
@@ -1107,7 +1225,7 @@ export function CadastroProcedimento() {
                             style={{
                               backgroundColor: item.isActive
                                 ? 'transparent'
-                                : (colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5'),
+                                : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5'),
                             }}
                           >
                             <Group justify="space-between" align="flex-start" wrap="nowrap">
@@ -1164,7 +1282,16 @@ export function CadastroProcedimento() {
                       </Stack>
                     )
                   ) : (
-                    <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <PaginatedGrid
+                      totalItems={filteredProcedures.length}
+                      page={procedurePage}
+                      pageSize={procedurePageSize}
+                      onPageChange={setProcedurePage}
+                      onPageSizeChange={setProcedurePageSize}
+                      isMobile={isMobile}
+                      maxHeight={isMobile ? 500 : 620}
+                      showFooter
+                    >
                       <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                         <Table.Thead>
                           <Table.Tr style={{ borderBottom: 'none' }}>
@@ -1175,27 +1302,29 @@ export function CadastroProcedimento() {
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Materiais</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                            <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                            <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
+                              Ações
+                            </Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
                           {filteredProcedures.length === 0 ? (
                             <Table.Tr>
-                              <Table.Td colSpan={9}>
+                              <Table.Td colSpan={isTablet ? 2 : 8}>
                                 <Text size="sm" c="dimmed" ta="center">
                                   Nenhum procedimento encontrado. Ajuste a busca ou cadastre um novo procedimento.
                                 </Text>
                               </Table.Td>
                             </Table.Tr>
                           ) : (
-                            filteredProcedures.map((item) => (
+                            paginatedProcedures.map((item) => (
                               <Table.Tr
                                 key={item.id}
                                 style={{
                                   borderBottom: '1px solid #e9ecef',
                                   backgroundColor: item.isActive
                                     ? 'transparent'
-                                    : (colorScheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5')
+                                    : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5'),
                                 }}
                               >
                                 <Table.Td>
@@ -1258,26 +1387,31 @@ export function CadastroProcedimento() {
                                     </Badge>
                                   </Table.Td>
                                 )}
-                                <Table.Td>
-                                  <Group gap={6} wrap="nowrap">
-                                    <ActionIcon
-                                      variant="light"
-                                      color="blue"
-                                      style={{ color: item.isActive ? undefined : '#adb5bd' }}
-                                      onClick={() => item.isActive && handleEditProcedure(item.id)}
-                                      title={item.isActive ? 'Editar' : 'Ative o procedimento para editar'}
-                                      disabled={!item.isActive}
-                                    >
-                                      <Pencil size={16} />
-                                    </ActionIcon>
-                                    <ActionIcon
-                                      variant="light"
-                                      color={item.isActive ? 'orange' : 'green'}
-                                      onClick={() => handleToggleActive(item)}
-                                      title={item.isActive ? 'Desativar' : 'Ativar'}
-                                    >
-                                      <Power size={16} />
-                                    </ActionIcon>
+                                <Table.Td style={{ textAlign: 'center' }}>
+                                  <Group justify="center">
+                                    <Menu shadow="md" width={210} position="bottom" withArrow>
+                                      <Menu.Target>
+                                        <ActionIcon variant="light" size="sm" aria-label="Ações do procedimento">
+                                          <MoreVertical size={16} />
+                                        </ActionIcon>
+                                      </Menu.Target>
+                                      <Menu.Dropdown>
+                                        <Menu.Item
+                                          leftSection={<Pencil size={14} />}
+                                          onClick={() => handleEditProcedure(item.id)}
+                                          disabled={!item.isActive}
+                                        >
+                                          Editar
+                                        </Menu.Item>
+                                        <Menu.Item
+                                          leftSection={<Power size={14} />}
+                                          color={item.isActive ? 'orange' : 'green'}
+                                          onClick={() => handleToggleActive(item)}
+                                        >
+                                          {item.isActive ? 'Desativar' : 'Ativar'}
+                                        </Menu.Item>
+                                      </Menu.Dropdown>
+                                    </Menu>
                                   </Group>
                                 </Table.Td>
                               </Table.Tr>
@@ -1285,12 +1419,13 @@ export function CadastroProcedimento() {
                           )}
                         </Table.Tbody>
                       </Table>
-                    </Box>
+                    </PaginatedGrid>
                   )
                 )}
               </Paper>
-            </Tabs.Panel>
-          </Tabs>
+              )}
+            </>
+          )}
         </Stack>
       </Box>
 
