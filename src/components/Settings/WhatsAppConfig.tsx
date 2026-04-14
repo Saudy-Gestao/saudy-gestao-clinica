@@ -65,6 +65,7 @@ interface WhatsAppConfigProps {
 export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const templateTypeLabels: Record<string, string> = {
     APPOINTMENT_CREATED: 'Resumo de Agendamento',
+    TELECONSULTATION_LINK: 'Link de Teleconsulta',
     APPOINTMENT_CONFIRMATION: 'Confirmação de Agendamento',
     NO_SHOW: 'Falta',
     CONFIRMATION_REPLY_CONFIRMED: 'Resposta: Confirmado',
@@ -74,6 +75,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const defaultTemplateMessages: Record<string, string> = {
     APPOINTMENT_CREATED:
       'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nSeu atendimento está confirmado:\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n📍 {{local}}\n📎 Para agilizar seu atendimento, pedimos que envie seus documentos pelo link abaixo:\n👉 {{link_documentos}}\nEm caso de necessidade, fale conosco por aqui.',
+    TELECONSULTATION_LINK:
+      'Olá, {{paciente_nome}}! 😊\nSeu acesso para teleconsulta na {{clinica_nome}} foi liberado.\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n🔗 Acesse por aqui: {{link_documentos}}\nCaso precise de ajuda, responda esta mensagem.',
     APPOINTMENT_CONFIRMATION:
       'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nEstamos entrando em contato para confirmar seu agendamento:\n📅 Data: {{data}}\n⏰ Horário: {{hora}}\n👩‍⚕️ Profissional: {{profissional}}\n📍 Local: {{local}}\nPor favor, escolha uma das opções abaixo:\n✅ Confirmar\n❌ Reagendar\nFicamos no aguardo.',
     CONFIRMATION_REPLY_CONFIRMED:
@@ -729,6 +732,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               required
               data={[
                 { value: 'APPOINTMENT_CREATED', label: 'Resumo de Agendamento', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CREATED') },
+                { value: 'TELECONSULTATION_LINK', label: 'Link de Teleconsulta', disabled: !isEditingTemplate && templates.some((template) => template.type === 'TELECONSULTATION_LINK') },
                 { value: 'APPOINTMENT_CONFIRMATION', label: 'Confirmação', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CONFIRMATION') },
                 { value: 'NO_SHOW', label: 'Falta', disabled: !isEditingTemplate && templates.some((template) => template.type === 'NO_SHOW') },
                 { value: 'CONFIRMATION_REPLY_CONFIRMED', label: 'Resposta: Confirmado', disabled: !isEditingTemplate && templates.some((template) => template.type === 'CONFIRMATION_REPLY_CONFIRMED') },
