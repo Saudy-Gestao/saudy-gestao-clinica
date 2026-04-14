@@ -430,6 +430,34 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       return;
     }
 
+    if (template.hsmTemplateApproved) {
+      setToggleLoadingType(template.type);
+      try {
+        await whatsappService.saveTemplate({
+          id: template.id,
+          type: template.type,
+          name: template.name,
+          message: template.message,
+          isActive: true,
+        });
+        notifications.show({
+          title: 'Template ativado',
+          message: 'Template já aprovado na Gupshup e ativado com sucesso.',
+          color: 'green',
+        });
+        await refreshPageData();
+      } catch (toggleError: any) {
+        notifications.show({
+          title: 'Erro',
+          message: resolveApiErrorMessage(toggleError, 'Erro ao ativar template'),
+          color: 'red',
+        });
+      } finally {
+        setToggleLoadingType(null);
+      }
+      return;
+    }
+
     setActivationConfirm({ mode: 'list', templateId: template.id });
   };
 
@@ -437,8 +465,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     if (!activationConfirm) return;
 
     if (activationConfirm.mode === 'form') {
+      const editingTemplate = editingTemplateId
+        ? templates.find((item) => item.id === editingTemplateId)
+        : null;
+      const alreadyApproved = Boolean(editingTemplate?.hsmTemplateApproved);
+
       setTemplateForm((prev) => ({ ...prev, isActive: true }));
-      setSendValidationOnSave(true);
+      setSendValidationOnSave(!alreadyApproved);
       setActivationConfirm(null);
       return;
     }
@@ -451,7 +484,9 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
     setToggleLoadingType(template.type);
     try {
-      await whatsappService.pushTemplateToGupshup(template.id);
+      if (!template.hsmTemplateApproved) {
+        await whatsappService.pushTemplateToGupshup(template.id);
+      }
       await whatsappService.saveTemplate({
         id: template.id,
         type: template.type,
@@ -460,8 +495,10 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         isActive: true,
       });
       notifications.show({
-        title: 'Template enviado para validação',
-        message: 'O template foi ativado e enviado para o Gupshup.',
+        title: template.hsmTemplateApproved ? 'Template ativado' : 'Template enviado para validação',
+        message: template.hsmTemplateApproved
+          ? 'O template foi ativado sem novo envio, pois já está aprovado.'
+          : 'O template foi ativado e enviado para o Gupshup.',
         color: 'green',
       });
       setActivationConfirm(null);
