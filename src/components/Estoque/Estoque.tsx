@@ -1161,7 +1161,7 @@ export function Estoque() {
             <Text size="xs" c="dimmed">Campos com * são obrigatórios</Text>
           </Group>
 
-          <Paper withBorder radius="md" p="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
+          <Paper withBorder radius="md" p="md">
             <Stack gap="md">
               <Text fw={700} size="sm">Identificação</Text>
               <FloatingInput
@@ -1183,7 +1183,7 @@ export function Estoque() {
             </Stack>
           </Paper>
 
-          <Paper withBorder radius="md" p="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
+          <Paper withBorder radius="md" p="md">
             <Stack gap="md">
               <Text fw={700} size="sm">Controle de estoque</Text>
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
