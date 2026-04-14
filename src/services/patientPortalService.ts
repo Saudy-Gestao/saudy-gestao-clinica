@@ -135,6 +135,13 @@ export type PatientPortalPhysicalDeliveryRequestResponse = {
   };
 };
 
+export type PatientPortalReportShareLinkResponse = {
+  reportId: string;
+  url: string;
+  expiresAt: string;
+  expiresInHours: number;
+};
+
 export type PatientPortalAccessLogItem = {
   id: string;
   event: string;
@@ -213,6 +220,13 @@ class PatientPortalService {
       responseType: 'blob',
     });
     return response.data as Blob;
+  }
+
+  generateReportShareLink(reportId: string, payload?: { expiresInHours?: number }) {
+    return api.post<PatientPortalReportShareLinkResponse>(
+      `/auth/patient-portal/me/reports/${reportId}/share-link`,
+      payload || {},
+    ).then((response) => response.data);
   }
 
   listDeliveryRequests(params?: { limit?: number; offset?: number }) {
