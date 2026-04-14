@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Badge, Paper, Skeleton, Textarea, Divider, SimpleGrid, Tabs } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Badge, Paper, Skeleton, Textarea, Divider, SimpleGrid, UnstyledButton, useComputedColorScheme, Menu } from '@mantine/core';
 import inventoryService from '../../services/inventoryService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Plus, ChevronLeft, Pencil, ArrowUpDown, History, Boxes, X } from 'lucide-react';
+import { Plus, ChevronLeft, Pencil, ArrowUpDown, History, Boxes, X, MoreVertical, Package, PackageOpen } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -16,6 +16,7 @@ import { FloatingDateInput } from '../common/FloatingDateInput';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 interface StockItem {
   id: string;
@@ -77,7 +78,11 @@ export function Estoque() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
-  const [activeTab, setActiveTab] = useState<string | null>('itens');
+  const [activeTab, setActiveTab] = useState<'hub' | 'itens' | 'kits'>('hub');
+  const [itemsPage, setItemsPage] = useState(1);
+  const [itemsPageSize, setItemsPageSize] = useState(10);
+  const [kitsPage, setKitsPage] = useState(1);
+  const [kitsPageSize, setKitsPageSize] = useState(10);
   const [items, setItems] = useState<StockItem[]>([]);
   const [kits, setKits] = useState<StockKit[]>([]);
   const [kitsLoading, setKitsLoading] = useState(false);
@@ -139,6 +144,7 @@ export function Estoque() {
 
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   // Category options shared between filter and modal
   const categoriesOptions = [
@@ -164,6 +170,9 @@ export function Estoque() {
     const description = String(kit.description || '').toLowerCase();
     return name.includes(q) || description.includes(q);
   });
+
+  const paginatedItems = filtered.slice((itemsPage - 1) * itemsPageSize, itemsPage * itemsPageSize);
+  const paginatedKits = filteredKits.slice((kitsPage - 1) * kitsPageSize, kitsPage * kitsPageSize);
 
   const [form, setForm] = useState({
     codigo: '',
@@ -229,6 +238,24 @@ export function Estoque() {
     setShowItemErrorModal(true);
     showNotification({ title: 'Erro', message: msg, color: 'red' });
   }, [inventoryError]);
+
+  useEffect(() => {
+    setItemsPage(1);
+  }, [query, category, itemsPageSize, items.length]);
+
+  useEffect(() => {
+    const total = Math.max(1, Math.ceil(filtered.length / itemsPageSize));
+    if (itemsPage > total) setItemsPage(total);
+  }, [filtered.length, itemsPage, itemsPageSize]);
+
+  useEffect(() => {
+    setKitsPage(1);
+  }, [kitQuery, kitsPageSize, kits.length]);
+
+  useEffect(() => {
+    const total = Math.max(1, Math.ceil(filteredKits.length / kitsPageSize));
+    if (kitsPage > total) setKitsPage(total);
+  }, [filteredKits.length, kitsPage, kitsPageSize]);
 
   const loadKits = async () => {
     setKitsLoading(true);
@@ -773,13 +800,108 @@ export function Estoque() {
           </Button>
         </Group>
 
-        <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
-          <Tabs.List mb={isMobile ? 16 : 20}>
-            <Tabs.Tab value="itens">Itens</Tabs.Tab>
-            <Tabs.Tab value="kits">Kits de insumos</Tabs.Tab>
-          </Tabs.List>
+        {activeTab === 'hub' ? (
+          <Box
+            style={{
+              minHeight: isMobile ? 'auto' : '58vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+              <UnstyledButton
+                onClick={() => setActiveTab('itens')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Package size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Itens</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Cadastre e gerencie os itens do estoque com controle de validade e movimentação.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
 
-          <Tabs.Panel value="itens">
+              <UnstyledButton
+                onClick={() => setActiveTab('kits')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <PackageOpen size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Kits de insumos</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Monte kits com itens do estoque para uso rápido nos procedimentos.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>{activeTab === 'itens' ? 'Itens de estoque' : 'Kits de insumos'}</Text>
+              </Group>
+            </Group>
+
+          {activeTab === 'itens' && (
+            <>
             <Group mb={isMobile ? 20 : 30} align="flex-end" wrap="wrap" grow>
               <FloatingInput
                 label="Buscar itens"
@@ -810,7 +932,16 @@ export function Estoque() {
                 ))}
               </Stack>
             ) : (
-              <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <PaginatedGrid
+                totalItems={filtered.length}
+                page={itemsPage}
+                pageSize={itemsPageSize}
+                onPageChange={setItemsPage}
+                onPageSizeChange={setItemsPageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
                 <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                   <Table.Thead>
                     <Table.Tr style={{ borderBottom: 'none' }}>
@@ -824,11 +955,11 @@ export function Estoque() {
                       {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valid.</Table.Th>}
                       {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Categoria</Table.Th>}
                       {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, width: 140 }}>Ações</Table.Th>
+                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, width: 96, textAlign: 'center' }}>Ações</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {filtered.length > 0 ? filtered.map((it) => (
+                    {filtered.length > 0 ? paginatedItems.map((it) => (
                       <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                     <Table.Td>
                       <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.codigo}</Text>
@@ -891,46 +1022,31 @@ export function Estoque() {
                     </Group>
                   </Table.Td>
                 )}
-                <Table.Td>
-                  <Group gap={4} wrap="nowrap">
-                    <ActionIcon
-                      variant="subtle"
-                      color="teal"
-                      onClick={() => openMovement(it)}
-                      aria-label={`Movimentar ${it.nome}`}
-                      title="Movimentar item"
-                    >
-                      <ArrowUpDown size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="subtle"
-                      color="indigo"
-                      onClick={() => { void openLots(it); }}
-                      aria-label={`Lotes ${it.nome}`}
-                      title="Gerenciar lotes"
-                    >
-                      <Boxes size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="subtle"
-                      color="grape"
-                      onClick={() => { void openHistory(it); }}
-                      aria-label={`Histórico ${it.nome}`}
-                      title="Ver histórico"
-                    >
-                      <History size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="subtle"
-                      color="blue"
-                      onClick={() => openCadastrar(it)}
-                      aria-label={`Editar ${it.nome}`}
-                      title="Editar item"
-                    >
-                      <Pencil size={16} />
-                    </ActionIcon>
+                <Table.Td style={{ textAlign: 'center' }}>
+                  <Group justify="center">
+                    <Menu shadow="md" width={220} position="bottom" withArrow>
+                      <Menu.Target>
+                        <ActionIcon variant="light" size="sm" aria-label={`Ações de ${it.nome}`}>
+                          <MoreVertical size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<ArrowUpDown size={14} />} onClick={() => openMovement(it)}>
+                          Movimentar
+                        </Menu.Item>
+                        <Menu.Item leftSection={<Boxes size={14} />} onClick={() => { void openLots(it); }}>
+                          Gerenciar lotes
+                        </Menu.Item>
+                        <Menu.Item leftSection={<History size={14} />} onClick={() => { void openHistory(it); }}>
+                          Ver histórico
+                        </Menu.Item>
+                        <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openCadastrar(it)}>
+                          Editar item
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
                   </Group>
-                  </Table.Td>
+                </Table.Td>
                   </Table.Tr>
                     )) : (
                       <Table.Tr>
@@ -946,11 +1062,12 @@ export function Estoque() {
                     )}
                   </Table.Tbody>
                 </Table>
-              </Box>
+              </PaginatedGrid>
             )}
-          </Tabs.Panel>
+            </>
+          )}
 
-          <Tabs.Panel value="kits">
+          {activeTab === 'kits' && (
             <Stack gap="md">
               <Group justify="space-between" align="flex-end" wrap="wrap">
                 <FloatingInput
@@ -986,7 +1103,16 @@ export function Estoque() {
                   ))}
                 </Stack>
               ) : (
-                <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <PaginatedGrid
+                  totalItems={filteredKits.length}
+                  page={kitsPage}
+                  pageSize={kitsPageSize}
+                  onPageChange={setKitsPage}
+                  onPageSizeChange={setKitsPageSize}
+                  isMobile={isMobile}
+                  maxHeight={isMobile ? 500 : 620}
+                  showFooter
+                >
                   <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                     <Table.Thead>
                       <Table.Tr style={{ borderBottom: 'none' }}>
@@ -1009,7 +1135,7 @@ export function Estoque() {
                             </Stack>
                           </Table.Td>
                         </Table.Tr>
-                      ) : filteredKits.map((kit) => (
+                      ) : paginatedKits.map((kit) => (
                         <Table.Tr key={kit.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                           <Table.Td>
                             <Text size="sm" fw={600}>{kit.name}</Text>
@@ -1034,11 +1160,12 @@ export function Estoque() {
                       ))}
                     </Table.Tbody>
                   </Table>
-                </Box>
+                </PaginatedGrid>
               )}
             </Stack>
-          </Tabs.Panel>
-        </Tabs>
+          )}
+          </>
+        )}
       </Box>
 
       <Modal

@@ -13,10 +13,11 @@ import {
   Stack,
   Table,
   Text,
+  Menu,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, Pencil, Plus, Trash2, MoreVertical } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import sectorService from '../../services/sectorService';
@@ -31,6 +32,7 @@ import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 interface BranchOption {
   id: string;
@@ -87,6 +89,8 @@ export function CadastroSala() {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [items, setItems] = useState<SalaRow[]>([]);
   const [doctorOptions, setDoctorOptions] = useState<DoctorOption[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -143,6 +147,26 @@ export function CadastroSala() {
       || (it.doctorNames || []).some((doctorName) => doctorName.toLowerCase().includes(q))
     ));
   }, [displayItems, query]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, page, pageSize]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredItems.length / pageSize)),
+    [filteredItems.length, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize, items.length, selectedBranchId]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   useEffect(() => {
     setLoadingBranches(branchesQuery.isFetching);
@@ -516,7 +540,16 @@ export function CadastroSala() {
               </Stack>
             )
           ) : (
-            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <PaginatedGrid
+              totalItems={filteredItems.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              isMobile={isMobile}
+              maxHeight={isMobile ? 500 : 620}
+              showFooter
+            >
               <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                 <Table.Thead>
                   <Table.Tr style={{ borderBottom: 'none' }}>
@@ -524,65 +557,76 @@ export function CadastroSala() {
                     {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos vinculados</Table.Th>}
                     {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
                     {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
+                      Ações
+                    </Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredItems.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>
-                        <Text fw={600}>{item.name}</Text>
-                      </Table.Td>
-                      {!isMobile && (
-                        <Table.Td>
-                          {(item.doctorNames || []).length > 0 ? (
-                            <Group gap={6}>
-                              {(item.doctorNames || []).slice(0, 2).map((doctorName) => (
-                                <Badge key={doctorName} variant="light" color="blue" size="sm">
-                                  {doctorName}
-                                </Badge>
-                              ))}
-                              {(item.doctorNames || []).length > 2 ? (
-                                <Text size="xs" c="dimmed">+{(item.doctorNames || []).length - 2}</Text>
-                              ) : null}
-                            </Group>
-                          ) : (
-                            <Text c="dimmed">-</Text>
-                          )}
-                        </Table.Td>
-                      )}
-                      {!isMobile && <Table.Td><Text c="dimmed" lineClamp={2}>{item.description || '-'}</Text></Table.Td>}
-                      {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
-                      <Table.Td>
-                        <Group gap="xs" justify="flex-end">
-                          <ActionIcon variant="light" color="blue" onClick={() => openModal(item)} aria-label="Editar sala">
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon
-                            variant="light"
-                            color="red"
-                            onClick={() => {
-                              setDeleteTarget(item);
-                              setDeleteModalOpen(true);
-                            }}
-                            aria-label="Excluir sala"
-                          >
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                  {filteredItems.length === 0 && (
+                  {filteredItems.length === 0 ? (
                     <Table.Tr>
-                      <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
+                      <Table.Td colSpan={isTablet ? 2 : 5} style={{ textAlign: 'center' }}>
                         <Text c="dimmed" py="md">Nenhuma sala encontrada para esta filial.</Text>
                       </Table.Td>
                     </Table.Tr>
+                  ) : (
+                    paginatedItems.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>
+                          <Text fw={600}>{item.name}</Text>
+                        </Table.Td>
+                        {!isMobile && (
+                          <Table.Td>
+                            {(item.doctorNames || []).length > 0 ? (
+                              <Group gap={6}>
+                                {(item.doctorNames || []).slice(0, 2).map((doctorName) => (
+                                  <Badge key={doctorName} variant="light" color="blue" size="sm">
+                                    {doctorName}
+                                  </Badge>
+                                ))}
+                                {(item.doctorNames || []).length > 2 ? (
+                                  <Text size="xs" c="dimmed">+{(item.doctorNames || []).length - 2}</Text>
+                                ) : null}
+                              </Group>
+                            ) : (
+                              <Text c="dimmed">-</Text>
+                            )}
+                          </Table.Td>
+                        )}
+                        {!isMobile && <Table.Td><Text c="dimmed" lineClamp={2}>{item.description || '-'}</Text></Table.Td>}
+                        {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações da sala">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openModal(item)}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<Trash2 size={14} />}
+                                  color="red"
+                                  onClick={() => {
+                                    setDeleteTarget(item);
+                                    setDeleteModalOpen(true);
+                                  }}
+                                >
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))
                   )}
                 </Table.Tbody>
               </Table>
-            </Box>
+            </PaginatedGrid>
           )
         )}
       </Box>

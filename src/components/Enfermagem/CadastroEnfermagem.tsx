@@ -15,10 +15,11 @@ import {
   Switch,
   Table,
   Text,
+  Menu,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardCheck, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { ChevronLeft, ClipboardCheck, Pencil, Plus, Power, Trash2, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -33,6 +34,7 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 type QuestionForm = NursingQuestionPayload & {
   id: string;
@@ -151,6 +153,8 @@ export function CadastroEnfermagem() {
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateForm>(INITIAL_FORM);
   const {
@@ -183,6 +187,16 @@ export function CadastroEnfermagem() {
     });
   }, [items, query]);
 
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, page, pageSize]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredItems.length / pageSize)),
+    [filteredItems.length, pageSize],
+  );
+
   useEffect(() => {
     const err: any = templatesError || proceduresError;
     if (err) {
@@ -193,6 +207,16 @@ export function CadastroEnfermagem() {
       });
     }
   }, [templatesError, proceduresError]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize, items.length]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM);
@@ -401,74 +425,94 @@ export function CadastroEnfermagem() {
           ) : (
             <>
               {!isMobile ? (
-                <Table highlightOnHover verticalSpacing="md">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Triagem</Table.Th>
-                      <Table.Th>Procedimento</Table.Th>
-                      <Table.Th>Campos padrão</Table.Th>
-                      <Table.Th>Perguntas livres</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th style={{ textAlign: 'right' }}>Ações</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {filteredItems.length > 0 ? filteredItems.map((item) => {
-                      const standardCount = STANDARD_FIELDS.filter((field) => Boolean(item[field.key])).length;
-                      return (
-                        <Table.Tr key={item.id}>
-                          <Table.Td>
-                            <Text fw={700}>{item.name}</Text>
-                            {item.description && (
-                              <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text>
-                            )}
-                          </Table.Td>
-                          <Table.Td>
-                            <Badge variant="light" color="blue" radius="xl">
-                              {item.procedure?.name || 'Sem procedimento'}
-                            </Badge>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text fw={600}>{standardCount > 0 ? `${standardCount} habilitado(s)` : 'Nenhum'}</Text>
-                            <Text size="sm" c="dimmed">
-                              {standardCount > 0 ? 'Sinais vitais e checagens padrão ativos' : 'Nenhum campo padrão selecionado'}
-                            </Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text fw={600}>{item.questions?.length || 0}</Text>
-                            <Text size="sm" c="dimmed">
-                              {(item.questions?.length || 0) === 1 ? 'pergunta específica' : 'perguntas específicas'}
-                            </Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Badge color={item.isActive ? 'green' : 'gray'} variant="light" radius="xl">
-                              {item.isActive ? 'Ativo' : 'Inativo'}
-                            </Badge>
-                          </Table.Td>
-                          <Table.Td>
-                            <Group gap="xs" justify="flex-end">
-                              <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)}>
-                                <Pencil size={16} />
-                              </ActionIcon>
-                              <ActionIcon variant="light" color="red" onClick={() => handleDeactivate(item.id)}>
-                                <Power size={16} />
-                              </ActionIcon>
-                            </Group>
+                <PaginatedGrid
+                  totalItems={filteredItems.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  isMobile={isMobile}
+                  maxHeight={isMobile ? 500 : 620}
+                  showFooter
+                >
+                  <Table highlightOnHover verticalSpacing="md">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Triagem</Table.Th>
+                        <Table.Th>Procedimento</Table.Th>
+                        <Table.Th>Campos padrão</Table.Th>
+                        <Table.Th>Perguntas livres</Table.Th>
+                        <Table.Th>Status</Table.Th>
+                        <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {filteredItems.length > 0 ? paginatedItems.map((item) => {
+                        const standardCount = STANDARD_FIELDS.filter((field) => Boolean(item[field.key])).length;
+                        return (
+                          <Table.Tr key={item.id}>
+                            <Table.Td>
+                              <Text fw={700}>{item.name}</Text>
+                              {item.description && (
+                                <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text>
+                              )}
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge variant="light" color="blue" radius="xl">
+                                {item.procedure?.name || 'Sem procedimento'}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <Text fw={600}>{standardCount > 0 ? `${standardCount} habilitado(s)` : 'Nenhum'}</Text>
+                              <Text size="sm" c="dimmed">
+                                {standardCount > 0 ? 'Sinais vitais e checagens padrão ativos' : 'Nenhum campo padrão selecionado'}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Text fw={600}>{item.questions?.length || 0}</Text>
+                              <Text size="sm" c="dimmed">
+                                {(item.questions?.length || 0) === 1 ? 'pergunta específica' : 'perguntas específicas'}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge color={item.isActive ? 'green' : 'gray'} variant="light" radius="xl">
+                                {item.isActive ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td style={{ textAlign: 'center' }}>
+                              <Group justify="center">
+                                <Menu shadow="md" width={210} position="bottom" withArrow>
+                                  <Menu.Target>
+                                    <ActionIcon variant="light" size="sm" aria-label="Ações da triagem">
+                                      <MoreVertical size={16} />
+                                    </ActionIcon>
+                                  </Menu.Target>
+                                  <Menu.Dropdown>
+                                    <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openEdit(item)}>
+                                      Editar
+                                    </Menu.Item>
+                                    <Menu.Item leftSection={<Power size={14} />} color="red" onClick={() => handleDeactivate(item.id)}>
+                                      Desativar
+                                    </Menu.Item>
+                                  </Menu.Dropdown>
+                                </Menu>
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        );
+                      }) : (
+                        <Table.Tr>
+                          <Table.Td colSpan={6}>
+                            <Stack align="center" py="xl" gap={6}>
+                              <Text fw={600}>Nenhuma triagem cadastrada</Text>
+                              <Text c="dimmed" size="sm">Cadastre uma triagem por procedimento para organizar o preparo dos exames.</Text>
+                            </Stack>
                           </Table.Td>
                         </Table.Tr>
-                      );
-                    }) : (
-                      <Table.Tr>
-                        <Table.Td colSpan={6}>
-                          <Stack align="center" py="xl" gap={6}>
-                            <Text fw={600}>Nenhuma triagem cadastrada</Text>
-                            <Text c="dimmed" size="sm">Cadastre uma triagem por procedimento para organizar o preparo dos exames.</Text>
-                          </Stack>
-                        </Table.Td>
-                      </Table.Tr>
-                    )}
-                  </Table.Tbody>
-                </Table>
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </PaginatedGrid>
               ) : (
                 <Stack gap="sm">
                   {filteredItems.length > 0 ? filteredItems.map((item) => {
