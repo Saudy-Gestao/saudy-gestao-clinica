@@ -1050,7 +1050,7 @@ export function Faturamento() {
       >
         <Box p="lg">
           <Group justify="space-between" align="center" mb="lg">
-            <Text fw={600} size="lg" c="#212529">{editingId ? 'Editar fatura' : 'Novo lançamento'}</Text>
+            <Text fw={600} size="lg" c="var(--mantine-color-text)">{editingId ? 'Editar fatura' : 'Novo lançamento'}</Text>
             <ActionIcon 
               variant="subtle" 
               color="gray" 
