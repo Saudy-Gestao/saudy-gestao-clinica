@@ -412,6 +412,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 440px;
   gap: 10px;
+  align-items: stretch;
 }
 
 .consultationPatientShell {
@@ -423,7 +424,9 @@
   position: relative;
   border-radius: 10px;
   overflow: hidden;
-  min-height: clamp(420px, calc(100vh - 110px), 820px);
+  height: 760px;
+  min-height: 760px;
+  max-height: 760px;
   background: #0a0d14;
   border: 1px solid #c8c8c8;
 }
@@ -431,9 +434,16 @@
 .consultationRemoteVideo {
   width: 100%;
   height: 100%;
-  object-fit: contain;
   display: block;
   background: #000;
+}
+
+.consultationRemoteVideoDoctor {
+  object-fit: contain;
+}
+
+.consultationRemoteVideoPatient {
+  object-fit: cover;
 }
 
 .consultationRemoteOverlay {
@@ -447,27 +457,32 @@
 
 .consultationTimerPill {
   position: absolute;
-  top: 14px;
+  top: 12px;
   left: 14px;
   z-index: 5;
-  background: rgba(20, 22, 28, 0.92);
+  background: rgba(8, 10, 16, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(6px);
   color: #ffffff;
   border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 35px;
-  font-weight: 500;
+  padding: 8px 16px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   line-height: 1;
 }
 
 .consultationFullscreenBtn {
   position: absolute;
-  top: 14px;
+  top: 12px;
   right: 14px;
+  left: auto;
   z-index: 5;
   background: #0a2a67;
   color: #ffffff;
-  width: 54px;
-  height: 54px;
+  width: 52px;
+  height: 52px;
 }
 
 .consultationControls {
@@ -523,7 +538,9 @@
   border: 1px solid #cccccc;
   background: #f2f2f2;
   overflow: hidden;
-  min-height: clamp(420px, calc(100vh - 110px), 820px);
+  height: 760px;
+  min-height: 760px;
+  max-height: 760px;
 }
 
 .consultationRecordTabs {
@@ -584,17 +601,24 @@
   }
 
   .consultationVideoPanel {
-    min-height: 500px;
+    height: 620px;
+    min-height: 620px;
+    max-height: 620px;
   }
 
   .consultationRecordPanel {
     max-width: 100%;
+    height: auto;
+    min-height: 560px;
+    max-height: none;
   }
 }
 
 @media (max-width: 900px) {
   .consultationVideoPanel {
+    height: calc(100vh - 90px);
     min-height: calc(100vh - 90px);
+    max-height: calc(100vh - 90px);
   }
 
   .consultationTimerPill {

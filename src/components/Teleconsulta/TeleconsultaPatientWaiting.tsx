@@ -894,13 +894,19 @@ export function TeleconsultaPatientWaiting() {
                     size="lg"
                     radius="md"
                     className={styles.consultationFullscreenBtn}
+                    style={{ right: 14, left: 'auto' }}
                     onClick={() => { void toggleDoctorFullscreen(); }}
                     aria-label={isFullscreen ? 'Sair da tela cheia' : 'Entrar em tela cheia'}
                   >
                     <Expand size={18} />
                   </ActionIcon>
 
-                  <video ref={remoteVideoRef} autoPlay playsInline className={styles.consultationRemoteVideo} />
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`${styles.consultationRemoteVideo} ${styles.consultationRemoteVideoDoctor}`}
+                  />
                   {!remoteConnected ? (
                     <Box className={styles.consultationRemoteOverlay}>
                       <Text size="sm">Aguardando vídeo do paciente...</Text>
@@ -1075,7 +1081,12 @@ export function TeleconsultaPatientWaiting() {
               <Box className={styles.consultationPatientShell}>
                 <Box className={styles.consultationVideoPanel}>
                   <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
-                  <video ref={remoteVideoRef} autoPlay playsInline className={styles.consultationRemoteVideo} />
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`${styles.consultationRemoteVideo} ${styles.consultationRemoteVideoPatient}`}
+                  />
                   {!remoteConnected ? (
                     <Box className={styles.consultationRemoteOverlay}>
                       <Text size="sm">Aguardando conexão da outra ponta...</Text>
@@ -1103,7 +1114,11 @@ export function TeleconsultaPatientWaiting() {
                         stopMediaAndPeer('patient-left');
                         setInCall(false);
                         setCallStartedAt(null);
-                        redirectPatientToFinished();
+                        showNotification({
+                          title: 'Você saiu da chamada',
+                          message: 'Você pode entrar novamente quando quiser.',
+                          color: 'blue',
+                        });
                       }}
                     >
                       <PhoneOff size={20} />

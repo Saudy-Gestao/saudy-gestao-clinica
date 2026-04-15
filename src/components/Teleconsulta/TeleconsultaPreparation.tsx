@@ -599,9 +599,11 @@ export function TeleconsultaPreparation() {
             <Text c="red.6" mt="sm" ta="right">
               {mediaError}
             </Text>
-          ) : (!canJoinWaitingWindow && isPatientToken) ? (
+          ) : !canJoinWaitingWindow ? (
             <Text c={isDark ? 'yellow.3' : 'yellow.9'} mt="sm" ta="right">
-              Você poderá ingressar na fila de espera em {formatRemainingToWindow(millisUntilAllowedWindow)}.
+              {isDoctorToken
+                ? `Você poderá ingressar na fila em ${formatRemainingToWindow(millisUntilAllowedWindow)} (libera 1 minuto antes).`
+                : `Você poderá ingressar na fila de espera em ${formatRemainingToWindow(millisUntilAllowedWindow)}.`}
             </Text>
           ) : null}
 
