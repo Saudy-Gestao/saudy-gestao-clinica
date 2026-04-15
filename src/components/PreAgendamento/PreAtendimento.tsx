@@ -1158,16 +1158,14 @@ export function PreAtendimento() {
       await loadReceptionPatients();
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
 
+      let generatedTeleLinks: { patientUrl: string; doctorUrl: string; expiresAt: string } | null = null;
       if (sendTeleconsultationLink && checklistPreAttendanceId) {
         try {
           const teleResult = await teleconsultationLinkService.sendWhatsAppLink(checklistPreAttendanceId, {
             notes: checklistData.observacoes || undefined,
             sendPatientMessage: false,
           });
-          setTeleLinkPatientUrl(teleResult?.links?.patientUrl || '');
-          setTeleLinkDoctorUrl(teleResult?.links?.doctorUrl || '');
-          setTeleLinkExpiresAt(teleResult?.links?.expiresAt || null);
-          setTeleLinkModalOpen(Boolean(teleResult?.links?.patientUrl));
+          generatedTeleLinks = teleResult?.links || null;
           showNotification({
             title: 'Link de teleconsulta gerado',
             message: 'Copie o link no modal para compartilhar manualmente com o paciente.',
@@ -1184,6 +1182,14 @@ export function PreAtendimento() {
 
       setChecklistOpen(false);
       resetChecklist();
+      if (generatedTeleLinks?.patientUrl) {
+        setTeleLinkPatientUrl(generatedTeleLinks.patientUrl || '');
+        setTeleLinkDoctorUrl(generatedTeleLinks.doctorUrl || '');
+        setTeleLinkExpiresAt(generatedTeleLinks.expiresAt || null);
+        window.setTimeout(() => {
+          setTeleLinkModalOpen(true);
+        }, 120);
+      }
 
       showNotification({
         title: 'Checklist concluído',

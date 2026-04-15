@@ -959,14 +959,32 @@ export function TeleconsultaPatientWaiting() {
                     <Box className={styles.consultationRecordBody}>
                       <Group justify="space-between" align="center" mb="sm">
                         <Text fw={800} size="xl">Prontuário</Text>
-                        <Button
-                          size="sm"
-                          leftSection={<Download size={14} />}
-                          onClick={handleSaveDoctorRecord}
-                          style={{ background: '#0a2a67', color: '#fff' }}
-                        >
-                          Salvar
-                        </Button>
+                        <Group gap="xs">
+                          <Button
+                            size="sm"
+                            leftSection={<Download size={14} />}
+                            onClick={handleSaveDoctorRecord}
+                            style={{ background: '#0a2a67', color: '#fff' }}
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            color="red"
+                            variant="light"
+                            leftSection={<PhoneOff size={14} />}
+                            onClick={() => {
+                              const confirmed = window.confirm('Deseja realmente encerrar e sair da teleconsulta?');
+                              if (!confirmed) return;
+                              stopMediaAndPeer('hangup');
+                              setInCall(false);
+                              setCallStartedAt(null);
+                              void finalizeDoctorConsultation();
+                            }}
+                          >
+                            Encerrar e sair
+                          </Button>
+                        </Group>
                       </Group>
 
                       <Box className={styles.consultationSubTabs}>
@@ -1068,37 +1086,64 @@ export function TeleconsultaPatientWaiting() {
                 </Box>
               </Box>
             ) : (
-              <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`} style={{ padding: 16 }}>
-                <Group justify="space-between" mb="md">
-                  <Text fw={700} size="lg">Consulta em andamento</Text>
-                  <Button
-                    size="sm"
-                    color="red"
-                    variant="light"
-                    leftSection={<PhoneOff size={16} />}
-                    onClick={() => {
-                      const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
-                      if (!confirmed) return;
-                      stopMediaAndPeer('patient-left');
-                      setInCall(false);
-                      setCallStartedAt(null);
-                      redirectPatientToFinished();
-                    }}
-                  >
-                    Sair da teleconsulta
-                  </Button>
-                </Group>
-                <Box style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260 }}>
-                    <video ref={localVideoRef} muted autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Box className={styles.consultationShell}>
+                <Box className={styles.consultationVideoPanel}>
+                  <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
+                  <video ref={remoteVideoRef} autoPlay playsInline className={styles.consultationRemoteVideo} />
+                  {!remoteConnected ? (
+                    <Box className={styles.consultationRemoteOverlay}>
+                      <Text size="sm">Aguardando conexão da outra ponta...</Text>
+                    </Box>
+                  ) : null}
+
+                  <Box className={styles.consultationControls}>
+                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Microfone">
+                      <Mic size={20} />
+                    </ActionIcon>
+                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Câmera">
+                      <Camera size={20} />
+                    </ActionIcon>
+                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Chat">
+                      <MessageCircle size={20} />
+                    </ActionIcon>
                   </Box>
-                  <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260, position: 'relative' }}>
-                    <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    {!remoteConnected ? (
-                      <Text size="sm" c="gray.3" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-                        Aguardando conexão da outra ponta...
-                      </Text>
-                    ) : null}
+
+                  <Box className={styles.consultationLocalPreview}>
+                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
+                  </Box>
+                </Box>
+
+                <Box className={`${styles.consultationRecordPanel} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
+                  <Box className={styles.consultationRecordTabs}>
+                    <button type="button" className={`${styles.consultationRecordTabBtn} ${styles.consultationRecordTabBtnActive}`}>
+                      Consulta
+                    </button>
+                    <button type="button" className={styles.consultationRecordTabBtn}>
+                      Paciente
+                    </button>
+                  </Box>
+                  <Box className={styles.consultationRecordBody}>
+                    <Text fw={800} size="xl">Teleconsulta em andamento</Text>
+                    <Text size="sm">Paciente: {patientName}</Text>
+                    <Text size="sm">Médico: {doctorName}</Text>
+                    <Text size="sm">Especialidade: {doctorSpecialty}</Text>
+                    <Text size="sm">Horário: {scheduledLabel}</Text>
+                    <Button
+                      size="md"
+                      color="red"
+                      variant="light"
+                      leftSection={<PhoneOff size={16} />}
+                      onClick={() => {
+                        const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
+                        if (!confirmed) return;
+                        stopMediaAndPeer('patient-left');
+                        setInCall(false);
+                        setCallStartedAt(null);
+                        redirectPatientToFinished();
+                      }}
+                    >
+                      Encerrar e sair
+                    </Button>
                   </Box>
                 </Box>
               </Box>
