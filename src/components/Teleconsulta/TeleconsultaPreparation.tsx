@@ -70,6 +70,16 @@ const formatRemainingToWindow = (ms: number) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
+const getInitials = (name?: string | null) => {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+};
+
 const evaluateConnection = (online: boolean, downlink?: number, effectiveType?: string) => {
   if (!online) {
     return {
@@ -388,6 +398,7 @@ export function TeleconsultaPreparation() {
   const doctorName = tokenMeta?.appointment?.doctorName || 'Dr(a) não informado(a)';
   const doctorSpecialty = tokenMeta?.appointment?.specialty || 'Especialidade não informada';
   const patientName = tokenMeta?.appointment?.patientName || FALLBACK_PATIENT.name;
+  const doctorInitials = getInitials(doctorName);
   const isPatientToken = String(tokenMeta?.role || '').toUpperCase() === 'PATIENT';
   const isDoctorToken = String(tokenMeta?.role || '').toUpperCase() === 'DOCTOR';
 
@@ -398,7 +409,7 @@ export function TeleconsultaPreparation() {
   const millisUntilAppointment = appointmentDateTime
     ? (appointmentDateTime.getTime() - now.getTime())
     : 0;
-  const joinWindowMinutes = isDoctorToken ? 1 : 10;
+  const joinWindowMinutes = 10;
   const millisUntilAllowedWindow = millisUntilAppointment - (joinWindowMinutes * 60 * 1000);
   const canJoinWaitingWindow = millisUntilAllowedWindow <= 0;
   const canEnter = cameraEnabled && microphoneEnabled && online && !mediaError && canJoinWaitingWindow;
@@ -426,7 +437,7 @@ export function TeleconsultaPreparation() {
 
           <Box className={`${styles.doctorCard} ${isDark ? styles.doctorCardDark : styles.doctorCardLight}`}>
             <Box className={styles.doctorLeft}>
-              <Box className={styles.avatar}>JS</Box>
+              <Box className={styles.avatar}>{doctorInitials}</Box>
               <div>
                 <p className={styles.doctorLabel}>Médico Responsável</p>
                 <p className={styles.doctorName}>{doctorName}</p>
@@ -601,9 +612,7 @@ export function TeleconsultaPreparation() {
             </Text>
           ) : !canJoinWaitingWindow ? (
             <Text c={isDark ? 'yellow.3' : 'yellow.9'} mt="sm" ta="right">
-              {isDoctorToken
-                ? `Você poderá ingressar na fila em ${formatRemainingToWindow(millisUntilAllowedWindow)} (libera 1 minuto antes).`
-                : `Você poderá ingressar na fila de espera em ${formatRemainingToWindow(millisUntilAllowedWindow)}.`}
+              {`Você poderá ingressar na fila de espera em ${formatRemainingToWindow(millisUntilAllowedWindow)}.`}
             </Text>
           ) : null}
 

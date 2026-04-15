@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocalStorage } from '@mantine/hooks';
 import { ActionIcon, Box, Button, Group, Text, Textarea } from '@mantine/core';
-import { Camera, Cast, Download, Expand, LampDesk, MessageCircle, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh } from 'lucide-react';
+import { Camera, Cast, Download, Expand, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -44,6 +44,16 @@ const normalizeCollection = (data: any) => (
       ? data.items
       : (Array.isArray(data?.data) ? data.data : []))
 );
+
+const getInitials = (name?: string | null) => {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+};
 
 export function TeleconsultaPatientWaiting() {
   const navigate = useNavigate();
@@ -188,6 +198,7 @@ export function TeleconsultaPatientWaiting() {
   const topCardLabel = isDoctorRole ? 'Paciente' : 'Médico Responsável';
   const topCardName = isDoctorRole ? patientName : doctorName;
   const topCardDetail = isDoctorRole ? 'Paciente da teleconsulta' : doctorSpecialty;
+  const topCardInitials = getInitials(topCardName);
   const allowJoinFromMinutesBefore = tokenMeta?.window?.allowJoinFromMinutesBefore ?? 10;
   const fromPreparation = params.get('fromPrep') === '1';
   const hasPreparedSession = token ? sessionStorage.getItem(`${PREPARED_SESSION_KEY_PREFIX}${token}`) === '1' : false;
@@ -870,7 +881,7 @@ export function TeleconsultaPatientWaiting() {
           {!doctorInCallMode ? (
           <Box className={`${styles.topCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
             <Box className={styles.topLeft}>
-              <Box className={styles.avatar}>MS</Box>
+              <Box className={styles.avatar}>{topCardInitials}</Box>
               <div>
                 <p className={styles.metaLabel}>{topCardLabel}</p>
                 <p className={styles.metaName}>{topCardName}</p>
@@ -894,7 +905,6 @@ export function TeleconsultaPatientWaiting() {
                     size="lg"
                     radius="md"
                     className={styles.consultationFullscreenBtn}
-                    style={{ right: 14, left: 'auto' }}
                     onClick={() => { void toggleDoctorFullscreen(); }}
                     aria-label={isFullscreen ? 'Sair da tela cheia' : 'Entrar em tela cheia'}
                   >
@@ -923,11 +933,10 @@ export function TeleconsultaPatientWaiting() {
                     <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Compartilhar tela">
                       <Cast size={20} />
                     </ActionIcon>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Chat">
-                      <MessageCircle size={20} />
-                    </ActionIcon>
                     <ActionIcon
                       className={styles.consultationControlBtnDanger}
+                      variant="filled"
+                      color="red"
                       radius="md"
                       size="xl"
                       aria-label="Encerrar e sair"
@@ -1001,6 +1010,7 @@ export function TeleconsultaPatientWaiting() {
                         value={soapData.subjective}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, subjective: event.currentTarget.value }))}
                         minRows={1}
+                        maxRows={4}
                         autosize
                         styles={recordFieldStyles}
                       />
@@ -1009,6 +1019,7 @@ export function TeleconsultaPatientWaiting() {
                         value={soapData.objective}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, objective: event.currentTarget.value }))}
                         minRows={1}
+                        maxRows={4}
                         autosize
                         styles={recordFieldStyles}
                       />
@@ -1017,6 +1028,7 @@ export function TeleconsultaPatientWaiting() {
                         value={soapData.assessment}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, assessment: event.currentTarget.value }))}
                         minRows={1}
+                        maxRows={4}
                         autosize
                         styles={recordFieldStyles}
                       />
@@ -1025,6 +1037,7 @@ export function TeleconsultaPatientWaiting() {
                         value={soapData.cid10}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, cid10: event.currentTarget.value }))}
                         minRows={1}
+                        maxRows={3}
                         autosize
                         styles={recordFieldStyles}
                       />
@@ -1033,6 +1046,7 @@ export function TeleconsultaPatientWaiting() {
                         value={soapData.treatmentPlan}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, treatmentPlan: event.currentTarget.value }))}
                         minRows={1}
+                        maxRows={4}
                         autosize
                         styles={recordFieldStyles}
                       />
@@ -1046,6 +1060,7 @@ export function TeleconsultaPatientWaiting() {
                             : { ...prev, notes: value }));
                         }}
                         minRows={1}
+                        maxRows={6}
                         autosize
                         styles={recordFieldStyles}
                       />
@@ -1080,7 +1095,6 @@ export function TeleconsultaPatientWaiting() {
             ) : (
               <Box className={styles.consultationPatientShell}>
                 <Box className={styles.consultationVideoPanel}>
-                  <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
                   <video
                     ref={remoteVideoRef}
                     autoPlay
@@ -1100,11 +1114,10 @@ export function TeleconsultaPatientWaiting() {
                     <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Câmera">
                       <Camera size={20} />
                     </ActionIcon>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Chat">
-                      <MessageCircle size={20} />
-                    </ActionIcon>
                     <ActionIcon
                       className={styles.consultationControlBtnDanger}
+                      variant="filled"
+                      color="red"
                       radius="md"
                       size="xl"
                       aria-label="Sair da teleconsulta"

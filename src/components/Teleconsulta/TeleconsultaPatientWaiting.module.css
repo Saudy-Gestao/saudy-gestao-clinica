@@ -478,6 +478,8 @@
   top: 12px;
   right: 14px;
   left: auto;
+  inset-inline-end: 14px;
+  inset-inline-start: auto;
   z-index: 5;
   background: #0a2a67;
   color: #ffffff;
@@ -538,6 +540,8 @@
   border: 1px solid #cccccc;
   background: #f2f2f2;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   height: 760px;
   min-height: 760px;
   max-height: 760px;
@@ -570,6 +574,9 @@
   display: grid;
   gap: 14px;
   align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .consultationSubTabs {
