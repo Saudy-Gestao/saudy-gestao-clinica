@@ -506,12 +506,23 @@
   border-radius: 10px;
 }
 
+.consultationControlBtnActive {
+  background: #1453c9;
+  box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.38) inset;
+}
+
+.consultationControlBtnInactive {
+  background: #334a7f;
+  opacity: 0.92;
+}
+
 .consultationControlBtnDanger {
-  background: #d90000;
-  color: #ffffff;
+  background: #d90000 !important;
+  color: #ffffff !important;
   width: 56px;
   height: 56px;
   border-radius: 10px;
+  border: 1px solid #ff6b6b;
 }
 
 .consultationLocalPreview {

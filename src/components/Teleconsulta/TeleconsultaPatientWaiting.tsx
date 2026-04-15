@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocalStorage } from '@mantine/hooks';
 import { ActionIcon, Box, Button, Group, Text, Textarea } from '@mantine/core';
-import { Camera, Cast, Download, Expand, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh } from 'lucide-react';
+import { Camera, Download, Expand, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -84,6 +84,8 @@ export function TeleconsultaPatientWaiting() {
   }>>([]);
   const [sendingChat, setSendingChat] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [recordTab, setRecordTab] = useState<'record' | 'patient'>('record');
   const [recordSubTab, setRecordSubTab] = useState<'prescription' | 'notes'>('prescription');
@@ -104,6 +106,7 @@ export function TeleconsultaPatientWaiting() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const pollingRef = useRef<number | null>(null);
   const lastEventIdRef = useRef<number>(0);
@@ -237,6 +240,7 @@ export function TeleconsultaPatientWaiting() {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    cameraTrackRef.current = null;
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
@@ -251,6 +255,8 @@ export function TeleconsultaPatientWaiting() {
     setRemoteConnected(false);
     enteringCallRef.current = false;
     setCallStartedAt(null);
+    setIsMicEnabled(true);
+    setIsCameraEnabled(true);
   };
 
   const resetPeerForReconnect = () => {
@@ -307,6 +313,9 @@ export function TeleconsultaPatientWaiting() {
       audio: { echoCancellation: true, noiseSuppression: true },
     });
     localStreamRef.current = stream;
+    cameraTrackRef.current = stream.getVideoTracks()[0] || null;
+    setIsMicEnabled((stream.getAudioTracks()[0]?.enabled ?? true));
+    setIsCameraEnabled((stream.getVideoTracks()[0]?.enabled ?? true));
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -339,6 +348,27 @@ export function TeleconsultaPatientWaiting() {
 
     peerRef.current = peer;
     return peer;
+  };
+
+  const getVideoSender = () => peerRef.current?.getSenders().find((sender) => sender.track?.kind === 'video') || null;
+
+  const toggleMicrophone = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) return;
+    const nextEnabled = !audioTracks[0].enabled;
+    audioTracks.forEach((track) => {
+      track.enabled = nextEnabled;
+    });
+    setIsMicEnabled(nextEnabled);
+  };
+
+  const toggleCamera = () => {
+    const activeVideoTrack = getVideoSender()?.track || localStreamRef.current?.getVideoTracks()?.[0] || null;
+    if (!activeVideoTrack) return;
+    activeVideoTrack.enabled = !activeVideoTrack.enabled;
+    setIsCameraEnabled(activeVideoTrack.enabled);
   };
 
   const acceptPendingOfferIfAny = async () => {
@@ -924,14 +954,23 @@ export function TeleconsultaPatientWaiting() {
                   ) : null}
 
                   <Box className={styles.consultationControls}>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Microfone">
-                      <Mic size={20} />
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isMicEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isMicEnabled ? 'Mutar microfone' : 'Desmutar microfone'}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
                     </ActionIcon>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Câmera">
-                      <Camera size={20} />
-                    </ActionIcon>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Compartilhar tela">
-                      <Cast size={20} />
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isCameraEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}
+                      onClick={toggleCamera}
+                    >
+                      {isCameraEnabled ? <Camera size={20} /> : <VideoOff size={20} />}
                     </ActionIcon>
                     <ActionIcon
                       className={styles.consultationControlBtnDanger}
@@ -1108,11 +1147,23 @@ export function TeleconsultaPatientWaiting() {
                   ) : null}
 
                   <Box className={styles.consultationControls}>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Microfone">
-                      <Mic size={20} />
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isMicEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isMicEnabled ? 'Mutar microfone' : 'Desmutar microfone'}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
                     </ActionIcon>
-                    <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Câmera">
-                      <Camera size={20} />
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isCameraEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}
+                      onClick={toggleCamera}
+                    >
+                      {isCameraEnabled ? <Camera size={20} /> : <VideoOff size={20} />}
                     </ActionIcon>
                     <ActionIcon
                       className={styles.consultationControlBtnDanger}
