@@ -626,9 +626,13 @@ export function TeleconsultaPatientWaiting() {
   const withinWindow = diffSeconds <= allowJoinFromMinutesBefore * 60;
   const isOverdue = diffSeconds < 0;
 
-  const counterpartReady = isDoctorRole ? patientJoined : doctorJoined;
+  const counterpartReady = isDoctorRole ? patientJoined : doctorInConsultation;
 
   const status = useMemo(() => {
+    if (!isDoctorRole && doctorJoined && !doctorInConsultation) {
+      return { label: 'Médico online. Aguarde ele iniciar a consulta.', color: '#7b90ff' };
+    }
+
     if (!isDoctorRole && doctorInConsultation) {
       return { label: 'Médico na consulta', color: '#58d82e' };
     }
@@ -858,7 +862,7 @@ export function TeleconsultaPatientWaiting() {
 
   return (
     <Box bg={doctorInCallMode ? '#efefef' : 'var(--mantine-color-body)'} style={{ minHeight: '100vh' }}>
-      {!doctorInCallMode ? <Header /> : null}
+      {isDoctorRole && !doctorInCallMode ? <Header /> : null}
       <Box className={`${styles.page} ${doctorInCallMode ? styles.pageConsultation : (isDark ? styles.pageDark : styles.pageLight)}`}>
         <Box className={styles.wrapper}>
           {!doctorInCallMode ? <Text className={styles.title}>Teleconsulta</Text> : null}
@@ -920,7 +924,7 @@ export function TeleconsultaPatientWaiting() {
                       className={styles.consultationControlBtnDanger}
                       radius="md"
                       size="xl"
-                      aria-label="Encerrar chamada"
+                      aria-label="Encerrar e sair"
                       onClick={() => {
                         stopMediaAndPeer('hangup');
                         setInCall(false);
@@ -928,7 +932,7 @@ export function TeleconsultaPatientWaiting() {
                         void finalizeDoctorConsultation();
                       }}
                     >
-                      <MicOff size={20} />
+                      <PhoneOff size={20} />
                     </ActionIcon>
                   </Box>
 
@@ -959,32 +963,14 @@ export function TeleconsultaPatientWaiting() {
                     <Box className={styles.consultationRecordBody}>
                       <Group justify="space-between" align="center" mb="sm">
                         <Text fw={800} size="xl">Prontuário</Text>
-                        <Group gap="xs">
-                          <Button
-                            size="sm"
-                            leftSection={<Download size={14} />}
-                            onClick={handleSaveDoctorRecord}
-                            style={{ background: '#0a2a67', color: '#fff' }}
-                          >
-                            Salvar
-                          </Button>
-                          <Button
-                            size="sm"
-                            color="red"
-                            variant="light"
-                            leftSection={<PhoneOff size={14} />}
-                            onClick={() => {
-                              const confirmed = window.confirm('Deseja realmente encerrar e sair da teleconsulta?');
-                              if (!confirmed) return;
-                              stopMediaAndPeer('hangup');
-                              setInCall(false);
-                              setCallStartedAt(null);
-                              void finalizeDoctorConsultation();
-                            }}
-                          >
-                            Encerrar e sair
-                          </Button>
-                        </Group>
+                        <Button
+                          size="sm"
+                          leftSection={<Download size={14} />}
+                          onClick={handleSaveDoctorRecord}
+                          style={{ background: '#0a2a67', color: '#fff' }}
+                        >
+                          Salvar
+                        </Button>
                       </Group>
 
                       <Box className={styles.consultationSubTabs}>
@@ -1086,7 +1072,7 @@ export function TeleconsultaPatientWaiting() {
                 </Box>
               </Box>
             ) : (
-              <Box className={styles.consultationShell}>
+              <Box className={styles.consultationPatientShell}>
                 <Box className={styles.consultationVideoPanel}>
                   <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
                   <video ref={remoteVideoRef} autoPlay playsInline className={styles.consultationRemoteVideo} />
@@ -1106,33 +1092,11 @@ export function TeleconsultaPatientWaiting() {
                     <ActionIcon className={styles.consultationControlBtn} radius="md" size="xl" aria-label="Chat">
                       <MessageCircle size={20} />
                     </ActionIcon>
-                  </Box>
-
-                  <Box className={styles.consultationLocalPreview}>
-                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
-                  </Box>
-                </Box>
-
-                <Box className={`${styles.consultationRecordPanel} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
-                  <Box className={styles.consultationRecordTabs}>
-                    <button type="button" className={`${styles.consultationRecordTabBtn} ${styles.consultationRecordTabBtnActive}`}>
-                      Consulta
-                    </button>
-                    <button type="button" className={styles.consultationRecordTabBtn}>
-                      Paciente
-                    </button>
-                  </Box>
-                  <Box className={styles.consultationRecordBody}>
-                    <Text fw={800} size="xl">Teleconsulta em andamento</Text>
-                    <Text size="sm">Paciente: {patientName}</Text>
-                    <Text size="sm">Médico: {doctorName}</Text>
-                    <Text size="sm">Especialidade: {doctorSpecialty}</Text>
-                    <Text size="sm">Horário: {scheduledLabel}</Text>
-                    <Button
-                      size="md"
-                      color="red"
-                      variant="light"
-                      leftSection={<PhoneOff size={16} />}
+                    <ActionIcon
+                      className={styles.consultationControlBtnDanger}
+                      radius="md"
+                      size="xl"
+                      aria-label="Sair da teleconsulta"
                       onClick={() => {
                         const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
                         if (!confirmed) return;
@@ -1142,8 +1106,12 @@ export function TeleconsultaPatientWaiting() {
                         redirectPatientToFinished();
                       }}
                     >
-                      Encerrar e sair
-                    </Button>
+                      <PhoneOff size={20} />
+                    </ActionIcon>
+                  </Box>
+
+                  <Box className={styles.consultationLocalPreview}>
+                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
                   </Box>
                 </Box>
               </Box>
@@ -1262,7 +1230,7 @@ export function TeleconsultaPatientWaiting() {
             </Text>
           ) : null}
 
-          {!doctorInCallMode ? (
+          {!doctorInCallMode && !inCall ? (
           <Box className={styles.enterRow}>
             <Button size="lg" radius="md" disabled={!canJoinConsultation || !signalingReady || inCall} onClick={() => { void enterConsultation(); }}>
               {isDoctorRole ? 'Entrar na Teleconsulta' : 'Entrar na Consulta'}

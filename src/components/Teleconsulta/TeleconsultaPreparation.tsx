@@ -398,8 +398,9 @@ export function TeleconsultaPreparation() {
   const millisUntilAppointment = appointmentDateTime
     ? (appointmentDateTime.getTime() - now.getTime())
     : 0;
-  const millisUntilAllowedWindow = millisUntilAppointment - (10 * 60 * 1000);
-  const canJoinWaitingWindow = isDoctorToken || millisUntilAllowedWindow <= 0;
+  const joinWindowMinutes = isDoctorToken ? 1 : 10;
+  const millisUntilAllowedWindow = millisUntilAppointment - (joinWindowMinutes * 60 * 1000);
+  const canJoinWaitingWindow = millisUntilAllowedWindow <= 0;
   const canEnter = cameraEnabled && microphoneEnabled && online && !mediaError && canJoinWaitingWindow;
 
   const progressToneClass = connectionState.tone === 'green'
@@ -417,7 +418,7 @@ export function TeleconsultaPreparation() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      {isDoctorToken ? <Header /> : null}
 
       <Box className={`${styles.page} ${isDark ? styles.pageDark : styles.pageLight}`}>
         <Box className={styles.wrapper}>

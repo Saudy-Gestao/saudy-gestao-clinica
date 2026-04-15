@@ -154,6 +154,10 @@ export function PreAgendamento() {
   const [savingPreAuth, setSavingPreAuth] = useState(false);
 
   const [sendingLink, setSendingLink] = useState(false);
+  const [teleLinkModalOpen, setTeleLinkModalOpen] = useState(false);
+  const [teleLinkPatientUrl, setTeleLinkPatientUrl] = useState('');
+  const [teleLinkDoctorUrl, setTeleLinkDoctorUrl] = useState('');
+  const [teleLinkExpiresAt, setTeleLinkExpiresAt] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewDocuments, setReviewDocuments] = useState<Array<{
@@ -261,10 +265,18 @@ export function PreAgendamento() {
   const handleSendTeleconsultationLinkDirect = async (item: PreSchedulingItem) => {
     setSendingLink(true);
     try {
-      await teleconsultationLinkService.sendWhatsAppLinkByAppointment(item.appointmentId);
+      const result = await teleconsultationLinkService.sendWhatsAppLinkByAppointment(item.appointmentId, {
+        sendPatientMessage: false,
+      });
+
+      setTeleLinkPatientUrl(result?.links?.patientUrl || '');
+      setTeleLinkDoctorUrl(result?.links?.doctorUrl || '');
+      setTeleLinkExpiresAt(result?.links?.expiresAt || null);
+      setTeleLinkModalOpen(Boolean(result?.links?.patientUrl || result?.links?.doctorUrl));
+
       showNotification({
         title: 'Link enviado',
-        message: 'Link de teleconsulta gerado com sucesso.',
+        message: 'Link de teleconsulta gerado com sucesso. Você pode copiar no modal.',
         color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
@@ -277,6 +289,25 @@ export function PreAgendamento() {
       });
     } finally {
       setSendingLink(false);
+    }
+  };
+
+  const copyToClipboard = async (value: string, label: string) => {
+    const text = value?.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showNotification({
+        title: 'Copiado',
+        message: `${label} copiado para a área de transferência.`,
+        color: 'green',
+      });
+    } catch {
+      showNotification({
+        title: 'Não foi possível copiar',
+        message: 'Copie manualmente o conteúdo do campo.',
+        color: 'yellow',
+      });
     }
   };
 
@@ -816,6 +847,60 @@ export function PreAgendamento() {
               Aprovar envio
             </Button>
           </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={teleLinkModalOpen}
+        onClose={() => setTeleLinkModalOpen(false)}
+        title="Link da teleconsulta"
+        size="lg"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Copie o link do paciente para compartilhar manualmente no teste do fluxo.
+          </Text>
+
+          <Textarea
+            label="Link do paciente"
+            value={teleLinkPatientUrl}
+            readOnly
+            autosize
+            minRows={3}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="light"
+              disabled={!teleLinkPatientUrl}
+              onClick={() => copyToClipboard(teleLinkPatientUrl, 'Link do paciente')}
+            >
+              Copiar link do paciente
+            </Button>
+          </Group>
+
+          <Textarea
+            label="Link do médico"
+            value={teleLinkDoctorUrl}
+            readOnly
+            autosize
+            minRows={3}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="light"
+              disabled={!teleLinkDoctorUrl}
+              onClick={() => copyToClipboard(teleLinkDoctorUrl, 'Link do médico')}
+            >
+              Copiar link do médico
+            </Button>
+          </Group>
+
+          {teleLinkExpiresAt && (
+            <Text size="xs" c="dimmed">
+              Expira em: {new Date(teleLinkExpiresAt).toLocaleString('pt-BR')}
+            </Text>
+          )}
         </Stack>
       </Modal>
     </Box>

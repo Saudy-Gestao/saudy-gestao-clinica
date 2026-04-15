@@ -414,11 +414,16 @@
   gap: 10px;
 }
 
+.consultationPatientShell {
+  margin-top: 0;
+  display: block;
+}
+
 .consultationVideoPanel {
   position: relative;
   border-radius: 10px;
   overflow: hidden;
-  min-height: calc(100vh - 24px);
+  min-height: clamp(420px, calc(100vh - 110px), 820px);
   background: #0a0d14;
   border: 1px solid #c8c8c8;
 }
@@ -518,7 +523,7 @@
   border: 1px solid #cccccc;
   background: #f2f2f2;
   overflow: hidden;
-  min-height: calc(100vh - 24px);
+  min-height: clamp(420px, calc(100vh - 110px), 820px);
 }
 
 .consultationRecordTabs {
@@ -588,6 +593,10 @@
 }
 
 @media (max-width: 900px) {
+  .consultationVideoPanel {
+    min-height: calc(100vh - 90px);
+  }
+
   .consultationTimerPill {
     font-size: 22px;
     padding: 6px 12px;
