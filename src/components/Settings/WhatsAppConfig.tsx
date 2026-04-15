@@ -386,10 +386,17 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; label: string }> = {
       SENT: { color: 'green', label: 'Enviado' },
+      SUBMITTED: { color: 'green', label: 'Enviado' },
+      DELIVERED: { color: 'teal', label: 'Entregue' },
+      READ: { color: 'blue', label: 'Lido' },
       PENDING: { color: 'yellow', label: 'Pendente' },
+      RESPONDED_CONFIRMED: { color: 'green', label: 'Respondido: Confirmado' },
+      RESPONDED_RESCHEDULE: { color: 'orange', label: 'Respondido: Reagendar' },
+      RECEIVED: { color: 'blue', label: 'Recebido' },
       FAILED: { color: 'red', label: 'Falhou' },
     };
-    const config = statusConfig[status] || { color: 'gray', label: status };
+    const normalized = String(status || '').trim().toUpperCase();
+    const config = statusConfig[normalized] || { color: 'gray', label: normalized || 'Sem status' };
     return <Badge color={config.color}>{config.label}</Badge>;
   };
 
