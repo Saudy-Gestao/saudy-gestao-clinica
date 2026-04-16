@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocalStorage } from '@mantine/hooks';
 import { ActionIcon, Box, Button, Group, Text, Textarea } from '@mantine/core';
-import { Camera, Download, Expand, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
+import { Camera, Download, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -86,7 +86,6 @@ export function TeleconsultaPatientWaiting() {
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [recordTab, setRecordTab] = useState<'record' | 'patient'>('record');
   const [recordSubTab, setRecordSubTab] = useState<'prescription' | 'notes'>('prescription');
   const [soapData, setSoapData] = useState({
@@ -573,12 +572,12 @@ export function TeleconsultaPatientWaiting() {
 
     if (type === 'hangup') {
       stopMediaAndPeer();
-      setInCall(false);
       if (isDoctorRole) {
         clearPreparedSession();
         navigate('/consulta', { replace: true });
         return;
       }
+      setInCall(false);
       redirectPatientToFinished();
     }
   };
@@ -636,16 +635,6 @@ export function TeleconsultaPatientWaiting() {
       void remoteVideoRef.current.play().catch(() => undefined);
     }
   }, [inCall]);
-
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -807,20 +796,6 @@ export function TeleconsultaPatientWaiting() {
     fileInputRef.current?.click();
   };
 
-  const toggleDoctorFullscreen = async () => {
-    const element = doctorMainVideoRef.current;
-    if (!element) return;
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await element.requestFullscreen();
-      }
-    } catch {
-      // Ignora erro de fullscreen.
-    }
-  };
-
   const handleSaveDoctorRecord = () => {
     showNotification({
       title: 'Prontuário salvo',
@@ -903,7 +878,7 @@ export function TeleconsultaPatientWaiting() {
 
   return (
     <Box bg={doctorInCallMode ? '#efefef' : 'var(--mantine-color-body)'} style={{ minHeight: '100vh' }}>
-      {isDoctorRole && !doctorInCallMode ? <Header /> : null}
+      {isDoctorRole ? <Header /> : null}
       <Box className={`${styles.page} ${doctorInCallMode ? styles.pageConsultation : (isDark ? styles.pageDark : styles.pageLight)}`}>
         <Box className={styles.wrapper}>
           {!doctorInCallMode ? <Text className={styles.title}>Teleconsulta</Text> : null}
@@ -931,15 +906,6 @@ export function TeleconsultaPatientWaiting() {
               <Box className={styles.consultationShell}>
                 <Box ref={doctorMainVideoRef} className={styles.consultationVideoPanel}>
                   <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
-                  <ActionIcon
-                    size="lg"
-                    radius="md"
-                    className={styles.consultationFullscreenBtn}
-                    onClick={() => { void toggleDoctorFullscreen(); }}
-                    aria-label={isFullscreen ? 'Sair da tela cheia' : 'Entrar em tela cheia'}
-                  >
-                    <Expand size={18} />
-                  </ActionIcon>
 
                   <video
                     ref={remoteVideoRef}
@@ -981,8 +947,6 @@ export function TeleconsultaPatientWaiting() {
                       aria-label="Encerrar e sair"
                       onClick={() => {
                         stopMediaAndPeer('hangup');
-                        setInCall(false);
-                        setCallStartedAt(null);
                         void finalizeDoctorConsultation();
                       }}
                     >
@@ -1048,27 +1012,21 @@ export function TeleconsultaPatientWaiting() {
                         label="Subjetivo (Queixa do paciente)"
                         value={soapData.subjective}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, subjective: event.currentTarget.value }))}
-                        minRows={1}
-                        maxRows={4}
-                        autosize
+                        minRows={2}
                         styles={recordFieldStyles}
                       />
                       <Textarea
                         label="Objetivo (Exame / Observação)"
                         value={soapData.objective}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, objective: event.currentTarget.value }))}
-                        minRows={1}
-                        maxRows={4}
-                        autosize
+                        minRows={2}
                         styles={recordFieldStyles}
                       />
                       <Textarea
                         label="Avaliação / Diagnóstico"
                         value={soapData.assessment}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, assessment: event.currentTarget.value }))}
-                        minRows={1}
-                        maxRows={4}
-                        autosize
+                        minRows={2}
                         styles={recordFieldStyles}
                       />
                       <Textarea
@@ -1076,17 +1034,13 @@ export function TeleconsultaPatientWaiting() {
                         value={soapData.cid10}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, cid10: event.currentTarget.value }))}
                         minRows={1}
-                        maxRows={3}
-                        autosize
                         styles={recordFieldStyles}
                       />
                       <Textarea
                         label="Plano de Tratamento"
                         value={soapData.treatmentPlan}
                         onChange={(event) => setSoapData((prev) => ({ ...prev, treatmentPlan: event.currentTarget.value }))}
-                        minRows={1}
-                        maxRows={4}
-                        autosize
+                        minRows={2}
                         styles={recordFieldStyles}
                       />
                       <Textarea
@@ -1098,9 +1052,7 @@ export function TeleconsultaPatientWaiting() {
                             ? { ...prev, prescription: value }
                             : { ...prev, notes: value }));
                         }}
-                        minRows={1}
-                        maxRows={6}
-                        autosize
+                        minRows={3}
                         styles={recordFieldStyles}
                       />
 

@@ -27,6 +27,7 @@ import 'dayjs/locale/pt-br';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
@@ -485,6 +486,8 @@ export function Agendamento() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('list');
+  const [agendadosPage, setAgendadosPage] = useState(1);
+  const [agendadosPageSize, setAgendadosPageSize] = useState(10);
   // State to track expanded cards (ids)
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
@@ -975,6 +978,18 @@ export function Agendamento() {
 
     return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesStatus;
   });
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredAgendamentos.length / agendadosPageSize));
+    if (agendadosPage > totalPages) {
+      setAgendadosPage(totalPages);
+    }
+  }, [agendadosPage, agendadosPageSize, filteredAgendamentos.length]);
+
+  const paginatedAgendamentos = filteredAgendamentos.slice(
+    (agendadosPage - 1) * agendadosPageSize,
+    agendadosPage * agendadosPageSize,
+  );
 
   const getInsuranceIncompatibleProcedures = (insuranceName: string, procedureNames: string[]): string[] => {
     if (isParticularInsurance(insuranceName)) return [];
@@ -1513,7 +1528,7 @@ export function Agendamento() {
     }
   };
 
-  const rows = filteredAgendamentos.map((agendamento) => (
+  const rows = paginatedAgendamentos.map((agendamento) => (
     <Box key={agendamento.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
       {/* Time column - centered */}
       <Box style={{ minWidth: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3697,19 +3712,31 @@ export function Agendamento() {
         )}
 
         {/* Agendamentos List */}
-        <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6}}>
-          {/* LIST */}
-          {layout === 'list' && (
-            <Box>
-              {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
-            </Box>
-          )}
+        {(layout === 'list' || layout === 'grid') && (
+          <PaginatedGrid
+            totalItems={filteredAgendamentos.length}
+            page={agendadosPage}
+            pageSize={agendadosPageSize}
+            onPageChange={setAgendadosPage}
+            onPageSizeChange={(size) => {
+              setAgendadosPageSize(size);
+              setAgendadosPage(1);
+            }}
+            isMobile={isMobile}
+            maxHeight={560}
+          >
+            {/* LIST */}
+            {layout === 'list' && (
+              <Box>
+                {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+              </Box>
+            )}
 
-          {/* GRID */}
-          {layout === 'grid' && (
-            <Box p="md">
-              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                {filteredAgendamentos.length > 0 ? filteredAgendamentos.map(a => {
+            {/* GRID */}
+            {layout === 'grid' && (
+              <Box p="md">
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                  {filteredAgendamentos.length > 0 ? paginatedAgendamentos.map(a => {
                   const isExpanded = expandedIds.includes(a.id);
                   return (
                     <Box
@@ -3800,14 +3827,16 @@ export function Agendamento() {
                       )}
                     </Box>
                   );
-                }) : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
-              </SimpleGrid>
-            </Box>
-          )}
+                  }) : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+                </SimpleGrid>
+              </Box>
+            )}
+          </PaginatedGrid>
+        )}
 
           {/* CALENDAR */}
           {layout === 'calendar' && (
-            <Box p="md">
+            <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }} p="md">
               {/* Calendar header */}
               <Group justify="apart" align="center" mb={8}>
                 <Group gap="xs">
@@ -4043,7 +4072,6 @@ export function Agendamento() {
               </Modal>
             </Box>
           )}
-        </Box>
           </Tabs.Panel>
         </Tabs>
       </Box>
