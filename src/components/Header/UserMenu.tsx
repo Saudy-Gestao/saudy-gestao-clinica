@@ -4,7 +4,7 @@ import { User, Settings, Moon, Sun, LifeBuoy } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 import authService from '../../services/authService';
-import { isDoctorUser } from '../../utils/userRole';
+import { isAdminUser, isDoctorUser } from '../../utils/userRole';
 import { APP_COLOR_SCHEME_EVENT, applyAppColorScheme, getAppColorScheme, type AppColorScheme } from '../../utils/appColorScheme';
 
 export function UserMenu() {
@@ -19,6 +19,7 @@ export function UserMenu() {
   const unreadCount = Number(myTicketsData?.unreadCount || 0);
   const currentUser = authService.getCurrentUser() as any;
   const doctorView = isDoctorUser(currentUser);
+  const adminView = isAdminUser(currentUser);
 
   useEffect(() => {
     const syncColorScheme = () => {
@@ -52,9 +53,9 @@ export function UserMenu() {
       </Menu.Target>
 
       <Menu.Dropdown>
-        {!isAdmHubScreen && !doctorView && (
+        {!isAdmHubScreen && adminView && !doctorView && (
           <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
-            Configuracoes
+            Configurações
           </Menu.Item>
         )}
         {!isAdmHubScreen && (

@@ -8,6 +8,7 @@ import {
   Card,
   Group,
   Loader,
+  MantineProvider,
   Modal,
   Paper,
   Select,
@@ -36,6 +37,7 @@ import patientPortalAuthService from '../../services/patientPortalAuthService';
 import { formatCPF } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
+import { theme } from '../../themes/theme';
 import './patient-portal.css';
 
 const formatDateTime = (date?: string | null, time?: string | null) => {
@@ -277,6 +279,7 @@ function PatientPortalDashboardSkeleton() {
 
 export function PatientPortalDashboard() {
   const { isDark, toggleTheme } = usePatientPortalTheme();
+  const portalColorScheme = isDark ? 'dark' : 'light';
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>('upcoming');
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
@@ -622,11 +625,16 @@ export function PatientPortalDashboard() {
   };
 
   if (loading && !summary) {
-    return <PatientPortalDashboardSkeleton />;
+    return (
+      <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+        <PatientPortalDashboardSkeleton />
+      </MantineProvider>
+    );
   }
 
   return (
-    <Box className="patient-portal-dashboard-page">
+    <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+      <Box className="patient-portal-dashboard-page">
       <a href="#patient-portal-main-content" className="patient-portal-skip-link">Ir para conteúdo principal</a>
       <Box className="patient-portal-dashboard-bg" />
       <Stack className="patient-portal-dashboard-shell" gap="lg" role="main" aria-label="Área do paciente">
@@ -1028,6 +1036,7 @@ export function PatientPortalDashboard() {
           </Group>
         </Stack>
       </Modal>
-    </Box>
+      </Box>
+    </MantineProvider>
   );
 }
