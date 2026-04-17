@@ -1,15 +1,13 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ActionIcon, Alert, Badge, Box, Button, Group, Paper, Select, SimpleGrid, Skeleton, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { BellRing, CheckCircle2, ChevronLeft, FlaskConical, Play, Printer, Save, ShieldAlert, WandSparkles } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, FlaskConical, Play, Printer, Save, ShieldAlert, WandSparkles } from 'lucide-react';
 import { Header } from '../Header/Header';
 import consultationService from '../../services/consultationService';
 import appointmentService from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import medicalRecordService from '../../services/medicalRecordService';
-import reportService from '../../services/reportService';
-import reportWorklistService from '../../services/reportWorklistService';
 import { formatCPF } from '../../utils/formatters';
 
 const CALLED_STATUS = 'Chamado para atendimento';
@@ -42,6 +40,15 @@ const formatRecordDate = (value: any) => {
   return date.toLocaleString('pt-BR');
 };
 
+const formatDateOnlyPtBr = (value?: string | null) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return raw;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+};
+
 const splitTriageNotes = (value: any) => {
   const lines = String(value || '')
     .split('\n')
@@ -65,7 +72,6 @@ export function AtendimentoClinico() {
   const [appointment, setAppointment] = useState<any>(null);
   const [patient, setPatient] = useState<any>(null);
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
-  const [signals, setSignals] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [triageAuditNotes, setTriageAuditNotes] = useState('');
   const [examConfig, setExamConfig] = useState<{ doctorCanScheduleExamFromConsultation: boolean }>({ doctorCanScheduleExamFromConsultation: false });
@@ -95,7 +101,9 @@ export function AtendimentoClinico() {
 
   const status = String(consultation?.queue || '');
   const isDone = status === DONE_STATUS;
-  const pendingSignals = useMemo(() => signals.filter((s: any) => s.reportStatus !== 'FINALIZED'), [signals]);
+  const hasFinalizedExamReport = Boolean(consultation?.hasFinalizedExamReport);
+  const hasExamImagesAvailable = Boolean(consultation?.hasExamImagesAvailable);
+  const latestFinalizedExamReport = consultation?.latestFinalizedExamReport || null;
 
   const setFormField = (field: string, value: string) => {
     setForm((prev: any) => ({ ...prev, [field]: value }));
@@ -116,7 +124,7 @@ export function AtendimentoClinico() {
     }
   };
 
-  const loadExamSignals = async (params: { patientId?: string; patientCpf?: string }) => {
+  const loadExamOrders = async (params: { patientId?: string; patientCpf?: string }) => {
     const appointmentsRes = await appointmentService.list({
       patientId: params.patientId || undefined,
       patientCpf: params.patientCpf || undefined,
@@ -126,24 +134,6 @@ export function AtendimentoClinico() {
     const all = normalizeArray(appointmentsRes);
     const exams = all.filter((a: any) => String(a?.type || '').toUpperCase() === 'EXAME');
     setOrders(exams.filter((a: any) => String(a?.status || '').toUpperCase() === 'PEDIDO_MEDICO'));
-    const realized = exams.filter((a: any) => ['REALIZADO', 'COMPLETED', 'FINALIZADO'].includes(String(a?.status || '').toUpperCase()));
-    const rows = await Promise.all(realized.map(async (a: any) => {
-      const appointmentId = String(a.id || '').trim();
-      if (!appointmentId) return null;
-
-      const [reportsRes, worklistRes] = await Promise.all([
-        reportService.list({ appointmentId, limit: 10, offset: 0 }),
-        reportWorklistService.list({ appointmentId, limit: 1, offset: 0 }),
-      ]);
-      const reports = normalizeArray(reportsRes);
-      const worklistItems = normalizeArray(worklistRes);
-      const hasWorklistTrail = worklistItems.length > 0;
-      if (!hasWorklistTrail && reports.length === 0) return null;
-
-      const finalized = reports.some((r: any) => String(r?.status || '').toLowerCase() === 'finalizado');
-      return { appointmentId, examType: a.specialty || 'Exame', date: [a.date, a.time].filter(Boolean).join(' '), reportStatus: finalized ? 'FINALIZED' : (reports.length ? 'DRAFT' : 'NONE') };
-    }));
-    setSignals(rows.filter(Boolean) as any[]);
   };
 
   const loadData = async () => {
@@ -173,8 +163,8 @@ export function AtendimentoClinico() {
       const [h] = await Promise.all([
         resolvedPatientId ? medicalRecordService.list({ patientId: resolvedPatientId, limit: 20, offset: 0 }) : Promise.resolve({ records: [] }),
         (resolvedPatientId || patientCpf)
-          ? loadExamSignals({ patientId: resolvedPatientId || undefined, patientCpf: patientCpf || undefined })
-          : Promise.resolve().then(() => { setOrders([]); setSignals([]); }),
+          ? loadExamOrders({ patientId: resolvedPatientId || undefined, patientCpf: patientCpf || undefined })
+          : Promise.resolve().then(() => { setOrders([]); }),
       ]);
       const triageParts = splitTriageNotes(c?.triageNotes);
       setTriageAuditNotes(triageParts.auditNotes);
@@ -215,12 +205,13 @@ export function AtendimentoClinico() {
         const items = normalizeArray(res).map((item: any) => {
           const date = String(item?.date || '').trim();
           const time = String(item?.time || '').trim();
+          const dateLabel = formatDateOnlyPtBr(date);
           const roomId = String(item?.roomId || '').trim();
           const equipmentId = String(item?.medicalEquipmentId || '').trim();
           const roomName = String(item?.roomName || 'Sala').trim();
           const equipmentName = String(item?.medicalEquipmentName || 'Equipamento').trim();
           const value = `${date}|${time}|${roomId}|${equipmentId}`;
-          return { value, label: `${date} às ${time} • ${roomName} • ${equipmentName}` };
+          return { value, label: `${dateLabel || date} às ${time} • ${roomName} • ${equipmentName}` };
         }).filter((item: any) => !String(item.value).includes('|||'));
         setSlotOptions(items);
       } catch {
@@ -350,7 +341,7 @@ export function AtendimentoClinico() {
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         <Group mb="lg" justify="space-between"><Group><ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/consulta')}><ChevronLeft size={28} /></ActionIcon><Box><Text fw={700} size="xl">Atendimento Clínico</Text><Text size="sm" c="dimmed">PEP e condução completa da consulta médica</Text></Box></Group><Badge color={isDone ? 'green' : 'blue'} variant="light">{status || '-'}</Badge></Group>
-        {pendingSignals.length > 0 && <Alert mb="md" color="orange" title="Exame pronto pendente de laudo" icon={<BellRing size={16} />}><Group justify="space-between"><Text size="sm">Paciente com {pendingSignals.length} exame(s) executados aguardando laudo/finalização.</Text><Button size="xs" variant="light" onClick={() => navigate('/laudo-exames')}>Abrir laudo</Button></Group></Alert>}
+        {hasFinalizedExamReport && <Alert mb="md" color="teal" title="Laudo de exame finalizado" icon={<CheckCircle2 size={16} />}><Group justify="space-between"><Text size="sm">{latestFinalizedExamReport?.exam ? `Último laudo finalizado: ${latestFinalizedExamReport.exam}.` : 'Paciente com laudo finalizado para acompanhamento médico.'}{hasExamImagesAvailable ? ' Imagens disponíveis para revisão.' : ''}</Text><Button size="xs" variant="light" onClick={() => navigate('/laudo-exames')}>Abrir laudo</Button></Group></Alert>}
         <Paper p="md" withBorder radius="md" mb="md"><SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}><Text>Paciente: <b>{patient?.name || consultation?.patientName || '-'}</b></Text><Text>CPF: <b>{patient?.cpf ? formatCPF(patient.cpf) : '-'}</b></Text><Text>Médico: <b>{consultation?.doctorName || appointment?.doctorName || '-'}</b></Text></SimpleGrid></Paper>
         <Paper p="md" withBorder radius="md">
           <Tabs defaultValue="evolucao">

@@ -149,6 +149,7 @@ interface PendingProfessionalSlotSelection {
   date: Date;
   time: string;
   procedure: string;
+  candidates?: string[];
 }
 const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   pacienteId: '',
@@ -922,6 +923,18 @@ export function Agendamento() {
     });
   };
   const handleProcedureSelectionChange = (values: string[]) => {
+    const selectedTypes = new Set(
+      values.map((procedureName) => normalizeProcedureAppointmentType(procedureMetaByName[procedureName]?.appointmentType)),
+    );
+    if (selectedTypes.size > 1) {
+      showNotification({
+        title: 'Combinação não permitida',
+        message: 'Não é possível misturar procedimentos de consulta com procedimentos de exame na mesma marcação.',
+        color: 'red',
+      });
+      return;
+    }
+
     setSelectedSpecialties(values);
     if (!canEditInsuranceFields) return;
     const incompatibleProcedures = getInsuranceIncompatibleProcedures(
@@ -1197,6 +1210,18 @@ export function Agendamento() {
       return null;
     }
   };
+
+  const resolveSchedulingError = (err: any, fallbackMessage: string) => {
+    const api = err?.response?.data || {};
+    const baseMessage = String(api?.message || err?.message || fallbackMessage);
+    const details = String(api?.details || '').trim();
+    const conflictType = String(api?.conflictType || '').trim().toUpperCase();
+
+    const title = conflictType ? 'Conflito de agenda' : 'Erro';
+    const message = details ? `${baseMessage} ${details}` : baseMessage;
+    return { title, message };
+  };
+
   const handleAddAgendamento = async () => {
     if (!novoAgendamento.convenio) {
       showNotification({ title: 'Erro', message: 'Convênio é obrigatório', color: 'red' });
@@ -1343,9 +1368,10 @@ export function Agendamento() {
           return;
         }
         setSavingAgendamento(false);
+        const resolvedError = resolveSchedulingError(err, 'Erro ao atualizar agendamento');
         showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao atualizar agendamento',
+          title: resolvedError.title,
+          message: resolvedError.message,
           color: 'red',
         });
         return;
@@ -1441,9 +1467,10 @@ export function Agendamento() {
         });
       } catch (err: any) {
         setSavingAgendamento(false);
+        const resolvedError = resolveSchedulingError(err, 'Erro ao criar agendamento');
         showNotification({
-          title: 'Erro',
-          message: err?.response?.data?.message || err?.message || 'Erro ao criar agendamento',
+          title: resolvedError.title,
+          message: resolvedError.message,
           color: 'red',
         });
         return;
@@ -2110,18 +2137,32 @@ export function Agendamento() {
           };
         })
         .sort((a, b) => (a.minute - b.minute));
-  const getProfessionalOptionsForSlot = (time: string, date: Date, procedureName?: string): typeof flattenedScheduleSlots => {
-    if (isExamAppointment) return [];
+  const getProfessionalOptionsForSlot = (
+    time: string,
+    date: Date,
+    procedureName?: string,
+    candidateActors?: string[],
+  ): typeof flattenedScheduleSlots => {
     const normalizedProcedure = String(procedureName || '').trim();
-    const candidateDoctors = novoAgendamento.profissional
-      ?[novoAgendamento.profissional]
-      : normalizedProcedure
-        ?getCompatibleDoctorsForProcedure(normalizedProcedure)
-        : filteredDoctorOptions.map((option) => option.value);
+    const candidateDoctors = Array.isArray(candidateActors) && candidateActors.length > 0
+      ?candidateActors
+      : (
+        isExamAppointment
+          ?(novoAgendamento.roomId ?[novoAgendamento.roomId] : safeSchedulerDoctors)
+          : (
+            novoAgendamento.profissional
+              ?[novoAgendamento.profissional]
+              : normalizedProcedure
+                ?getCompatibleDoctorsForProcedure(normalizedProcedure)
+                : filteredDoctorOptions.map((option) => option.value)
+          )
+      );
     return Array.from(new Set(candidateDoctors))
       .filter(Boolean)
       .filter((doctor) => {
-        const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
+        const doctorSlots = isExamAppointment
+          ?buildRoomSlots(roomScheduleById[doctor], activeSchedulePeriod, date)
+          : buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
         if (!doctorSlots.includes(time)) return false;
         if (normalizedProcedure) {
           return getSelectableProceduresForSlot(doctor, time, date).includes(normalizedProcedure)
@@ -2494,13 +2535,13 @@ export function Agendamento() {
     setActiveSchedulePeriod(resolveTurnoFromTime(time) || 'Manhã');
     setNovoAgendamento((prev) => ({
       ...prev,
-      profissional: doctorName,
+      profissional: isExamAppointment ?prev.profissional : doctorName,
       hora: time,
       data: date,
     }));
   };
   const handleSelectAnchorSlot = (doctorName: string, time: string, date: Date) => {
-    if (isExamAppointment) {
+    if (isExamAppointment && !isMultiProcedureFlow) {
       setSelectedSuggestedOptionId(null);
       setNovoAgendamento((prev) => ({
         ...prev,
@@ -2528,7 +2569,7 @@ export function Agendamento() {
     setAnchorProcedureModalOpen(true);
   };
   const handleSelectGridSlot = (slot: { doctor?: string; slot: string; availableDoctorsForSlot?: string[] }, date: Date) => {
-    if (isExamAppointment) {
+    if (isExamAppointment && !isMultiProcedureFlow) {
       setSelectedSuggestedOptionId(null);
       setNovoAgendamento((prev) => ({
         ...prev,
@@ -2542,7 +2583,7 @@ export function Agendamento() {
         handleSelectAnchorSlot(slot.doctor || novoAgendamento.profissional, slot.slot, date);
         return;
       }
-      setPendingProfessionalSlot({ date, time: slot.slot, procedure: '' });
+      setPendingProfessionalSlot({ date, time: slot.slot, procedure: '', candidates: slot.availableDoctorsForSlot || [] });
       setProfessionalSlotModalOpen(true);
       return;
     }
@@ -2553,7 +2594,12 @@ export function Agendamento() {
     }
     const selectableProcedures = getSchedulableProceduresForSlot('', slot.slot, date);
     if (selectableProcedures.length === 1) {
-      setPendingProfessionalSlot({ date, time: slot.slot, procedure: selectableProcedures[0] });
+      setPendingProfessionalSlot({
+        date,
+        time: slot.slot,
+        procedure: selectableProcedures[0],
+        candidates: slot.availableDoctorsForSlot || [],
+      });
       setProfessionalSlotModalOpen(true);
       return;
     }
@@ -2568,6 +2614,11 @@ export function Agendamento() {
         date: pendingAnchorSlot.date,
         time: pendingAnchorSlot.time,
         procedure: procedureName,
+        candidates: getProfessionalOptionsForSlot(
+          pendingAnchorSlot.time,
+          pendingAnchorSlot.date,
+          procedureName,
+        ).map((item) => item.doctor),
       });
       setProfessionalSlotModalOpen(true);
       setPendingAnchorSlot(null);
@@ -3280,7 +3331,17 @@ export function Agendamento() {
                       <UnstyledButton
                         key={slotItem.key}
                           onClick={() => {
-                            if (slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange) return;
+                            if (slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange) {
+                              let reason = 'Esse horário já está comprometido por uma seleção atual.';
+                              if (slotItem.isCoveredBySuggestedRange) reason = 'Esse horário está reservado por uma sugestão selecionada.';
+                              if (slotItem.isCoveredByAnchorRange) reason = 'Esse horário está dentro de um intervalo já em execução.';
+                              showNotification({
+                                title: 'Horário indisponível',
+                                message: reason,
+                                color: 'yellow',
+                              });
+                              return;
+                            }
                             handleSelectGridSlot(slotItem, schedulingDate);
                           }}
                         style={{
@@ -3398,19 +3459,20 @@ export function Agendamento() {
                       setProfessionalSlotModalOpen(false);
                       setPendingProfessionalSlot(null);
                     }}
-                    title="Selecionar profissional"
+                    title={isExamAppointment ?'Selecionar sala' : 'Selecionar profissional'}
                     centered
                     size="md"
                   >
                     <Stack gap="sm">
                       <Text size="sm" c="dimmed">
-                        Profissionais com disponibilidade às {pendingProfessionalSlot?.time || '--:--'}.
+                        {isExamAppointment ?'Salas' : 'Profissionais'} com disponibilidade às {pendingProfessionalSlot?.time || '--:--'}.
                       </Text>
                       {(pendingProfessionalSlot
                         ?getProfessionalOptionsForSlot(
                             pendingProfessionalSlot.time,
                             pendingProfessionalSlot.date,
                             pendingProfessionalSlot.procedure,
+                            pendingProfessionalSlot.candidates,
                           )
                         : []).map((slotItem) => (
                         <Button
@@ -3433,16 +3495,19 @@ export function Agendamento() {
                             setPendingProfessionalSlot(null);
                           }}
                         >
-                          {slotItem.doctor}
+                          {isExamAppointment ?slotItem.doctorLabel : slotItem.doctor}
                         </Button>
                       ))}
                       {pendingProfessionalSlot && getProfessionalOptionsForSlot(
                         pendingProfessionalSlot.time,
                         pendingProfessionalSlot.date,
                         pendingProfessionalSlot.procedure,
+                        pendingProfessionalSlot.candidates,
                       ).length === 0 && (
                         <Text size="sm" c="dimmed">
-                          Nenhum profissional compatível com este procedimento está disponível nesse horário.
+                          {isExamAppointment
+                            ?'Nenhuma sala compatível com este procedimento está disponível nesse horário.'
+                            :'Nenhum profissional compatível com este procedimento está disponível nesse horário.'}
                         </Text>
                       )}
                     </Stack>
