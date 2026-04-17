@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -82,7 +82,7 @@ const isCanceledOrNoShow = (statusRaw?: string | null) => {
   return normalized === 'CANCELADO'
     || normalized === 'CANCELED'
     || normalized === 'NAO_COMPARECEU'
-    || normalized === 'NÃO_COMPARECEU'
+    || normalized === 'NÃƒO_COMPARECEU'
     || normalized === 'NO_SHOW'
     || normalized === 'NO-SHOW'
     || normalized === 'AUSENTE'
@@ -92,7 +92,7 @@ const isCanceledOrNoShow = (statusRaw?: string | null) => {
 const isDoneStatus = (statusRaw?: string | null) => {
   const normalized = String(statusRaw || '').trim().toUpperCase();
   return normalized === 'CONCLUIDO'
-    || normalized === 'CONCLUÍDO'
+    || normalized === 'CONCLUÃDO'
     || normalized === 'COMPLETED'
     || normalized === 'REALIZADO'
     || normalized === 'FINALIZADO'
@@ -127,7 +127,7 @@ const normalizeDoctorOptions = (data: any): DoctorOption[] => {
   return list
     .map((doctor: any) => ({
       value: String(doctor?.id || ''),
-      label: doctor?.name || 'Médico sem nome',
+      label: doctor?.name || 'MÃ©dico sem nome',
       branchId: String(doctor?.branchId || ''),
       roomIds: Array.isArray(doctor?.roomIds)
         ? doctor.roomIds.map((roomId: any) => String(roomId || '').trim()).filter(Boolean)
@@ -138,11 +138,11 @@ const normalizeDoctorOptions = (data: any): DoctorOption[] => {
 
 const WEEKDAY_OPTIONS = [
   { value: 'segunda', label: 'Segunda' },
-  { value: 'terca', label: 'Terça' },
+  { value: 'terca', label: 'TerÃ§a' },
   { value: 'quarta', label: 'Quarta' },
   { value: 'quinta', label: 'Quinta' },
   { value: 'sexta', label: 'Sexta' },
-  { value: 'sabado', label: 'Sábado' },
+  { value: 'sabado', label: 'SÃ¡bado' },
   { value: 'domingo', label: 'Domingo' },
 ];
 
@@ -414,8 +414,8 @@ export function CadastroSala() {
     const err: any = doctorsQuery.error;
     setDoctorOptions([]);
     showNotification({
-      title: 'Erro ao carregar médicos',
-      message: resolveApiErrorMessage(err, 'A lista de médicos não pôde ser carregada.'),
+      title: 'Erro ao carregar mÃ©dicos',
+      message: resolveApiErrorMessage(err, 'A lista de mÃ©dicos nÃ£o pÃ´de ser carregada.'),
       color: 'red',
     });
   }, [doctorsQuery.error]);
@@ -489,7 +489,7 @@ export function CadastroSala() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      showNotification({ title: 'Erro', message: 'Nome da sala é obrigatório', color: 'red' });
+      showNotification({ title: 'Erro', message: 'Nome da sala Ã© obrigatÃ³rio', color: 'red' });
       return;
     }
 
@@ -503,7 +503,7 @@ export function CadastroSala() {
       if ((form.workingHoursStart && !form.workingHoursEnd) || (!form.workingHoursStart && form.workingHoursEnd)) {
         showNotification({
           title: 'Erro',
-          message: 'Informe horário inicial e final do funcionamento da sala.',
+          message: 'Informe horÃ¡rio inicial e final do funcionamento da sala.',
           color: 'red',
         });
         setSaving(false);
@@ -512,7 +512,7 @@ export function CadastroSala() {
       if (form.workingHoursStart && form.workingHoursEnd && form.workingHoursEnd <= form.workingHoursStart) {
         showNotification({
           title: 'Erro',
-          message: 'O horário final deve ser maior que o horário inicial.',
+          message: 'O horÃ¡rio final deve ser maior que o horÃ¡rio inicial.',
           color: 'red',
         });
         setSaving(false);
@@ -539,7 +539,7 @@ export function CadastroSala() {
       }
 
       if (!roomId) {
-        throw new Error('Não foi possível identificar a sala salva para vincular o médico.');
+        throw new Error('NÃ£o foi possÃ­vel identificar a sala salva para vincular o mÃ©dico.');
       }
 
       await syncRoomDoctors(roomId, form.doctorIds || []);
@@ -585,7 +585,7 @@ export function CadastroSala() {
     try {
       await sectorService.deleteSector(item.id);
       await queryClient.invalidateQueries({ queryKey: queryKeys.roomsAdmin });
-      showNotification({ title: 'Removido', message: 'Sala excluída', color: 'green' });
+      showNotification({ title: 'Removido', message: 'Sala excluÃ­da', color: 'green' });
       setItems((prev) => prev.filter((it) => it.id !== item.id));
       setDeleteModalOpen(false);
       setDeleteTarget(null);
@@ -655,7 +655,7 @@ export function CadastroSala() {
             <Group mb={isMobile ? 16 : 24} grow align="flex-end">
               <FloatingInput
                 label="Buscar sala"
-                placeholder="Buscar por nome ou descrição..."
+                placeholder="Buscar por nome ou descriÃ§Ã£o..."
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
               />
@@ -686,10 +686,10 @@ export function CadastroSala() {
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Nome da sala</Table.Th>
-                        <Table.Th>Médicos vinculados</Table.Th>
-                        <Table.Th>Descrição</Table.Th>
+                        <Table.Th>MÃ©dicos vinculados</Table.Th>
+                        <Table.Th>DescriÃ§Ã£o</Table.Th>
                         <Table.Th>Filial</Table.Th>
-                        <Table.Th>Ações</Table.Th>
+                        <Table.Th>AÃ§Ãµes</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -728,7 +728,7 @@ export function CadastroSala() {
                             <Text fw={600}>{item.name}</Text>
                             <Text size="sm" c="dimmed">{branchLabelById[item.branchId] || '-'}</Text>
                             <Text size="sm" c="dimmed">
-                              {(item.doctorNames || []).length > 0 ? `${item.doctorNames?.length} médico(s) vinculados` : 'Sem médicos vinculados'}
+                              {(item.doctorNames || []).length > 0 ? `${item.doctorNames?.length} mÃ©dico(s) vinculados` : 'Sem mÃ©dicos vinculados'}
                             </Text>
                             {item.description ? (
                               <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text>
@@ -761,10 +761,10 @@ export function CadastroSala() {
                     <Table.Thead>
                       <Table.Tr style={{ borderBottom: 'none' }}>
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
-                        {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos vinculados</Table.Th>}
-                        {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
+                        {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>MÃ©dicos vinculados</Table.Th>}
+                        {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>DescriÃ§Ã£o</Table.Th>}
                         {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>AÃ§Ãµes</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -832,11 +832,11 @@ export function CadastroSala() {
               <Group justify="space-between" align="center" mb="sm">
                 <Box>
                   <Text fw={700} size={isMobile ? 'md' : 'lg'}>Mapa de Salas</Text>
-                  <Text size="sm" c="dimmed">Visualização em tempo real da ocupação por sala</Text>
+                  <Text size="sm" c="dimmed">VisualizaÃ§Ã£o em tempo real da ocupaÃ§Ã£o por sala</Text>
                 </Box>
                 <Group gap={6} align="center">
                   <Clock3 size={14} />
-                  <Text size="xs" c="dimmed">Atualizado às {dayjs().format('HH:mm')}</Text>
+                  <Text size="xs" c="dimmed">Atualizado Ã s {dayjs().format('HH:mm')}</Text>
                 </Group>
               </Group>
 
@@ -862,7 +862,7 @@ export function CadastroSala() {
                 </SimpleGrid>
               ) : roomMapItems.length === 0 ? (
                 <Alert color="gray" variant="light" title="Sem salas para exibir">
-                  Cadastre salas nesta filial para habilitar o mapa de utilização.
+                  Cadastre salas nesta filial para habilitar o mapa de utilizaÃ§Ã£o.
                 </Alert>
               ) : (
                 <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="sm">
@@ -902,7 +902,7 @@ export function CadastroSala() {
                             <Text fw={700} size="sm">{roomMap.inProgressNow}</Text>
                           </Box>
                           <Box>
-                            <Text size="10px" c="dimmed">Próximos</Text>
+                            <Text size="10px" c="dimmed">PrÃ³ximos</Text>
                             <Text fw={700} size="sm">{roomMap.upcomingToday}</Text>
                           </Box>
                           <Box>
@@ -910,7 +910,7 @@ export function CadastroSala() {
                             <Text fw={700} size="sm">{roomMap.totalToday}</Text>
                           </Box>
                           <Box>
-                            <Text size="10px" c="dimmed">Concluídos</Text>
+                            <Text size="10px" c="dimmed">ConcluÃ­dos</Text>
                             <Text fw={700} size="sm">{roomMap.doneToday}</Text>
                           </Box>
                         </SimpleGrid>
@@ -951,13 +951,13 @@ export function CadastroSala() {
             required
           />
           <FloatingMultiSelect
-            label="Médicos vinculados"
+            label="MÃ©dicos vinculados"
             value={form.doctorIds}
             onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
             data={availableDoctorOptions}
             searchable
             clearable
-            nothingFoundMessage="Nenhum médico encontrado para esta filial"
+            nothingFoundMessage="Nenhum mÃ©dico encontrado para esta filial"
           />
           <FloatingMultiSelect
             label="Dias de funcionamento"
@@ -970,7 +970,7 @@ export function CadastroSala() {
           />
           <Group grow>
             <FloatingInput
-              label="Início do funcionamento"
+              label="InÃ­cio do funcionamento"
               type="time"
               value={form.workingHoursStart}
               onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, workingHoursStart: value })); }}
@@ -983,8 +983,8 @@ export function CadastroSala() {
             />
           </Group>
           <FloatingTextarea
-            label="Descrição"
-            placeholder="Informações adicionais da sala"
+            label="DescriÃ§Ã£o"
+            placeholder="InformaÃ§Ãµes adicionais da sala"
             minRows={3}
             value={form.description}
             onChange={(e) => {
@@ -993,7 +993,7 @@ export function CadastroSala() {
             }}
           />
           <Button bg={DARK_BLUE} c="white" onClick={handleSave} loading={saving}>
-            {editingId ? 'Salvar alterações' : 'Cadastrar sala'}
+            {editingId ? 'Salvar alteraÃ§Ãµes' : 'Cadastrar sala'}
           </Button>
         </Stack>
       </Modal>
@@ -1005,12 +1005,12 @@ export function CadastroSala() {
           setDeleteModalOpen(false);
           setDeleteTarget(null);
         }}
-        title="Confirmar exclusão"
+        title="Confirmar exclusÃ£o"
         centered
       >
         <Stack>
           <Text size="sm" c="dimmed">
-            {`Confirma a exclusão da sala ${deleteTarget?.name || 'selecionada'}?`}
+            {`Confirma a exclusÃ£o da sala ${deleteTarget?.name || 'selecionada'}?`}
           </Text>
           <Group justify="flex-end">
             <Button
@@ -1032,3 +1032,4 @@ export function CadastroSala() {
     </Box>
   );
 }
+

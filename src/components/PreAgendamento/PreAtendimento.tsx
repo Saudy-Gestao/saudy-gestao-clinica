@@ -179,6 +179,10 @@ export function PreAtendimento() {
   const [teleconsultationEligibility, setTeleconsultationEligibility] = useState<TeleconsultationEligibility | null>(null);
   const [teleconsultationEligibilityLoading, setTeleconsultationEligibilityLoading] = useState(false);
   const [teleconsultationSendingLink, setTeleconsultationSendingLink] = useState(false);
+  const [teleLinkModalOpen, setTeleLinkModalOpen] = useState(false);
+  const [teleLinkPatientUrl, setTeleLinkPatientUrl] = useState('');
+  const [teleLinkDoctorUrl, setTeleLinkDoctorUrl] = useState('');
+  const [teleLinkExpiresAt, setTeleLinkExpiresAt] = useState<string | null>(null);
   const [checklistData, setChecklistData] = useState({
     dadosConferidos: false,
     contatoConferido: false,
@@ -1153,23 +1157,23 @@ export function PreAtendimento() {
       await loadReceptionPatients();
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
 
+      let generatedTeleLinks: { patientUrl: string; doctorUrl: string; expiresAt: string } | null = null;
       if (sendTeleconsultationLink && checklistPreAttendanceId) {
         try {
-          const sendResult = await teleconsultationLinkService.sendWhatsAppLink(checklistPreAttendanceId, {
+          const teleResult = await teleconsultationLinkService.sendWhatsAppLink(checklistPreAttendanceId, {
             notes: checklistData.observacoes || undefined,
+            sendPatientMessage: false,
           });
-          const sentTo = sendResult.whatsapp?.to || sendResult.whatsappMock?.to;
+          generatedTeleLinks = teleResult?.links || null;
           showNotification({
-            title: 'Link de teleconsulta enviado',
-            message: sentTo
-              ? `Link enviado para ${sentTo}.`
-              : 'Link gerado e envio concluído.',
-            color: 'green',
+            title: 'Link de teleconsulta gerado',
+            message: 'Copie o link no modal para compartilhar manualmente com o paciente.',
+            color: 'blue',
           });
         } catch (teleError: any) {
           showNotification({
-            title: 'Checklist concluído, mas link não enviado',
-            message: teleError?.response?.data?.error || teleError?.response?.data?.message || teleError?.message || 'Não foi possível enviar o link da teleconsulta.',
+            title: 'Checklist concluído, mas link não gerado',
+            message: teleError?.response?.data?.error || teleError?.response?.data?.message || teleError?.message || 'Não foi possível gerar o link da teleconsulta.',
             color: 'yellow',
           });
         }
@@ -1177,6 +1181,14 @@ export function PreAtendimento() {
 
       setChecklistOpen(false);
       resetChecklist();
+      if (generatedTeleLinks?.patientUrl) {
+        setTeleLinkPatientUrl(generatedTeleLinks.patientUrl || '');
+        setTeleLinkDoctorUrl(generatedTeleLinks.doctorUrl || '');
+        setTeleLinkExpiresAt(generatedTeleLinks.expiresAt || null);
+        window.setTimeout(() => {
+          setTeleLinkModalOpen(true);
+        }, 120);
+      }
 
       showNotification({
         title: 'Checklist concluído',
@@ -1270,6 +1282,25 @@ export function PreAtendimento() {
       });
     } finally {
       setFacialValidationLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (value: string, label: string) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showNotification({
+        title: 'Link copiado',
+        message: `${label} copiado para a área de transferência.`,
+        color: 'green',
+      });
+    } catch {
+      showNotification({
+        title: 'Falha ao copiar',
+        message: `Não foi possível copiar o ${label.toLowerCase()}.`,
+        color: 'red',
+      });
     }
   };
 
@@ -2289,6 +2320,60 @@ export function PreAtendimento() {
               Confirmar
             </Button>
           </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={teleLinkModalOpen}
+        onClose={() => setTeleLinkModalOpen(false)}
+        title="Link da teleconsulta"
+        size={isMobile ? '100%' : 'lg'}
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Copie o link do paciente para compartilhar manualmente no teste do fluxo.
+          </Text>
+
+          <Textarea
+            label="Link do paciente"
+            value={teleLinkPatientUrl}
+            readOnly
+            autosize
+            minRows={3}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="light"
+              disabled={!teleLinkPatientUrl}
+              onClick={() => copyToClipboard(teleLinkPatientUrl, 'Link do paciente')}
+            >
+              Copiar link do paciente
+            </Button>
+          </Group>
+
+          <Textarea
+            label="Link do médico"
+            value={teleLinkDoctorUrl}
+            readOnly
+            autosize
+            minRows={3}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="light"
+              disabled={!teleLinkDoctorUrl}
+              onClick={() => copyToClipboard(teleLinkDoctorUrl, 'Link do médico')}
+            >
+              Copiar link do médico
+            </Button>
+          </Group>
+
+          {teleLinkExpiresAt && (
+            <Text size="xs" c="dimmed">
+              Expira em: {new Date(teleLinkExpiresAt).toLocaleString('pt-BR')}
+            </Text>
+          )}
         </Stack>
       </Modal>
 

@@ -839,6 +839,8 @@ export function SettingsPage() {
     setUserErrors({});
     setSavingUser(true);
     try {
+      const currentUserId = String(JSON.parse(localStorage.getItem('user') || '{}')?.id || '').trim();
+      let affectedUserId = '';
       const payload: any = { ...userForm };
       if (!payload.doctorId) payload.doctorId = null;
       if (!payload.password) delete payload.password;
@@ -847,9 +849,11 @@ export function SettingsPage() {
 
       if (editingUser) {
         await userService.updateUser(editingUser.id, payload);
+        affectedUserId = String(editingUser.id || '').trim();
         notifications.show({ title: 'Sucesso', message: 'Usuário atualizado', color: 'green' });
       } else {
         const createdUser = await userService.createUser(payload);
+        affectedUserId = String(createdUser?.id || '').trim();
 
         queryClient.setQueryData(queryKeys.settingsUsers, (previous: any) => {
           const list = Array.isArray(previous) ? previous : [];
@@ -871,6 +875,11 @@ export function SettingsPage() {
           setSelectedSectorForUsers(createdSectorId);
         }
       }
+
+      if (currentUserId && affectedUserId && currentUserId === affectedUserId) {
+        await refreshLoggedUserInStorage();
+      }
+
       setUserModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });

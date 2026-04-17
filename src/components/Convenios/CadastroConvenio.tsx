@@ -13,15 +13,17 @@ import {
   Switch,
   Badge,
   Paper,
-  Skeleton
+  Skeleton,
+  Menu,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingTextarea } from '../common/FloatingTextarea';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 import insuranceService from '../../services/insuranceService';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -52,6 +54,8 @@ export function CadastroConvenio() {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<InsuranceRow[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -83,6 +87,26 @@ export function CadastroConvenio() {
       (it.code || '').toLowerCase().includes(q)
     ));
   }, [items, query]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filtered.length / pageSize)),
+    [filtered.length, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize, items.length]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   useEffect(() => {
     setItemsLoading(insurancesQuery.isLoading && items.length === 0);
@@ -415,27 +439,38 @@ export function CadastroConvenio() {
               </Stack>
             )
           ) : (
-            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <PaginatedGrid
+              totalItems={filtered.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              isMobile={isMobile}
+              maxHeight={isMobile ? 500 : 620}
+              showFooter
+            >
               <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                 <Table.Thead>
                   <Table.Tr style={{ borderBottom: 'none' }}>
                     <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
                     {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Código</Table.Th>}
                     {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
+                      Ações
+                    </Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {filtered.length === 0 ? (
                     <Table.Tr>
-                      <Table.Td colSpan={4}>
+                      <Table.Td colSpan={isTablet ? 2 : 4}>
                         <Text size="sm" c="dimmed" ta="center">
                           Nenhum convênio encontrado. Ajuste a busca ou cadastre um novo convênio.
                         </Text>
                       </Table.Td>
                     </Table.Tr>
                   ) : (
-                    filtered.map((it) => (
+                    paginatedItems.map((it) => (
                       <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                         <Table.Td>
                           <Stack gap={2}>
@@ -459,21 +494,30 @@ export function CadastroConvenio() {
                             </Badge>
                           </Table.Td>
                         )}
-                        <Table.Td>
-                          <Group gap="xs">
-                            <ActionIcon variant="light" color="blue" onClick={() => openModal(it)}>
-                              <Pencil size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="light"
-                              color="red"
-                              onClick={() => {
-                                setDeleteTarget(it);
-                                setDeleteModalOpen(true);
-                              }}
-                            >
-                              <Trash2 size={16} />
-                            </ActionIcon>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações do convênio">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openModal(it)}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<Trash2 size={14} />}
+                                  color="red"
+                                  onClick={() => {
+                                    setDeleteTarget(it);
+                                    setDeleteModalOpen(true);
+                                  }}
+                                >
+                                  Desativar
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
                           </Group>
                         </Table.Td>
                       </Table.Tr>
@@ -481,7 +525,7 @@ export function CadastroConvenio() {
                   )}
                 </Table.Tbody>
               </Table>
-            </Box>
+            </PaginatedGrid>
           )
         )}
       </Box>

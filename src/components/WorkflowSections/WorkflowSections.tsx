@@ -123,7 +123,8 @@ export function WorkflowSections() {
     [allowedModules, companyModuleType],
   );
   const doctorView = isDoctorUser(currentUser);
-  const doctorDefaultModules = ['agendamento', 'pre-agendamento', 'consulta', 'laudo'];
+  const doctorDefaultModules = ['consulta', 'laudo'];
+  const doctorBlockedModules = new Set(['agendamento', 'pre-agendamento', 'pre-atendimento']);
 
   const hasResolvedAccessData = useMemo(() => {
       const user = currentUser as any;
@@ -199,13 +200,17 @@ export function WorkflowSections() {
   // Filtra as seções para mostrar apenas módulos permitidos
   const filteredSections = sections.map(section => ({
     ...section,
-    items: section.items.filter(item =>
-      item.moduleName === 'meus-chamados'
-      || (visibleAllowedModules.length === 0 && doctorView && doctorDefaultModules.includes(item.moduleName))
-      || (visibleAllowedModules.length === 0 && !doctorView)
-      || visibleAllowedModules.includes(item.moduleName)
-      || (Array.isArray((item as any).fallbackModuleNames) && (item as any).fallbackModuleNames.some((moduleName: string) => visibleAllowedModules.includes(moduleName)))
-    )
+    items: section.items.filter(item => {
+      if (doctorView && doctorBlockedModules.has(String(item.moduleName || ''))) {
+        return false;
+      }
+
+      return item.moduleName === 'meus-chamados'
+        || (visibleAllowedModules.length === 0 && doctorView && doctorDefaultModules.includes(item.moduleName))
+        || (visibleAllowedModules.length === 0 && !doctorView)
+        || visibleAllowedModules.includes(item.moduleName)
+        || (Array.isArray((item as any).fallbackModuleNames) && (item as any).fallbackModuleNames.some((moduleName: string) => visibleAllowedModules.includes(moduleName)));
+    }),
   })).filter(section => section.items.length > 0); // Remove seções vazias
 
   return (

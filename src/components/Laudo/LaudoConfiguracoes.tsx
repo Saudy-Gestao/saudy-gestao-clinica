@@ -9,17 +9,19 @@ import {
   Modal,
   Paper,
   Skeleton,
+  SimpleGrid,
   Stack,
   Switch,
   Table,
-  Tabs,
   Text,
   Title,
+  Menu,
+  UnstyledButton,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, Pencil, Plus, Trash2, MoreVertical, FileText, TextQuote, ListTodo, Settings2 } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
@@ -33,6 +35,7 @@ import reportWorklistService from '../../services/reportWorklistService';
 import reportConfigService from '../../services/reportConfigService';
 import { useReportSettingsQuery } from '../../hooks/useReportSettingsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
@@ -82,7 +85,7 @@ export function LaudoConfiguracoes() {
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const [activeTab, setActiveTab] = useState<string | null>('templates');
+  const [activeTab, setActiveTab] = useState<'hub' | 'templates' | 'phrases' | 'worklist' | 'settings'>('hub');
   const [requiresReviewer, setRequiresReviewer] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
   const tinyMceContentStyle = isDark
@@ -113,6 +116,12 @@ export function LaudoConfiguracoes() {
   const [templateQuery, setTemplateQuery] = useState('');
   const [phraseQuery, setPhraseQuery] = useState('');
   const [worklistQuery, setWorklistQuery] = useState('');
+  const [templatePage, setTemplatePage] = useState(1);
+  const [templatePageSize, setTemplatePageSize] = useState(10);
+  const [phrasePage, setPhrasePage] = useState(1);
+  const [phrasePageSize, setPhrasePageSize] = useState(10);
+  const [worklistPage, setWorklistPage] = useState(1);
+  const [worklistPageSize, setWorklistPageSize] = useState(10);
 
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [phraseModalOpen, setPhraseModalOpen] = useState(false);
@@ -177,6 +186,36 @@ export function LaudoConfiguracoes() {
     if (!q) return worklist;
     return worklist.filter((item) => item.patientName.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
   }, [worklist, worklistQuery]);
+
+  const paginatedTemplates = useMemo(() => {
+    const start = (templatePage - 1) * templatePageSize;
+    return filteredTemplates.slice(start, start + templatePageSize);
+  }, [filteredTemplates, templatePage, templatePageSize]);
+
+  const paginatedPhrases = useMemo(() => {
+    const start = (phrasePage - 1) * phrasePageSize;
+    return filteredPhrases.slice(start, start + phrasePageSize);
+  }, [filteredPhrases, phrasePage, phrasePageSize]);
+
+  const paginatedWorklist = useMemo(() => {
+    const start = (worklistPage - 1) * worklistPageSize;
+    return filteredWorklist.slice(start, start + worklistPageSize);
+  }, [filteredWorklist, worklistPage, worklistPageSize]);
+
+  const templateTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredTemplates.length / templatePageSize)),
+    [filteredTemplates.length, templatePageSize],
+  );
+
+  const phraseTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredPhrases.length / phrasePageSize)),
+    [filteredPhrases.length, phrasePageSize],
+  );
+
+  const worklistTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredWorklist.length / worklistPageSize)),
+    [filteredWorklist.length, worklistPageSize],
+  );
 
   const renderTableSkeleton = (columns: number) =>
     Array.from({ length: 5 }).map((_, index) => (
@@ -287,6 +326,36 @@ export function LaudoConfiguracoes() {
       color: 'red',
     });
   }, [settingsError]);
+
+  useEffect(() => {
+    setTemplatePage(1);
+  }, [templateQuery, templatePageSize, templates.length]);
+
+  useEffect(() => {
+    if (templatePage > templateTotalPages) {
+      setTemplatePage(templateTotalPages);
+    }
+  }, [templatePage, templateTotalPages]);
+
+  useEffect(() => {
+    setPhrasePage(1);
+  }, [phraseQuery, phrasePageSize, phrases.length]);
+
+  useEffect(() => {
+    if (phrasePage > phraseTotalPages) {
+      setPhrasePage(phraseTotalPages);
+    }
+  }, [phrasePage, phraseTotalPages]);
+
+  useEffect(() => {
+    setWorklistPage(1);
+  }, [worklistQuery, worklistPageSize, worklist.length]);
+
+  useEffect(() => {
+    if (worklistPage > worklistTotalPages) {
+      setWorklistPage(worklistTotalPages);
+    }
+  }, [worklistPage, worklistTotalPages]);
 
   const handleRequiresReviewerChange = async (nextValue: boolean) => {
     setRequiresReviewer(nextValue);
@@ -449,14 +518,141 @@ export function LaudoConfiguracoes() {
           </Group>
         </Group>
 
-        <Tabs value={activeTab} onChange={setActiveTab}>
-          <Tabs.List>
-            <Tabs.Tab value="templates">Padrões</Tabs.Tab>
-            <Tabs.Tab value="phrases">Frases</Tabs.Tab>
-            <Tabs.Tab value="settings">Configurações</Tabs.Tab>
-          </Tabs.List>
+        {activeTab === 'hub' ? (
+          <Box
+            style={{
+              minHeight: isMobile ? 'auto' : '58vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 920 }}>
+              <UnstyledButton
+                onClick={() => setActiveTab('templates')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Padrões</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Cadastre e gerencie modelos de laudo por tipo de exame.</Text>
+                </Stack>
+              </UnstyledButton>
 
-          <Tabs.Panel value="templates" pt="md">
+              <UnstyledButton
+                onClick={() => setActiveTab('phrases')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <TextQuote size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Frases</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Organize frases frequentes para acelerar o preenchimento de laudos.</Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('worklist')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ListTodo size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Fila Manual</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Gerencie itens da fila de laudo enquanto a integração completa não é usada.</Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('settings')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Settings2 size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Configurações</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Defina regras globais para finalização e revisão de laudos.</Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {activeTab === 'templates'
+                    ? 'Padrões de Laudo'
+                    : activeTab === 'phrases'
+                      ? 'Frases de Laudo'
+                      : activeTab === 'worklist'
+                        ? 'Fila Manual'
+                        : 'Configurações'}
+                </Text>
+              </Group>
+            </Group>
+
+            {activeTab === 'templates' && (
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
                 <FloatingInput
@@ -468,55 +664,75 @@ export function LaudoConfiguracoes() {
                 />
                 <Button leftSection={<Plus size={16} />} onClick={openTemplateCreate}>Novo padrão</Button>
               </Group>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Nome</Table.Th>
-                    <Table.Th>Exame</Table.Th>
-                    <Table.Th>Grupo</Table.Th>
-                    <Table.Th>Ações</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {settingsLoading && templates.length === 0 ? renderTableSkeleton(4) : filteredTemplates.length === 0 ? (
+              <PaginatedGrid
+                totalItems={filteredTemplates.length}
+                page={templatePage}
+                pageSize={templatePageSize}
+                onPageChange={setTemplatePage}
+                onPageSizeChange={setTemplatePageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={4}>
-                        <Stack align="center" py="lg" gap={6}>
-                          <Text fw={600} size="sm">Nenhum padrão encontrado</Text>
-                          <Text size="sm" c="dimmed">Crie um novo padrão ou ajuste a busca para encontrar um modelo existente.</Text>
-                        </Stack>
-                      </Table.Td>
+                      <Table.Th>Nome</Table.Th>
+                      <Table.Th>Exame</Table.Th>
+                      <Table.Th>Grupo</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
-                  ) : filteredTemplates.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>{item.name}</Table.Td>
-                      <Table.Td>{item.examType}</Table.Td>
-                      <Table.Td>{item.group || '-'}</Table.Td>
-                      <Table.Td>
-                        <Group gap={6}>
-                          <ActionIcon variant="subtle" color="blue" onClick={() => {
-                            setTemplateEditingId(item.id);
-                            setTemplateForm({ name: item.name, examType: item.examType, group: item.group || '', content: item.content });
-                            setTemplateModalOpen(true);
-                          }}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={async () => {
-                            await reportTemplateService.remove(item.id);
-                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
-                          }}>
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {settingsLoading && templates.length === 0 ? renderTableSkeleton(4) : filteredTemplates.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={4}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhum padrão encontrado</Text>
+                            <Text size="sm" c="dimmed">Crie um novo padrão ou ajuste a busca para encontrar um modelo existente.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : paginatedTemplates.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>{item.name}</Table.Td>
+                        <Table.Td>{item.examType}</Table.Td>
+                        <Table.Td>{item.group || '-'}</Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações do padrão">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
+                                  setTemplateEditingId(item.id);
+                                  setTemplateForm({ name: item.name, examType: item.examType, group: item.group || '', content: item.content });
+                                  setTemplateModalOpen(true);
+                                }}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={async () => {
+                                  await reportTemplateService.remove(item.id);
+                                  await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+                                }}>
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
             </Paper>
-          </Tabs.Panel>
+            )}
 
-          <Tabs.Panel value="phrases" pt="md">
+            {activeTab === 'phrases' && (
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
                 <FloatingInput
@@ -528,55 +744,75 @@ export function LaudoConfiguracoes() {
                 />
                 <Button leftSection={<Plus size={16} />} onClick={openPhraseCreate}>Nova frase</Button>
               </Group>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Rótulo</Table.Th>
-                    <Table.Th>Exame</Table.Th>
-                    <Table.Th>Frase</Table.Th>
-                    <Table.Th>Ações</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {settingsLoading && phrases.length === 0 ? renderTableSkeleton(4) : filteredPhrases.length === 0 ? (
+              <PaginatedGrid
+                totalItems={filteredPhrases.length}
+                page={phrasePage}
+                pageSize={phrasePageSize}
+                onPageChange={setPhrasePage}
+                onPageSizeChange={setPhrasePageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={4}>
-                        <Stack align="center" py="lg" gap={6}>
-                          <Text fw={600} size="sm">Nenhuma frase encontrada</Text>
-                          <Text size="sm" c="dimmed">Cadastre frases frequentes para acelerar o preenchimento dos laudos.</Text>
-                        </Stack>
-                      </Table.Td>
+                      <Table.Th>Rótulo</Table.Th>
+                      <Table.Th>Exame</Table.Th>
+                      <Table.Th>Frase</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
-                  ) : filteredPhrases.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>{decodeHtmlEntities(item.label)}</Table.Td>
-                      <Table.Td>{item.examType}</Table.Td>
-                      <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
-                      <Table.Td>
-                        <Group gap={6}>
-                          <ActionIcon variant="subtle" color="blue" onClick={() => {
-                            setPhraseEditingId(item.id);
-                            setPhraseForm({ examType: item.examType, label: item.label, text: item.text });
-                            setPhraseModalOpen(true);
-                          }}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={async () => {
-                            await reportPhraseService.remove(item.id);
-                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
-                          }}>
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {settingsLoading && phrases.length === 0 ? renderTableSkeleton(4) : filteredPhrases.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={4}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhuma frase encontrada</Text>
+                            <Text size="sm" c="dimmed">Cadastre frases frequentes para acelerar o preenchimento dos laudos.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : paginatedPhrases.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>{decodeHtmlEntities(item.label)}</Table.Td>
+                        <Table.Td>{item.examType}</Table.Td>
+                        <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações da frase">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
+                                  setPhraseEditingId(item.id);
+                                  setPhraseForm({ examType: item.examType, label: item.label, text: item.text });
+                                  setPhraseModalOpen(true);
+                                }}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={async () => {
+                                  await reportPhraseService.remove(item.id);
+                                  await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+                                }}>
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
             </Paper>
-          </Tabs.Panel>
+            )}
 
-          <Tabs.Panel value="worklist" pt="md">
+            {activeTab === 'worklist' && (
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
                 <FloatingInput
@@ -588,87 +824,107 @@ export function LaudoConfiguracoes() {
                 />
                 <Button leftSection={<Plus size={16} />} onClick={openWorklistCreate}>Novo item de fila</Button>
               </Group>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Paciente</Table.Th>
-                    <Table.Th>Exame</Table.Th>
-                    <Table.Th>Convênio</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Prioridade</Table.Th>
-                    <Table.Th>Ações</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {settingsLoading && worklist.length === 0 ? renderTableSkeleton(6) : filteredWorklist.length === 0 ? (
+              <PaginatedGrid
+                totalItems={filteredWorklist.length}
+                page={worklistPage}
+                pageSize={worklistPageSize}
+                onPageChange={setWorklistPage}
+                onPageSizeChange={setWorklistPageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={6}>
-                        <Stack align="center" py="lg" gap={6}>
-                          <Text fw={600} size="sm">Nenhum item na fila manual</Text>
-                          <Text size="sm" c="dimmed">Use esta aba para montar a fila manualmente enquanto a integração DICOM não estiver completa.</Text>
-                        </Stack>
-                      </Table.Td>
+                      <Table.Th>Paciente</Table.Th>
+                      <Table.Th>Exame</Table.Th>
+                      <Table.Th>Convênio</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Prioridade</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
-                  ) : filteredWorklist.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>
-                        <Stack gap={0}>
-                          <Text size="sm" fw={500}>{item.patientName}</Text>
-                          <Text size="xs" c="dimmed">CPF: {item.patientCpf || 'Não informado'}</Text>
-                        </Stack>
-                      </Table.Td>
-                      <Table.Td>
-                        <Stack gap={0}>
-                          <Text size="sm">{item.examType}</Text>
-                          <Text size="xs" c="dimmed">{item.scheduledAt || 'Data não informada'}</Text>
-                        </Stack>
-                      </Table.Td>
-                      <Table.Td>{item.convenio ? <Badge variant="outline" color="blue">{item.convenio}</Badge> : '-'}</Table.Td>
-                      <Table.Td>
-                        <Badge color={item.status === 'finalizado' ? 'green' : item.status === 'revisado' ? 'cyan' : item.status === 'laudado' ? 'blue' : 'gray'} variant="light">
-                          {item.status === 'sem_laudo' ? 'Sem laudo' : item.status === 'laudado' ? 'Laudado' : item.status === 'revisado' ? 'Revisado' : 'Finalizado'}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge color={item.priority === 'urgente' ? 'red' : 'gray'} variant="light">
-                          {item.priority}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Group gap={6}>
-                          <ActionIcon variant="subtle" color="blue" onClick={() => {
-                            setWorklistEditingId(item.id);
-                            setWorklistForm({
-                              patientName: item.patientName,
-                              patientCpf: item.patientCpf || '',
-                              examType: item.examType,
-                              scheduledAt: item.scheduledAt || '',
-                              requestingDoctor: item.requestingDoctor || '',
-                              assignedTo: item.assignedTo || '',
-                              convenio: item.convenio || '',
-                              priority: item.priority,
-                              status: item.status,
-                            });
-                            setWorklistModalOpen(true);
-                          }}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={async () => {
-                            await reportWorklistService.remove(item.id);
-                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
-                          }}>
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {settingsLoading && worklist.length === 0 ? renderTableSkeleton(6) : filteredWorklist.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={6}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhum item na fila manual</Text>
+                            <Text size="sm" c="dimmed">Use esta aba para montar a fila manualmente enquanto a integração DICOM não estiver completa.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : paginatedWorklist.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>
+                          <Stack gap={0}>
+                            <Text size="sm" fw={500}>{item.patientName}</Text>
+                            <Text size="xs" c="dimmed">CPF: {item.patientCpf || 'Não informado'}</Text>
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>
+                          <Stack gap={0}>
+                            <Text size="sm">{item.examType}</Text>
+                            <Text size="xs" c="dimmed">{item.scheduledAt || 'Data não informada'}</Text>
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>{item.convenio ? <Badge variant="outline" color="blue">{item.convenio}</Badge> : '-'}</Table.Td>
+                        <Table.Td>
+                          <Badge color={item.status === 'finalizado' ? 'green' : item.status === 'revisado' ? 'cyan' : item.status === 'laudado' ? 'blue' : 'gray'} variant="light">
+                            {item.status === 'sem_laudo' ? 'Sem laudo' : item.status === 'laudado' ? 'Laudado' : item.status === 'revisado' ? 'Revisado' : 'Finalizado'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={item.priority === 'urgente' ? 'red' : 'gray'} variant="light">
+                            {item.priority}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações da fila">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
+                                  setWorklistEditingId(item.id);
+                                  setWorklistForm({
+                                    patientName: item.patientName,
+                                    patientCpf: item.patientCpf || '',
+                                    examType: item.examType,
+                                    scheduledAt: item.scheduledAt || '',
+                                    requestingDoctor: item.requestingDoctor || '',
+                                    assignedTo: item.assignedTo || '',
+                                    convenio: item.convenio || '',
+                                    priority: item.priority,
+                                    status: item.status,
+                                  });
+                                  setWorklistModalOpen(true);
+                                }}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={async () => {
+                                  await reportWorklistService.remove(item.id);
+                                  await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+                                }}>
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
             </Paper>
-          </Tabs.Panel>
+            )}
 
-          <Tabs.Panel value="settings" pt="md">
+            {activeTab === 'settings' && (
             <Paper withBorder p="md">
               <Stack>
                 <Title order={5}>Regras de Finalização</Title>
@@ -683,8 +939,9 @@ export function LaudoConfiguracoes() {
                 </Text>
               </Stack>
             </Paper>
-          </Tabs.Panel>
-        </Tabs>
+            )}
+          </>
+        )}
       </Box>
 
       <Modal opened={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateEditingId ? 'Editar padrão' : 'Novo padrão'} centered size="xl">

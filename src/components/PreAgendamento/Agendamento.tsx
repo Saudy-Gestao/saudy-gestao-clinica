@@ -27,6 +27,7 @@ import 'dayjs/locale/pt-br';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
@@ -431,7 +432,7 @@ export function Agendamento() {
   const schedulerRef = useRef<HTMLDivElement | null>(null);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [searchValue, setSearchValue] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('marcacao');
+  const [activeTab, setActiveTab] = useState<string>('hub');
   const [, setSchedulingStep] = useState<number>(0);
   const [activeSchedulePeriod, setActiveSchedulePeriod] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
@@ -442,6 +443,8 @@ export function Agendamento() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('list');
+  const [agendadosPage, setAgendadosPage] = useState(1);
+  const [agendadosPageSize, setAgendadosPageSize] = useState(10);
   // State to track expanded cards (ids)
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   // Calendar state
@@ -893,6 +896,19 @@ export function Agendamento() {
     const matchesStatus = !statusFiltro || agendamento.status === statusFiltro;
     return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesStatus;
   });
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredAgendamentos.length / agendadosPageSize));
+    if (agendadosPage > totalPages) {
+      setAgendadosPage(totalPages);
+    }
+  }, [agendadosPage, agendadosPageSize, filteredAgendamentos.length]);
+
+  const paginatedAgendamentos = filteredAgendamentos.slice(
+    (agendadosPage - 1) * agendadosPageSize,
+    agendadosPage * agendadosPageSize,
+  );
+
   const getInsuranceIncompatibleProcedures = (insuranceName: string, procedureNames: string[]): string[] => {
     if (isParticularInsurance(insuranceName)) return [];
     const normalizedInsurance = normalizeComparableText(insuranceName);
@@ -1451,7 +1467,8 @@ export function Agendamento() {
       });
     }
   };
-  const rows = filteredAgendamentos.map((agendamento) => (
+
+  const rows = paginatedAgendamentos.map((agendamento) => (
     <Box key={agendamento.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
       {/* Time column - centered */}
       <Box style={{ minWidth: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2642,11 +2659,116 @@ export function Agendamento() {
             </Text>
           </Box>
         </Group>
-        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'marcacao')} variant="default">
-          <Tabs.List mb="lg">
-            <Tabs.Tab value="marcacao">Marcação</Tabs.Tab>
-            <Tabs.Tab value="agendados">Agenda</Tabs.Tab>
-          </Tabs.List>
+
+        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'hub')} variant="default">
+          {activeTab !== 'hub' && (
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {activeTab === 'marcacao' ? 'Realizar marcação' : 'Visualizar agenda'}
+                </Text>
+              </Group>
+            </Group>
+          )}
+
+          <Tabs.Panel value="hub">
+            <Box
+              style={{
+                minHeight: isMobile ? 'auto' : '58vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <SimpleGrid
+                cols={{ base: 1, md: 2 }}
+                spacing="xl"
+                style={{ width: '100%', maxWidth: 900 }}
+              >
+              <UnstyledButton
+                onClick={() => setActiveTab('marcacao')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Plus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Realizar marcação</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Cadastrar novo agendamento com paciente, procedimento, profissional e horário.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('agendados')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Calendar size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Visualizar agenda</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Consultar agenda, filtrar atendimentos e acompanhar horários já marcados.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+              </SimpleGrid>
+            </Box>
+          </Tabs.Panel>
+
           <Tabs.Panel value="marcacao">
         <Box ref={schedulerRef}>
           <Paper
@@ -3692,18 +3814,31 @@ export function Agendamento() {
           </Text>
         )}
         {/* Agendamentos List */}
-        <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6}}>
-          {/* LIST */}
-          {layout === 'list' && (
-            <Box>
-              {rows.length > 0 ?rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
-            </Box>
-          )}
-          {/* GRID */}
-          {layout === 'grid' && (
-            <Box p="md">
-              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                {filteredAgendamentos.length > 0 ?filteredAgendamentos.map(a => {
+        {(layout === 'list' || layout === 'grid') && (
+          <PaginatedGrid
+            totalItems={filteredAgendamentos.length}
+            page={agendadosPage}
+            pageSize={agendadosPageSize}
+            onPageChange={setAgendadosPage}
+            onPageSizeChange={(size) => {
+              setAgendadosPageSize(size);
+              setAgendadosPage(1);
+            }}
+            isMobile={isMobile}
+            maxHeight={560}
+          >
+            {/* LIST */}
+            {layout === 'list' && (
+              <Box>
+                {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+              </Box>
+            )}
+
+            {/* GRID */}
+            {layout === 'grid' && (
+              <Box p="md">
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                  {filteredAgendamentos.length > 0 ? paginatedAgendamentos.map(a => {
                   const isExpanded = expandedIds.includes(a.id);
                   return (
                     <Box
@@ -3790,13 +3925,16 @@ export function Agendamento() {
                       )}
                     </Box>
                   );
-                }) : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
-              </SimpleGrid>
-            </Box>
-          )}
+                  }) : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
+                </SimpleGrid>
+              </Box>
+            )}
+          </PaginatedGrid>
+        )}
+
           {/* CALENDAR */}
           {layout === 'calendar' && (
-            <Box p="md">
+            <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }} p="md">
               {/* Calendar header */}
               <Group justify="apart" align="center" mb={8}>
                 <Group gap="xs">
@@ -4021,7 +4159,6 @@ export function Agendamento() {
               </Modal>
             </Box>
           )}
-        </Box>
           </Tabs.Panel>
         </Tabs>
       </Box>

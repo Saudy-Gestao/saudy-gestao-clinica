@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocalStorage } from '@mantine/hooks';
-import { Box, Button, Group, Text } from '@mantine/core';
-import { LampDesk, MicOff, PhoneOff, Send, SignalHigh } from 'lucide-react';
+import { ActionIcon, Box, Button, Group, Text, Textarea } from '@mantine/core';
+import { Camera, Download, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -45,6 +45,16 @@ const normalizeCollection = (data: any) => (
       : (Array.isArray(data?.data) ? data.data : []))
 );
 
+const getInitials = (name?: string | null) => {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+};
+
 export function TeleconsultaPatientWaiting() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -73,12 +83,29 @@ export function TeleconsultaPatientWaiting() {
     createdAt: string;
   }>>([]);
   const [sendingChat, setSendingChat] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [recordTab, setRecordTab] = useState<'record' | 'patient'>('record');
+  const [recordSubTab, setRecordSubTab] = useState<'prescription' | 'notes'>('prescription');
+  const [soapData, setSoapData] = useState({
+    subjective: '',
+    objective: '',
+    assessment: '',
+    cid10: '',
+    treatmentPlan: '',
+    prescription: '',
+    notes: '',
+  });
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const doctorMainVideoRef = useRef<HTMLDivElement | null>(null);
+  const doctorAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const chatBodyRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const pollingRef = useRef<number | null>(null);
   const lastEventIdRef = useRef<number>(0);
@@ -173,6 +200,7 @@ export function TeleconsultaPatientWaiting() {
   const topCardLabel = isDoctorRole ? 'Paciente' : 'Médico Responsável';
   const topCardName = isDoctorRole ? patientName : doctorName;
   const topCardDetail = isDoctorRole ? 'Paciente da teleconsulta' : doctorSpecialty;
+  const topCardInitials = getInitials(topCardName);
   const allowJoinFromMinutesBefore = tokenMeta?.window?.allowJoinFromMinutesBefore ?? 10;
   const fromPreparation = params.get('fromPrep') === '1';
   const hasPreparedSession = token ? sessionStorage.getItem(`${PREPARED_SESSION_KEY_PREFIX}${token}`) === '1' : false;
@@ -211,6 +239,7 @@ export function TeleconsultaPatientWaiting() {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    cameraTrackRef.current = null;
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
@@ -224,6 +253,9 @@ export function TeleconsultaPatientWaiting() {
 
     setRemoteConnected(false);
     enteringCallRef.current = false;
+    setCallStartedAt(null);
+    setIsMicEnabled(true);
+    setIsCameraEnabled(true);
   };
 
   const resetPeerForReconnect = () => {
@@ -280,6 +312,9 @@ export function TeleconsultaPatientWaiting() {
       audio: { echoCancellation: true, noiseSuppression: true },
     });
     localStreamRef.current = stream;
+    cameraTrackRef.current = stream.getVideoTracks()[0] || null;
+    setIsMicEnabled((stream.getAudioTracks()[0]?.enabled ?? true));
+    setIsCameraEnabled((stream.getVideoTracks()[0]?.enabled ?? true));
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -312,6 +347,27 @@ export function TeleconsultaPatientWaiting() {
 
     peerRef.current = peer;
     return peer;
+  };
+
+  const getVideoSender = () => peerRef.current?.getSenders().find((sender) => sender.track?.kind === 'video') || null;
+
+  const toggleMicrophone = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) return;
+    const nextEnabled = !audioTracks[0].enabled;
+    audioTracks.forEach((track) => {
+      track.enabled = nextEnabled;
+    });
+    setIsMicEnabled(nextEnabled);
+  };
+
+  const toggleCamera = () => {
+    const activeVideoTrack = getVideoSender()?.track || localStreamRef.current?.getVideoTracks()?.[0] || null;
+    if (!activeVideoTrack) return;
+    activeVideoTrack.enabled = !activeVideoTrack.enabled;
+    setIsCameraEnabled(activeVideoTrack.enabled);
   };
 
   const acceptPendingOfferIfAny = async () => {
@@ -348,6 +404,7 @@ export function TeleconsultaPatientWaiting() {
         await updateConsultationQueue(IN_PROGRESS_STATUS);
       }
 
+      setCallStartedAt(Date.now());
       setInCall(true);
       const peer = await ensurePeerConnection();
 
@@ -370,6 +427,7 @@ export function TeleconsultaPatientWaiting() {
       }
     } catch (error: any) {
       setInCall(false);
+      setCallStartedAt(null);
       stopMediaAndPeer();
       showNotification({
         title: 'Falha ao iniciar chamada',
@@ -514,12 +572,12 @@ export function TeleconsultaPatientWaiting() {
 
     if (type === 'hangup') {
       stopMediaAndPeer();
-      setInCall(false);
       if (isDoctorRole) {
         clearPreparedSession();
         navigate('/consulta', { replace: true });
         return;
       }
+      setInCall(false);
       redirectPatientToFinished();
     }
   };
@@ -598,9 +656,13 @@ export function TeleconsultaPatientWaiting() {
   const withinWindow = diffSeconds <= allowJoinFromMinutesBefore * 60;
   const isOverdue = diffSeconds < 0;
 
-  const counterpartReady = isDoctorRole ? patientJoined : doctorJoined;
+  const counterpartReady = isDoctorRole ? patientJoined : doctorInConsultation;
 
   const status = useMemo(() => {
+    if (!isDoctorRole && doctorJoined && !doctorInConsultation) {
+      return { label: 'Médico online. Aguarde ele iniciar a consulta.', color: '#7b90ff' };
+    }
+
     if (!isDoctorRole && doctorInConsultation) {
       return { label: 'Médico na consulta', color: '#58d82e' };
     }
@@ -631,6 +693,31 @@ export function TeleconsultaPatientWaiting() {
   const timeText = (!isDoctorRole && doctorInConsultation) ? 'PRONTO' : counterpartReady ? 'PRONTO' : formatClock(diffSeconds, isOverdue);
   const canJoinConsultation = isDoctorRole || (doctorInConsultation && withinWindow);
   const chatCounterpartName = isDoctorRole ? patientName : doctorName;
+  const doctorInCallMode = inCall && isDoctorRole;
+  const recordFieldStyles = {
+    input: {
+      border: 'none',
+      borderBottom: `1px solid ${isDark ? 'rgba(187, 196, 212, 0.45)' : '#2b2f36'}`,
+      borderRadius: 0,
+      paddingLeft: 0,
+      paddingRight: 0,
+      background: 'transparent',
+      color: 'inherit',
+      fontSize: '15px',
+      minHeight: 34,
+    },
+    label: {
+      fontSize: '13px',
+      fontWeight: 600,
+      marginBottom: 2,
+      color: isDark ? '#d3ddf2' : '#21252c',
+    },
+  } as const;
+  const callElapsed = useMemo(() => {
+    if (!inCall || !callStartedAt) return '00:00';
+    const seconds = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000));
+    return formatClock(seconds, false);
+  }, [callStartedAt, inCall, now]);
 
   const formatChatTime = (iso: string) => {
     const date = new Date(iso);
@@ -709,6 +796,29 @@ export function TeleconsultaPatientWaiting() {
     fileInputRef.current?.click();
   };
 
+  const handleSaveDoctorRecord = () => {
+    showNotification({
+      title: 'Prontuário salvo',
+      message: 'Rascunho salvo localmente para esta sessão de teleconsulta.',
+      color: 'green',
+    });
+  };
+
+  const handleAttachDoctorDocument = () => {
+    doctorAttachmentInputRef.current?.click();
+  };
+
+  const handleDoctorAttachmentSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    showNotification({
+      title: 'Documento anexado',
+      message: `${file.name} adicionado ao prontuário da sessão.`,
+      color: 'green',
+    });
+  };
+
   const handleFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
@@ -767,15 +877,16 @@ export function TeleconsultaPatientWaiting() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-      <Box className={`${styles.page} ${isDark ? styles.pageDark : styles.pageLight}`}>
+    <Box bg={doctorInCallMode ? '#efefef' : 'var(--mantine-color-body)'} style={{ minHeight: '100vh' }}>
+      {isDoctorRole ? <Header /> : null}
+      <Box className={`${styles.page} ${doctorInCallMode ? styles.pageConsultation : (isDark ? styles.pageDark : styles.pageLight)}`}>
         <Box className={styles.wrapper}>
-          <Text className={styles.title}>Teleconsulta</Text>
+          {!doctorInCallMode ? <Text className={styles.title}>Teleconsulta</Text> : null}
 
+          {!doctorInCallMode ? (
           <Box className={`${styles.topCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
             <Box className={styles.topLeft}>
-              <Box className={styles.avatar}>MS</Box>
+              <Box className={styles.avatar}>{topCardInitials}</Box>
               <div>
                 <p className={styles.metaLabel}>{topCardLabel}</p>
                 <p className={styles.metaName}>{topCardName}</p>
@@ -788,47 +899,254 @@ export function TeleconsultaPatientWaiting() {
               <p className={styles.scheduleTime}>{scheduledLabel}</p>
             </Box>
           </Box>
+          ) : null}
 
           {inCall ? (
-            <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`} style={{ padding: 16 }}>
-              <Group justify="space-between" mb="md">
-                <Text fw={700} size="lg">Consulta em andamento</Text>
-                <Button
-                  size="sm"
-                  color="red"
-                  variant="light"
-                  leftSection={<PhoneOff size={16} />}
-                  onClick={() => {
-                    if (!isDoctorRole) {
-                      const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
-                      if (!confirmed) return;
-                    }
-                    stopMediaAndPeer(isDoctorRole ? 'hangup' : 'patient-left');
-                    setInCall(false);
-                    if (isDoctorRole) {
-                      void finalizeDoctorConsultation();
-                      return;
-                    }
-                    redirectPatientToFinished();
-                  }}
-                >
-                  {isDoctorRole ? 'Encerrar e finalizar consulta' : 'Sair da teleconsulta'}
-                </Button>
-              </Group>
-              <Box style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260 }}>
-                  <video ref={localVideoRef} muted autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </Box>
-                <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260, position: 'relative' }}>
-                  <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            isDoctorRole ? (
+              <Box className={styles.consultationShell}>
+                <Box ref={doctorMainVideoRef} className={styles.consultationVideoPanel}>
+                  <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
+
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`${styles.consultationRemoteVideo} ${styles.consultationRemoteVideoDoctor}`}
+                  />
                   {!remoteConnected ? (
-                    <Text size="sm" c="gray.3" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-                      Aguardando conexão da outra ponta...
-                    </Text>
+                    <Box className={styles.consultationRemoteOverlay}>
+                      <Text size="sm">Aguardando vídeo do paciente...</Text>
+                    </Box>
                   ) : null}
+
+                  <Box className={styles.consultationControls}>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isMicEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isMicEnabled ? 'Mutar microfone' : 'Desmutar microfone'}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isCameraEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}
+                      onClick={toggleCamera}
+                    >
+                      {isCameraEnabled ? <Camera size={20} /> : <VideoOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={styles.consultationControlBtnDanger}
+                      variant="filled"
+                      color="red"
+                      radius="md"
+                      size="xl"
+                      aria-label="Encerrar e sair"
+                      onClick={() => {
+                        stopMediaAndPeer('hangup');
+                        void finalizeDoctorConsultation();
+                      }}
+                    >
+                      <PhoneOff size={20} />
+                    </ActionIcon>
+                  </Box>
+
+                  <Box className={styles.consultationLocalPreview}>
+                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
+                  </Box>
+                </Box>
+
+                <Box className={`${styles.consultationRecordPanel} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
+                  <Box className={styles.consultationRecordTabs}>
+                    <button
+                      type="button"
+                      className={`${styles.consultationRecordTabBtn} ${recordTab === 'record' ? styles.consultationRecordTabBtnActive : ''}`}
+                      onClick={() => setRecordTab('record')}
+                    >
+                      Prontuário
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.consultationRecordTabBtn} ${recordTab === 'patient' ? styles.consultationRecordTabBtnActive : ''}`}
+                      onClick={() => setRecordTab('patient')}
+                    >
+                      Paciente
+                    </button>
+                  </Box>
+
+                  {recordTab === 'record' ? (
+                    <Box className={styles.consultationRecordBody}>
+                      <Group justify="space-between" align="center" mb="sm">
+                        <Text fw={800} size="xl">Prontuário</Text>
+                        <Button
+                          size="sm"
+                          leftSection={<Download size={14} />}
+                          onClick={handleSaveDoctorRecord}
+                          style={{ background: '#0a2a67', color: '#fff' }}
+                        >
+                          Salvar
+                        </Button>
+                      </Group>
+
+                      <Box className={styles.consultationSubTabs}>
+                        <button
+                          type="button"
+                          className={`${styles.consultationSubTabBtn} ${recordSubTab === 'prescription' ? styles.consultationSubTabBtnActive : ''}`}
+                          onClick={() => setRecordSubTab('prescription')}
+                        >
+                          Prescrição
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.consultationSubTabBtn} ${recordSubTab === 'notes' ? styles.consultationSubTabBtnActive : ''}`}
+                          onClick={() => setRecordSubTab('notes')}
+                        >
+                          Notas
+                        </button>
+                      </Box>
+
+                      <Textarea
+                        label="Subjetivo (Queixa do paciente)"
+                        value={soapData.subjective}
+                        onChange={(event) => setSoapData((prev) => ({ ...prev, subjective: event.currentTarget.value }))}
+                        minRows={2}
+                        styles={recordFieldStyles}
+                      />
+                      <Textarea
+                        label="Objetivo (Exame / Observação)"
+                        value={soapData.objective}
+                        onChange={(event) => setSoapData((prev) => ({ ...prev, objective: event.currentTarget.value }))}
+                        minRows={2}
+                        styles={recordFieldStyles}
+                      />
+                      <Textarea
+                        label="Avaliação / Diagnóstico"
+                        value={soapData.assessment}
+                        onChange={(event) => setSoapData((prev) => ({ ...prev, assessment: event.currentTarget.value }))}
+                        minRows={2}
+                        styles={recordFieldStyles}
+                      />
+                      <Textarea
+                        label="CID - 10"
+                        value={soapData.cid10}
+                        onChange={(event) => setSoapData((prev) => ({ ...prev, cid10: event.currentTarget.value }))}
+                        minRows={1}
+                        styles={recordFieldStyles}
+                      />
+                      <Textarea
+                        label="Plano de Tratamento"
+                        value={soapData.treatmentPlan}
+                        onChange={(event) => setSoapData((prev) => ({ ...prev, treatmentPlan: event.currentTarget.value }))}
+                        minRows={2}
+                        styles={recordFieldStyles}
+                      />
+                      <Textarea
+                        label={recordSubTab === 'prescription' ? 'Prescrição' : 'Notas'}
+                        value={recordSubTab === 'prescription' ? soapData.prescription : soapData.notes}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          setSoapData((prev) => (recordSubTab === 'prescription'
+                            ? { ...prev, prescription: value }
+                            : { ...prev, notes: value }));
+                        }}
+                        minRows={3}
+                        styles={recordFieldStyles}
+                      />
+
+                      <Button
+                        variant="default"
+                        leftSection={<Paperclip size={14} />}
+                        onClick={handleAttachDoctorDocument}
+                        fullWidth
+                        style={{ minHeight: 88, fontSize: 18, background: '#d9d9d9', borderColor: '#d9d9d9' }}
+                      >
+                        Anexar documentos
+                      </Button>
+                      <input
+                        ref={doctorAttachmentInputRef}
+                        type="file"
+                        style={{ display: 'none' }}
+                        onChange={handleDoctorAttachmentSelected}
+                      />
+                    </Box>
+                  ) : (
+                    <Box className={styles.consultationRecordBody}>
+                      <Text fw={700}>Dados do paciente</Text>
+                      <Text size="sm">Nome: {patientName}</Text>
+                      <Text size="sm">Médico: {doctorName}</Text>
+                      <Text size="sm">Especialidade: {doctorSpecialty}</Text>
+                      <Text size="sm">Horário: {scheduledLabel}</Text>
+                    </Box>
+                  )}
                 </Box>
               </Box>
-            </Box>
+            ) : (
+              <Box className={styles.consultationPatientShell}>
+                <Box className={styles.consultationVideoPanel}>
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`${styles.consultationRemoteVideo} ${styles.consultationRemoteVideoPatient}`}
+                  />
+                  {!remoteConnected ? (
+                    <Box className={styles.consultationRemoteOverlay}>
+                      <Text size="sm">Aguardando conexão da outra ponta...</Text>
+                    </Box>
+                  ) : null}
+
+                  <Box className={styles.consultationControls}>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isMicEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isMicEnabled ? 'Mutar microfone' : 'Desmutar microfone'}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isCameraEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}
+                      onClick={toggleCamera}
+                    >
+                      {isCameraEnabled ? <Camera size={20} /> : <VideoOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={styles.consultationControlBtnDanger}
+                      variant="filled"
+                      color="red"
+                      radius="md"
+                      size="xl"
+                      aria-label="Sair da teleconsulta"
+                      onClick={() => {
+                        const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
+                        if (!confirmed) return;
+                        stopMediaAndPeer('patient-left');
+                        setInCall(false);
+                        setCallStartedAt(null);
+                        showNotification({
+                          title: 'Você saiu da chamada',
+                          message: 'Você pode entrar novamente quando quiser.',
+                          color: 'blue',
+                        });
+                      }}
+                    >
+                      <PhoneOff size={20} />
+                    </ActionIcon>
+                  </Box>
+
+                  <Box className={styles.consultationLocalPreview}>
+                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
+                  </Box>
+                </Box>
+              </Box>
+            )
           ) : (
             <Box className={styles.mainGrid}>
               <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
@@ -937,24 +1255,27 @@ export function TeleconsultaPatientWaiting() {
             </Box>
           )}
 
-          {!withinWindow && !isDoctorRole ? (
+          {!doctorInCallMode && !withinWindow && !isDoctorRole ? (
             <Text c="yellow.3" mt={10}>
               A consulta será liberada {allowJoinFromMinutesBefore} minutos antes do horário agendado.
             </Text>
           ) : null}
 
+          {!doctorInCallMode && !inCall ? (
           <Box className={styles.enterRow}>
             <Button size="lg" radius="md" disabled={!canJoinConsultation || !signalingReady || inCall} onClick={() => { void enterConsultation(); }}>
               {isDoctorRole ? 'Entrar na Teleconsulta' : 'Entrar na Consulta'}
             </Button>
           </Box>
+          ) : null}
 
-          {!isDoctorRole && doctorInConsultation && !inCall ? (
+          {!doctorInCallMode && !isDoctorRole && doctorInConsultation && !inCall ? (
             <Text mt={8} c={isDark ? 'green.3' : 'green.8'} ta="right">
               O médico já está na consulta. Clique em "Entrar na Consulta" para participar.
             </Text>
           ) : null}
 
+          {!doctorInCallMode ? (
           <Box className={styles.tipsRow}>
             <Box className={`${styles.tipCard} ${isDark ? styles.tipCardDark : styles.tipCardLight}`}>
               <LampDesk size={24} />
@@ -969,6 +1290,7 @@ export function TeleconsultaPatientWaiting() {
               <Text className={styles.tipText}>Use uma conexão estável</Text>
             </Box>
           </Box>
+          ) : null}
         </Box>
       </Box>
     </Box>

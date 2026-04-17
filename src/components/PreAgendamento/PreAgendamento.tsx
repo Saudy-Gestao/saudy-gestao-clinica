@@ -9,16 +9,18 @@ import {
   Menu,
   Modal,
   Paper,
-  SegmentedControl,
   Skeleton,
   Stack,
   Table,
   Text,
   TextInput,
   Textarea,
+  UnstyledButton,
+  SimpleGrid,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, Copy, ExternalLink, FileSearch, Link as LinkIcon, MoreVertical, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, FileSearch, History, Link as LinkIcon, MoreVertical, ShieldCheck, BriefcaseBusiness } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
@@ -142,7 +144,8 @@ export function PreAgendamento() {
   const [items, setItems] = useState<PreSchedulingItem[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'queue' | 'history'>('queue');
+  const [viewMode, setViewMode] = useState<'hub' | 'queue' | 'history'>('hub');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [preAuthOpen, setPreAuthOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PreSchedulingItem | null>(null);
@@ -150,14 +153,11 @@ export function PreAgendamento() {
   const [preAuthNotes, setPreAuthNotes] = useState('');
   const [savingPreAuth, setSavingPreAuth] = useState(false);
 
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkMode, setLinkMode] = useState<'DOCS' | 'TELECONSULTA'>('DOCS');
-  const [linkResult, setLinkResult] = useState<{
-    publicUrl: string;
-    message: string;
-    to?: string;
-  } | null>(null);
   const [sendingLink, setSendingLink] = useState(false);
+  const [teleLinkModalOpen, setTeleLinkModalOpen] = useState(false);
+  const [teleLinkPatientUrl, setTeleLinkPatientUrl] = useState('');
+  const [teleLinkDoctorUrl, setTeleLinkDoctorUrl] = useState('');
+  const [teleLinkExpiresAt, setTeleLinkExpiresAt] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewDocuments, setReviewDocuments] = useState<Array<{
@@ -262,20 +262,21 @@ export function PreAgendamento() {
     }
   };
 
-  const openSendLink = (item: PreSchedulingItem, mode: 'DOCS' | 'TELECONSULTA' = 'DOCS') => {
-    setSelectedItem(item);
-    setLinkMode(mode);
-    setLinkResult(null);
-    setLinkOpen(true);
-  };
-
   const handleSendTeleconsultationLinkDirect = async (item: PreSchedulingItem) => {
     setSendingLink(true);
     try {
-      await teleconsultationLinkService.sendWhatsAppLinkByAppointment(item.appointmentId);
+      const result = await teleconsultationLinkService.sendWhatsAppLinkByAppointment(item.appointmentId, {
+        sendPatientMessage: false,
+      });
+
+      setTeleLinkPatientUrl(result?.links?.patientUrl || '');
+      setTeleLinkDoctorUrl(result?.links?.doctorUrl || '');
+      setTeleLinkExpiresAt(result?.links?.expiresAt || null);
+      setTeleLinkModalOpen(Boolean(result?.links?.patientUrl || result?.links?.doctorUrl));
+
       showNotification({
         title: 'Link enviado',
-        message: 'Link de teleconsulta gerado com sucesso.',
+        message: 'Link de teleconsulta gerado com sucesso. Você pode copiar no modal.',
         color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
@@ -291,30 +292,35 @@ export function PreAgendamento() {
     }
   };
 
-  const handleSendLink = async (mode: 'DOCS' | 'TELECONSULTA' = linkMode) => {
-    if (!selectedItem) return;
+  const copyToClipboard = async (value: string, label: string) => {
+    const text = value?.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showNotification({
+        title: 'Copiado',
+        message: `${label} copiado para a área de transferência.`,
+        color: 'green',
+      });
+    } catch {
+      showNotification({
+        title: 'Não foi possível copiar',
+        message: 'Copie manualmente o conteúdo do campo.',
+        color: 'yellow',
+      });
+    }
+  };
+
+  const handleSendLinkDirect = async (item: PreSchedulingItem) => {
     setSendingLink(true);
     try {
-      const data: any = mode === 'TELECONSULTA'
-        ? await teleconsultationLinkService.sendWhatsAppLinkByAppointment(selectedItem.appointmentId)
-        : await preSchedulingService.sendLink(selectedItem.appointmentId);
-      const whatsappData = data.whatsapp || data.whatsappMock || null;
-      setLinkResult({
-        publicUrl: data.publicUrl || data.links?.patientUrl,
-        message: whatsappData?.message || '',
-        to: whatsappData?.to,
-      });
+      const data: any = await preSchedulingService.sendLink(item.appointmentId);
       showNotification({
         title: 'Link enviado',
-        message: mode === 'TELECONSULTA'
-          ? 'Link de teleconsulta gerado com sucesso.'
-          : (data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.'),
+        message: data.hasAnamnesis ? 'Link de documentos e anamnese gerado com sucesso.' : 'Link de documentos gerado com sucesso.',
         color: 'green',
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.preSchedulings });
-      if (mode === 'TELECONSULTA') {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
-      }
     } catch (err: any) {
       showNotification({
         title: 'Erro ao enviar link',
@@ -323,24 +329,6 @@ export function PreAgendamento() {
       });
     } finally {
       setSendingLink(false);
-    }
-  };
-
-  const copyToClipboard = async (value: string) => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      showNotification({
-        title: 'Copiado',
-        message: 'Link copiado para a área de transferência.',
-        color: 'green',
-      });
-    } catch {
-      showNotification({
-        title: 'Falha ao copiar',
-        message: 'Não foi possível copiar o link.',
-        color: 'red',
-      });
     }
   };
 
@@ -452,69 +440,164 @@ export function PreAgendamento() {
           </Group>
         </Group>
 
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+        <Paper
+          p="md"
+          withBorder={viewMode !== 'hub'}
+          style={viewMode !== 'hub' ? { borderColor: 'var(--mantine-color-default-border)' } : undefined}
+        >
           <Stack gap="md">
-            <Group justify="space-between" wrap="wrap">
-              <SegmentedControl
-                value={viewMode}
-                onChange={(value) => setViewMode(value as 'queue' | 'history')}
-                data={[
-                  { label: 'Fila de trabalho', value: 'queue' },
-                  { label: 'Histórico', value: 'history' },
-                ]}
-              />
-              <Text size="sm" c="dimmed">
-                {viewMode === 'queue'
-                  ? 'Mostrando somente itens pendentes de ação'
-                  : 'Mostrando itens concluídos (auditoria)'}
-              </Text>
-            </Group>
+            {viewMode === 'hub' ? (
+              <Box
+                style={{
+                  minHeight: '52vh',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+                  <UnstyledButton
+                    onClick={() => setViewMode('queue')}
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 16,
+                      padding: '24px',
+                      background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                      textAlign: 'left',
+                      minHeight: 220,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Stack gap={8}>
+                      <Group gap="xs">
+                        <Box
+                          w={34}
+                          h={34}
+                          style={{
+                            borderRadius: 10,
+                            background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BriefcaseBusiness size={16} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                        </Box>
+                        <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Fila de trabalho</Text>
+                      </Group>
+                      <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                        Itens pendentes para pré-autorização, envio de links e revisão de documentos.
+                      </Text>
+                    </Stack>
+                  </UnstyledButton>
 
-            <Group grow align="flex-end">
-              <FloatingInput
-                label="Buscar"
-                alwaysFloatLabel
-                placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
-                value={search}
-                onChange={(e) => setSearch(e.currentTarget.value)}
-                containerProps={{ style: { minHeight: 64 } }}
-              />
-              <FloatingSelect
-                label="Status"
-                alwaysFloatLabel
-                data={statusOptions}
-                clearable
-                value={statusFilter}
-                onChange={setStatusFilter}
-                containerProps={{ style: { minHeight: 64 } }}
-              />
-            </Group>
-
-            {loading && items.length === 0 ? (
-              <PreSchedulingTableSkeleton />
+                  <UnstyledButton
+                    onClick={() => setViewMode('history')}
+                    style={{
+                      border: '1px solid var(--mantine-color-default-border)',
+                      borderRadius: 16,
+                      padding: '24px',
+                      background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                      textAlign: 'left',
+                      minHeight: 220,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Stack gap={8}>
+                      <Group gap="xs">
+                        <Box
+                          w={34}
+                          h={34}
+                          style={{
+                            borderRadius: 10,
+                            background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <History size={16} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                        </Box>
+                        <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Histórico</Text>
+                      </Group>
+                      <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                        Auditoria dos fluxos concluídos, links enviados e revisões finalizadas.
+                      </Text>
+                    </Stack>
+                  </UnstyledButton>
+                </SimpleGrid>
+              </Box>
             ) : (
-              <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
-                <Table verticalSpacing="sm" horizontalSpacing="md">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Paciente</Table.Th>
-                      <Table.Th>Agendamento</Table.Th>
-                      <Table.Th>Médico</Table.Th>
-                      <Table.Th>Convênio</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Docs</Table.Th>
-                      <Table.Th>Ações</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {items.length === 0 ? (
-                      <Table.Tr>
-                        <Table.Td colSpan={7}>
-                          <Text c="dimmed" ta="center" py="md">Nenhum agendamento confirmado encontrado.</Text>
-                        </Table.Td>
-                      </Table.Tr>
-                    ) : (
-                      items.map((item) => (
+              <Group justify="space-between" wrap="wrap">
+                <Group gap="xs">
+                  <Button
+                    variant="default"
+                    leftSection={<ChevronLeft size={16} />}
+                    onClick={() => setViewMode('hub')}
+                  >
+                    Voltar
+                  </Button>
+                  <Text fw={700}>
+                    {viewMode === 'queue' ? 'Fila de trabalho' : 'Histórico'}
+                  </Text>
+                </Group>
+                <Text size="sm" c="dimmed">
+                  {viewMode === 'queue'
+                    ? 'Mostrando somente itens pendentes de ação'
+                    : 'Mostrando itens concluídos (auditoria)'}
+                </Text>
+              </Group>
+            )}
+
+            {viewMode === 'hub' ? null : (
+              <>
+                <Group grow align="flex-end">
+                  <FloatingInput
+                    label="Buscar"
+                    alwaysFloatLabel
+                    placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
+                    value={search}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                    containerProps={{ style: { minHeight: 64 } }}
+                  />
+                  <FloatingSelect
+                    label="Status"
+                    alwaysFloatLabel
+                    data={statusOptions}
+                    clearable
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    containerProps={{ style: { minHeight: 64 } }}
+                  />
+                </Group>
+
+                {loading && items.length === 0 ? (
+                  <PreSchedulingTableSkeleton />
+                ) : (
+                  <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                    <Table verticalSpacing="sm" horizontalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Paciente</Table.Th>
+                          <Table.Th>Agendamento</Table.Th>
+                          <Table.Th>Médico</Table.Th>
+                          <Table.Th>Convênio</Table.Th>
+                          <Table.Th>Status</Table.Th>
+                          <Table.Th>Docs</Table.Th>
+                          <Table.Th>Ações</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {items.length === 0 ? (
+                          <Table.Tr>
+                            <Table.Td colSpan={7}>
+                              <Text c="dimmed" ta="center" py="md">Nenhum agendamento confirmado encontrado.</Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ) : (
+                          items.map((item) => (
                         <Table.Tr key={item.appointmentId}>
                           <Table.Td>
                             <Stack gap={4}>
@@ -587,7 +670,7 @@ export function PreAgendamento() {
                                     || isCanceled
                                     || isCompleted
                                   }
-                                  onClick={() => openSendLink(item, 'DOCS')}
+                                  onClick={() => handleSendLinkDirect(item)}
                                 >
                                   Enviar link docs
                                 </Menu.Item>
@@ -628,12 +711,14 @@ export function PreAgendamento() {
                               </Menu.Dropdown>
                             </Menu>
                           </Table.Td>
-                        </Table.Tr>
-                      ))
-                    )}
-                  </Table.Tbody>
-                </Table>
-              </Box>
+                          </Table.Tr>
+                        ))
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </Box>
+                )}
+              </>
             )}
           </Stack>
         </Paper>
@@ -664,63 +749,6 @@ export function PreAgendamento() {
         </Stack>
       </Modal>
 
-      <Modal
-        opened={linkOpen}
-        onClose={() => setLinkOpen(false)}
-        title={linkMode === 'TELECONSULTA' ? 'Envio de link de teleconsulta (WhatsApp)' : 'Envio de link de documentos (WhatsApp mock)'}
-        centered
-        size="lg"
-      >
-        <Stack>
-          <Text size="sm" c="dimmed">
-            {selectedItem?.patientName || 'Paciente'} • {selectedItem?.specialty || 'Procedimento'}
-          </Text>
-
-          {!linkResult ? (
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setLinkOpen(false)}>Cancelar</Button>
-              <Button
-                color="darkBlue"
-                onClick={() => handleSendLink(linkMode)}
-                loading={sendingLink}
-              >
-                Gerar e enviar link
-              </Button>
-            </Group>
-          ) : (
-            <>
-              <Paper p="sm" withBorder>
-                <Stack gap={6}>
-                  <Text size="sm" fw={600}>Link público</Text>
-                  <Group wrap="nowrap" justify="space-between">
-                    <Text size="sm" style={{ wordBreak: 'break-all' }}>{linkResult.publicUrl}</Text>
-                    <Group gap={6}>
-                      <ActionIcon variant="light" onClick={() => copyToClipboard(linkResult.publicUrl)}>
-                        <Copy size={14} />
-                      </ActionIcon>
-                      <ActionIcon variant="light" onClick={() => window.open(linkResult.publicUrl, '_blank')}>
-                        <ExternalLink size={14} />
-                      </ActionIcon>
-                    </Group>
-                  </Group>
-                </Stack>
-              </Paper>
-
-              <Paper p="sm" withBorder>
-                <Stack gap={6}>
-                  <Text size="sm" fw={600}>Mensagem mock enviada</Text>
-                  <Text size="xs" c="dimmed">Destino: {linkResult.to || 'não informado'}</Text>
-                  <Textarea value={linkResult.message} readOnly minRows={4} autosize />
-                </Stack>
-              </Paper>
-
-              <Group justify="flex-end">
-                <Button variant="default" onClick={() => setLinkOpen(false)}>Fechar</Button>
-              </Group>
-            </>
-          )}
-        </Stack>
-      </Modal>
       <Modal opened={reviewOpen} onClose={() => setReviewOpen(false)} title="Revisar envio do paciente" centered size="lg">
         <Stack>
           <Text size="sm" c="dimmed">
@@ -819,6 +847,60 @@ export function PreAgendamento() {
               Aprovar envio
             </Button>
           </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={teleLinkModalOpen}
+        onClose={() => setTeleLinkModalOpen(false)}
+        title="Link da teleconsulta"
+        size="lg"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Copie o link do paciente para compartilhar manualmente no teste do fluxo.
+          </Text>
+
+          <Textarea
+            label="Link do paciente"
+            value={teleLinkPatientUrl}
+            readOnly
+            autosize
+            minRows={3}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="light"
+              disabled={!teleLinkPatientUrl}
+              onClick={() => copyToClipboard(teleLinkPatientUrl, 'Link do paciente')}
+            >
+              Copiar link do paciente
+            </Button>
+          </Group>
+
+          <Textarea
+            label="Link do médico"
+            value={teleLinkDoctorUrl}
+            readOnly
+            autosize
+            minRows={3}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="light"
+              disabled={!teleLinkDoctorUrl}
+              onClick={() => copyToClipboard(teleLinkDoctorUrl, 'Link do médico')}
+            >
+              Copiar link do médico
+            </Button>
+          </Group>
+
+          {teleLinkExpiresAt && (
+            <Text size="xs" c="dimmed">
+              Expira em: {new Date(teleLinkExpiresAt).toLocaleString('pt-BR')}
+            </Text>
+          )}
         </Stack>
       </Modal>
     </Box>

@@ -21,6 +21,7 @@ export interface WhatsAppMessageTemplate {
   branchId: string;
   type:
     | 'APPOINTMENT_CREATED'
+    | 'TELECONSULTATION_LINK'
     | 'APPOINTMENT_CONFIRMATION'
     | 'NO_SHOW'
     | 'CONFIRMATION_REPLY_CONFIRMED'

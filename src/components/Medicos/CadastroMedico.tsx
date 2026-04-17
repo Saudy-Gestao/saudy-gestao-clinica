@@ -12,6 +12,7 @@ import {
   Title,
   Popover,
   ActionIcon,
+  Menu,
   Modal,
   Tabs,
   Table,
@@ -19,9 +20,11 @@ import {
   Skeleton,
   Badge,
   Switch,
+  UnstyledButton,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, Power } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -32,6 +35,7 @@ import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 import doctorService from '../../services/doctorService';
 import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
@@ -232,6 +236,7 @@ export function CadastroMedico() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   // Ensure the page starts at the top (header) when this route/component mounts
   useEffect(() => {
@@ -267,10 +272,12 @@ export function CadastroMedico() {
   };
 
   const [form, setForm] = useState<DoctorForm>({ ...INITIAL_DOCTOR_FORM });
-  const [activeTab, setActiveTab] = useState('cadastro');
+  const [activeTab, setActiveTab] = useState<'hub' | 'cadastro' | 'lista'>('hub');
   const [doctors, setDoctors] = useState<DoctorListItem[]>([]);
   const [doctorsLoading, setDoctorsLoading] = useState(false);
   const [doctorQuery, setDoctorQuery] = useState('');
+  const [doctorPage, setDoctorPage] = useState(1);
+  const [doctorPageSize, setDoctorPageSize] = useState(10);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorListItem | null>(null);
   const [editingDoctorId, setEditingDoctorId] = useState<string | null>(null);
@@ -344,6 +351,26 @@ export function CadastroMedico() {
     if (!q) return doctors;
     return doctors.filter((item) => item.name.toLowerCase().includes(q));
   }, [doctors, doctorQuery]);
+
+  const paginatedDoctors = useMemo(() => {
+    const start = (doctorPage - 1) * doctorPageSize;
+    return filteredDoctors.slice(start, start + doctorPageSize);
+  }, [doctorPage, doctorPageSize, filteredDoctors]);
+
+  const doctorTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredDoctors.length / doctorPageSize)),
+    [doctorPageSize, filteredDoctors.length],
+  );
+
+  useEffect(() => {
+    setDoctorPage(1);
+  }, [doctorQuery, doctorPageSize, doctors.length]);
+
+  useEffect(() => {
+    if (doctorPage > doctorTotalPages) {
+      setDoctorPage(doctorTotalPages);
+    }
+  }, [doctorPage, doctorTotalPages]);
 
   const isEditing = Boolean(editingDoctorId);
 
@@ -675,6 +702,18 @@ export function CadastroMedico() {
     }
   };
 
+  const handleViewDoctor = (item: DoctorListItem) => {
+    setSelectedDoctor(item);
+    setDetailsOpen(true);
+  };
+
+  const handleEditDoctor = (item: DoctorListItem) => {
+    setSelectedDoctor(item);
+    setEditingDoctorId(item.id);
+    populateFormFromDoctor(item.raw);
+    setActiveTab('cadastro');
+  };
+
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
@@ -698,13 +737,110 @@ export function CadastroMedico() {
           </Group>
 
         </Group>
-        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'cadastro')} keepMounted={false}>
-          <Tabs.List>
-            <Tabs.Tab value="cadastro">Cadastrar</Tabs.Tab>
-            <Tabs.Tab value="lista">Cadastrados</Tabs.Tab>
-          </Tabs.List>
+        {activeTab === 'hub' ? (
+          <Box
+            style={{
+              minHeight: isMobile ? 'auto' : '58vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+              <UnstyledButton
+                onClick={() => setActiveTab('cadastro')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <UserPlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar médico</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Registrar médico com dados profissionais, contatos e turnos de atendimento.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
 
-          <Tabs.Panel value="cadastro" pt="md">
+              <UnstyledButton
+                onClick={() => setActiveTab('lista')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Users size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Médicos cadastrados</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Visualize, edite e gerencie o status dos médicos registrados no sistema.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {activeTab === 'cadastro' ? 'Cadastrar médico' : 'Médicos cadastrados'}
+                </Text>
+              </Group>
+            </Group>
+
+        <Tabs value={activeTab} onChange={(value) => setActiveTab((value as 'cadastro' | 'lista') || 'cadastro')} keepMounted={false}>
+          <Tabs.Panel value="cadastro" pt={0}>
             <Stack gap="md">
               {isEditing && (
                 <Text size="sm" c="dimmed">
@@ -972,7 +1108,7 @@ export function CadastroMedico() {
             </Stack>
           </Tabs.Panel>
 
-          <Tabs.Panel value="lista" pt="md">
+          <Tabs.Panel value="lista" pt={0}>
             <Paper p="md" withBorder radius="md">
               <Group justify="space-between" mb="md" wrap="wrap">
                 <SectionTitle>Médicos cadastrados</SectionTitle>
@@ -1064,57 +1200,55 @@ export function CadastroMedico() {
                               {item.isActive ? 'Ativo' : 'Inativo'}
                             </Badge>
                           </Group>
-                          <Group gap={8} mt="md" wrap="nowrap">
-                            <ActionIcon
-                              variant="light"
-                              color="gray"
-                              onClick={() => {
-                                setSelectedDoctor(item);
-                                setDetailsOpen(true);
-                              }}
-                              title="Visualizar"
-                            >
-                              <Eye size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="light"
-                              color="blue"
-                              onClick={() => {
-                                setSelectedDoctor(item);
-                                setEditingDoctorId(item.id);
-                                populateFormFromDoctor(item.raw);
-                                setActiveTab('cadastro');
-                              }}
-                              title="Editar"
-                            >
-                              <Pencil size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="light"
-                              color={item.isActive ? 'orange' : 'green'}
-                              onClick={() => handleToggleActive(item)}
-                              title={item.isActive ? 'Desativar' : 'Ativar'}
-                            >
-                              <Power size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="light"
-                              color="red"
-                              onClick={() => {
-                                setDeleteTarget(item);
-                                setDeleteConfirmOpen(true);
-                              }}
-                              title="Excluir"
-                            >
-                              <Trash size={16} />
-                            </ActionIcon>
+                          <Group justify="flex-end" mt="md">
+                            <Menu shadow="md" width={210} position="bottom-end" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações do médico">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Eye size={14} />} onClick={() => handleViewDoctor(item)}>
+                                  Visualizar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => handleEditDoctor(item)}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<Power size={14} />}
+                                  color={item.isActive ? 'orange' : 'green'}
+                                  onClick={() => handleToggleActive(item)}
+                                >
+                                  {item.isActive ? 'Desativar' : 'Ativar'}
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<Trash size={14} />}
+                                  color="red"
+                                  onClick={() => {
+                                    setDeleteTarget(item);
+                                    setDeleteConfirmOpen(true);
+                                  }}
+                                >
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
                           </Group>
                         </Paper>
                       ))}
                     </Stack>
                   )
                 ) : (
-                  <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                  <PaginatedGrid
+                    totalItems={filteredDoctors.length}
+                    page={doctorPage}
+                    pageSize={doctorPageSize}
+                    onPageChange={setDoctorPage}
+                    onPageSizeChange={setDoctorPageSize}
+                    isMobile={isMobile}
+                    maxHeight={isMobile ? 500 : 620}
+                    showFooter
+                  >
                     <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                       <Table.Thead>
                         <Table.Tr style={{ borderBottom: 'none' }}>
@@ -1128,14 +1262,14 @@ export function CadastroMedico() {
                       <Table.Tbody>
                         {filteredDoctors.length === 0 ? (
                           <Table.Tr>
-                            <Table.Td colSpan={5}>
+                            <Table.Td colSpan={isTablet ? 2 : 5}>
                               <Text size="sm" c="dimmed" ta="center">
                                 Nenhum médico encontrado. Ajuste a busca ou cadastre um novo médico.
                               </Text>
                             </Table.Td>
                           </Table.Tr>
                         ) : (
-                          filteredDoctors.map((item) => (
+                          paginatedDoctors.map((item) => (
                             <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                               <Table.Td>
                                 <Stack gap={2}>
@@ -1169,50 +1303,39 @@ export function CadastroMedico() {
                                 </Table.Td>
                               )}
                               <Table.Td>
-                                <Group gap={6} wrap="nowrap">
-                                  <ActionIcon
-                                    variant="light"
-                                    color="gray"
-                                    onClick={() => {
-                                      setSelectedDoctor(item);
-                                      setDetailsOpen(true);
-                                    }}
-                                    title="Visualizar"
-                                  >
-                                    <Eye size={16} />
-                                  </ActionIcon>
-                                  <ActionIcon
-                                    variant="light"
-                                    color="blue"
-                                    onClick={() => {
-                                      setSelectedDoctor(item);
-                                      setEditingDoctorId(item.id);
-                                      populateFormFromDoctor(item.raw);
-                                      setActiveTab('cadastro');
-                                    }}
-                                    title="Editar"
-                                  >
-                                    <Pencil size={16} />
-                                  </ActionIcon>
-                                  <ActionIcon
-                                    variant="light"
-                                    color={item.isActive ? 'orange' : 'green'}
-                                    onClick={() => handleToggleActive(item)}
-                                    title={item.isActive ? 'Desativar' : 'Ativar'}
-                                  >
-                                    <Power size={16} />
-                                  </ActionIcon>
-                                  <ActionIcon
-                                    variant="light"
-                                    color="red"
-                                    onClick={() => {
-                                      setDeleteTarget(item);
-                                      setDeleteConfirmOpen(true);
-                                    }}
-                                    title="Excluir"
-                                  >
-                                    <Trash size={16} />
-                                  </ActionIcon>
+                                <Group justify="flex-end">
+                                  <Menu shadow="md" width={220} position="bottom-end" withArrow>
+                                    <Menu.Target>
+                                      <ActionIcon variant="light" size="sm" aria-label="Ações do médico">
+                                        <MoreVertical size={16} />
+                                      </ActionIcon>
+                                    </Menu.Target>
+                                    <Menu.Dropdown>
+                                      <Menu.Item leftSection={<Eye size={14} />} onClick={() => handleViewDoctor(item)}>
+                                        Visualizar
+                                      </Menu.Item>
+                                      <Menu.Item leftSection={<Pencil size={14} />} onClick={() => handleEditDoctor(item)}>
+                                        Editar
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        leftSection={<Power size={14} />}
+                                        color={item.isActive ? 'orange' : 'green'}
+                                        onClick={() => handleToggleActive(item)}
+                                      >
+                                        {item.isActive ? 'Desativar' : 'Ativar'}
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        leftSection={<Trash size={14} />}
+                                        color="red"
+                                        onClick={() => {
+                                          setDeleteTarget(item);
+                                          setDeleteConfirmOpen(true);
+                                        }}
+                                      >
+                                        Excluir
+                                      </Menu.Item>
+                                    </Menu.Dropdown>
+                                  </Menu>
                                 </Group>
                               </Table.Td>
                             </Table.Tr>
@@ -1220,12 +1343,14 @@ export function CadastroMedico() {
                         )}
                       </Table.Tbody>
                     </Table>
-                  </Box>
+                  </PaginatedGrid>
                 )
               )}
             </Paper>
           </Tabs.Panel>
         </Tabs>
+          </>
+        )}
 
         <Modal
           opened={detailsOpen}

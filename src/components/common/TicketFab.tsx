@@ -51,7 +51,19 @@ const TYPE_OPTIONS: Array<{ value: TicketType; label: string }> = [
   { value: 'IMPROVEMENT', label: 'Melhoria' },
 ];
 
-const HIDDEN_PATH_PREFIXES = ['/login', '/cadastro', '/esqueci-a-senha', '/adm', '/adm-register', '/check-in', '/pre-atendimento/documentos', '/pre-agendamento/documentos'];
+const HIDDEN_PATH_PREFIXES = [
+  '/login',
+  '/cadastro',
+  '/esqueci-a-senha',
+  '/adm',
+  '/adm-register',
+  '/check-in',
+  '/pre-atendimento/documentos',
+  '/pre-agendamento/documentos',
+  '/teleconsulta/preparacao',
+  '/teleconsulta/paciente',
+  '/teleconsulta/finalizada',
+];
 
 const isAuthenticated = () => Boolean(localStorage.getItem('token'));
 
