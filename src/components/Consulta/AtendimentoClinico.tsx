@@ -9,6 +9,7 @@ import appointmentService from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import medicalRecordService from '../../services/medicalRecordService';
 import reportService from '../../services/reportService';
+import reportWorklistService from '../../services/reportWorklistService';
 import { formatCPF } from '../../utils/formatters';
 
 const CALLED_STATUS = 'Chamado para atendimento';
@@ -127,12 +128,22 @@ export function AtendimentoClinico() {
     setOrders(exams.filter((a: any) => String(a?.status || '').toUpperCase() === 'PEDIDO_MEDICO'));
     const realized = exams.filter((a: any) => ['REALIZADO', 'COMPLETED', 'FINALIZADO'].includes(String(a?.status || '').toUpperCase()));
     const rows = await Promise.all(realized.map(async (a: any) => {
-      const reportsRes = await reportService.list({ appointmentId: String(a.id), limit: 10, offset: 0 });
+      const appointmentId = String(a.id || '').trim();
+      if (!appointmentId) return null;
+
+      const [reportsRes, worklistRes] = await Promise.all([
+        reportService.list({ appointmentId, limit: 10, offset: 0 }),
+        reportWorklistService.list({ appointmentId, limit: 1, offset: 0 }),
+      ]);
       const reports = normalizeArray(reportsRes);
+      const worklistItems = normalizeArray(worklistRes);
+      const hasWorklistTrail = worklistItems.length > 0;
+      if (!hasWorklistTrail && reports.length === 0) return null;
+
       const finalized = reports.some((r: any) => String(r?.status || '').toLowerCase() === 'finalizado');
-      return { appointmentId: String(a.id), examType: a.specialty || 'Exame', date: [a.date, a.time].filter(Boolean).join(' '), reportStatus: finalized ? 'FINALIZED' : (reports.length ? 'DRAFT' : 'NONE') };
+      return { appointmentId, examType: a.specialty || 'Exame', date: [a.date, a.time].filter(Boolean).join(' '), reportStatus: finalized ? 'FINALIZED' : (reports.length ? 'DRAFT' : 'NONE') };
     }));
-    setSignals(rows);
+    setSignals(rows.filter(Boolean) as any[]);
   };
 
   const loadData = async () => {
