@@ -1657,7 +1657,7 @@ export function Agendamento() {
     if (!equipmentId || !roomId) return false;
     if (equipment?.isActive === false) return false;
     if (status === 'INATIVO' || status === 'INACTIVE' || status === 'MANUTENCAO' || status === 'MANUTENÇÃO') return false;
-    if (novoAgendamento.profissional && selectedDoctorRoomIds.length > 0 && !selectedDoctorRoomIds.includes(roomId)) return false;
+    if (!isExamAppointment && novoAgendamento.profissional && selectedDoctorRoomIds.length > 0 && !selectedDoctorRoomIds.includes(roomId)) return false;
     if (!examProcedureIds.length) return false;
     const procedureIds = Array.isArray(equipment?.procedureIds)
       ?equipment.procedureIds.map((item: any) => String(item || '').trim()).filter(Boolean)
@@ -2864,23 +2864,23 @@ export function Agendamento() {
                   valueFormat="DD/MM/YYYY"
                   locale="pt-br"
                 />
-                <FloatingSelect
-                  label="Profissional"
-                  placeholder={doctorsLoading ?'Carregando médicos...' : 'Selecione se quiser filtrar por um profissional'}
-                  data={filteredDoctorOptions}
-                  value={novoAgendamento.profissional}
-                  onChange={(value) => setNovoAgendamento({ ...novoAgendamento, profissional: value || '' })}
-                  searchable
-                  clearable
-                  disabled={doctorsLoading}
-                  nothingFoundMessage="Nenhum médico compatível com o procedimento encontrado"
-                />
+                {!isExamAppointment && (
+                  <FloatingSelect
+                    label="Profissional"
+                    placeholder={doctorsLoading ?'Carregando médicos...' : 'Selecione se quiser filtrar por um profissional'}
+                    data={filteredDoctorOptions}
+                    value={novoAgendamento.profissional}
+                    onChange={(value) => setNovoAgendamento({ ...novoAgendamento, profissional: value || '' })}
+                    searchable
+                    clearable
+                    disabled={doctorsLoading}
+                    nothingFoundMessage="Nenhum médico compatível com o procedimento encontrado"
+                  />
+                )}
                 {isExamAppointment && (
                   <FloatingSelect
                     label="Sala (exame)"
-                    placeholder={!novoAgendamento.profissional
-                      ?'Selecione o profissional'
-                      : !examProcedureIds.length
+                    placeholder={!examProcedureIds.length
                         ?'Selecione o procedimento de exame'
                         : !canSelectExamResources
                           ?'Sem salas/equipamentos compatíveis'
@@ -2975,13 +2975,15 @@ export function Agendamento() {
                   onChange={(value) => setActiveSchedulePeriod((value as 'Manhã' | 'Tarde' | 'Noite') || 'Manhã')}
                   containerProps={{ w: 140 }}
                 />
-                <FloatingSelect
-                  label="Profissional"
-                  data={[{ value: '', label: 'Todos os profissionais' }, ...filteredDoctorOptions]}
-                  value={novoAgendamento.profissional}
-                  onChange={(value) => setNovoAgendamento((prev) => ({ ...prev, profissional: value || '' }))}
-                  containerProps={{ w: 260 }}
-                />
+                {!isExamAppointment && (
+                  <FloatingSelect
+                    label="Profissional"
+                    data={[{ value: '', label: 'Todos os profissionais' }, ...filteredDoctorOptions]}
+                    value={novoAgendamento.profissional}
+                    onChange={(value) => setNovoAgendamento((prev) => ({ ...prev, profissional: value || '' }))}
+                    containerProps={{ w: 260 }}
+                  />
+                )}
               </Group>
               {safeSchedulerDoctors.length === 0 ?(
                 <Paper
@@ -2993,7 +2995,9 @@ export function Agendamento() {
                   }}
                 >
                   <Text ta="center" c="dimmed">
-                    Nenhum médico compatível com os procedimentos escolhidos está disponível para esta visualização.
+                    {isExamAppointment
+                      ? 'Nenhuma sala compatível com os procedimentos escolhidos está disponível para esta visualização.'
+                      : 'Nenhum médico compatível com os procedimentos escolhidos está disponível para esta visualização.'}
                   </Text>
                 </Paper>
               ) : (
@@ -3385,7 +3389,9 @@ export function Agendamento() {
               <FloatingInput label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
               <FloatingInput label="Data" value={reviewDateValue ?dayjs(reviewDateValue).format('DD/MM/YYYY') : ''} readOnly />
               <FloatingInput label="Horário" value={reviewTimeValue} readOnly />
-              <FloatingInput label="Profissional respons." value={reviewProfessionalValue} readOnly />
+              {!isExamAppointment && (
+                <FloatingInput label="Profissional respons." value={reviewProfessionalValue} readOnly />
+              )}
               {isExamAppointment && (
                 <FloatingInput label="Sala" value={roomLabelById[novoAgendamento.roomId] || ''} readOnly />
               )}
