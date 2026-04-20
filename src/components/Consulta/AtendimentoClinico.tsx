@@ -2,13 +2,13 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { ActionIcon, Alert, Badge, Box, Button, Group, Paper, Select, SimpleGrid, Skeleton, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, FlaskConical, Play, Printer, Save, ShieldAlert, WandSparkles } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, FlaskConical, Play, Printer, Save, WandSparkles } from 'lucide-react';
 import { Header } from '../Header/Header';
 import consultationService from '../../services/consultationService';
 import appointmentService from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import medicalRecordService from '../../services/medicalRecordService';
-import { formatCPF } from '../../utils/formatters';
+import { formatCNPJ, formatCPF, formatPhone } from '../../utils/formatters';
 
 const CALLED_STATUS = 'Chamado para atendimento';
 const IN_PROGRESS_STATUS = 'Em atendimento';
@@ -19,13 +19,136 @@ const normalizeArray = (response: any) => (
   Array.isArray(response) ? response : (Array.isArray(response?.items) ? response.items : (Array.isArray(response?.data?.items) ? response.data.items : []))
 );
 
-const printDoc = (title: string, patient: string, doctor: string, text: string) => {
-  const popup = window.open('', '_blank', 'width=900,height=700');
+const escapeHtml = (value: any) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const openPrintWindow = (title: string, contentHtml: string) => {
+  const popup = window.open('', '_blank', 'width=980,height=760');
   if (!popup) return;
-  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>${title}</title></head><body style="font-family:Arial;padding:24px"><h2>${title}</h2><p>Paciente: ${patient || '-'} | Médico: ${doctor || '-'} | ${new Date().toLocaleString('pt-BR')}</p><pre style="white-space:pre-wrap;border:1px solid #ccc;padding:12px;border-radius:8px">${text || 'Sem conteúdo informado.'}</pre></body></html>`);
+  popup.document.write(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      @page { margin: 16mm; }
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        color: #1f2937;
+        margin: 0;
+      }
+      .sheet {
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 18px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid #0f4c81;
+        padding-bottom: 10px;
+        margin-bottom: 14px;
+      }
+      .title {
+        margin: 0;
+        font-size: 22px;
+        color: #0f172a;
+      }
+      .meta {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #475569;
+        line-height: 1.45;
+      }
+      .section {
+        margin-top: 12px;
+      }
+      .section h3 {
+        margin: 0 0 8px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        color: #0f4c81;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      .line {
+        margin: 2px 0;
+        font-size: 13px;
+      }
+      .pill {
+        display: inline-block;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        color: #334155;
+      }
+      .free {
+        white-space: pre-wrap;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        min-height: 38px;
+      }
+      .footer {
+        margin-top: 16px;
+        font-size: 11px;
+        color: #64748b;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    ${contentHtml}
+  </body>
+</html>`);
   popup.document.close();
   popup.focus();
   popup.print();
+};
+
+const getClinicPrintInfo = () => {
+  try {
+    const raw = localStorage.getItem('user');
+    const user = raw ? JSON.parse(raw) : {};
+    const branch = user?.sector?.branch || user?.branch || {};
+    const company = branch?.company || user?.company || {};
+
+    const clinicName = String(
+      branch?.tradeName
+      || branch?.socialName
+      || company?.tradeName
+      || company?.legalName
+      || 'Clínica',
+    ).trim();
+    const cnpjRaw = String(company?.cnpj || branch?.cnpj || '').trim();
+    const address = String(branch?.address || company?.address || '').trim();
+    const phoneRaw = String(branch?.phone || company?.phone || '').trim();
+
+    return {
+      clinicName,
+      cnpj: cnpjRaw ? formatCNPJ(cnpjRaw) : '',
+      address,
+      phone: phoneRaw ? formatPhone(phoneRaw) : '',
+    };
+  } catch {
+    return {
+      clinicName: 'Clínica',
+      cnpj: '',
+      address: '',
+      phone: '',
+    };
+  }
 };
 
 const formatClinicalField = (value: any) => {
@@ -47,6 +170,63 @@ const formatDateOnlyPtBr = (value?: string | null) => {
   if (!match) return raw;
   const [, year, month, day] = match;
   return `${day}/${month}/${year}`;
+};
+
+const normalizeStatus = (value?: string | null) => String(value || '').trim().toUpperCase();
+
+const isExamOrderStatus = (value?: string | null) => {
+  const status = normalizeStatus(value);
+  return [
+    'PEDIDO_MEDICO',
+    'AGENDADO',
+    'CONFIRMADO',
+    'EM_ANDAMENTO',
+    'EM ATENDIMENTO',
+    'REALIZADO',
+    'FINALIZADO',
+    'CANCELADO',
+    'NAO_COMPARECEU',
+    'NÃO_COMPARECEU',
+  ].includes(status);
+};
+
+const formatOrderStatusLabel = (value?: string | null) => {
+  const status = normalizeStatus(value);
+  if (!status) return 'Pedido médico';
+  if (status === 'PEDIDO_MEDICO') return 'Pedido médico';
+  if (status === 'AGENDADO') return 'Agendado';
+  if (status === 'CONFIRMADO') return 'Confirmado';
+  if (status === 'EM_ANDAMENTO' || status === 'EM ATENDIMENTO') return 'Em andamento';
+  if (status === 'REALIZADO' || status === 'FINALIZADO') return 'Realizado';
+  if (status === 'CANCELADO') return 'Cancelado';
+  if (status === 'NAO_COMPARECEU' || status === 'NÃO_COMPARECEU') return 'Não compareceu';
+  return status;
+};
+
+const getOrderStatusColor = (value?: string | null) => {
+  const status = normalizeStatus(value);
+  if (!status || status === 'PEDIDO_MEDICO') return 'gray';
+  if (status === 'AGENDADO' || status === 'CONFIRMADO') return 'blue';
+  if (status === 'EM_ANDAMENTO' || status === 'EM ATENDIMENTO') return 'teal';
+  if (status === 'REALIZADO' || status === 'FINALIZADO') return 'green';
+  if (status === 'CANCELADO' || status === 'NAO_COMPARECEU' || status === 'NÃO_COMPARECEU') return 'red';
+  return 'gray';
+};
+
+const formatOrderDateTime = (order: any) => {
+  const scheduledDate = String(order?.date || '').trim();
+  const scheduledTime = String(order?.time || '').trim();
+  if (scheduledDate || scheduledTime) {
+    return `${scheduledDate ? formatDateOnlyPtBr(scheduledDate) : 'Data não definida'}${scheduledTime ? ` às ${scheduledTime}` : ''}`;
+  }
+
+  const preferredDate = String(order?.preferredDate || '').trim();
+  const preferredTime = String(order?.preferredTime || '').trim();
+  if (preferredDate || preferredTime) {
+    return `${preferredDate ? `${formatDateOnlyPtBr(preferredDate)} (preferencial)` : 'Data preferencial não definida'}${preferredTime ? ` às ${preferredTime}` : ''}`;
+  }
+
+  return 'Data não definida';
 };
 
 const splitTriageNotes = (value: any) => {
@@ -72,6 +252,7 @@ export function AtendimentoClinico() {
   const [appointment, setAppointment] = useState<any>(null);
   const [patient, setPatient] = useState<any>(null);
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [currentMedicalRecordId, setCurrentMedicalRecordId] = useState<string | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [triageAuditNotes, setTriageAuditNotes] = useState('');
   const [examConfig, setExamConfig] = useState<{ doctorCanScheduleExamFromConsultation: boolean }>({ doctorCanScheduleExamFromConsultation: false });
@@ -79,7 +260,6 @@ export function AtendimentoClinico() {
   const [slotOptions, setSlotOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [form, setForm] = useState<any>({
-    riskClassification: '',
     chiefComplaint: '',
     historyOfPresentIllness: '',
     physicalExamination: '',
@@ -124,16 +304,20 @@ export function AtendimentoClinico() {
     }
   };
 
-  const loadExamOrders = async (params: { patientId?: string; patientCpf?: string }) => {
+  const loadExamOrders = async (params: { consultationId: string; patientId?: string; patientCpf?: string }) => {
     const appointmentsRes = await appointmentService.list({
       patientId: params.patientId || undefined,
       patientCpf: params.patientCpf || undefined,
-      limit: 120,
+      limit: 300,
       offset: 0,
     });
     const all = normalizeArray(appointmentsRes);
     const exams = all.filter((a: any) => String(a?.type || '').toUpperCase() === 'EXAME');
-    setOrders(exams.filter((a: any) => String(a?.status || '').toUpperCase() === 'PEDIDO_MEDICO'));
+    const sameConsultation = exams
+      .filter((a: any) => String(a?.sourceConsultationId || '').trim() === params.consultationId)
+      .filter((a: any) => isExamOrderStatus(a?.status))
+      .sort((a: any, b: any) => new Date(String(b?.createdAt || 0)).getTime() - new Date(String(a?.createdAt || 0)).getTime());
+    setOrders(sameConsultation);
   };
 
   const loadData = async () => {
@@ -163,19 +347,31 @@ export function AtendimentoClinico() {
       const [h] = await Promise.all([
         resolvedPatientId ? medicalRecordService.list({ patientId: resolvedPatientId, limit: 20, offset: 0 }) : Promise.resolve({ records: [] }),
         (resolvedPatientId || patientCpf)
-          ? loadExamOrders({ patientId: resolvedPatientId || undefined, patientCpf: patientCpf || undefined })
+          ? loadExamOrders({
+              consultationId,
+              patientId: resolvedPatientId || undefined,
+              patientCpf: patientCpf || undefined,
+            })
           : Promise.resolve().then(() => { setOrders([]); }),
       ]);
       const triageParts = splitTriageNotes(c?.triageNotes);
       setTriageAuditNotes(triageParts.auditNotes);
-      setHistoryRecords(Array.isArray(h?.records) ? h.records : normalizeArray(h));
+      const loadedRecords = Array.isArray(h?.records) ? h.records : normalizeArray(h);
+      const currentConsultationRecord = loadedRecords.find((item: any) => String(item?.consultationId || '').trim() === consultationId) || null;
+      setCurrentMedicalRecordId(currentConsultationRecord?.id ? String(currentConsultationRecord.id) : null);
+      setHistoryRecords(currentConsultationRecord?.id
+        ? loadedRecords.filter((item: any) => String(item?.id || '') !== String(currentConsultationRecord.id))
+        : loadedRecords);
       setForm((prev: any) => ({
         ...prev,
-        chiefComplaint: String(c?.mainComplaint || ''),
-        historyOfPresentIllness: String(c?.anamnese || ''),
-        treatment: String(c?.diseaseHistory || ''),
-        prescriptions: String(c?.medications || ''),
-        notes: triageParts.clinicalNotes,
+        chiefComplaint: String(currentConsultationRecord?.chiefComplaint || c?.mainComplaint || ''),
+        historyOfPresentIllness: String(currentConsultationRecord?.historyOfPresentIllness || c?.anamnese || ''),
+        physicalExamination: String(currentConsultationRecord?.physicalExamination || ''),
+        diagnosis: String(currentConsultationRecord?.diagnosis || ''),
+        treatment: String(currentConsultationRecord?.treatment || c?.diseaseHistory || ''),
+        prescriptions: String(currentConsultationRecord?.prescriptions || c?.medications || ''),
+        examRequests: String(currentConsultationRecord?.examRequests || prev.examRequests || ''),
+        notes: String(currentConsultationRecord?.notes || triageParts.clinicalNotes || ''),
       }));
       setHasPendingRecordSave(false);
     } catch (err: any) {
@@ -229,8 +425,9 @@ export function AtendimentoClinico() {
       const patientId = String(resolvedPatient?.id || '').trim();
       if (!patientId) return showNotification({ title: 'Paciente não vinculado', message: 'Não foi possível salvar.', color: 'red' });
       setSaving(true);
-      await medicalRecordService.create({
+      const payload = {
         patientId,
+        consultationId: consultationId || undefined,
         doctorId: consultation?.doctorId || undefined,
         chiefComplaint: form.chiefComplaint || undefined,
         historyOfPresentIllness: form.historyOfPresentIllness || undefined,
@@ -240,7 +437,14 @@ export function AtendimentoClinico() {
         prescriptions: form.prescriptions || undefined,
         examRequests: form.examRequests || undefined,
         notes: form.notes || undefined,
-      });
+      };
+
+      if (currentMedicalRecordId) {
+        await medicalRecordService.update(currentMedicalRecordId, payload);
+      } else {
+        const created = await medicalRecordService.create(payload);
+        if (created?.id) setCurrentMedicalRecordId(String(created.id));
+      }
       await consultationService.update(consultationId, {
         mainComplaint: form.chiefComplaint || undefined,
         anamnese: form.historyOfPresentIllness || undefined,
@@ -285,9 +489,14 @@ export function AtendimentoClinico() {
         scheduleRoomId: examConfig.doctorCanScheduleExamFromConsultation && scheduleRoomId ? scheduleRoomId : undefined,
         scheduleMedicalEquipmentId: examConfig.doctorCanScheduleExamFromConsultation && scheduleMedicalEquipmentId ? scheduleMedicalEquipmentId : undefined,
       });
-      setOrders((prev: any[]) => [res?.appointment || examOrder, ...prev]);
-      setForm((prev: any) => ({ ...prev, examRequests: [prev.examRequests, `${examType}${examOrder.notes ? ` - ${examOrder.notes}` : ''}`].filter(Boolean).join('\n') }));
-      setHasPendingRecordSave(true);
+      const createdOrder = {
+        ...(res?.appointment || {}),
+        specialty: res?.appointment?.specialty || examType,
+        status: res?.appointment?.status || (scheduleDate ? 'AGENDADO' : 'PEDIDO_MEDICO'),
+        preferredDate: res?.appointment?.preferredDate || examOrder.preferredDate || undefined,
+        preferredTime: res?.appointment?.preferredTime || examOrder.preferredTime || undefined,
+      };
+      setOrders((prev: any[]) => [createdOrder, ...prev]);
       setExamOrder({ procedureId: '', examType: '', priority: 'ROTINA', notes: '', preferredDate: '', preferredTime: '', scheduleSlot: '' });
       setSlotOptions([]);
       showNotification({
@@ -334,6 +543,105 @@ export function AtendimentoClinico() {
     }
   };
 
+  const handlePrintExamOrder = () => {
+    const clinic = getClinicPrintInfo();
+    const orderItems = orders
+      .slice(0, 20)
+      .map((o: any) => {
+        const exam = escapeHtml(String(o?.specialty || o?.examType || 'Exame solicitado'));
+        const dateTimeText = formatOrderDateTime(o);
+        const statusText = formatOrderStatusLabel(o?.status);
+        const notesText = String(o?.orderNotes || '').trim();
+        return `
+          <div class="card">
+            <div class="line"><strong>${exam}</strong></div>
+            <div class="line">${escapeHtml(`${dateTimeText} - ${statusText}`)}</div>
+            ${notesText ? `<div class="line"><strong>Observações:</strong> ${escapeHtml(notesText)}</div>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+
+    const freeText = String(form.examRequests || '').trim();
+
+    openPrintWindow(
+      'Pedido Médico',
+      `
+      <div class="sheet">
+        <div class="head">
+          <div>
+            <h1 class="title">Pedido Médico</h1>
+            <div class="meta">
+              <div><strong>Clínica:</strong> ${escapeHtml(clinic.clinicName)}</div>
+              ${clinic.cnpj ? `<div><strong>CNPJ:</strong> ${escapeHtml(clinic.cnpj)}</div>` : ''}
+              ${clinic.address ? `<div><strong>Endereço:</strong> ${escapeHtml(clinic.address)}</div>` : ''}
+              ${clinic.phone ? `<div><strong>Telefone:</strong> ${escapeHtml(clinic.phone)}</div>` : ''}
+            </div>
+            <div class="meta" style="margin-top:8px;">
+              <div><strong>Paciente:</strong> ${escapeHtml(patient?.name || consultation?.patientName || '-')}</div>
+              <div><strong>Médico:</strong> ${escapeHtml(consultation?.doctorName || appointment?.doctorName || '-')}</div>
+            </div>
+          </div>
+          <div class="meta">${escapeHtml(new Date().toLocaleString('pt-BR'))}</div>
+        </div>
+
+        <div class="section">
+          <h3>Pedidos estruturados desta consulta</h3>
+          ${orderItems || '<div class="card"><div class="line">Nenhum pedido estruturado encontrado.</div></div>'}
+        </div>
+
+        <div class="section">
+          <h3>Pedidos (texto livre)</h3>
+          <div class="free">${escapeHtml(freeText || 'Sem conteúdo informado.')}</div>
+        </div>
+
+        <div class="footer">Documento gerado pelo sistema Saudy</div>
+      </div>
+      `,
+    );
+  };
+
+  const handlePrintPrescription = () => {
+    const clinic = getClinicPrintInfo();
+    const treatmentText = String(form.treatment || '').trim();
+    const prescriptionText = String(form.prescriptions || '').trim();
+    openPrintWindow(
+      'Receituário Médico',
+      `
+      <div class="sheet">
+        <div class="head">
+          <div>
+            <h1 class="title">Receituário Médico</h1>
+            <div class="meta">
+              <div><strong>Clínica:</strong> ${escapeHtml(clinic.clinicName)}</div>
+              ${clinic.cnpj ? `<div><strong>CNPJ:</strong> ${escapeHtml(clinic.cnpj)}</div>` : ''}
+              ${clinic.address ? `<div><strong>Endereço:</strong> ${escapeHtml(clinic.address)}</div>` : ''}
+              ${clinic.phone ? `<div><strong>Telefone:</strong> ${escapeHtml(clinic.phone)}</div>` : ''}
+            </div>
+            <div class="meta" style="margin-top:8px;">
+              <div><strong>Paciente:</strong> ${escapeHtml(patient?.name || consultation?.patientName || '-')}</div>
+              <div><strong>Médico:</strong> ${escapeHtml(consultation?.doctorName || appointment?.doctorName || '-')}</div>
+            </div>
+          </div>
+          <div class="meta">${escapeHtml(new Date().toLocaleString('pt-BR'))}</div>
+        </div>
+
+        <div class="section">
+          <h3>Conduta / Tratamento</h3>
+          <div class="free">${escapeHtml(treatmentText || 'Não informado')}</div>
+        </div>
+
+        <div class="section">
+          <h3>Prescrição</h3>
+          <div class="free">${escapeHtml(prescriptionText || 'Não informado')}</div>
+        </div>
+
+        <div class="footer">Documento gerado pelo sistema Saudy</div>
+      </div>
+      `,
+    );
+  };
+
   if (loading) return <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}><Header /><Box p="xl"><Skeleton h={80} /><Skeleton mt="md" h={300} /></Box></Box>;
 
   return (
@@ -352,12 +660,11 @@ export function AtendimentoClinico() {
               <Tabs.Tab value="historia">Histórico</Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="evolucao" pt="md">
-              <Select label="Classificação de risco" data={[{ value: 'NAO_CLASSIFICADO', label: 'Não classificado' }, { value: 'AMARELO', label: 'Amarelo' }, { value: 'VERMELHO', label: 'Vermelho' }]} value={form.riskClassification} onChange={(v) => setForm((p: any) => ({ ...p, riskClassification: v || '' }))} leftSection={<ShieldAlert size={14} />} />
-              <Textarea mt="sm" label="Queixa principal" value={form.chiefComplaint} onChange={(e) => { const value = e.currentTarget.value; setFormField('chiefComplaint', value); }} />
-              <Textarea mt="sm" label="História da doença atual" value={form.historyOfPresentIllness} onChange={(e) => { const value = e.currentTarget.value; setFormField('historyOfPresentIllness', value); }} />
-              <Textarea mt="sm" label="Exame físico" value={form.physicalExamination} onChange={(e) => { const value = e.currentTarget.value; setFormField('physicalExamination', value); }} />
-              <Textarea mt="sm" label="Diagnóstico/CID" value={form.diagnosis} onChange={(e) => { const value = e.currentTarget.value; setFormField('diagnosis', value); }} />
-              <Textarea mt="sm" label="Observações" value={form.notes} onChange={(e) => { const value = e.currentTarget.value; setFormField('notes', value); }} />
+              <Textarea mt="sm" label="Queixa principal" autosize minRows={3} maxRows={8} value={form.chiefComplaint} onChange={(e) => { const value = e.currentTarget.value; setFormField('chiefComplaint', value); }} />
+              <Textarea mt="sm" label="História da doença atual" autosize minRows={4} maxRows={12} value={form.historyOfPresentIllness} onChange={(e) => { const value = e.currentTarget.value; setFormField('historyOfPresentIllness', value); }} />
+              <Textarea mt="sm" label="Exame físico" autosize minRows={3} maxRows={10} value={form.physicalExamination} onChange={(e) => { const value = e.currentTarget.value; setFormField('physicalExamination', value); }} />
+              <Textarea mt="sm" label="Diagnóstico/CID" autosize minRows={3} maxRows={8} value={form.diagnosis} onChange={(e) => { const value = e.currentTarget.value; setFormField('diagnosis', value); }} />
+              <Textarea mt="sm" label="Observações" autosize minRows={4} maxRows={12} value={form.notes} onChange={(e) => { const value = e.currentTarget.value; setFormField('notes', value); }} />
             </Tabs.Panel>
             <Tabs.Panel value="pedidos" pt="md">
               <Group mb="xs" justify="space-between"><Text fw={600}>Pedido estruturado</Text><Button size="xs" variant="light" leftSection={<WandSparkles size={14} />} onClick={() => setExamOrder((p: any) => ({ ...p, notes: p.notes || 'Solicitação médica registrada em consulta.' }))}>Sugerir texto</Button></Group>
@@ -386,19 +693,56 @@ export function AtendimentoClinico() {
                 />
               ) : (
                 <SimpleGrid cols={{ base: 1, sm: 2 }} mt="sm">
-                  <TextInput label="Data preferencial" placeholder="YYYY-MM-DD" value={examOrder.preferredDate} onChange={(e) => { const value = e.currentTarget.value; setExamOrder((p: any) => ({ ...p, preferredDate: value })); }} />
-                  <TextInput label="Horário preferencial" placeholder="HH:mm" value={examOrder.preferredTime} onChange={(e) => { const value = e.currentTarget.value; setExamOrder((p: any) => ({ ...p, preferredTime: value })); }} />
+                  <TextInput
+                    label="Data preferencial"
+                    type="date"
+                    value={examOrder.preferredDate}
+                    onChange={(e) => {
+                      const value = e.currentTarget.value;
+                      setExamOrder((p: any) => ({ ...p, preferredDate: value }));
+                    }}
+                  />
+                  <TextInput
+                    label="Horário preferencial"
+                    type="time"
+                    step={60}
+                    value={examOrder.preferredTime}
+                    onChange={(e) => {
+                      const value = e.currentTarget.value;
+                      setExamOrder((p: any) => ({ ...p, preferredTime: value }));
+                    }}
+                  />
                 </SimpleGrid>
               )}
-              <Textarea mt="sm" label="Observações do pedido" value={examOrder.notes} onChange={(e) => { const value = e.currentTarget.value; setExamOrder((p: any) => ({ ...p, notes: value })); }} />
-              <Group justify="space-between" mt="sm"><Button variant="light" leftSection={<Printer size={14} />} onClick={() => printDoc('Pedido Médico', patient?.name || '', consultation?.doctorName || '', form.examRequests)}>Imprimir pedido</Button><Button leftSection={<FlaskConical size={14} />} onClick={emitExamOrder} loading={saving}>{examConfig.doctorCanScheduleExamFromConsultation ? 'Agendar exame' : 'Emitir pedido'}</Button></Group>
-              {orders.length > 0 && <Paper withBorder p="sm" mt="sm"><Text fw={600} mb="xs">Pedidos emitidos</Text>{orders.slice(0, 5).map((o: any) => <Text key={String(o.id)} size="sm">- {o.specialty || examOrder.examType} ({o.status || 'PEDIDO_MEDICO'})</Text>)}</Paper>}
+              <Textarea mt="sm" label="Observações do pedido" autosize minRows={3} maxRows={8} value={examOrder.notes} onChange={(e) => { const value = e.currentTarget.value; setExamOrder((p: any) => ({ ...p, notes: value })); }} />
+              <Group justify="space-between" mt="sm"><Button variant="light" leftSection={<Printer size={14} />} onClick={handlePrintExamOrder}>Imprimir pedido</Button><Button leftSection={<FlaskConical size={14} />} onClick={emitExamOrder} loading={saving}>{examConfig.doctorCanScheduleExamFromConsultation ? 'Agendar exame' : 'Emitir pedido'}</Button></Group>
+              {orders.length > 0 && (
+                <Paper withBorder p="sm" mt="sm">
+                  <Text fw={600} mb="xs">Pedidos emitidos nesta consulta</Text>
+                  <Stack gap={8}>
+                    {orders.slice(0, 8).map((o: any) => (
+                      <Group key={String(o.id)} justify="space-between" align="center" wrap="wrap">
+                        <Box>
+                          <Text size="sm" fw={600}>{String(o.specialty || o.examType || 'Exame solicitado')}</Text>
+                          <Text size="xs" c="dimmed">
+                            {formatOrderDateTime(o)}
+                            {o?.orderNotes ? ` • ${String(o.orderNotes)}` : ''}
+                          </Text>
+                        </Box>
+                        <Badge variant="light" color={getOrderStatusColor(o?.status)}>
+                          {formatOrderStatusLabel(o?.status)}
+                        </Badge>
+                      </Group>
+                    ))}
+                  </Stack>
+                </Paper>
+              )}
               <Textarea mt="sm" label="Pedidos (texto livre)" value={form.examRequests} onChange={(e) => { const value = e.currentTarget.value; setFormField('examRequests', value); }} />
             </Tabs.Panel>
             <Tabs.Panel value="receita" pt="md">
-              <Textarea label="Conduta/tratamento" value={form.treatment} onChange={(e) => { const value = e.currentTarget.value; setFormField('treatment', value); }} />
-              <Group justify="space-between" mt="sm"><Text fw={600}>Receituário</Text><Button size="xs" variant="light" leftSection={<Printer size={14} />} onClick={() => printDoc('Receituário Médico', patient?.name || '', consultation?.doctorName || '', form.prescriptions)}>Imprimir receituario</Button></Group>
-              <Textarea mt="xs" value={form.prescriptions} onChange={(e) => { const value = e.currentTarget.value; setFormField('prescriptions', value); }} />
+              <Textarea label="Conduta/tratamento" autosize minRows={4} maxRows={12} value={form.treatment} onChange={(e) => { const value = e.currentTarget.value; setFormField('treatment', value); }} />
+              <Group justify="space-between" mt="sm"><Text fw={600}>Receituário</Text><Button size="xs" variant="light" leftSection={<Printer size={14} />} onClick={handlePrintPrescription}>Imprimir receituario</Button></Group>
+              <Textarea mt="xs" autosize minRows={4} maxRows={12} value={form.prescriptions} onChange={(e) => { const value = e.currentTarget.value; setFormField('prescriptions', value); }} />
             </Tabs.Panel>
             <Tabs.Panel value="historia" pt="md">
               {historyRecords.length === 0 ? (

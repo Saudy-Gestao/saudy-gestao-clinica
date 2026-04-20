@@ -2,7 +2,9 @@ import api from './api';
 
 export interface MedicalRecordPayload {
   patientId: string;
+  consultationId?: string;
   doctorId?: string;
+  riskClassification?: string;
   chiefComplaint?: string;
   historyOfPresentIllness?: string;
   physicalExamination?: string;

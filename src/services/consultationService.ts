@@ -68,7 +68,7 @@ export interface ConsultationExamOrderPayload {
 }
 
 export default {
-  async list(params?: { search?: string; convenioStatus?: string; queueType?: string; limit?: number; offset?: number }) {
+  async list(params?: { search?: string; convenioStatus?: string; queueType?: string; includeCompleted?: boolean; limit?: number; offset?: number }) {
     const url = '/care/consultations/';
     const res = await api.get(url, { params });
     return res.data;
