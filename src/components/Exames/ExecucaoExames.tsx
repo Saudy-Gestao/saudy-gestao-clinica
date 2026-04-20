@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -23,7 +23,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react';
+import { ChevronLeft, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search, Image as ImageIcon } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
@@ -78,6 +78,14 @@ interface ConsultationRow {
   appointmentType: string;
   triageRequired: boolean;
   nursingTemplate: NursingTemplateSummary | null;
+  hasExamImageReceived: boolean;
+  latestExamImage: {
+    id?: string | null;
+    appointmentId?: string | null;
+    dicomStudyUid?: string | null;
+    dicomUrl?: string | null;
+    dicomReceivedAt?: string | null;
+  } | null;
 }
 
 type TriageAnswerForm = {
@@ -133,6 +141,12 @@ const statusBadge = (status: string) => {
   if (status === EXAM_DONE_STATUS) return { color: 'green', label: 'Exame concluído' };
   return { color: 'gray', label: status || '-' };
 };
+
+const imageBadge = (row: ConsultationRow) => (
+  row.hasExamImageReceived
+    ? { color: 'teal', label: 'Imagem recebida' }
+    : { color: 'gray', label: 'Aguardando imagem' }
+);
 
 const getExamActionConfig = (row: ConsultationRow) => {
   if (row.triageRequired && row.statusFluxo === TRIAGE_WAITING_STATUS) {
@@ -252,6 +266,8 @@ export function ExecucaoExames() {
     appointmentType: String(it.appointmentType || it.appointment?.type || ''),
     triageRequired: Boolean(it.triageRequired),
     nursingTemplate: it.nursingTemplate || null,
+    hasExamImageReceived: Boolean(it.hasExamImageReceived || it.hasExamImagesAvailable),
+    latestExamImage: it.latestExamImage || null,
   });
 
   const appointmentCpfById = useMemo(() => {
@@ -486,16 +502,47 @@ export function ExecucaoExames() {
       );
     }
 
+    const finishBlockedByMissingImage = action.onClick === 'finish-exam' && !row.hasExamImageReceived;
     return (
       <Button
         size="xs"
         variant={action.variant}
         color={action.color}
         leftSection={action.icon}
-        onClick={() => updateExamStatus(row, EXAM_DONE_STATUS)}
+        onClick={() => {
+          if (finishBlockedByMissingImage) {
+            showNotification({
+              title: 'Imagem pendente',
+              message: 'Não é possível finalizar o exame antes do recebimento das imagens.',
+              color: 'orange',
+            });
+            return;
+          }
+          updateExamStatus(row, EXAM_DONE_STATUS);
+        }}
         loading={loadingId === row.id}
       >
-        {action.label}
+        {finishBlockedByMissingImage ? 'Finalizar exame' : action.label}
+      </Button>
+    );
+  };
+
+  const renderImageAction = (row: ConsultationRow) => {
+    const key = String(
+      row?.latestExamImage?.id
+      || row?.latestExamImage?.dicomStudyUid
+      || '',
+    ).trim();
+    if (!row.hasExamImageReceived || !key) return null;
+    return (
+      <Button
+        size="xs"
+        variant="subtle"
+        color="cyan"
+        leftSection={<ImageIcon size={14} />}
+        onClick={() => navigate(`/dicom-viewer/${encodeURIComponent(key)}`)}
+      >
+        Abrir imagens
       </Button>
     );
   };
@@ -717,6 +764,7 @@ export function ExecucaoExames() {
                     <Stack gap="sm">
                       {section.items.map((row) => {
                         const badge = statusBadge(row.statusFluxo);
+                        const imageStatus = imageBadge(row);
                         return (
                           <Paper key={row.id} p="md" withBorder radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                             <Stack gap="sm">
@@ -749,10 +797,18 @@ export function ExecucaoExames() {
                               </Box>
 
                               <Group justify="space-between" align="center">
-                                <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
-                                  {row.convenio || 'Particular'}
-                                </Badge>
-                                {renderExamAction(row)}
+                                <Group gap={8}>
+                                  <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
+                                    {row.convenio || 'Particular'}
+                                  </Badge>
+                                  <Badge variant="outline" radius="xl" color={imageStatus.color}>
+                                    {imageStatus.label}
+                                  </Badge>
+                                </Group>
+                                <Group gap={8}>
+                                  {renderImageAction(row)}
+                                  {renderExamAction(row)}
+                                </Group>
                               </Group>
                             </Stack>
                           </Paper>
@@ -768,12 +824,14 @@ export function ExecucaoExames() {
                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Imagem</Table.Th>
                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
                           {section.items.map((row) => {
                             const badge = statusBadge(row.statusFluxo);
+                            const imageStatus = imageBadge(row);
                             return (
                               <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                 <Table.Td>
@@ -821,7 +879,13 @@ export function ExecucaoExames() {
                                   </Badge>
                                 </Table.Td>
                                 <Table.Td>
+                                  <Badge color={imageStatus.color} variant="outline">
+                                    {imageStatus.label}
+                                  </Badge>
+                                </Table.Td>
+                                <Table.Td>
                                   <Group gap={8} justify="flex-end">
+                                    {renderImageAction(row)}
                                     {renderExamAction(row)}
                                   </Group>
                                 </Table.Td>
@@ -1009,3 +1073,4 @@ export function ExecucaoExames() {
     </Box>
   );
 }
+

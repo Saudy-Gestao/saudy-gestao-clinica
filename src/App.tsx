@@ -23,6 +23,7 @@ import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
 import { PublicPreAgendamentoDocs } from './components/PreAgendamento/PublicPreAgendamentoDocs';
 import { Consulta } from './components/Consulta/Consulta';
+import { AtendimentoClinico } from './components/Consulta/AtendimentoClinico';
 import { TeleconsultaPreparation } from './components/Teleconsulta/TeleconsultaPreparation';
 import { TeleconsultaPatientWaiting } from './components/Teleconsulta/TeleconsultaPatientWaiting';
 import { TeleconsultaFinished } from './components/Teleconsulta/TeleconsultaFinished';
@@ -248,6 +249,10 @@ function App() {
           <Route 
             path="/consulta" 
             element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
+          />
+          <Route
+            path="/consulta/atendimento/:consultationId"
+            element={<ProtectedRoute><AtendimentoClinico /></ProtectedRoute>}
           />
           <Route
             path="/teleconsulta/preparacao"

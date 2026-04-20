@@ -40,7 +40,7 @@ export interface DicomSeriesSummaryItem {
 }
 
 export default {
-  async list(params?: { search?: string; status?: string; examType?: string; limit?: number; offset?: number }) {
+  async list(params?: { search?: string; status?: string; examType?: string; appointmentId?: string; limit?: number; offset?: number }) {
     const res = await api.get('/care/report-worklist/', { params });
     return res.data;
   },

@@ -22,7 +22,7 @@ export interface ReportPayload {
 }
 
 export default {
-  async list(params?: { search?: string; status?: string; exam?: string; worklistItemId?: string; appointmentId?: string; limit?: number; offset?: number }) {
+  async list(params?: { search?: string; status?: string; exam?: string; worklistItemId?: string; appointmentId?: string; mine?: boolean; limit?: number; offset?: number }) {
     const url = '/care/reports/';
     const res = await api.get(url, { params });
     return res.data;

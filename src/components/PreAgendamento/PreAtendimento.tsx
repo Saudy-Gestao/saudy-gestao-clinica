@@ -1122,7 +1122,6 @@ export function PreAtendimento() {
         scheduledFor: checklistPatient.agenda || undefined,
         queueType: 'Fila clínica',
         agenda: checklistPatient.agenda || undefined,
-        queue: 'Aguardando atendimento',
         bloodPressure: checklistPatient.pressaoArterial || undefined,
         heartRate: checklistPatient.frequenciaCardiaca || undefined,
         temperature: checklistPatient.temperatura || undefined,
