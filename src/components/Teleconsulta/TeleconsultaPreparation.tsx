@@ -30,12 +30,12 @@ const SPEED_TEST_FILE = '/speed-test.bin';
 const SPEED_TEST_TIMEOUT_MS = 8000;
 const PREPARED_SESSION_KEY_PREFIX = 'teleconsulta:prepared:';
 
-const getConnection = (): NetworkInformationLike | undefined => {
+export const getConnection = (): NetworkInformationLike | undefined => {
   const nav = navigator as NavigatorWithConnection;
   return nav.connection || nav.mozConnection || nav.webkitConnection;
 };
 
-const parseAppointmentDateTime = (date?: string | null, time?: string | null) => {
+export const parseAppointmentDateTime = (date?: string | null, time?: string | null) => {
   const normalizedTime = String(time || '').trim();
   const [hoursRaw, minutesRaw] = normalizedTime.split(':');
   const hours = Number(hoursRaw);
@@ -57,7 +57,7 @@ const parseAppointmentDateTime = (date?: string | null, time?: string | null) =>
   return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 };
 
-const formatRemainingToWindow = (ms: number) => {
+export const formatRemainingToWindow = (ms: number) => {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -70,7 +70,7 @@ const formatRemainingToWindow = (ms: number) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-const evaluateConnection = (online: boolean, downlink?: number, effectiveType?: string) => {
+export const evaluateConnection = (online: boolean, downlink?: number, effectiveType?: string) => {
   if (!online) {
     return {
       label: 'Sem conexão',
