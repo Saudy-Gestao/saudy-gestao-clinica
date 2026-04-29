@@ -13,6 +13,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import UserMenu from './UserMenu';
 import authService from '../../services/authService';
 import { DARK_BLUE } from '../../themes/theme';
+import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
+import { filterModulesForCompanyType, normalizeCompanyModuleType } from '../../utils/moduleTypeAccess';
+import { isDoctorUser } from '../../utils/userRole';
 
 type ModuleUsageItem = {
   key: string;
@@ -57,6 +60,73 @@ const MODULES: ModuleDefinition[] = [
 
 const DEFAULT_QUICK_MODULE_KEYS = ['modulo-tea', 'agendamento', 'laudo', 'pre-agendamento', 'consulta'];
 
+const normalizeModuleKey = (value: unknown) => {
+  const raw = String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase();
+  if (!raw) return '';
+  const compact = raw.replace(/\s+/g, ' ').trim();
+  const aliases: Record<string, string> = {
+    'agendamento': 'agendamento',
+    'pre agendamento': 'pre-agendamento',
+    'pre-atendimento': 'pre-atendimento',
+    'pre atendimento': 'pre-atendimento',
+    'autorizacao e recepcao': 'pre-atendimento',
+    'consulta': 'consulta',
+    'teleconsulta': 'consulta',
+    'execucao de exames': 'execucao-exames',
+    'laudo': 'laudo',
+    'laudo por exame': 'laudo',
+    'autorizacao convenio': 'autorizacao-convenio',
+    'modulo tea': 'modulo-tea',
+    'cadastro de paciente': 'cadastro-paciente',
+    'cadastro de medico': 'cadastro-medico',
+    'cadastro de procedimentos': 'cadastro-procedimento',
+    'cadastro de procedimento': 'cadastro-procedimento',
+    'cadastro de convenio': 'cadastro-convenio',
+    'cadastro de salas': 'cadastro-sala',
+    'cadastro de equipamentos': 'cadastro-equipamento',
+    'cadastro de anamnese': 'cadastro-anamnese',
+    'cadastro de enfermagem': 'cadastro-enfermagem',
+    'entrega': 'entrega',
+    'estoque': 'estoque',
+    'financeiro': 'financeiro',
+    'faturamento': 'faturamento',
+    'whatsapp': 'whatsapp-config',
+    'conversas': 'whatsapp-config',
+    'meus chamados': 'meus-chamados',
+    'configuracoes de laudo': 'laudo',
+  };
+  if (aliases[compact]) return aliases[compact];
+  return compact.replace(/\s+/g, '-');
+};
+
+const extractAllowedModules = (user: any): string[] => {
+  const modules: string[] = [];
+  const accesses = Array.isArray(user?.accesses)
+    ? user.accesses
+    : Array.isArray(user?.access)
+      ? user.access
+      : [];
+
+  accesses.forEach((access: any) => {
+    (access.modules || []).forEach((module: any) => {
+      const moduleKey = normalizeModuleKey(module?.name);
+      if (moduleKey && !modules.includes(moduleKey)) modules.push(moduleKey);
+    });
+  });
+
+  (Array.isArray(user?.modules) ? user.modules : []).forEach((module: any) => {
+    const moduleName = typeof module === 'string' ? module : module?.name;
+    const moduleKey = normalizeModuleKey(moduleName);
+    if (moduleKey && !modules.includes(moduleKey)) modules.push(moduleKey);
+  });
+
+  return modules;
+};
+
 const resolveModuleByPath = (pathname: string): ModuleDefinition | null => {
   if (!pathname || pathname === '/dashboard') return null;
   return MODULES.find((item) => item.prefixes.some((prefix) => pathname.startsWith(prefix))) || null;
@@ -75,6 +145,8 @@ export function Header() {
   const [searchText, setSearchText] = useState('');
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
 
+  const { data: userProfile } = useCurrentUserProfileQuery();
+
   const userKey = useMemo(
     () => String((currentUser as any)?.id || (currentUser as any)?.email || 'anonymous'),
     [currentUser],
@@ -83,13 +155,38 @@ export function Header() {
   const homeRoute = isAdmHubOnly ? '/adm-hub' : '/dashboard';
   const usageStorageKey = `saudy:module-usage:v1:${userKey}`;
 
+  const doctorView = isDoctorUser(userProfile || currentUser);
+  const doctorBlockedModules = new Set(['agendamento', 'pre-agendamento', 'pre-atendimento']);
+  const doctorDefaultModules = ['consulta', 'laudo'];
+
+  const allowedModules = useMemo(() => extractAllowedModules(userProfile || currentUser), [userProfile, currentUser]);
+  const companyModuleType = useMemo(
+    () => normalizeCompanyModuleType((userProfile as any)?.sector?.branch?.company?.module_type ?? (currentUser as any)?.sector?.branch?.company?.module_type),
+    [userProfile, currentUser],
+  );
+  const visibleAllowedModules = useMemo(
+    () => filterModulesForCompanyType(allowedModules.map((name) => ({ name })), companyModuleType).map((m) => String(m.name)),
+    [allowedModules, companyModuleType],
+  );
+
+  const accessibleModules = useMemo(() => {
+    return MODULES.filter((module) => {
+      if (doctorView && doctorBlockedModules.has(module.key)) return false;
+      if (module.key === 'meus-chamados') return true;
+      if (visibleAllowedModules.length === 0 && doctorView) return doctorDefaultModules.includes(module.key);
+      if (visibleAllowedModules.length === 0) return true;
+      return visibleAllowedModules.includes(module.key);
+    });
+  }, [visibleAllowedModules, doctorView]);
+
   const quickLinks = useMemo(() => {
-    if (quickModules.length > 0) return quickModules;
+    const filtered = quickModules.filter((m) => accessibleModules.some((am) => am.key === m.key));
+    if (filtered.length > 0) return filtered;
     return DEFAULT_QUICK_MODULE_KEYS
-      .map((key) => MODULES.find((item) => item.key === key))
+      .map((key) => accessibleModules.find((item) => item.key === key))
       .filter(Boolean)
       .map((item) => ({ key: item!.key, label: item!.label, route: item!.route }));
-  }, [quickModules]);
+  }, [quickModules, accessibleModules]);
 
   const timeStr = useMemo(() => {
     return currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -163,6 +260,23 @@ export function Header() {
     readTopModules();
   }, [usageStorageKey]);
 
+  // Atualiza quickModules quando acessos mudam (após carregar perfil)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(usageStorageKey);
+      const usage = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+      const ranked = Object.entries(usage)
+        .filter(([, count]) => Number.isFinite(Number(count)) && Number(count) > 0)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 5)
+        .map(([moduleKey]) => MODULES.find((item) => item.key === moduleKey))
+        .filter(Boolean) as ModuleDefinition[];
+      setQuickModules(ranked.map((item) => ({ key: item.key, label: item.label, route: item.route })));
+    } catch {
+      setQuickModules([]);
+    }
+  }, [visibleAllowedModules, usageStorageKey]);
+
   useEffect(() => {
     const pathname = location.pathname;
     if (!pathname || pathname === lastTrackedPathRef.current) return;
@@ -199,7 +313,7 @@ export function Header() {
     }
 
     const normalizedTerm = toSearchToken(term);
-    const matched = MODULES.find((item) => {
+    const matched = accessibleModules.find((item) => {
       const label = toSearchToken(item.label);
       const route = toSearchToken(item.route);
       const key = toSearchToken(item.key);
@@ -210,9 +324,6 @@ export function Header() {
       navigate(matched.route);
       return;
     }
-
-    const fallbackPath = term.startsWith('/') ? term : `/${term}`;
-    navigate(fallbackPath);
   };
 
   return (

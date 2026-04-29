@@ -1447,6 +1447,14 @@ body {
   pointer-events: none;
 }
 
+/* Keep number input step controls clickable */
+.floating-mantine-field .mantine-NumberInput-controls,
+.floating-mantine-field .mantine-NumberInput-control,
+.floating-mantine-field .mantine-NumberInput-section,
+.floating-mantine-field .mantine-Input-section[data-position='right'] {
+  pointer-events: auto;
+}
+
 .floating-mantine-field .mantine-Input-input:focus,
 .floating-mantine-field:focus-within .mantine-Input-input {
   outline: none;
