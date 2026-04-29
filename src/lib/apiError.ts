@@ -133,7 +133,10 @@ export const resolveApiErrorMessage = (error: any, fallback: string) => {
   if (requiredFieldsMessage) return requiredFieldsMessage;
 
   const raw = toStringValue(
-    error?.userMessage
+    error?.response?.data?.originalError
+    || error?.response?.data?.originalMessage
+    || error?.response?.data?.originalDetail
+    || error?.userMessage
     || error?.response?.data?.error
     || error?.response?.data?.message
     || error?.response?.data?.detail
@@ -141,6 +144,12 @@ export const resolveApiErrorMessage = (error: any, fallback: string) => {
   );
 
   if (!raw) return fallback;
+
+  // When there is no HTTP response, keep the raw JS/runtime error visible.
+  // This helps diagnose frontend errors that happen before the request is sent.
+  if (!error?.response) {
+    return raw;
+  }
 
   for (const item of ERROR_MESSAGE_TRANSLATIONS) {
     if (item.pattern.test(raw)) return item.message;

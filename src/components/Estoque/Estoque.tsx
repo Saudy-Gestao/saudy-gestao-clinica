@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Badge, Paper, Skeleton, Textarea, Divider, SimpleGrid, UnstyledButton, useComputedColorScheme, Menu } from '@mantine/core';
 import inventoryService from '../../services/inventoryService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Plus, ChevronLeft, Pencil, ArrowUpDown, History, Boxes, X, MoreVertical, Package, PackageOpen } from 'lucide-react';
+import { Plus, Minus, ChevronLeft, Pencil, ArrowUpDown, History, Boxes, X, MoreVertical, Package, PackageOpen } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -71,7 +71,7 @@ interface StockKit {
 
 const EMPTY_INVENTORY_ITEMS: any[] = [];
 
-// SAMPLE_ITEMS removed — items are now fetched from backend (/inventory/).
+// SAMPLE_ITEMS removed â€” items are now fetched from backend (/inventory/).
 
 export function Estoque() {
   const navigate = useNavigate();
@@ -88,6 +88,7 @@ export function Estoque() {
   const [kitsLoading, setKitsLoading] = useState(false);
   const [kitSaving, setKitSaving] = useState(false);
   const [kitModalOpen, setKitModalOpen] = useState(false);
+  const [editingKitId, setEditingKitId] = useState<string | null>(null);
   const [kitQuery, setKitQuery] = useState('');
   const [kitForm, setKitForm] = useState({
     name: '',
@@ -115,6 +116,7 @@ export function Estoque() {
   const [showItemErrorModal, setShowItemErrorModal] = useState(false);
   const [itemErrorMessage, setItemErrorMessage] = useState<string | null>(null);
   const [itemErrorTitle, setItemErrorTitle] = useState<string | null>(null);
+  const [inventoryEditUnavailable, setInventoryEditUnavailable] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
   const [movementSaving, setMovementSaving] = useState(false);
   const [movementItem, setMovementItem] = useState<StockItem | null>(null);
@@ -531,35 +533,132 @@ export function Estoque() {
     }));
   };
 
-  const handleCreateKit = async () => {
+
+  const handleChangeKitDraftItemQuantityByStep = (inventoryItemId: string, delta: number) => {
+    setKitForm((prev) => {
+      const found = prev.items.find((item) => item.inventoryItemId === inventoryItemId);
+      if (!found) return prev;
+      const nextQty = Math.floor(Number(found.quantity || 0) + delta);
+      if (nextQty <= 0) {
+        return {
+          ...prev,
+          items: prev.items.filter((item) => item.inventoryItemId !== inventoryItemId),
+        };
+      }
+      return {
+        ...prev,
+        items: prev.items.map((item) => (
+          item.inventoryItemId === inventoryItemId
+            ? { ...item, quantity: nextQty }
+            : item
+        )),
+      };
+    });
+  };
+
+  const resetKitForm = () => {
+    setKitForm({
+      name: '',
+      description: '',
+      selectedItemId: null,
+      selectedQuantity: 1,
+      items: [],
+    });
+    setEditingKitId(null);
+  };
+
+  const openCreateKit = () => {
+    resetKitForm();
+    setKitModalOpen(true);
+  };
+
+  const openEditKit = (kit: StockKit) => {
+    setEditingKitId(kit.id);
+    setKitForm({
+      name: String(kit.name || ''),
+      description: String(kit.description || ''),
+      selectedItemId: null,
+      selectedQuantity: 1,
+      items: Array.isArray(kit.items)
+        ? kit.items
+          .map((item) => ({
+            inventoryItemId: String(item.inventoryItemId || '').trim(),
+            quantity: Number(item.quantity || 0),
+          }))
+          .filter((item) => item.inventoryItemId && Number.isFinite(item.quantity) && item.quantity > 0)
+        : [],
+    });
+    setKitModalOpen(true);
+  };
+
+  const handleSaveKit = async () => {
+    const normalizedItems = kitForm.items
+      .map((item) => ({
+        inventoryItemId: String(item.inventoryItemId || '').trim(),
+        quantity: Math.floor(Number(item.quantity || 0)),
+      }))
+      .filter((item) => item.inventoryItemId && Number.isFinite(item.quantity) && item.quantity > 0);
+
+    if (editingKitId) {
+      setKitSaving(true);
+      try {
+        if (!normalizedItems.length) {
+          await inventoryService.updateKit(editingKitId, { isActive: false, items: [] });
+          showNotification({ title: 'Kit inativado', message: 'Kit removido da listagem por não ter itens com quantidade.', color: 'green' });
+          resetKitForm();
+          setKitModalOpen(false);
+          await loadKits();
+          return;
+        }
+
+        await inventoryService.updateKit(editingKitId, {
+          name: kitForm.name.trim() || undefined,
+          description: kitForm.description.trim() || undefined,
+          items: normalizedItems,
+        });
+
+        showNotification({ title: 'Kit atualizado', message: 'Quantidade dos itens atualizada com sucesso.', color: 'green' });
+        resetKitForm();
+        setKitModalOpen(false);
+        await loadKits();
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro ao atualizar kit',
+          message: resolveApiErrorMessage(err, 'Não foi possível atualizar o kit.'),
+          color: 'red',
+        });
+      } finally {
+        setKitSaving(false);
+      }
+      return;
+    }
+
     const name = kitForm.name.trim();
     if (!name) {
       showNotification({ title: 'Nome obrigatório', message: 'Informe o nome do kit.', color: 'red' });
       return;
     }
-    if (!kitForm.items.length) {
+    if (!normalizedItems.length) {
       showNotification({ title: 'Kit vazio', message: 'Adicione ao menos 1 item ao kit.', color: 'red' });
       return;
     }
 
     setKitSaving(true);
     try {
-      await inventoryService.createKit({
+      const payload = {
         name,
         description: kitForm.description.trim() || undefined,
-        items: kitForm.items.map((item) => ({
-          inventoryItemId: item.inventoryItemId,
-          quantity: item.quantity,
-        })),
+        items: normalizedItems,
+      };
+
+      await inventoryService.createKit(payload);
+
+      showNotification({
+        title: editingKitId ? 'Kit atualizado' : 'Kit cadastrado',
+        message: editingKitId ? 'Kit atualizado com sucesso.' : 'Kit salvo com sucesso.',
+        color: 'green',
       });
-      showNotification({ title: 'Kit cadastrado', message: 'Kit salvo com sucesso.', color: 'green' });
-      setKitForm({
-        name: '',
-        description: '',
-        selectedItemId: null,
-        selectedQuantity: 1,
-        items: [],
-      });
+      resetKitForm();
       setKitModalOpen(false);
       await loadKits();
     } catch (err: any) {
@@ -584,6 +683,20 @@ export function Estoque() {
       'EQUIPAMENTO': 'Equipamento',
     };
     return map[String(c).toUpperCase()] || humanize(c);
+  };
+
+  const getAvailableKitsCount = (kit: StockKit) => {
+    const kitItems = Array.isArray(kit.items) ? kit.items : [];
+    if (!kitItems.length) return 0;
+
+    // Business rule: this value is manually controlled in kit editing.
+    // Use the smallest configured qty among kit items as the remaining kits counter.
+    const configuredCounts = kitItems
+      .map((item) => Math.floor(Number(item.quantity || 0)))
+      .filter((qty) => Number.isFinite(qty) && qty > 0);
+
+    if (!configuredCounts.length) return 0;
+    return Math.min(...configuredCounts);
   };
 
   const openCadastrar = (it?: StockItem) => {
@@ -617,7 +730,41 @@ export function Estoque() {
     return `${y}-${m}-${day}`;
   };
 
+  const formatExpiryFromApi = (raw?: string | null, fallback?: string) => {
+    if (!raw) return fallback;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return fallback;
+    return parsed.toLocaleDateString('en-GB');
+  };
+
+  const isUpdateRouteMissingError = (err: any) => {
+    const raw = String(
+      err?.response?.data?.originalMessage
+      || err?.response?.data?.message
+      || err?.message
+      || '',
+    ).toLowerCase();
+    return raw.includes('route put:/admin/inventory/') && raw.includes('not found');
+  };
+  const isMovementRouteMissingError = (err: any) => {
+    const raw = String(
+      err?.response?.data?.originalMessage
+      || err?.response?.data?.message
+      || err?.message
+      || '',
+    ).toLowerCase();
+    return raw.includes('/admin/inventory/') && raw.includes('/movements/') && raw.includes('not found');
+  };
+
   const handleAddOrUpdate = async () => {
+    if (editingId && inventoryEditUnavailable) {
+      setItemErrorTitle('Edição indisponível');
+      setItemErrorMessage('O backend deste ambiente não possui rotas para atualizar item de estoque. Solicite a habilitação de edição e movimentação no backend para salvar alterações.');
+      setShowItemErrorModal(true);
+      return;
+    }
+
+    let stage = 'init';
     // clear previous field errors
     setFieldErrors({});
 
@@ -637,41 +784,88 @@ export function Estoque() {
 
     try {
       if (editingId) {
+        stage = 'edit:start';
+        console.info('[Estoque] iniciando update', { editingId });
+        const currentItem = items.find((item) => item.id === editingId) || null;
+        const desiredQuantity = normalizeNumber(form.quantidade) ?? 0;
+        const currentQuantity = normalizeNumber(currentItem?.quantidade) ?? 0;
+        const quantityDelta = desiredQuantity - currentQuantity;
         const payload = {
           name: form.nome,
           code: form.codigo || undefined,
-          category: form.categoria || undefined,
-          unit: form.unidade || undefined,
-          quantity: normalizeNumber(form.quantidade) ?? 0,
+          category: form.categoria || '',
+          unit: form.unidade || '',
+          quantity: currentQuantity,
           minQuantity: normalizeNumber(form.minimo) ?? 0,
           maxQuantity: normalizeNumber(form.maximo) ?? 0,
           unitPrice: normalizeNumber(form.precoUnitario) ?? 0,
           expiryDate: formatISODate(form.validade),
-          notes: undefined,
         };
 
-        const updated = await inventoryService.updateItem(editingId, payload);
+        console.info('[Estoque] payload update pronto', payload);
+        stage = 'edit:updateItem';
+        let updated: any = null;
+        let metadataUpdated = true;
+        let quantityUpdated = quantityDelta === 0;
+        try {
+          updated = await inventoryService.updateItem(editingId, payload);
+          console.info('[Estoque] update concluido', updated);
+        } catch (updateErr: any) {
+          if (!isUpdateRouteMissingError(updateErr)) throw updateErr;
+          setInventoryEditUnavailable(true);
+          throw new Error('Edição indisponível neste ambiente: backend sem rota de atualização de estoque.');
+        }
 
+        if (quantityDelta !== 0) {
+          try {
+            stage = 'edit:createMovement';
+            await inventoryService.createMovement(editingId, {
+              type: quantityDelta > 0 ? 'ENTRY' : 'EXIT',
+              quantity: Math.abs(quantityDelta),
+              reason: 'Ajuste de quantidade via edição do item',
+              notes: 'Movimentação automática ao atualizar quantidade no cadastro.',
+            });
+            quantityUpdated = true;
+          } catch (movementErr: any) {
+            if (isMovementRouteMissingError(movementErr)) setInventoryEditUnavailable(true);
+            quantityUpdated = false;
+            showNotification({
+              title: 'Quantidade não atualizada',
+              message: resolveApiErrorMessage(movementErr, 'O item foi atualizado, mas não foi possível ajustar a quantidade automaticamente. Use "Movimentar" para concluir o ajuste.'),
+              color: 'yellow',
+            });
+          }
+        }
+
+        if (!metadataUpdated && !quantityUpdated) {
+          throw new Error('Não foi possível salvar as alterações: o backend não possui rota de edição nem de movimentação para este item.');
+        }
+
+        stage = 'edit:setItems';
         setItems((prev) => prev.map((p) => p.id === editingId ? ({
           ...p,
-          nome: updated.name ?? p.nome,
-          codigo: updated.code ?? p.codigo,
-          categoria: updated.category ?? p.categoria,
-          unidade: updated.unit ?? p.unidade,
-          quantidade: updated.quantity ?? p.quantidade,
-          minimo: updated.minQuantity ?? p.minimo,
-          maximo: updated.maxQuantity ?? p.maximo,
-          precoUnitario: parseNumber(updated.unitPrice ?? updated.unitPrice ?? p.precoUnitario),
-          validade: updated.expiryDate ? (new Date(updated.expiryDate)).toLocaleDateString('en-GB') : p.validade,
-          status: updated.status ? String(updated.status).toUpperCase() : ((updated.quantity ?? p.quantidade) <= (updated.minQuantity ?? p.minimo) ? 'LOW' : 'AVAILABLE'),
+          nome: metadataUpdated ? (updated.name ?? p.nome) : p.nome,
+          codigo: metadataUpdated ? (updated.code ?? p.codigo) : p.codigo,
+          categoria: metadataUpdated ? (updated.category ?? p.categoria) : p.categoria,
+          unidade: metadataUpdated ? (updated.unit ?? p.unidade) : p.unidade,
+          quantidade: quantityUpdated ? desiredQuantity : p.quantidade,
+          minimo: metadataUpdated ? (updated.minQuantity ?? p.minimo) : p.minimo,
+          maximo: metadataUpdated ? (updated.maxQuantity ?? p.maximo) : p.maximo,
+          precoUnitario: metadataUpdated ? parseNumber(updated.unitPrice ?? updated.unitPrice ?? p.precoUnitario) : p.precoUnitario,
+          validade: metadataUpdated ? formatExpiryFromApi(updated.expiryDate, p.validade) : p.validade,
+          status: metadataUpdated
+            ? (updated.status ? String(updated.status).toUpperCase() : ((quantityUpdated ? desiredQuantity : p.quantidade) <= (updated.minQuantity ?? p.minimo) ? 'LOW' : 'AVAILABLE'))
+            : ((quantityUpdated ? desiredQuantity : p.quantidade) <= (p.minimo ?? 0) ? 'LOW' : 'AVAILABLE'),
         }) : p));
 
         setLastItemAction('updated');
         setLastCreatedItemName(updated.name || form.nome);
         setModalOpen(false);
         setShowItemSuccessModal(true);
+        stage = 'edit:invalidateQueries';
         await queryClient.invalidateQueries({ queryKey: queryKeys.inventoryItems });
       } else {
+        stage = 'create:start';
         const existingByCode = items.find((it) => it.codigo.trim().toLowerCase() === form.codigo.trim().toLowerCase());
 
         if (existingByCode) {
@@ -758,18 +952,35 @@ export function Estoque() {
         await queryClient.invalidateQueries({ queryKey: queryKeys.inventoryItems });
       }
     } catch (err: any) {
+      console.error('[Estoque] erro ao salvar item', { stage, err });
+
       // if backend returned per-field errors, map them to the form
       const serverFields: Record<string,string> | undefined = err?.response?.data?.fields;
       if (serverFields && typeof serverFields === 'object') {
         setFieldErrors(serverFields);
       }
 
-      const msg = resolveApiErrorMessage(err, 'Erro ao salvar item');
+      const responseData = err?.response?.data;
+      const rawServerMessage = String(
+        responseData?.originalMessage
+        || responseData?.originalError
+        || responseData?.originalDetail
+        || responseData?.message
+        || responseData?.error
+        || responseData?.detail
+        || '',
+      ).trim();
+      const msg = err?.response
+        ? (rawServerMessage || resolveApiErrorMessage(err, 'Erro ao salvar item'))
+        : (String(err?.message || err || '').trim() || 'Erro ao salvar item');
+      const isControlledUnavailable = String(msg).toLowerCase().includes('edição indisponível neste ambiente');
+      const debugStage = stage && !isControlledUnavailable ? `Etapa: ${stage}. ` : '';
+      const finalMsg = `${debugStage}${msg}`.trim();
       // fallback to toast for some errors but also show error modal
       setItemErrorTitle('Erro ao salvar item');
-      setItemErrorMessage(msg);
+      setItemErrorMessage(finalMsg);
       setShowItemErrorModal(true);
-      showNotification({ title: 'Erro', message: msg, color: 'red' });
+      showNotification({ title: 'Erro', message: finalMsg, color: 'red' });
     } finally {
       setSavingItem(false);
     }
@@ -1081,7 +1292,7 @@ export function Estoque() {
                   bg={DARK_BLUE}
                   c="white"
                   leftSection={<Plus size={16} />}
-                  onClick={() => setKitModalOpen(true)}
+                  onClick={openCreateKit}
                 >
                   Novo kit
                 </Button>
@@ -1119,14 +1330,16 @@ export function Estoque() {
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Kit</Table.Th>
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Itens</Table.Th>
+                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Kits possíveis</Table.Th>
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center' }}>Ações</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                       {filteredKits.length === 0 ? (
                         <Table.Tr>
-                          <Table.Td colSpan={5}>
+                          <Table.Td colSpan={7}>
                             <Stack align="center" py="xl" gap={6}>
                               <Text fw={600}>Nenhum kit encontrado</Text>
                               <Text c="dimmed" size="sm" ta="center">
@@ -1149,12 +1362,22 @@ export function Estoque() {
                             </Badge>
                           </Table.Td>
                           <Table.Td>
+                            <Badge variant="light" color={getAvailableKitsCount(kit) > 0 ? 'teal' : 'red'} radius="xl">
+                              {getAvailableKitsCount(kit)}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
                             <Text size="sm" c="dimmed">Definido no procedimento</Text>
                           </Table.Td>
                           <Table.Td>
                             <Badge variant="light" color={kit.isActive ? 'green' : 'gray'} radius="xl">
                               {kit.isActive ? 'Ativo' : 'Inativo'}
                             </Badge>
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'center' }}>
+                            <ActionIcon variant="light" size="sm" onClick={() => openEditKit(kit)} aria-label={`Editar kit ${kit.name}`}>
+                              <Pencil size={14} />
+                            </ActionIcon>
                           </Table.Td>
                         </Table.Tr>
                       ))}
@@ -1170,57 +1393,61 @@ export function Estoque() {
 
       <Modal
         opened={kitModalOpen}
-        onClose={() => setKitModalOpen(false)}
-        title="Cadastrar kit de insumos"
+        onClose={() => { setKitModalOpen(false); resetKitForm(); }}
+        title={editingKitId ? 'Editar kit de insumos' : 'Cadastrar kit de insumos'}
         size={isMobile ? '100%' : 760}
         centered
         fullScreen={isMobile}
       >
         <Stack gap="lg">
-          <Text size="sm" c="dimmed">
-            O convênio não é definido no cadastro do kit. Esse vínculo é feito por procedimento.
-          </Text>
+          {!editingKitId ? (
+            <>
+              <Text size="sm" c="dimmed">
+                O convênio não é definido no cadastro do kit. Esse vínculo é feito por procedimento.
+              </Text>
 
-          <Paper withBorder radius="md" p="md">
-            <Stack gap="md">
-              <Text fw={700} size="sm" c="var(--mantine-color-text)">Dados do kit</Text>
-              <FloatingInput
-                label="Nome do kit"
-                value={kitForm.name}
-                onChange={(event) => {
-                  const { value } = event.currentTarget;
-                  setKitForm((prev) => ({ ...prev, name: value }));
-                }}
-              />
-              <FloatingInput
-                label="Descrição"
-                value={kitForm.description}
-                onChange={(event) => {
-                  const { value } = event.currentTarget;
-                  setKitForm((prev) => ({ ...prev, description: value }));
-                }}
-              />
+              <Paper withBorder radius="md" p="md">
+                <Stack gap="md">
+                  <Text fw={700} size="sm" c="var(--mantine-color-text)">Dados do kit</Text>
+                  <FloatingInput
+                    label="Nome do kit"
+                    value={kitForm.name}
+                    onChange={(event) => {
+                      const { value } = event.currentTarget;
+                      setKitForm((prev) => ({ ...prev, name: value }));
+                    }}
+                  />
+                  <FloatingInput
+                    label="Descrição"
+                    value={kitForm.description}
+                    onChange={(event) => {
+                      const { value } = event.currentTarget;
+                      setKitForm((prev) => ({ ...prev, description: value }));
+                    }}
+                  />
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                 <FloatingSelect
                   label="Item"
-                  data={items.map((item) => ({ value: item.id, label: item.codigo ? `${item.nome} (${item.codigo})` : item.nome }))}
-                  value={kitForm.selectedItemId}
-                  onChange={(value) => setKitForm((prev) => ({ ...prev, selectedItemId: value }))}
-                  searchable
-                  clearable
-                />
+                      data={items.map((item) => ({ value: item.id, label: item.codigo ? `${item.nome} (${item.codigo})` : item.nome }))}
+                      value={kitForm.selectedItemId}
+                      onChange={(value) => setKitForm((prev) => ({ ...prev, selectedItemId: value }))}
+                      searchable
+                      clearable
+                    />
                 <FloatingNumberInput
-                  label="Quantidade no kit"
+                  label="Qtd por kit"
                   min={1}
                   value={kitForm.selectedQuantity}
                   onChange={(value) => setKitForm((prev) => ({ ...prev, selectedQuantity: typeof value === 'number' ? value : '' }))}
                 />
               </SimpleGrid>
-              <Group justify="flex-end">
-                <Button variant="light" onClick={handleAddItemToKitDraft}>Adicionar item</Button>
-              </Group>
-            </Stack>
-          </Paper>
+                  <Group justify="flex-end">
+                    <Button variant="light" onClick={handleAddItemToKitDraft}>Adicionar item</Button>
+                  </Group>
+                </Stack>
+              </Paper>
+            </>
+          ) : null}
 
           <Paper withBorder radius="md" p="md">
             <Stack gap="sm">
@@ -1243,7 +1470,29 @@ export function Estoque() {
                       return (
                         <Table.Tr key={item.inventoryItemId}>
                           <Table.Td>{label}</Table.Td>
-                          <Table.Td>{item.quantity}</Table.Td>
+                          <Table.Td>
+                            {editingKitId ? (
+                              <Group gap={8} wrap="nowrap">
+                                <ActionIcon
+                                  variant="light"
+                                  color="gray"
+                                  onClick={() => handleChangeKitDraftItemQuantityByStep(item.inventoryItemId, -1)}
+                                  aria-label="Diminuir quantidade"
+                                >
+                                  <Minus size={14} />
+                                </ActionIcon>
+                                <Text fw={600} miw={24} ta="center">{item.quantity}</Text>
+                                <ActionIcon
+                                  variant="light"
+                                  color="blue"
+                                  onClick={() => handleChangeKitDraftItemQuantityByStep(item.inventoryItemId, 1)}
+                                  aria-label="Aumentar quantidade"
+                                >
+                                  <Plus size={14} />
+                                </ActionIcon>
+                              </Group>
+                            ) : item.quantity}
+                          </Table.Td>
                           <Table.Td>
                             <ActionIcon variant="subtle" color="red" onClick={() => handleRemoveItemFromKitDraft(item.inventoryItemId)}>
                               <X size={14} />
@@ -1260,15 +1509,15 @@ export function Estoque() {
 
           <Divider />
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setKitModalOpen(false)}>Cancelar</Button>
+            <Button variant="default" onClick={() => { setKitModalOpen(false); resetKitForm(); }}>Cancelar</Button>
             <Button
               bg={DARK_BLUE}
               loading={kitSaving}
               onClick={() => {
-                void handleCreateKit();
+                void handleSaveKit();
               }}
             >
-              Salvar kit
+              {editingKitId ? 'Atualizar kit' : 'Salvar kit'}
             </Button>
           </Group>
         </Stack>
@@ -1314,7 +1563,13 @@ export function Estoque() {
             <Stack gap="md">
               <Text fw={700} size="sm">Controle de estoque</Text>
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                <FloatingNumberInput value={form.quantidade ?? undefined} onChange={(val) => setForm({ ...form, quantidade: normalizeNumber(val) })} label="Quantidade atual" placeholder="Quantidade atual" min={0} />
+                <FloatingNumberInput
+                  value={form.quantidade ?? undefined}
+                  onChange={(val) => setForm({ ...form, quantidade: normalizeNumber(val) })}
+                  label="Quantidade atual"
+                  placeholder="Quantidade atual"
+                  min={0}
+                />
                 <FloatingNumberInput value={form.precoUnitario ?? undefined} onChange={(val) => setForm({ ...form, precoUnitario: normalizeNumber(val) })} label="Preço unitário" placeholder="Preço unitário" min={0} step={0.01} />
               </SimpleGrid>
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
@@ -1337,13 +1592,18 @@ export function Estoque() {
               <Text size="xs" c="dimmed">
                 Após cadastrar, prefira usar "Movimentar" para registrar entradas, saídas e ajustes com histórico auditável.
               </Text>
+              {editingId && inventoryEditUnavailable ? (
+                <Text size="xs" c="orange">
+                  Edição desabilitada neste ambiente: rotas de atualização/movimentação de estoque não encontradas no backend.
+                </Text>
+              ) : null}
             </Stack>
           </Paper>
 
           <Divider />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-            <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingItem} disabled={savingItem}>
+            <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingItem} disabled={savingItem || (Boolean(editingId) && inventoryEditUnavailable)}>
               {editingId ? 'Atualizar' : 'Cadastrar'}
             </Button>
           </Group>
@@ -1421,7 +1681,7 @@ export function Estoque() {
                   <Table.Th style={{ width: 170 }}>Data</Table.Th>
                   <Table.Th style={{ width: 130 }}>Tipo</Table.Th>
                   <Table.Th style={{ width: 90 }}>Qtd</Table.Th>
-                  <Table.Th style={{ width: 130 }}>De → Para</Table.Th>
+                  <Table.Th style={{ width: 130 }}>De â†’ Para</Table.Th>
                   <Table.Th style={{ width: 340 }}>Motivo</Table.Th>
                   <Table.Th style={{ width: 180 }}>Usuário</Table.Th>
                 </Table.Tr>
@@ -1443,7 +1703,7 @@ export function Estoque() {
                       <Text size="sm">{row.quantity}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{row.previousQty} → {row.resultingQty}</Text>
+                      <Text size="sm">{row.previousQty} â†’ {row.resultingQty}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" style={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
@@ -1617,3 +1877,6 @@ export function Estoque() {
     </Box>
   );
 }
+
+
+
