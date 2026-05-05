@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useLocalStorage } from '@mantine/hooks';
-import { ActionIcon, Box, Button, Group, Text, Textarea } from '@mantine/core';
-import { Camera, Download, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
+import { ActionIcon, Box, Button, Group, Loader, Stack, Text, Textarea } from '@mantine/core';
+import { Camera, CheckCircle, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import teleconsultationLinkService, { type TeleconsultationPublicTokenMeta } from '../../services/teleconsultationLinkService';
 import consultationService from '../../services/consultationService';
+import aiQuestionnaireService, { type AiQuestion } from '../../services/aiQuestionnaireService';
+import appointmentService from '../../services/appointmentService';
+import patientService from '../../services/patientService';
 import styles from './TeleconsultaPatientWaiting.module.css';
 
 const DOCTOR = {
@@ -87,7 +90,13 @@ export function TeleconsultaPatientWaiting() {
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [recordTab, setRecordTab] = useState<'record' | 'patient'>('record');
-  const [recordSubTab, setRecordSubTab] = useState<'prescription' | 'notes'>('prescription');
+  const [questions, setQuestions] = useState<AiQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsSaving, setQuestionsSaving] = useState(false);
+  const [questionsSaved, setQuestionsSaved] = useState(false);
+  const [patientComplaints, setPatientComplaints] = useState('');
+  const [patientData, setPatientData] = useState<any>(null);
   const [soapData, setSoapData] = useState({
     subjective: '',
     objective: '',
@@ -216,6 +225,38 @@ export function TeleconsultaPatientWaiting() {
     const interval = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!isDoctorRole || !appointmentId) return;
+    setQuestionsLoading(true);
+    aiQuestionnaireService.generate(appointmentId)
+      .then((data) => {
+        setQuestions(data.questions || []);
+        setPatientComplaints(data.patientComplaints || '');
+        if (data.answers && typeof data.answers === 'object') {
+          setAnswers(data.answers as Record<string, string>);
+        }
+      })
+      .catch(() => {
+        showNotification({ title: 'Aviso', message: 'Não foi possível gerar o questionário da IA.', color: 'yellow' });
+      })
+      .finally(() => setQuestionsLoading(false));
+  }, [isDoctorRole, tokenMeta?.appointment?.id]);
+
+  useEffect(() => {
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!isDoctorRole || !appointmentId) return;
+    appointmentService.getById(appointmentId)
+      .then(async (appt: any) => {
+        const pid = String(appt?.patientId || appt?.patient_id || '').trim();
+        if (pid) {
+          const patient = await patientService.getPatientById(pid);
+          setPatientData(patient);
+        }
+      })
+      .catch(() => {});
+  }, [isDoctorRole, tokenMeta?.appointment?.id]);
 
   useEffect(() => {
     const onDoctorJoined = () => setDoctorJoined(true);
@@ -702,15 +743,15 @@ export function TeleconsultaPatientWaiting() {
       paddingLeft: 0,
       paddingRight: 0,
       background: 'transparent',
-      color: 'inherit',
+      color: isDark ? '#e8edf7' : '#0d1117',
       fontSize: '15px',
       minHeight: 34,
     },
     label: {
       fontSize: '13px',
-      fontWeight: 600,
+      fontWeight: 700,
       marginBottom: 2,
-      color: isDark ? '#d3ddf2' : '#21252c',
+      color: isDark ? '#c8d6f0' : '#1a1d23',
     },
   } as const;
   const callElapsed = useMemo(() => {
@@ -794,6 +835,21 @@ export function TeleconsultaPatientWaiting() {
 
   const handlePickFileClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSaveAnswers = async () => {
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!appointmentId) return;
+    setQuestionsSaving(true);
+    try {
+      await aiQuestionnaireService.saveAnswers(appointmentId, answers);
+      setQuestionsSaved(true);
+      showNotification({ title: 'Respostas salvas', message: 'As respostas do questionário foram salvas com sucesso.', color: 'green' });
+    } catch {
+      showNotification({ title: 'Erro', message: 'Não foi possível salvar as respostas.', color: 'red' });
+    } finally {
+      setQuestionsSaving(false);
+    }
   };
 
   const handleSaveDoctorRecord = () => {
@@ -979,106 +1035,96 @@ export function TeleconsultaPatientWaiting() {
 
                   {recordTab === 'record' ? (
                     <Box className={styles.consultationRecordBody}>
-                      <Group justify="space-between" align="center" mb="sm">
-                        <Text fw={800} size="xl">Prontuário</Text>
+                      <Group justify="space-between" align="center" mb="xs">
+                        <Text fw={800} size="xl">Questionário</Text>
                         <Button
                           size="sm"
-                          leftSection={<Download size={14} />}
-                          onClick={handleSaveDoctorRecord}
-                          style={{ background: '#0a2a67', color: '#fff' }}
+                          leftSection={questionsSaved ? <CheckCircle size={14} /> : undefined}
+                          onClick={handleSaveAnswers}
+                          loading={questionsSaving}
+                          disabled={questions.length === 0}
+                          style={{ background: questionsSaved ? '#1a7f37' : '#0a2a67', color: '#fff' }}
                         >
-                          Salvar
+                          {questionsSaved ? 'Salvo' : 'Salvar'}
                         </Button>
                       </Group>
 
-                      <Box className={styles.consultationSubTabs}>
-                        <button
-                          type="button"
-                          className={`${styles.consultationSubTabBtn} ${recordSubTab === 'prescription' ? styles.consultationSubTabBtnActive : ''}`}
-                          onClick={() => setRecordSubTab('prescription')}
+                      {patientComplaints ? (
+                        <Box
+                          mb="sm"
+                          p="xs"
+                          style={{ background: 'rgba(45,118,201,0.08)', borderRadius: 8, borderLeft: '3px solid #2d76c9' }}
                         >
-                          Prescrição
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.consultationSubTabBtn} ${recordSubTab === 'notes' ? styles.consultationSubTabBtnActive : ''}`}
-                          onClick={() => setRecordSubTab('notes')}
-                        >
-                          Notas
-                        </button>
-                      </Box>
+                          <Text size="xs" fw={600} c="#2d76c9" mb={2}>Queixa relatada pelo paciente</Text>
+                          <Text size="sm">{patientComplaints}</Text>
+                        </Box>
+                      ) : null}
 
-                      <Textarea
-                        label="Subjetivo (Queixa do paciente)"
-                        value={soapData.subjective}
-                        onChange={(event) => setSoapData((prev) => ({ ...prev, subjective: event.currentTarget.value }))}
-                        minRows={2}
-                        styles={recordFieldStyles}
-                      />
-                      <Textarea
-                        label="Objetivo (Exame / Observação)"
-                        value={soapData.objective}
-                        onChange={(event) => setSoapData((prev) => ({ ...prev, objective: event.currentTarget.value }))}
-                        minRows={2}
-                        styles={recordFieldStyles}
-                      />
-                      <Textarea
-                        label="Avaliação / Diagnóstico"
-                        value={soapData.assessment}
-                        onChange={(event) => setSoapData((prev) => ({ ...prev, assessment: event.currentTarget.value }))}
-                        minRows={2}
-                        styles={recordFieldStyles}
-                      />
-                      <Textarea
-                        label="CID - 10"
-                        value={soapData.cid10}
-                        onChange={(event) => setSoapData((prev) => ({ ...prev, cid10: event.currentTarget.value }))}
-                        minRows={1}
-                        styles={recordFieldStyles}
-                      />
-                      <Textarea
-                        label="Plano de Tratamento"
-                        value={soapData.treatmentPlan}
-                        onChange={(event) => setSoapData((prev) => ({ ...prev, treatmentPlan: event.currentTarget.value }))}
-                        minRows={2}
-                        styles={recordFieldStyles}
-                      />
-                      <Textarea
-                        label={recordSubTab === 'prescription' ? 'Prescrição' : 'Notas'}
-                        value={recordSubTab === 'prescription' ? soapData.prescription : soapData.notes}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          setSoapData((prev) => (recordSubTab === 'prescription'
-                            ? { ...prev, prescription: value }
-                            : { ...prev, notes: value }));
-                        }}
-                        minRows={3}
-                        styles={recordFieldStyles}
-                      />
-
-                      <Button
-                        variant="default"
-                        leftSection={<Paperclip size={14} />}
-                        onClick={handleAttachDoctorDocument}
-                        fullWidth
-                        style={{ minHeight: 88, fontSize: 18, background: '#d9d9d9', borderColor: '#d9d9d9' }}
-                      >
-                        Anexar documentos
-                      </Button>
-                      <input
-                        ref={doctorAttachmentInputRef}
-                        type="file"
-                        style={{ display: 'none' }}
-                        onChange={handleDoctorAttachmentSelected}
-                      />
+                      {questionsLoading ? (
+                        <Stack align="center" py="xl" gap="sm">
+                          <Loader size="sm" color="blue" />
+                          <Text size="sm" c="dimmed">Gerando perguntas com IA...</Text>
+                        </Stack>
+                      ) : questions.length === 0 ? (
+                        <Text size="sm" ta="center" py="xl" style={{ opacity: 0.6 }}>
+                          Nenhuma pergunta gerada ainda.
+                        </Text>
+                      ) : (
+                        <Stack gap="md">
+                          {questions.map((q) => (
+                            <Box
+                              key={q.id}
+                              pb="md"
+                              style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
+                            >
+                              <Text size="sm" fw={700} mb={6}>
+                                {q.id}. {q.question}
+                              </Text>
+                              <Textarea
+                                placeholder="Resposta do paciente..."
+                                value={answers[String(q.id)] || ''}
+                                onChange={(e) => { const val = e.currentTarget.value; setAnswers((prev) => ({ ...prev, [String(q.id)]: val })); }}
+                                minRows={2}
+                                autosize
+                              />
+                            </Box>
+                          ))}
+                        </Stack>
+                      )}
                     </Box>
                   ) : (
                     <Box className={styles.consultationRecordBody}>
-                      <Text fw={700}>Dados do paciente</Text>
-                      <Text size="sm">Nome: {patientName}</Text>
-                      <Text size="sm">Médico: {doctorName}</Text>
-                      <Text size="sm">Especialidade: {doctorSpecialty}</Text>
-                      <Text size="sm">Horário: {scheduledLabel}</Text>
+                      <Text fw={800} size="xl" mb="md">Dados do paciente</Text>
+                      {patientData ? (
+                        <Stack gap="xs">
+                          {[
+                            { label: 'Nome', value: patientData.name },
+                            { label: 'CPF', value: patientData.cpf ? String(patientData.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : null },
+                            { label: 'Data de nascimento', value: patientData.birthDate ? new Date(patientData.birthDate).toLocaleDateString('pt-BR') : null },
+                            { label: 'Sexo', value: patientData.gender === 'MALE' ? 'Masculino' : patientData.gender === 'FEMALE' ? 'Feminino' : patientData.gender },
+                            { label: 'Telefone', value: patientData.cellphone || patientData.phone },
+                            { label: 'E-mail', value: patientData.email },
+                            { label: 'Convênio', value: patientData.healthInsuranceName },
+                            { label: 'Nº convênio', value: patientData.healthInsuranceNumber },
+                            { label: 'Tipo sanguíneo', value: patientData.bloodType },
+                            { label: 'Alergias', value: Array.isArray(patientData.allergies) && patientData.allergies.length > 0 ? patientData.allergies.join(', ') : null },
+                            { label: 'Condições crônicas', value: Array.isArray(patientData.chronicConditions) && patientData.chronicConditions.length > 0 ? patientData.chronicConditions.join(', ') : null },
+                            { label: 'Medicamentos em uso', value: Array.isArray(patientData.currentMedications) && patientData.currentMedications.length > 0 ? patientData.currentMedications.join(', ') : null },
+                            { label: 'Contato de emergência', value: patientData.emergencyContactName ? `${patientData.emergencyContactName}${patientData.emergencyContactPhone ? ` — ${patientData.emergencyContactPhone}` : ''}` : null },
+                            { label: 'Observações', value: patientData.observations },
+                          ].filter((item) => item.value).map((item) => (
+                            <Box key={item.label} pb="xs" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                              <Text size="xs" fw={600} style={{ opacity: 0.55 }}>{item.label}</Text>
+                              <Text size="sm" fw={500}>{item.value}</Text>
+                            </Box>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Stack align="center" py="xl" gap="sm">
+                          <Loader size="sm" color="blue" />
+                          <Text size="sm">Carregando dados do paciente...</Text>
+                        </Stack>
+                      )}
                     </Box>
                   )}
                 </Box>
