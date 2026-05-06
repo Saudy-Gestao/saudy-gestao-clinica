@@ -548,8 +548,6 @@
 
 .consultationRecordPanel {
   border-radius: 10px;
-  border: 1px solid #cccccc;
-  background: #f2f2f2;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -561,6 +559,14 @@
 .consultationRecordTabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
+}
+
+.consultationRecordTabsDark {
+  border-bottom: 1px solid rgba(145, 177, 252, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.consultationRecordTabsLight {
   border-bottom: 1px solid #cfcfcf;
   background: #e8e8e8;
 }
@@ -603,7 +609,7 @@
   border-radius: 999px;
   padding: 8px 10px;
   background: transparent;
-  color: inherit;
+  color: #1a1d23;
   font-weight: 600;
   cursor: pointer;
 }

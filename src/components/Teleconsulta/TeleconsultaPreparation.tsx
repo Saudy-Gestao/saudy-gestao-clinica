@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocalStorage } from '@mantine/hooks';
-import { Box, Button, Group, NativeSelect, Text } from '@mantine/core';
+import { Box, Button, Group, NativeSelect, Text, useMantineColorScheme } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
 import { Camera, LampDesk, Mic, MicOff, SignalHigh, Wifi, WifiOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -116,10 +115,7 @@ export function TeleconsultaPreparation() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
-  const [colorScheme] = useLocalStorage<'light' | 'dark'>({
-    key: 'mantine-color-scheme',
-    defaultValue: 'light',
-  });
+  const { colorScheme } = useMantineColorScheme();
 
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [microphoneDevices, setMicrophoneDevices] = useState<MediaDeviceInfo[]>([]);

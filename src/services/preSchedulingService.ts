@@ -284,8 +284,8 @@ const preSchedulingService = {
     return response.data as { message: string };
   },
 
-  async finalizePublicDocuments(token: string) {
-    const response = await publicApi.post(`/care/pre-scheduling/public/${token}/finalize`);
+  async finalizePublicDocuments(token: string, payload?: { patientComplaints?: string }) {
+    const response = await publicApi.post(`/care/pre-scheduling/public/${token}/finalize`, payload || {});
     return response.data as {
       message: string;
       status: PreSchedulingStatus;
