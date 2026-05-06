@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { useLocalStorage } from '@mantine/hooks';
-import { ActionIcon, Box, Button, Group, Loader, Stack, Text, Textarea } from '@mantine/core';
-import { Camera, CheckCircle, LampDesk, Mic, MicOff, Paperclip, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
+import { ActionIcon, Box, Button, Group, Loader, Radio, Stack, Text, Textarea, TextInput, useMantineColorScheme } from '@mantine/core';
+import { Camera, CheckCircle, LampDesk, Mic, MicOff, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -61,10 +60,7 @@ const getInitials = (name?: string | null) => {
 export function TeleconsultaPatientWaiting() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [colorScheme] = useLocalStorage<'light' | 'dark'>({
-    key: 'mantine-color-scheme',
-    defaultValue: 'light',
-  });
+  const { colorScheme } = useMantineColorScheme();
   const [now, setNow] = useState<Date>(() => new Date());
   const [doctorJoined, setDoctorJoined] = useState(false);
   const [doctorInConsultation, setDoctorInConsultation] = useState(false);
@@ -97,19 +93,9 @@ export function TeleconsultaPatientWaiting() {
   const [questionsSaved, setQuestionsSaved] = useState(false);
   const [patientComplaints, setPatientComplaints] = useState('');
   const [patientData, setPatientData] = useState<any>(null);
-  const [soapData, setSoapData] = useState({
-    subjective: '',
-    objective: '',
-    assessment: '',
-    cid10: '',
-    treatmentPlan: '',
-    prescription: '',
-    notes: '',
-  });
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const doctorMainVideoRef = useRef<HTMLDivElement | null>(null);
-  const doctorAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const chatBodyRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -735,25 +721,6 @@ export function TeleconsultaPatientWaiting() {
   const canJoinConsultation = isDoctorRole || (doctorInConsultation && withinWindow);
   const chatCounterpartName = isDoctorRole ? patientName : doctorName;
   const doctorInCallMode = inCall && isDoctorRole;
-  const recordFieldStyles = {
-    input: {
-      border: 'none',
-      borderBottom: `1px solid ${isDark ? 'rgba(187, 196, 212, 0.45)' : '#2b2f36'}`,
-      borderRadius: 0,
-      paddingLeft: 0,
-      paddingRight: 0,
-      background: 'transparent',
-      color: isDark ? '#e8edf7' : '#0d1117',
-      fontSize: '15px',
-      minHeight: 34,
-    },
-    label: {
-      fontSize: '13px',
-      fontWeight: 700,
-      marginBottom: 2,
-      color: isDark ? '#c8d6f0' : '#1a1d23',
-    },
-  } as const;
   const callElapsed = useMemo(() => {
     if (!inCall || !callStartedAt) return '00:00';
     const seconds = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000));
@@ -842,7 +809,13 @@ export function TeleconsultaPatientWaiting() {
     if (!appointmentId) return;
     setQuestionsSaving(true);
     try {
-      await aiQuestionnaireService.saveAnswers(appointmentId, answers);
+      const consolidated: Record<string, string> = {};
+      for (const [key, val] of Object.entries(answers)) {
+        if (key.endsWith('__other')) continue;
+        const otherText = answers[`${key}__other`];
+        consolidated[key] = val === 'Outra' && otherText ? `Outra: ${otherText}` : val;
+      }
+      await aiQuestionnaireService.saveAnswers(appointmentId, consolidated);
       setQuestionsSaved(true);
       showNotification({ title: 'Respostas salvas', message: 'As respostas do questionário foram salvas com sucesso.', color: 'green' });
     } catch {
@@ -850,29 +823,6 @@ export function TeleconsultaPatientWaiting() {
     } finally {
       setQuestionsSaving(false);
     }
-  };
-
-  const handleSaveDoctorRecord = () => {
-    showNotification({
-      title: 'Prontuário salvo',
-      message: 'Rascunho salvo localmente para esta sessão de teleconsulta.',
-      color: 'green',
-    });
-  };
-
-  const handleAttachDoctorDocument = () => {
-    doctorAttachmentInputRef.current?.click();
-  };
-
-  const handleDoctorAttachmentSelected = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = '';
-    if (!file) return;
-    showNotification({
-      title: 'Documento anexado',
-      message: `${file.name} adicionado ao prontuário da sessão.`,
-      color: 'green',
-    });
   };
 
   const handleFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1016,7 +966,7 @@ export function TeleconsultaPatientWaiting() {
                 </Box>
 
                 <Box className={`${styles.consultationRecordPanel} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
-                  <Box className={styles.consultationRecordTabs}>
+                  <Box className={`${styles.consultationRecordTabs} ${isDark ? styles.consultationRecordTabsDark : styles.consultationRecordTabsLight}`}>
                     <button
                       type="button"
                       className={`${styles.consultationRecordTabBtn} ${recordTab === 'record' ? styles.consultationRecordTabBtnActive : ''}`}
@@ -1071,24 +1021,59 @@ export function TeleconsultaPatientWaiting() {
                         </Text>
                       ) : (
                         <Stack gap="md">
-                          {questions.map((q) => (
-                            <Box
-                              key={q.id}
-                              pb="md"
-                              style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
-                            >
-                              <Text size="sm" fw={700} mb={6}>
-                                {q.id}. {q.question}
-                              </Text>
-                              <Textarea
-                                placeholder="Resposta do paciente..."
-                                value={answers[String(q.id)] || ''}
-                                onChange={(e) => { const val = e.currentTarget.value; setAnswers((prev) => ({ ...prev, [String(q.id)]: val })); }}
-                                minRows={2}
-                                autosize
-                              />
-                            </Box>
-                          ))}
+                          {questions.map((q) => {
+                            const answerKey = String(q.id);
+                            const selectedOption = answers[answerKey] || '';
+                            const isOther = q.options && selectedOption === 'Outra';
+                            const otherKey = `${answerKey}__other`;
+                            return (
+                              <Box
+                                key={q.id}
+                                pb="md"
+                                style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
+                              >
+                                <Text size="sm" fw={700} mb={6}>
+                                  {q.id}. {q.question}
+                                </Text>
+                                {q.options && q.options.length > 0 ? (
+                                  <Stack gap={6}>
+                                    <Radio.Group
+                                      value={selectedOption}
+                                      onChange={(val) => {
+                                        setAnswers((prev) => {
+                                          const next = { ...prev, [answerKey]: val };
+                                          if (val !== 'Outra') delete next[otherKey];
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      <Stack gap={6}>
+                                        {q.options.map((opt) => (
+                                          <Radio key={opt} value={opt} label={opt} size="sm" />
+                                        ))}
+                                      </Stack>
+                                    </Radio.Group>
+                                    {isOther && (
+                                      <TextInput
+                                        placeholder="Descreva..."
+                                        value={answers[otherKey] || ''}
+                                        onChange={(e) => { const val = e.currentTarget.value; setAnswers((prev) => ({ ...prev, [otherKey]: val })); }}
+                                        mt={4}
+                                      />
+                                    )}
+                                  </Stack>
+                                ) : (
+                                  <Textarea
+                                    placeholder="Resposta do paciente..."
+                                    value={selectedOption}
+                                    onChange={(e) => { const val = e.currentTarget.value; setAnswers((prev) => ({ ...prev, [answerKey]: val })); }}
+                                    minRows={2}
+                                    autosize
+                                  />
+                                )}
+                              </Box>
+                            );
+                          })}
                         </Stack>
                       )}
                     </Box>

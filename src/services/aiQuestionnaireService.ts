@@ -3,6 +3,7 @@ import api from './api';
 export interface AiQuestion {
   id: number;
   question: string;
+  options?: string[];
 }
 
 export interface AiQuestionnaire {
