@@ -11,6 +11,7 @@ import {
   Modal,
   Paper,
   Skeleton,
+  Loader,
   Stack,
   Table,
   Text,
@@ -23,7 +24,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck, Trash2, ClipboardList } from 'lucide-react';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck, Trash2, ClipboardList, Images } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -36,6 +37,8 @@ import { useReportPreviousReportsQuery } from '../../hooks/useReportPreviousRepo
 import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQuery';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
+import { escapeHtml, normalizeReportLayout } from '../../lib/reportLayout';
+import type { ReportLayoutConfig } from '../../services/reportConfigService';
 
 type ExamStatus = 'sem_laudo' | 'em_andamento' | 'laudado' | 'revisado' | 'finalizado';
 type ExamPriority = 'normal' | 'urgente';
@@ -51,6 +54,7 @@ interface ExamItem {
   convenio: string;
   requestingDoctor: string;
   assignedTo: string;
+  reviewerName?: string;
   priority: ExamPriority;
   status: ExamStatus;
   reportText: string;
@@ -68,6 +72,21 @@ const decodeHtmlEntities = (value: string) => {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = value;
   return textarea.value;
+};
+const normalizePhraseShortcut = (value: string) => value
+  .toLowerCase()
+  .replace(/\s+/g, '')
+  .replace('control', 'ctrl');
+const keyboardEventToShortcut = (event: KeyboardEvent) => {
+  const isAltGraph = event.getModifierState?.('AltGraph') ?? false;
+  const parts: string[] = [];
+  // AltGr usually arrives as Ctrl+Alt on pt-BR; treat it as Alt for shortcut matching.
+  if (event.ctrlKey && !isAltGraph) parts.push('ctrl');
+  if (event.altKey) parts.push('alt');
+  if (event.shiftKey) parts.push('shift');
+  const key = event.key.toLowerCase();
+  if (!['control', 'alt', 'shift', 'meta'].includes(key)) parts.push(key);
+  return parts.join('+');
 };
 
 interface ReportTemplate {
@@ -91,6 +110,7 @@ interface ReportPhrase {
   id: string;
   examType: string;
   label: string;
+  shortcut?: string;
   text: string;
 }
 
@@ -359,6 +379,7 @@ const normalizeExamStatus = (status: any): ExamStatus => {
 
 export function LaudoExames() {
   const navigate = useNavigate();
+  const currentUser = authService.getCurrentUser();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
@@ -396,6 +417,7 @@ export function LaudoExames() {
   const [selectedPreviousReport, setSelectedPreviousReport] = useState<PreviousReport | null>(null);
   const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Record<string, boolean>>({});
   const [requiresReviewer, setRequiresReviewer] = useState(true);
+  const [reportLayout, setReportLayout] = useState<ReportLayoutConfig>(() => normalizeReportLayout(null));
   const [signPasswordModalOpen, setSignPasswordModalOpen] = useState(false);
   const [signPassword, setSignPassword] = useState('');
   const [signRolePending, setSignRolePending] = useState<'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer' | 'save-issuer' | 'save-reviewer' | 'save-addendum-issuer' | 'save-addendum-reviewer' | null>(null);
@@ -419,6 +441,8 @@ export function LaudoExames() {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditLogsLoading, setAuditLogsLoading] = useState(false);
   const [removingAdendo, setRemovingAdendo] = useState(false);
+  const [editorReadyToken, setEditorReadyToken] = useState(0);
+  const [editorInitializing, setEditorInitializing] = useState(true);
   const localStatusOverridesRef = useRef<Record<string, ExamStatus>>({});
   const { data: reportPageData, error: reportPageError, isLoading: reportPageLoading } = useReportExamsPageDataQuery();
   const { data: previousReportsData = [] } = useReportPreviousReportsQuery(selectedExamId ? (examRows.find((exam) => exam.id === selectedExamId)?.cpf || null) : null);
@@ -631,6 +655,7 @@ export function LaudoExames() {
       convenio: appt?.convenio || '',
       requestingDoctor: appt?.doctorName || it.requestingDoctor || '-',
       assignedTo: it.reportingDoctor || '-',
+      reviewerName: it.reviewingDoctor || undefined,
       priority: 'normal' as ExamPriority,
       status: normalizeExamStatus(it.status),
       reportText: it.description || '',
@@ -717,10 +742,12 @@ export function LaudoExames() {
         id: String(item.id || ''),
         examType: item.examType || '',
         label: item.label || '',
+        shortcut: item.shortcut || '',
         text: item.text || '',
       })).filter((item: ReportPhrase) => item.id);
       setPhrases(mappedPhrases.length > 0 ? mappedPhrases : MOCK_REPORT_PHRASES);
       setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
+      setReportLayout(normalizeReportLayout(configData?.reportLayout));
       return;
     }
 
@@ -729,6 +756,7 @@ export function LaudoExames() {
       setTemplates(MOCK_REPORT_TEMPLATES);
       setPhrases(MOCK_REPORT_PHRASES);
       setRequiresReviewer(true);
+      setReportLayout(normalizeReportLayout(null));
       showNotification({
         title: 'Erro',
         message: resolveApiErrorMessage(reportPageError, 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.'),
@@ -869,6 +897,11 @@ export function LaudoExames() {
   }, [selectedExam]);
 
   useEffect(() => {
+    if (!modalOpen) return;
+    setEditorInitializing(true);
+  }, [modalOpen, selectedExamId]);
+
+  useEffect(() => {
     if (!selectedExam) {
       setSelectedTemplateId(null);
       setSelectedPhraseId(null);
@@ -952,6 +985,26 @@ export function LaudoExames() {
   const openAddendumModal = () => {
     if (!selectedExam) return;
     setAddendumModalOpen(true);
+  };
+
+  const getSelectedExamImageKey = () => {
+    if (!selectedExam) return '';
+    return selectedExam.dicomStudyUid || selectedExam.id;
+  };
+
+  const openExamImages = () => {
+    const imageKey = getSelectedExamImageKey();
+    if (!imageKey) {
+      showNotification({
+        title: 'Imagens indisponiveis',
+        message: 'Este exame ainda não possui identificador de imagem DICOM.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const reportItemId = selectedExam?.id || imageKey;
+    navigate(`/dicom-viewer/${encodeURIComponent(imageKey)}?itemId=${encodeURIComponent(reportItemId)}&returnTo=${encodeURIComponent(`/laudo-exames?itemId=${reportItemId}`)}`);
   };
 
   useEffect(() => {
@@ -1098,7 +1151,8 @@ export function LaudoExames() {
       return;
     }
 
-    const htmlFragment = `<p>${phrase.text}</p>`;
+    const htmlFragment = String(phrase.text || '').trim();
+    if (!htmlFragment) return;
 
     if (editorRef.current) {
       editorRef.current.insertContent(htmlFragment);
@@ -1108,16 +1162,91 @@ export function LaudoExames() {
     }
   };
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    if (filteredPhrases.length === 0) return;
+
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.metaKey) return;
+      const typedShortcut = normalizePhraseShortcut(keyboardEventToShortcut(event));
+      if (!typedShortcut) return;
+
+      const matched = filteredPhrases.find((phrase) => {
+        const shortcut = String(phrase.shortcut || '').trim();
+        if (!shortcut) return false;
+        return normalizePhraseShortcut(shortcut) === typedShortcut;
+      });
+      if (!matched) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedPhraseId(matched.id);
+      insertPhrase(matched.id);
+    };
+
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [modalOpen, filteredPhrases, insertPhrase]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    if (filteredPhrases.length === 0) return;
+    if (!editorRef.current) return;
+
+    const editorDoc = editorRef.current.getDoc?.();
+    if (!editorDoc) return;
+
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (event.metaKey) return;
+      const typedShortcut = normalizePhraseShortcut(keyboardEventToShortcut(event));
+      if (!typedShortcut) return;
+
+      const matched = filteredPhrases.find((phrase) => {
+        const shortcut = String(phrase.shortcut || '').trim();
+        if (!shortcut) return false;
+        return normalizePhraseShortcut(shortcut) === typedShortcut;
+      });
+      if (!matched) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedPhraseId(matched.id);
+      insertPhrase(matched.id);
+    };
+
+    editorDoc.addEventListener('keydown', handleEditorShortcut);
+    return () => editorDoc.removeEventListener('keydown', handleEditorShortcut);
+  }, [modalOpen, filteredPhrases, insertPhrase, editorReadyToken]);
+
   const buildPreviewHtml = () => {
     if (!selectedExam) return '';
 
     const resolvedContent = resolvePlaceholders(getAllLaudoContent(), selectedExam);
-    const pageBg = isDark ? '#0f172a' : '#ffffff';
-    const cardBg = isDark ? '#111827' : '#ffffff';
+    const layout = normalizeReportLayout(reportLayout);
+    const pageBg = isDark ? '#0f172a' : '#f8fafc';
+    const sheetBg = '#ffffff';
     const border = isDark ? '#334155' : '#e2e8f0';
-    const title = isDark ? '#e2e8f0' : '#0f172a';
-    const text = isDark ? '#cbd5e1' : '#0f172a';
-    const muted = isDark ? '#94a3b8' : '#475569';
+    const title = layout.primaryColor || '#0f172a';
+    const text = '#0f172a';
+    const muted = '#475569';
+    const paperWidth = layout.paperSize === 'Letter' ? (layout.orientation === 'landscape' ? '279mm' : '216mm') : (layout.orientation === 'landscape' ? '297mm' : '210mm');
+    const paperHeight = layout.paperSize === 'Letter' ? (layout.orientation === 'landscape' ? '216mm' : '279mm') : (layout.orientation === 'landscape' ? '210mm' : '297mm');
+    const signatureIssuer = selectedExam.issuerSignedAt || 'Pendente';
+    const signatureReviewer = requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Não obrigatório';
+    const issuerSigned = Boolean(selectedExam.issuerSignedAt);
+    const reviewerSigned = Boolean(selectedExam.reviewerSignedAt);
+    const professionalName = (
+      (selectedExam.assignedTo && selectedExam.assignedTo !== '-' ? selectedExam.assignedTo : '')
+      || (currentUser?.name || '')
+      || 'Emissor não identificado'
+    );
+    const reviewerProfessionalName = (
+      (selectedExam.reviewerName && selectedExam.reviewerName !== '-' ? selectedExam.reviewerName : '')
+      || (requiresReviewer ? 'Revisor não identificado' : 'Revisor não obrigatório')
+    );
+    const normalizedFooterText = String(layout.footerText || '').trim();
+    const shouldRenderFooterExtra = normalizedFooterText.length > 0;
+    const logoSrc = layout.logoImageDataUrl || layout.logoUrl;
 
     return `
       <!DOCTYPE html>
@@ -1129,32 +1258,187 @@ export function LaudoExames() {
           <style>
             :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
             html, body { margin: 0; padding: 0; background: ${pageBg}; color: ${text}; }
-            body { font-family: Inter, Arial, sans-serif; }
+            body { font-family: ${layout.fontFamily}; font-size: ${layout.fontSizePx}px; line-height: 1.42; }
             .sheet {
-              margin: 18px;
-              padding: 28px;
-              border-radius: 10px;
+              width: ${paperWidth};
+              min-height: ${paperHeight};
+              box-sizing: border-box;
+              margin: 18px auto;
+              padding: ${layout.marginTopMm}mm ${layout.marginRightMm}mm ${layout.marginBottomMm}mm ${layout.marginLeftMm}mm;
+              border-radius: 8px;
               border: 1px solid ${border};
-              background: ${cardBg};
+              background: ${sheetBg};
             }
-            h1 { font-size: 20px; margin-bottom: 6px; color: ${title}; }
-            .meta { font-size: 12px; color: ${muted}; margin-bottom: 18px; }
-            .block { margin-bottom: 14px; }
-            .signature { margin-top: 24px; font-size: 12px; color: ${muted}; }
+            .header {
+              border-bottom: 2px solid ${title};
+              padding: 4px 0 14px;
+              margin-bottom: 16px;
+              display: grid;
+              grid-template-columns: auto 1fr;
+              gap: 18px;
+              align-items: center;
+            }
+            .logo-wrap {
+              width: 164px;
+              height: 96px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 1px solid #d6e0ee;
+              border-radius: 12px;
+              background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+              box-shadow: inset 0 0 0 1px #eef4fb;
+              padding: 6px;
+              box-sizing: border-box;
+            }
+            .logo {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              border-radius: 8px;
+            }
+            .clinic {
+              font-size: 10px;
+              color: ${muted};
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              margin-bottom: 3px;
+            }
+            h1 {
+              font-size: 22px;
+              line-height: 1.12;
+              margin: 0 0 4px;
+              color: ${title};
+              font-weight: 700;
+            }
+            .subtitle, .header-text, .footer-note { font-size: 12px; color: ${muted}; }
+            .subtitle { font-weight: 600; color: #334155; margin-bottom: 1px; }
+            .header-text { font-size: 11px; }
+            .meta {
+              margin-bottom: 16px;
+              padding: 9px 11px;
+              border: 1px solid #dbe3ee;
+              border-radius: 6px;
+              background: #f8fafc;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 5px 16px;
+            }
+            .meta-item { font-size: 12px; color: #1f2937; }
+            .meta-item b { color: #0b1324; font-weight: 700; }
+            .content { color: #0f172a; font-size: 13px; }
+            .content h1, .content h2, .content h3, .content h4 {
+              margin: 14px 0 6px;
+              color: #0b1324;
+              font-size: 16px;
+              line-height: 1.25;
+              font-weight: 800;
+            }
+            .content p { margin: 0 0 8px; }
+            .content ul, .content ol { margin: 4px 0 10px 22px; }
+            .content li { margin: 2px 0; }
+            .signatures {
+              margin-top: 26px;
+              border-top: 1px solid #cbd5e1;
+              padding-top: 10px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 12px;
+              font-size: 12px;
+              color: ${muted};
+            }
+            .sign-card {
+              border: 1px solid #e2e8f0;
+              border-radius: 6px;
+              padding: 8px 10px;
+              background: #fafcff;
+            }
+            .sign-title { font-weight: 700; color: #334155; margin-bottom: 2px; }
+            .sign-person { color: #0b1324; font-weight: 700; margin-bottom: 3px; }
+            .sign-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; }
+            .sign-dot {
+              width: 18px;
+              height: 18px;
+              border-radius: 999px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              line-height: 1;
+              color: #fff;
+            }
+            .sign-dot-ok { background: #16a34a; }
+            .sign-dot-pending { background: #94a3b8; }
+            .sign-time { margin-top: 2px; font-size: 11px; color: #475569; }
+            .footer {
+              margin-top: 20px;
+              padding-top: 10px;
+              border-top: 1px solid #e2e8f0;
+              font-size: 12px;
+              color: ${muted};
+            }
+            .footer-extra {
+              margin-top: 2px;
+              font-size: 11px;
+              color: ${muted};
+            }
             @media print {
               :root { color-scheme: light; }
+              @page { size: ${layout.paperSize} ${layout.orientation}; margin: 0; }
               html, body { background: #fff !important; color: #111 !important; }
-              .sheet { margin: 0; border: none; border-radius: 0; padding: 0; background: #fff !important; }
-              h1, .meta, .signature { color: #111 !important; }
+              .sheet { width: auto; min-height: auto; margin: 0; border: none; border-radius: 0; background: #fff !important; }
+              h1, .meta, .signatures, .footer, .subtitle, .header-text { color: #111 !important; }
             }
           </style>
         </head>
         <body>
           <div class="sheet">
-            <h1>Laudo - ${selectedExam.examType}</h1>
-            <div class="meta">Paciente: ${selectedExam.patientName}  •  CPF: ${selectedExam.cpf}  •  Exame: ${selectedExam.id}</div>
-            <div class="block">${resolvedContent}</div>
-            <div class="signature">Emissor: ${selectedExam.issuerSignedAt || 'Pendente'}  •  Revisor: ${requiresReviewer ? (selectedExam.reviewerSignedAt || 'Pendente') : 'Não obrigatório'}</div>
+            <div class="header">
+              <div class="logo-wrap">
+                ${layout.showLogo && logoSrc ? `<img class="logo" src="${escapeHtml(logoSrc)}" alt="Logo" />` : ''}
+              </div>
+              <div>
+                <div class="clinic">${escapeHtml(layout.clinicName)}</div>
+                <h1>${escapeHtml(layout.title || 'Laudo Médico')}</h1>
+                ${layout.subtitle ? `<div class="subtitle">${escapeHtml(layout.subtitle)}</div>` : ''}
+                ${layout.headerText ? `<div class="header-text">${escapeHtml(layout.headerText)}</div>` : ''}
+              </div>
+            </div>
+            ${layout.showPatientInfo ? `
+              <div class="meta">
+                <div class="meta-item"><b>Paciente:</b> ${escapeHtml(selectedExam.patientName)}</div>
+                <div class="meta-item"><b>Exame:</b> ${escapeHtml(selectedExam.examType)}</div>
+                <div class="meta-item"><b>CPF:</b> ${escapeHtml(selectedExam.cpf || 'Não informado')}</div>
+                <div class="meta-item"><b>Convênio:</b> ${escapeHtml(selectedExam.convenio || 'Não informado')}</div>
+              </div>
+            ` : ''}
+            <div class="content">${resolvedContent}</div>
+            ${layout.showSignatures ? `
+              <div class="signatures">
+                <div class="sign-card">
+                  <div class="sign-title">Emissor</div>
+                  <div class="sign-person">${escapeHtml(professionalName)}</div>
+                  <div class="sign-status">
+                    <span class="sign-dot ${issuerSigned ? 'sign-dot-ok' : 'sign-dot-pending'}">${issuerSigned ? '&#10003;' : '...'}</span>
+                    <span>${issuerSigned ? 'Assinado' : 'Pendente'}</span>
+                  </div>
+                  <div class="sign-time">${escapeHtml(String(signatureIssuer))}</div>
+                </div>
+                <div class="sign-card">
+                  <div class="sign-title">Revisor</div>
+                  <div class="sign-person">${escapeHtml(reviewerProfessionalName)}</div>
+                  <div class="sign-status">
+                    <span class="sign-dot ${reviewerSigned ? 'sign-dot-ok' : 'sign-dot-pending'}">${reviewerSigned ? '&#10003;' : '...'}</span>
+                    <span>${requiresReviewer ? (reviewerSigned ? 'Assinado' : 'Pendente') : 'Não obrigatório'}</span>
+                  </div>
+                  <div class="sign-time">${escapeHtml(String(signatureReviewer))}</div>
+                </div>
+              </div>
+            ` : ''}
+            <div class="footer">
+              ${shouldRenderFooterExtra ? `<div class="footer-extra">${escapeHtml(normalizedFooterText)}</div>` : ''}
+            </div>
           </div>
         </body>
       </html>
@@ -2097,6 +2381,7 @@ export function LaudoExames() {
                     />
 
                     <Text size="sm" fw={700} c={isDark ? 'gray.1' : 'dark.8'} mb={8}>Frases de laudo</Text>
+                    <Text size="xs" c="dimmed" mb={8}>Use o atalho cadastrado para inserir a frase diretamente no editor.</Text>
                     <Box style={{ minHeight: 0, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }}>
                       <Stack gap="xs" mb="md">
                         {filteredPhrases.length === 0 ? (
@@ -2120,6 +2405,9 @@ export function LaudoExames() {
                               onDoubleClick={() => insertPhrase(phrase.id)}
                             >
                               <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{decodeHtmlEntities(phrase.label)}</Text>
+                              {phrase.shortcut ? (
+                                <Badge size="xs" variant="light" color="indigo" mt={4}>{phrase.shortcut}</Badge>
+                              ) : null}
                               <Text size="xs" c="dimmed" lineClamp={2} mt={4}>{decodeHtmlEntities(stripHtml(phrase.text))}</Text>
                             </Paper>
                           ))
@@ -2229,12 +2517,35 @@ export function LaudoExames() {
                     </Group>
                   )}
 
-                  <Box style={{ flex: 1, minHeight: 0 }}>
+                  <Box style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                    {editorInitializing ? (
+                      <Box
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          border: `1px solid ${borderColor}`,
+                          borderRadius: 8,
+                          background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 2,
+                        }}
+                      >
+                        <Group gap="sm">
+                          <Loader size="sm" />
+                          <Text size="sm" c="dimmed">Carregando editor de laudo...</Text>
+                        </Group>
+                      </Box>
+                    ) : null}
+                    <Box style={{ height: '100%', visibility: editorInitializing ? 'hidden' : 'visible' }}>
                     <Editor
                     apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
                     disabled={selectedExam.status === 'finalizado'}
                     onInit={(_event, editor) => {
                       editorRef.current = editor;
+                      setEditorReadyToken((prev) => prev + 1);
+                      setEditorInitializing(false);
                     }}
                     value={editorContent}
                     onEditorChange={(value) => {
@@ -2252,6 +2563,7 @@ export function LaudoExames() {
                       content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
                     }}
                   />
+                    </Box>
                   </Box>
                 </Box>
               </Group>
@@ -2267,6 +2579,9 @@ export function LaudoExames() {
                 </Group>
 
                 <Group wrap="wrap" justify="flex-end" gap="sm">
+                  <Button variant="default" onClick={openExamImages} leftSection={<Images size={16} />}>
+                    Imagens
+                  </Button>
                   <Button variant="default" onClick={() => setPdfPreviewModalOpen(true)} leftSection={<FileText size={16} />}>
                     Prévia
                   </Button>

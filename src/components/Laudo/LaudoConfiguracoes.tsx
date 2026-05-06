@@ -16,8 +16,14 @@ import {
   Text,
   Title,
   Menu,
+  NumberInput,
   UnstyledButton,
+  Select,
   useMantineColorScheme,
+  Textarea,
+  ColorInput,
+  FileInput,
+  Image,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
@@ -36,6 +42,8 @@ import reportConfigService from '../../services/reportConfigService';
 import { useReportSettingsQuery } from '../../hooks/useReportSettingsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import { normalizeReportLayout } from '../../lib/reportLayout';
+import type { ReportLayoutConfig } from '../../services/reportConfigService';
 
 type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
@@ -47,6 +55,32 @@ const decodeHtmlEntities = (value: string) => {
   textarea.innerHTML = value;
   return textarea.value;
 };
+const buildShortcutLabelFromEvent = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const isAltGraph = event.getModifierState?.('AltGraph') ?? false;
+  const parts: string[] = [];
+  // AltGr on pt-BR keyboards is usually reported as Ctrl+Alt. Treat as Alt for UX.
+  if (event.ctrlKey && !isAltGraph) parts.push('Ctrl');
+  if (event.altKey) parts.push('Alt');
+  if (event.shiftKey) parts.push('Shift');
+
+  const rawKey = String(event.key || '');
+  const lowered = rawKey.toLowerCase();
+  if (['control', 'alt', 'shift', 'meta'].includes(lowered)) {
+    return parts.join('+');
+  }
+
+  let keyLabel = rawKey;
+  if (rawKey.length === 1) keyLabel = rawKey.toUpperCase();
+  return [...parts, keyLabel].join('+');
+};
+const normalizeShortcutForValidation = (value: string) => value.toLowerCase().replace(/\s+/g, '');
+const FORBIDDEN_SHORTCUTS = new Set([
+  'alt+f4',
+  'alt+tab',
+  'ctrl+w',
+  'ctrl+f4',
+  'ctrl+shift+w',
+]);
 const DEFAULT_REPORT_GROUPS = ['Tomografia', 'Ressonancia', 'Ultrassonografia', 'Raio-X', 'Mamografia', 'Densitometria'];
 
 interface TemplateItem {
@@ -61,6 +95,7 @@ interface PhraseItem {
   id: string;
   examType: string;
   label: string;
+  shortcut?: string;
   text: string;
 }
 
@@ -87,6 +122,7 @@ export function LaudoConfiguracoes() {
 
   const [activeTab, setActiveTab] = useState<'hub' | 'templates' | 'phrases' | 'worklist' | 'settings'>('hub');
   const [requiresReviewer, setRequiresReviewer] = useState(true);
+  const [reportLayout, setReportLayout] = useState<ReportLayoutConfig>(() => normalizeReportLayout(null));
   const [savingConfig, setSavingConfig] = useState(false);
   const tinyMceContentStyle = isDark
     ? `:root, html { color-scheme: dark; }
@@ -132,7 +168,7 @@ export function LaudoConfiguracoes() {
   const [worklistEditingId, setWorklistEditingId] = useState<string | null>(null);
 
   const [templateForm, setTemplateForm] = useState({ name: '', examType: '', group: '', content: '' });
-  const [phraseForm, setPhraseForm] = useState({ examType: '', label: '', text: '' });
+  const [phraseForm, setPhraseForm] = useState({ examType: '', label: '', shortcut: '', text: '' });
   const [worklistForm, setWorklistForm] = useState({
     patientName: '',
     patientCpf: '',
@@ -178,7 +214,7 @@ export function LaudoConfiguracoes() {
   const filteredPhrases = useMemo(() => {
     const q = phraseQuery.trim().toLowerCase();
     if (!q) return phrases;
-    return phrases.filter((item) => item.label.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || stripHtml(item.text).toLowerCase().includes(q));
+    return phrases.filter((item) => item.label.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || String(item.shortcut || '').toLowerCase().includes(q) || stripHtml(item.text).toLowerCase().includes(q));
   }, [phrases, phraseQuery]);
 
   const filteredWorklist = useMemo(() => {
@@ -268,6 +304,7 @@ export function LaudoConfiguracoes() {
       id: String(item.id || ''),
       examType: item.examType || '',
       label: item.label || '',
+      shortcut: item.shortcut || '',
       text: item.text || '',
     })).filter((item: PhraseItem) => item.id);
 
@@ -288,6 +325,7 @@ export function LaudoConfiguracoes() {
     setPhrases(mappedPhrases);
     setWorklist(mappedWorklist);
     setRequiresReviewer(Boolean((configData as any)?.requiresReviewer ?? true));
+    setReportLayout(normalizeReportLayout((configData as any)?.reportLayout));
 
     const examTypes = new Set<string>();
     proceduresList.forEach((item: any) => {
@@ -381,6 +419,60 @@ export function LaudoConfiguracoes() {
     }
   };
 
+  const saveReportLayout = async () => {
+    setSavingConfig(true);
+    try {
+      const normalizedLayout = normalizeReportLayout(reportLayout);
+      await reportConfigService.update({ reportLayout: normalizedLayout });
+      setReportLayout(normalizedLayout);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportExamsPageData });
+      showNotification({
+        title: 'Layout atualizado',
+        message: 'A previa do laudo agora usara este layout.',
+        color: 'green',
+      });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: resolveApiErrorMessage(err, 'Falha ao salvar layout do laudo'),
+        color: 'red',
+      });
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const updateReportLayout = <K extends keyof ReportLayoutConfig>(key: K, value: ReportLayoutConfig[K]) => {
+    setReportLayout((prev) => normalizeReportLayout({ ...prev, [key]: value }));
+  };
+
+  const handleLogoImageUpload = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showNotification({
+        title: 'Arquivo invalido',
+        message: 'Selecione uma imagem para usar como logo.',
+        color: 'red',
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateReportLayout('logoImageDataUrl', String(reader.result || ''));
+      updateReportLayout('showLogo', true);
+    };
+    reader.onerror = () => {
+      showNotification({
+        title: 'Erro',
+        message: 'Nao foi possivel carregar a imagem do logo.',
+        color: 'red',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const openTemplateCreate = () => {
     setTemplateEditingId(null);
     setTemplateForm({ name: '', examType: '', group: '', content: '' });
@@ -389,7 +481,7 @@ export function LaudoConfiguracoes() {
 
   const openPhraseCreate = () => {
     setPhraseEditingId(null);
-    setPhraseForm({ examType: '', label: '', text: '' });
+    setPhraseForm({ examType: '', label: '', shortcut: '', text: '' });
     setPhraseModalOpen(true);
   };
 
@@ -446,17 +538,29 @@ export function LaudoConfiguracoes() {
       return;
     }
 
+    const normalizedShortcut = normalizeShortcutForValidation(phraseForm.shortcut || '');
+    if (FORBIDDEN_SHORTCUTS.has(normalizedShortcut)) {
+      showNotification({
+        title: 'Atalho bloqueado',
+        message: 'Esse atalho é reservado pelo sistema/navegador. Escolha outro.',
+        color: 'yellow',
+      });
+      return;
+    }
+
     try {
       if (phraseEditingId) {
         await reportPhraseService.update(phraseEditingId, {
           examType: phraseForm.examType,
           label: phraseForm.label.trim(),
+          shortcut: phraseForm.shortcut.trim() || undefined,
           text: phraseForm.text,
         });
       } else {
         await reportPhraseService.create({
           examType: phraseForm.examType,
           label: phraseForm.label.trim(),
+          shortcut: phraseForm.shortcut.trim() || undefined,
           text: phraseForm.text,
         });
       }
@@ -759,14 +863,15 @@ export function LaudoConfiguracoes() {
                     <Table.Tr>
                       <Table.Th>Rótulo</Table.Th>
                       <Table.Th>Exame</Table.Th>
+                      <Table.Th>Atalho</Table.Th>
                       <Table.Th>Frase</Table.Th>
                       <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {settingsLoading && phrases.length === 0 ? renderTableSkeleton(4) : filteredPhrases.length === 0 ? (
+                    {settingsLoading && phrases.length === 0 ? renderTableSkeleton(5) : filteredPhrases.length === 0 ? (
                       <Table.Tr>
-                        <Table.Td colSpan={4}>
+                        <Table.Td colSpan={5}>
                           <Stack align="center" py="lg" gap={6}>
                             <Text fw={600} size="sm">Nenhuma frase encontrada</Text>
                             <Text size="sm" c="dimmed">Cadastre frases frequentes para acelerar o preenchimento dos laudos.</Text>
@@ -777,6 +882,7 @@ export function LaudoConfiguracoes() {
                       <Table.Tr key={item.id}>
                         <Table.Td>{decodeHtmlEntities(item.label)}</Table.Td>
                         <Table.Td>{item.examType}</Table.Td>
+                        <Table.Td>{item.shortcut ? <Badge variant="light" color="indigo">{item.shortcut}</Badge> : '-'}</Table.Td>
                         <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
@@ -789,7 +895,7 @@ export function LaudoConfiguracoes() {
                               <Menu.Dropdown>
                                 <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
                                   setPhraseEditingId(item.id);
-                                  setPhraseForm({ examType: item.examType, label: item.label, text: item.text });
+                                  setPhraseForm({ examType: item.examType, label: item.label, shortcut: item.shortcut || '', text: item.text });
                                   setPhraseModalOpen(true);
                                 }}>
                                   Editar
@@ -926,7 +1032,7 @@ export function LaudoConfiguracoes() {
 
             {activeTab === 'settings' && (
             <Paper withBorder p="md">
-              <Stack>
+              <Stack gap="lg">
                 <Title order={5}>Regras de Finalização</Title>
                 <Switch
                   label="Exigir assinatura de revisor na finalização"
@@ -937,6 +1043,63 @@ export function LaudoConfiguracoes() {
                 <Text size="sm" c="dimmed">
                   Quando habilitado, o laudo só pode ser finalizado após assinatura do emissor e do revisor.
                 </Text>
+
+                <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)', paddingTop: 18 }}>
+                  <Group justify="space-between" align="center" mb="md" wrap="wrap">
+                    <Box>
+                      <Title order={5}>Layout da Prévia</Title>
+                      <Text size="sm" c="dimmed">Estas opções controlam o documento exibido em Prévia no editor de laudo.</Text>
+                    </Box>
+                    <Button bg={DARK_BLUE} c="white" onClick={saveReportLayout} loading={savingConfig}>
+                      Salvar layout
+                    </Button>
+                  </Group>
+
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                    <FloatingInput label="Nome da clínica" value={reportLayout.clinicName} onChange={(event) => updateReportLayout('clinicName', event.currentTarget.value)} />
+                    <FloatingInput label="Título do laudo" value={reportLayout.title} onChange={(event) => updateReportLayout('title', event.currentTarget.value)} />
+                    <FloatingInput label="Subtítulo" value={reportLayout.subtitle} onChange={(event) => updateReportLayout('subtitle', event.currentTarget.value)} />
+                    <FloatingInput label="URL do logo" value={reportLayout.logoUrl} onChange={(event) => updateReportLayout('logoUrl', event.currentTarget.value)} />
+                    <FileInput label="Carregar logo" accept="image/*" clearable onChange={handleLogoImageUpload} />
+                    <Group align="flex-end" gap="sm">
+                      {reportLayout.logoImageDataUrl ? (
+                        <Image src={reportLayout.logoImageDataUrl} alt="Logo carregado" fit="contain" h={54} w={120} radius="sm" />
+                      ) : (
+                        <Text size="sm" c="dimmed">Sem imagem carregada</Text>
+                      )}
+                      <Button
+                        variant="default"
+                        size="xs"
+                        onClick={() => updateReportLayout('logoImageDataUrl', '')}
+                        disabled={!reportLayout.logoImageDataUrl}
+                      >
+                        Remover imagem
+                      </Button>
+                    </Group>
+                    <Select label="Papel" data={[{ value: 'A4', label: 'A4' }, { value: 'Letter', label: 'Carta' }]} value={reportLayout.paperSize} onChange={(value) => updateReportLayout('paperSize', (value as ReportLayoutConfig['paperSize']) || 'A4')} />
+                    <Select label="Orientação" data={[{ value: 'portrait', label: 'Retrato' }, { value: 'landscape', label: 'Paisagem' }]} value={reportLayout.orientation} onChange={(value) => updateReportLayout('orientation', (value as ReportLayoutConfig['orientation']) || 'portrait')} />
+                    <ColorInput label="Cor principal" value={reportLayout.primaryColor} onChange={(value) => updateReportLayout('primaryColor', value)} />
+                    <NumberInput label="Tamanho da fonte" min={10} max={18} value={reportLayout.fontSizePx} onChange={(value) => updateReportLayout('fontSizePx', Number(value) || 13)} />
+                  </SimpleGrid>
+
+                  <SimpleGrid cols={{ base: 2, md: 4 }} spacing="md" mt="md">
+                    <NumberInput label="Margem topo (mm)" min={0} max={60} value={reportLayout.marginTopMm} onChange={(value) => updateReportLayout('marginTopMm', Number(value) || 0)} />
+                    <NumberInput label="Margem direita (mm)" min={0} max={60} value={reportLayout.marginRightMm} onChange={(value) => updateReportLayout('marginRightMm', Number(value) || 0)} />
+                    <NumberInput label="Margem base (mm)" min={0} max={60} value={reportLayout.marginBottomMm} onChange={(value) => updateReportLayout('marginBottomMm', Number(value) || 0)} />
+                    <NumberInput label="Margem esquerda (mm)" min={0} max={60} value={reportLayout.marginLeftMm} onChange={(value) => updateReportLayout('marginLeftMm', Number(value) || 0)} />
+                  </SimpleGrid>
+
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mt="md">
+                    <Textarea label="Texto do cabeçalho" minRows={2} value={reportLayout.headerText} onChange={(event) => updateReportLayout('headerText', event.currentTarget.value)} />
+                    <Textarea label="Rodapé" minRows={2} value={reportLayout.footerText} onChange={(event) => updateReportLayout('footerText', event.currentTarget.value)} />
+                  </SimpleGrid>
+
+                  <Group mt="md" gap="xl" wrap="wrap">
+                    <Switch label="Exibir logo" checked={reportLayout.showLogo} onChange={(event) => updateReportLayout('showLogo', event.currentTarget.checked)} />
+                    <Switch label="Exibir dados do paciente" checked={reportLayout.showPatientInfo} onChange={(event) => updateReportLayout('showPatientInfo', event.currentTarget.checked)} />
+                    <Switch label="Exibir assinaturas" checked={reportLayout.showSignatures} onChange={(event) => updateReportLayout('showSignatures', event.currentTarget.checked)} />
+                  </Group>
+                </Box>
               </Stack>
             </Paper>
             )}
@@ -1013,6 +1176,27 @@ export function LaudoConfiguracoes() {
               setPhraseForm((prev) => ({ ...prev, label: value }));
             }}
             required
+          />
+          <FloatingInput
+            label="Atalho (ex: Ctrl+1)"
+            value={phraseForm.shortcut}
+            placeholder="Pressione a combinação"
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setPhraseForm((prev) => ({ ...prev, shortcut: value }));
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Backspace' || event.key === 'Delete') {
+                event.preventDefault();
+                setPhraseForm((prev) => ({ ...prev, shortcut: '' }));
+                return;
+              }
+
+              const shortcut = buildShortcutLabelFromEvent(event);
+              if (!shortcut) return;
+              event.preventDefault();
+              setPhraseForm((prev) => ({ ...prev, shortcut }));
+            }}
           />
           <Box>
             <Text size="sm" fw={500} mb={6}>Frase</Text>

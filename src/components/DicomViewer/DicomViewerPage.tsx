@@ -143,6 +143,9 @@ export function DicomViewerPage() {
   const { key } = useParams<{ key: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const returnTo = searchParams.get('returnTo');
+  const reportItemId = searchParams.get('itemId') || key || '';
 
   const [seriesList, setSeriesList] = useState<DicomSeriesSummaryItem[]>([]);
   const [activeSeriesUid, setActiveSeriesUid] = useState<string | null>(null);
@@ -233,7 +236,7 @@ export function DicomViewerPage() {
       >
         <Group>
           <Tooltip label="Voltar para a lista">
-            <ActionIcon variant="light" color="gray" size="lg" onClick={() => navigate('/laudo-exames')}>
+            <ActionIcon variant="light" color="gray" size="lg" onClick={() => navigate(returnTo || '/laudo-exames')}>
               <ArrowLeft size={20} />
             </ActionIcon>
           </Tooltip>
@@ -256,7 +259,7 @@ export function DicomViewerPage() {
             color="blue"
             leftSection={<FileText size={16} />}
             onClick={() =>
-              navigate(`/laudo-exames?itemId=${encodeURIComponent(key || '')}&returnTo=${encodeURIComponent(location.pathname)}`)
+              navigate(`/laudo-exames?itemId=${encodeURIComponent(reportItemId)}&returnTo=${encodeURIComponent(location.pathname)}`)
             }
             radius="md"
           >

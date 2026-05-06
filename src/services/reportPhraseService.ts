@@ -3,6 +3,7 @@ import api from './api';
 export interface ReportPhrasePayload {
   examType: string;
   label: string;
+  shortcut?: string;
   text: string;
 }
 
