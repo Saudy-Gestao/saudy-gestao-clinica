@@ -39,6 +39,12 @@ export interface DicomSeriesSummaryItem {
   url: string;
 }
 
+const getDicomWebTagValue = (item: any, tag: string): string | null => {
+  const value = item?.[tag]?.Value;
+  if (Array.isArray(value) && value.length > 0) return String(value[0]);
+  return null;
+};
+
 export default {
   async list(params?: { search?: string; status?: string; examType?: string; appointmentId?: string; limit?: number; offset?: number }) {
     const res = await api.get('/care/report-worklist/', { params });
@@ -130,5 +136,59 @@ export default {
   async fetchDicomSeriesImageIds(key: string, seriesUid: string | null): Promise<string[]> {
     const files = await this.fetchDicomSeriesFiles(key, seriesUid);
     return files.map((f) => this.buildSeriesImageId(f.url));
+  },
+
+  buildDicomWebImageId(studyInstanceUid: string, seriesInstanceUid: string, sopInstanceUid: string): string {
+    const base = ((import.meta.env.VITE_API_URL as string) ?? '').replace(/\/$/, '');
+    return `wadouri:${base}/dicom/orthanc/studies/${encodeURIComponent(studyInstanceUid)}/series/${encodeURIComponent(seriesInstanceUid)}/instances/${encodeURIComponent(sopInstanceUid)}/file`;
+  },
+
+  async fetchDicomWebSeriesSummary(studyInstanceUid: string): Promise<DicomSeriesSummaryItem[]> {
+    const seriesRes = await api.get(`/dicom-web/studies/${encodeURIComponent(studyInstanceUid)}/series`, {
+      headers: { Accept: 'application/dicom+json, application/json' },
+    });
+    const seriesItems: any[] = Array.isArray(seriesRes.data) ? seriesRes.data : [];
+
+    const summaries = await Promise.all(seriesItems.map(async (series, index) => {
+      const seriesUid = getDicomWebTagValue(series, '0020000E');
+      if (!seriesUid) return null;
+
+      const instancesRes = await api.get(
+        `/dicom-web/studies/${encodeURIComponent(studyInstanceUid)}/series/${encodeURIComponent(seriesUid)}/instances`,
+        { headers: { Accept: 'application/dicom+json, application/json' } },
+      );
+      const instances: any[] = Array.isArray(instancesRes.data) ? instancesRes.data : [];
+      const firstSopUid = instances.map((item) => getDicomWebTagValue(item, '00080018')).find(Boolean);
+
+      return {
+        id: seriesUid,
+        seriesUid,
+        instancesCount: instances.length,
+        url: firstSopUid ? this.buildDicomWebImageId(studyInstanceUid, seriesUid, firstSopUid) : '',
+        sortIndex: index,
+      };
+    }));
+
+    return summaries
+      .filter(Boolean)
+      .map((item: any) => ({
+        id: item.id,
+        seriesUid: item.seriesUid,
+        instancesCount: item.instancesCount,
+        url: item.url,
+      }));
+  },
+
+  async fetchDicomWebSeriesImageIds(studyInstanceUid: string, seriesInstanceUid: string | null): Promise<string[]> {
+    if (!seriesInstanceUid) return [];
+    const res = await api.get(
+      `/dicom-web/studies/${encodeURIComponent(studyInstanceUid)}/series/${encodeURIComponent(seriesInstanceUid)}/instances`,
+      { headers: { Accept: 'application/dicom+json, application/json' } },
+    );
+    const instances: any[] = Array.isArray(res.data) ? res.data : [];
+    return instances
+      .map((item) => getDicomWebTagValue(item, '00080018'))
+      .filter(Boolean)
+      .map((sopInstanceUid) => this.buildDicomWebImageId(studyInstanceUid, seriesInstanceUid, sopInstanceUid as string));
   },
 };

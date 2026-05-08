@@ -13,6 +13,7 @@ import {
   Skeleton,
   Loader,
   Stack,
+  Switch,
   Table,
   Text,
   TextInput,
@@ -24,7 +25,8 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck, Trash2, ClipboardList, Images } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck, Trash2, ClipboardList, Images, Upload, FileArchive } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -36,6 +38,7 @@ import { useReportExamsPageDataQuery } from '../../hooks/useReportExamsPageDataQ
 import { useReportPreviousReportsQuery } from '../../hooks/useReportPreviousReportsQuery';
 import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQuery';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { queryKeys } from '../../lib/queryKeys';
 import { FloatingInput } from '../common/FloatingInput';
 import { escapeHtml, normalizeReportLayout } from '../../lib/reportLayout';
 import type { ReportLayoutConfig } from '../../services/reportConfigService';
@@ -357,6 +360,16 @@ const priorityColor: Record<ExamPriority, string> = {
   urgente: 'red',
 };
 
+const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const value = String(reader.result || '');
+    resolve(value.includes(',') ? value.split(',').pop() || '' : value);
+  };
+  reader.onerror = () => reject(reader.error || new Error('Falha ao ler arquivo'));
+  reader.readAsDataURL(file);
+});
+
 const REPORT_PLACEHOLDERS = [
   { key: '{{paciente_nome}}', label: 'Nome do paciente' },
   { key: '{{cpf}}', label: 'CPF' },
@@ -379,12 +392,14 @@ const normalizeExamStatus = (status: any): ExamStatus => {
 
 export function LaudoExames() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const currentUser = authService.getCurrentUser();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
   const { colorScheme } = useMantineColorScheme();
   const editorRef = useRef<any>(null);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const priorStudyFileInputRef = useRef<HTMLInputElement | null>(null);
   const isDark = colorScheme === 'dark';
   const pageBg = isDark ? 'var(--mantine-color-body)' : '#f8f9fa';
   const panelBg = isDark ? 'transparent' : 'var(--mantine-color-white)';
@@ -415,6 +430,10 @@ export function LaudoExames() {
   const [headerExpanded, setHeaderExpanded] = useState(true);
   const [previousReportsModalOpen, setPreviousReportsModalOpen] = useState(false);
   const [selectedPreviousReport, setSelectedPreviousReport] = useState<PreviousReport | null>(null);
+  const [priorStudyModalOpen, setPriorStudyModalOpen] = useState(false);
+  const [priorStudyFiles, setPriorStudyFiles] = useState<File[]>([]);
+  const [priorStudyUploading, setPriorStudyUploading] = useState(false);
+  const [priorStudyCompareWithCurrent, setPriorStudyCompareWithCurrent] = useState(false);
   const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Record<string, boolean>>({});
   const [requiresReviewer, setRequiresReviewer] = useState(true);
   const [reportLayout, setReportLayout] = useState<ReportLayoutConfig>(() => normalizeReportLayout(null));
@@ -1005,6 +1024,105 @@ export function LaudoExames() {
 
     const reportItemId = selectedExam?.id || imageKey;
     navigate(`/dicom-viewer/${encodeURIComponent(imageKey)}?itemId=${encodeURIComponent(reportItemId)}&returnTo=${encodeURIComponent(`/laudo-exames?itemId=${reportItemId}`)}`);
+  };
+
+  const resetPriorStudyUpload = () => {
+    setPriorStudyFiles([]);
+    setPriorStudyCompareWithCurrent(false);
+    if (priorStudyFileInputRef.current) priorStudyFileInputRef.current.value = '';
+  };
+
+  const openPriorStudyUploadModal = () => {
+    if (!selectedExamReportId) {
+      showNotification({
+        title: 'Laudo não selecionado',
+        message: 'Abra um laudo antes de carregar um exame anterior.',
+        color: 'yellow',
+      });
+      return;
+    }
+    resetPriorStudyUpload();
+    setPriorStudyModalOpen(true);
+  };
+
+  const handlePriorStudyFilesChange = (files: FileList | null) => {
+    const selected = Array.from(files || []);
+    setPriorStudyFiles(selected);
+  };
+
+  const uploadTemporaryPriorStudy = async () => {
+    if (!selectedExam || !selectedExamReportId) return;
+    if (priorStudyFiles.length === 0) {
+      showNotification({
+        title: 'Nenhum arquivo selecionado',
+        message: 'Selecione um ZIP ou arquivos DICOM para carregar no visualizador.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const zipFiles = priorStudyFiles.filter((file) => /\.zip$/i.test(file.name) || file.type.includes('zip'));
+    if (zipFiles.length > 1 || (zipFiles.length === 1 && priorStudyFiles.length > 1)) {
+      showNotification({
+        title: 'Seleção inválida',
+        message: 'Envie um ZIP por vez ou selecione apenas arquivos DICOM.',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    setPriorStudyUploading(true);
+    try {
+      const payload = zipFiles.length === 1
+        ? {
+            zipBase64: await fileToBase64(zipFiles[0]),
+            zipFileName: zipFiles[0].name,
+            description: `Exame anterior temporário - ${selectedExam.patientName}`,
+          }
+        : {
+            files: await Promise.all(priorStudyFiles.map(async (file) => ({
+              fileName: file.name,
+              base64: await fileToBase64(file),
+            }))),
+            description: `Exame anterior temporário - ${selectedExam.patientName}`,
+          };
+
+      const result = await reportService.uploadTemporaryPriorStudy(selectedExamReportId, payload);
+      const studyUid = result?.studyInstanceUid;
+      if (!studyUid) throw new Error('O backend não retornou o identificador do estudo temporário.');
+
+      setPriorStudyModalOpen(false);
+      resetPriorStudyUpload();
+      showNotification({
+        title: 'Exame anterior carregado',
+        message: 'Abrindo as imagens temporárias no visualizador.',
+        color: 'green',
+      });
+
+      const tempStudyId = result?.temporaryStudyId || result?.item?.id || '';
+      const currentImageKey = getSelectedExamImageKey();
+      const params = new URLSearchParams({
+        source: 'dicomweb',
+        itemId: selectedExam.id,
+        returnTo: `/laudo-exames?itemId=${selectedExam.id}`,
+      });
+      if (tempStudyId) params.set('tempStudyId', tempStudyId);
+      params.set('reportId', selectedExamReportId);
+      if (priorStudyCompareWithCurrent && currentImageKey) {
+        params.set('compare', '1');
+        params.set('currentKey', currentImageKey);
+      }
+
+      navigate(`/dicom-viewer/${encodeURIComponent(studyUid)}?${params.toString()}`);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao carregar exame anterior',
+        message: resolveApiErrorMessage(err, 'Não foi possível carregar o exame anterior no visualizador.'),
+        color: 'red',
+      });
+    } finally {
+      setPriorStudyUploading(false);
+    }
   };
 
   useEffect(() => {
@@ -1648,6 +1766,8 @@ export function LaudoExames() {
         status: nextStatus,
         description: reportText,
       });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportExamsPageData });
+      await queryClient.refetchQueries({ queryKey: queryKeys.reportExamsPageData });
       setLastSavedAt(new Date().toLocaleString('pt-BR'));
       showNotification({ title: 'Laudo salvo', message: `Laudo salvo com status ${statusLabel[nextStatus]}.`, color: 'green' });
     } catch (err: any) {
@@ -2159,7 +2279,14 @@ export function LaudoExames() {
                       <Table.Td>
                         <Group gap={6}>
                           <Tooltip label="Abrir Exame (DICOM)">
-                            <ActionIcon variant="subtle" color="cyan" onClick={() => navigate(`/dicom-viewer/${encodeURIComponent(exam.id)}`)}>
+                            <ActionIcon
+                              variant="subtle"
+                              color="cyan"
+                              onClick={() => {
+                                const imageKey = exam.dicomStudyUid || exam.id;
+                                navigate(`/dicom-viewer/${encodeURIComponent(imageKey)}?itemId=${encodeURIComponent(exam.id)}&returnTo=${encodeURIComponent('/laudo-exames')}`);
+                              }}
+                            >
                               <Eye size={16} />
                             </ActionIcon>
                           </Tooltip>
@@ -2582,6 +2709,9 @@ export function LaudoExames() {
                   <Button variant="default" onClick={openExamImages} leftSection={<Images size={16} />}>
                     Imagens
                   </Button>
+                  <Button variant="light" color="cyan" onClick={openPriorStudyUploadModal} leftSection={<Upload size={16} />}>
+                    Exame anterior
+                  </Button>
                   <Button variant="default" onClick={() => setPdfPreviewModalOpen(true)} leftSection={<FileText size={16} />}>
                     Prévia
                   </Button>
@@ -2625,6 +2755,104 @@ export function LaudoExames() {
               </Group>
             </Stack>
           )}
+        </Modal>
+
+        <Modal
+          opened={priorStudyModalOpen}
+          onClose={() => {
+            if (priorStudyUploading) return;
+            setPriorStudyModalOpen(false);
+            resetPriorStudyUpload();
+          }}
+          title="Carregar exame anterior"
+          centered
+          size="md"
+        >
+          <Stack gap="md">
+            <Paper withBorder p="sm" radius="md" bg={subtleBg} style={{ borderColor }}>
+              <Group gap="sm" align="flex-start">
+                <ThemeIcon variant="light" color="cyan" size="lg">
+                  <FileArchive size={20} />
+                </ThemeIcon>
+                <Box>
+                  <Text size="sm" fw={600}>
+                    {selectedExam?.patientName || 'Paciente'}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Envie um ZIP com DICOMs ou selecione arquivos .dcm. O estudo será carregado temporariamente para comparação.
+                  </Text>
+                </Box>
+              </Group>
+            </Paper>
+
+            <input
+              ref={priorStudyFileInputRef}
+              type="file"
+              accept=".zip,.dcm,application/zip,application/x-zip-compressed,application/dicom"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(event) => handlePriorStudyFilesChange(event.currentTarget.files)}
+            />
+
+            <Button
+              variant="default"
+              leftSection={<Upload size={16} />}
+              onClick={() => priorStudyFileInputRef.current?.click()}
+              disabled={priorStudyUploading}
+            >
+              Selecionar ZIP ou DICOMs
+            </Button>
+
+            {priorStudyFiles.length > 0 ? (
+              <Paper withBorder p="sm" radius="md" style={{ borderColor }}>
+                <Text size="xs" c="dimmed" mb={6}>
+                  {priorStudyFiles.length} arquivo(s) selecionado(s)
+                </Text>
+                <Stack gap={4} style={{ maxHeight: 140, overflowY: 'auto' }}>
+                  {priorStudyFiles.map((file) => (
+                    <Text key={`${file.name}-${file.size}`} size="sm" lineClamp={1}>
+                      {file.name}
+                    </Text>
+                  ))}
+                </Stack>
+              </Paper>
+            ) : (
+              <Text size="sm" c="dimmed">
+                Nenhum arquivo selecionado.
+              </Text>
+            )}
+
+            <Switch
+              label="Comparar com exame atual"
+              description="Abre o exame atual e o anterior lado a lado."
+              checked={priorStudyCompareWithCurrent}
+              onChange={(event) => setPriorStudyCompareWithCurrent(event.currentTarget.checked)}
+              disabled={!getSelectedExamImageKey() || priorStudyUploading}
+            />
+
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                onClick={() => {
+                  setPriorStudyModalOpen(false);
+                  resetPriorStudyUpload();
+                }}
+                disabled={priorStudyUploading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                bg={DARK_BLUE}
+                c="white"
+                leftSection={<Images size={16} />}
+                onClick={uploadTemporaryPriorStudy}
+                loading={priorStudyUploading}
+                disabled={priorStudyFiles.length === 0}
+              >
+                Carregar no visualizador
+              </Button>
+            </Group>
+          </Stack>
         </Modal>
 
         <Modal

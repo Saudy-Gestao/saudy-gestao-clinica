@@ -21,6 +21,15 @@ export interface ReportPayload {
   reviewerSignedAt?: string | null;
 }
 
+export interface TemporaryPriorStudyUploadPayload {
+  files?: Array<{ fileName?: string; base64: string }>;
+  filesBase64?: string[];
+  zipBase64?: string;
+  zipFileName?: string;
+  description?: string;
+  ttlHours?: number;
+}
+
 export default {
   async list(params?: { search?: string; status?: string; exam?: string; worklistItemId?: string; appointmentId?: string; mine?: boolean; limit?: number; offset?: number }) {
     const url = '/care/reports/';
@@ -48,6 +57,21 @@ export default {
 
   async spellCheck(html: string): Promise<{ correctedHtml: string }> {
     const res = await api.post('/care/spell-check', { html });
+    return res.data;
+  },
+
+  async uploadTemporaryPriorStudy(reportId: string, payload: TemporaryPriorStudyUploadPayload) {
+    const res = await api.post(`/care/reports/${reportId}/temporary-prior-studies`, payload);
+    return res.data;
+  },
+
+  async listTemporaryPriorStudies(reportId: string) {
+    const res = await api.get(`/care/reports/${reportId}/temporary-prior-studies`);
+    return res.data;
+  },
+
+  async deleteTemporaryPriorStudy(reportId: string, temporaryStudyId: string) {
+    const res = await api.delete(`/care/reports/${reportId}/temporary-prior-studies/${temporaryStudyId}`);
     return res.data;
   },
 };
