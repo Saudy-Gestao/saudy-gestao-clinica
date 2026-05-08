@@ -56,6 +56,7 @@ export function PublicPreAgendamentoDocs() {
   const [submittingAnamnesis, setSubmittingAnamnesis] = useState(false);
   const [expired, setExpired] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [patientComplaints, setPatientComplaints] = useState('');
   const [anamnesisAnswers, setAnamnesisAnswers] = useState<Record<string, {
     answerText?: string;
     answerValues?: string[];
@@ -216,7 +217,9 @@ export function PublicPreAgendamentoDocs() {
     }
     setFinalizing(true);
     try {
-      await preSchedulingService.finalizePublicDocuments(token);
+      await preSchedulingService.finalizePublicDocuments(token, {
+        patientComplaints: patientComplaints.trim() || undefined,
+      });
       showNotification({
         title: 'Envio finalizado',
         message: 'Documentos enviados e liberados para revisão da clínica.',
@@ -667,6 +670,20 @@ export function PublicPreAgendamentoDocs() {
                       <Text size="sm" c="rgba(255,255,255,0.7)">Nenhum documento enviado ainda.</Text>
                     )}
                   </Stack>
+
+                  <Textarea
+                    label="O que você está sentindo?"
+                    description="Descreva seus sintomas ou queixas para auxiliar o atendimento."
+                    placeholder="Ex: dor de cabeça, tontura, falta de ar..."
+                    value={patientComplaints}
+                    onChange={(e) => setPatientComplaints(e.currentTarget.value)}
+                    minRows={3}
+                    styles={{
+                      label: { color: 'white' },
+                      description: { color: 'rgba(255,255,255,0.65)' },
+                      input: { background: '#0A1128', color: 'white', borderColor: '#3559A8' },
+                    }}
+                  />
 
                   <Group justify="flex-end" mt="sm">
                     <Button
