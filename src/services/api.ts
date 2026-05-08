@@ -47,8 +47,9 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     const requestUrl = String(error?.config?.url || '');
     const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/forgot-password') || requestUrl.includes('/auth/verify-code') || requestUrl.includes('/auth/reset-password');
+    const isDicomWebEndpoint = requestUrl.includes('/dicom-web');
 
-    if (status === 401 && hadToken && !isAuthEndpoint) {
+    if (status === 401 && hadToken && !isAuthEndpoint && !isDicomWebEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (typeof window !== 'undefined') {

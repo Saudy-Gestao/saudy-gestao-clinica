@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ActionIcon, Box, Button, Flex, Group, Loader, Skeleton, Text, Tooltip } from '@mantine/core';
-import { ArrowLeft, FileText, ScanLine } from 'lucide-react';
+import { showNotification } from '@mantine/notifications';
+import { ArrowLeft, FileText, ScanLine, Trash2 } from 'lucide-react';
 import cornerstone from 'cornerstone-core';
 import { DicomViewer } from './DicomViewer';
 import reportWorklistService, { type DicomSeriesSummaryItem } from '../../services/reportWorklistService';
+import reportService from '../../services/reportService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import styles from './DicomViewerPage.module.css';
 
 const SERIES_SIDEBAR_WIDTH = 192;
+
+type StudySource = 'archive' | 'dicomweb';
 
 interface SeriesThumbnailProps {
   imageUrl: string;
@@ -34,7 +38,9 @@ function SeriesThumbnail({ imageUrl, active, loading, label, count, onClick }: S
 
     const base = ((import.meta.env.VITE_API_URL as string) ?? '').replace(/\/$/, '');
     const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-    const wadoId = `wadouri:${base}${path}`;
+    const wadoId = imageUrl.startsWith('wadors:') || imageUrl.startsWith('wadouri:')
+      ? imageUrl
+      : `wadouri:${base}${path}`;
 
     cornerstone
       .loadAndCacheImage(wadoId)
@@ -75,7 +81,6 @@ function SeriesThumbnail({ imageUrl, active, loading, label, count, onClick }: S
         position: 'relative',
       }}
     >
-      {/* Accent bar esquerdo */}
       {active && (
         <Box
           style={{
@@ -103,7 +108,7 @@ function SeriesThumbnail({ imageUrl, active, loading, label, count, onClick }: S
         {dataUrl ? (
           <img src={dataUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         ) : thumbError ? (
-          <Text size="xs" c="dimmed">—</Text>
+          <Text size="xs" c="dimmed">-</Text>
         ) : (
           <Loader size="sm" color="gray" />
         )}
@@ -118,7 +123,6 @@ function SeriesThumbnail({ imageUrl, active, loading, label, count, onClick }: S
         </Text>
       </Box>
 
-      {/* Overlay de carregamento ao trocar série */}
       {loading && active && (
         <Box
           style={{
@@ -139,27 +143,32 @@ function SeriesThumbnail({ imageUrl, active, loading, label, count, onClick }: S
   );
 }
 
-export function DicomViewerPage() {
-  const { key } = useParams<{ key: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
+interface StudyPaneProps {
+  studyKey: string;
+  source: StudySource;
+  title?: string;
+}
 
+function StudyPane({ studyKey, source, title }: StudyPaneProps) {
+  const navigate = useNavigate();
   const [seriesList, setSeriesList] = useState<DicomSeriesSummaryItem[]>([]);
   const [activeSeriesUid, setActiveSeriesUid] = useState<string | null>(null);
   const [seriesImageIds, setSeriesImageIds] = useState<string[]>([]);
   const [loadingStudy, setLoadingStudy] = useState(true);
   const [loadingSeries, setLoadingSeries] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const requestIdRef = useRef(0);
+  const isDicomWebSource = source === 'dicomweb';
 
   const loadSeries = useCallback(
-    async (studyKey: string, seriesUid: string | null) => {
+    async (currentStudyKey: string, seriesUid: string | null) => {
       const requestId = ++requestIdRef.current;
       setLoadingSeries(true);
 
       try {
-        const imageIds = await reportWorklistService.fetchDicomSeriesImageIds(studyKey, seriesUid);
+        const imageIds = isDicomWebSource
+          ? await reportWorklistService.fetchDicomWebSeriesImageIds(currentStudyKey, seriesUid)
+          : await reportWorklistService.fetchDicomSeriesImageIds(currentStudyKey, seriesUid);
         if (requestIdRef.current !== requestId) return;
         setSeriesImageIds(imageIds);
         setActiveSeriesUid(seriesUid);
@@ -169,11 +178,11 @@ export function DicomViewerPage() {
         }
       }
     },
-    [],
+    [isDicomWebSource],
   );
 
   useEffect(() => {
-    if (!key) return;
+    if (!studyKey) return;
 
     const requestId = ++requestIdRef.current;
     setLoadingStudy(true);
@@ -183,91 +192,60 @@ export function DicomViewerPage() {
     setSeriesImageIds([]);
     setActiveSeriesUid(null);
 
-    reportWorklistService
-      .fetchDicomSeriesSummary(key)
+    const summaryPromise = isDicomWebSource
+      ? reportWorklistService.fetchDicomWebSeriesSummary(studyKey)
+      : reportWorklistService.fetchDicomSeriesSummary(studyKey);
+
+    summaryPromise
       .then(async (summary) => {
         if (requestIdRef.current !== requestId) return;
-
         setSeriesList(summary);
-        // Show the viewer shell immediately after the series list is known
         setLoadingStudy(false);
-
         if (!summary.length) return;
-
-        await loadSeries(key, summary[0].seriesUid);
+        await loadSeries(studyKey, summary[0].seriesUid);
       })
       .catch((err) => {
         if (requestIdRef.current !== requestId) return;
-        setError(resolveApiErrorMessage(err, 'Não foi possível carregar o DICOM'));
+        const message = isDicomWebSource && Number(err?.response?.status || 0) === 401
+          ? 'Nao foi possivel autenticar no Orthanc pelo proxy DICOMweb. Reinicie o backend e tente novamente.'
+          : resolveApiErrorMessage(err, 'Nao foi possivel carregar o DICOM');
+        setError(message);
         setLoadingStudy(false);
       });
-  }, [key, loadSeries]);
+  }, [isDicomWebSource, loadSeries, studyKey]);
 
   const handleSelectSeries = useCallback(
     async (seriesUid: string | null) => {
-      if (!key) return;
-      if (seriesUid === activeSeriesUid) return;
+      if (!studyKey || seriesUid === activeSeriesUid) return;
       setError(null);
       try {
-        await loadSeries(key, seriesUid);
+        await loadSeries(studyKey, seriesUid);
       } catch (err: any) {
-        setError(resolveApiErrorMessage(err, 'Não foi possível carregar a série'));
+        setError(resolveApiErrorMessage(err, 'Nao foi possivel carregar a serie'));
       }
     },
-    [activeSeriesUid, key, loadSeries],
+    [activeSeriesUid, loadSeries, studyKey],
   );
 
   return (
-    <Box style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#000' }}>
-      {/* Header */}
-      <Box
-        style={{
-          padding: '12px 24px',
-          backgroundColor: '#1A1B1E',
-          borderBottom: '1px solid #2C2E33',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
-        <Group>
-          <Tooltip label="Voltar para a lista">
-            <ActionIcon variant="light" color="gray" size="lg" onClick={() => navigate('/laudo-exames')}>
-              <ArrowLeft size={20} />
-            </ActionIcon>
-          </Tooltip>
-          <Group gap={8} ml="md">
-            <ScanLine size={24} color="#0ab5ff" />
-            <Box>
-              <Text size="sm" c="white" fw={600} lh={1.2}>
-                Visualizador Diagnóstico
-              </Text>
-              <Text size="xs" c="dimmed" lh={1.2}>
-                Exame ID: {key}
-              </Text>
-            </Box>
-          </Group>
-        </Group>
-
-        <Group>
-          <Button
-            variant="filled"
-            color="blue"
-            leftSection={<FileText size={16} />}
-            onClick={() =>
-              navigate(`/laudo-exames?itemId=${encodeURIComponent(key || '')}&returnTo=${encodeURIComponent(location.pathname)}`)
-            }
-            radius="md"
-          >
-            Abrir Laudo
-          </Button>
-        </Group>
-      </Box>
-
-      {/* Conteúdo principal */}
-      <Box style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Sidebar de séries */}
+    <Box
+      style={{
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        minWidth: 0,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#000',
+      }}
+    >
+      {title ? (
+        <Box style={{ padding: '8px 12px', borderBottom: '1px solid rgba(44,46,51,0.8)', background: '#101318' }}>
+          <Text size="sm" fw={700} c="gray.1">{title}</Text>
+        </Box>
+      ) : null}
+      <Box style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {!loadingStudy && seriesList.length > 0 && (
           <Box
             className={styles.sidebar}
@@ -283,7 +261,6 @@ export function DicomViewerPage() {
               padding: '12px 10px 16px',
             }}
           >
-            {/* Header da sidebar */}
             <Box
               style={{
                 display: 'flex',
@@ -295,7 +272,7 @@ export function DicomViewerPage() {
               }}
             >
               <Text size="xs" c="gray.5" fw={700} style={{ letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Séries
+                Series
               </Text>
               <Box
                 style={{
@@ -317,7 +294,7 @@ export function DicomViewerPage() {
                 imageUrl={series.url}
                 active={series.seriesUid === activeSeriesUid}
                 loading={loadingSeries}
-                label={`Série ${index + 1}`}
+                label={`Serie ${index + 1}`}
                 count={series.instancesCount}
                 onClick={() => handleSelectSeries(series.seriesUid)}
               />
@@ -325,7 +302,6 @@ export function DicomViewerPage() {
           </Box>
         )}
 
-        {/* Área do viewer */}
         <Box style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#000' }}>
           {loadingStudy ? (
             <Box p="lg">
@@ -334,7 +310,7 @@ export function DicomViewerPage() {
             </Box>
           ) : error ? (
             <Flex h="100%" align="center" justify="center" direction="column" gap="md">
-              <Text c="red" size="lg">
+              <Text c="red" size="lg" ta="center">
                 {error}
               </Text>
               <Button variant="outline" color="gray" onClick={() => navigate('/laudo-exames')}>
@@ -350,10 +326,135 @@ export function DicomViewerPage() {
                 Voltar
               </Button>
             </Flex>
+          ) : loadingSeries || seriesImageIds.length === 0 ? (
+            <Flex h="100%" align="center" justify="center" direction="column" gap="md">
+              <Loader size="lg" color="blue" />
+              <Text c="dimmed" size="sm">
+                Carregando imagens da série...
+              </Text>
+            </Flex>
           ) : (
-            <DicomViewer style={{ height: '100%', width: '100%' }} initialImageIds={seriesImageIds} />
+            <DicomViewer
+              key={`${source}:${studyKey}:${activeSeriesUid || 'no-series'}:${seriesImageIds.length}`}
+              style={{ height: '100%', width: '100%' }}
+              initialImageIds={seriesImageIds}
+            />
           )}
         </Box>
+      </Box>
+    </Box>
+  );
+}
+
+export function DicomViewerPage() {
+  const { key } = useParams<{ key: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const returnTo = searchParams.get('returnTo');
+  const reportItemId = searchParams.get('itemId') || key || '';
+  const isDicomWebSource = searchParams.get('source') === 'dicomweb';
+  const isCompareMode = searchParams.get('compare') === '1';
+  const currentKey = searchParams.get('currentKey') || '';
+  const temporaryStudyId = searchParams.get('tempStudyId') || '';
+  const reportId = searchParams.get('reportId') || '';
+  const [removingTemporaryStudy, setRemovingTemporaryStudy] = useState(false);
+
+  const handleRemoveTemporaryStudy = async () => {
+    if (!reportId || !temporaryStudyId) return;
+    setRemovingTemporaryStudy(true);
+    try {
+      await reportService.deleteTemporaryPriorStudy(reportId, temporaryStudyId);
+      showNotification({
+        title: 'Exame temporario removido',
+        message: 'O estudo anterior foi removido do visualizador temporario.',
+        color: 'green',
+      });
+      navigate(returnTo || '/laudo-exames');
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro ao remover exame temporario',
+        message: resolveApiErrorMessage(err, 'Nao foi possivel remover o estudo temporario.'),
+        color: 'red',
+      });
+    } finally {
+      setRemovingTemporaryStudy(false);
+    }
+  };
+
+  const source: StudySource = isDicomWebSource ? 'dicomweb' : 'archive';
+
+  return (
+    <Box style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#000' }}>
+      <Box
+        style={{
+          padding: '12px 24px',
+          backgroundColor: '#1A1B1E',
+          borderBottom: '1px solid #2C2E33',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}
+      >
+        <Group>
+          <Tooltip label="Voltar para a lista">
+            <ActionIcon variant="light" color="gray" size="lg" onClick={() => navigate(returnTo || '/laudo-exames')}>
+              <ArrowLeft size={20} />
+            </ActionIcon>
+          </Tooltip>
+          <Group gap={8} ml="md">
+            <ScanLine size={24} color="#0ab5ff" />
+            <Box>
+              <Text size="sm" c="white" fw={600} lh={1.2}>
+                Visualizador Diagnostico
+              </Text>
+              <Text size="xs" c="dimmed" lh={1.2}>
+                {isCompareMode ? 'Comparacao' : isDicomWebSource ? 'Estudo temporario' : 'Exame ID'}: {key}
+              </Text>
+            </Box>
+          </Group>
+        </Group>
+
+        <Group>
+          {isDicomWebSource && temporaryStudyId && reportId ? (
+            <Button
+              variant="light"
+              color="red"
+              leftSection={<Trash2 size={16} />}
+              loading={removingTemporaryStudy}
+              onClick={handleRemoveTemporaryStudy}
+            >
+              Remover temporário
+            </Button>
+          ) : null}
+          <Button
+            variant="filled"
+            color="blue"
+            leftSection={<FileText size={16} />}
+            onClick={() =>
+              navigate(`/laudo-exames?itemId=${encodeURIComponent(reportItemId)}&returnTo=${encodeURIComponent(location.pathname)}`)
+            }
+            radius="md"
+          >
+            Abrir Laudo
+          </Button>
+        </Group>
+      </Box>
+
+      <Box style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        {isCompareMode && currentKey ? (
+          <>
+            <Box style={{ flex: 1, minWidth: 0, borderRight: '1px solid #2C2E33' }}>
+              <StudyPane studyKey={currentKey} source="archive" title="Exame atual" />
+            </Box>
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <StudyPane studyKey={key || ''} source={source} title="Exame anterior" />
+            </Box>
+          </>
+        ) : (
+          <StudyPane studyKey={key || ''} source={source} />
+        )}
       </Box>
     </Box>
   );
