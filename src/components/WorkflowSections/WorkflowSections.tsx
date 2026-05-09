@@ -16,6 +16,7 @@ import {
   Wallet,
   DollarSign,
   Brain,
+  BarChart3,
   ShieldCheck,
   ChevronRight,
   MessageCircle
@@ -76,6 +77,9 @@ export function WorkflowSections() {
       'conversas': 'whatsapp-config',
       'meus chamados': 'meus-chamados',
       'configuracoes de laudo': 'laudo',
+      'bi': 'bi-gestao',
+      'bi gestao': 'bi-gestao',
+      'business intelligence': 'bi-gestao',
     };
 
     if (aliases[compact]) return aliases[compact];
@@ -181,6 +185,7 @@ export function WorkflowSections() {
     {
       title: 'Gestão e Apoio',
       items: [
+        { icon: BarChart3, label: 'BI Gestão', desc: 'Indicadores executivos', route: '/bi', moduleName: 'bi-gestao' },
         { icon: Package, label: 'Entrega', desc: 'Controle de entregas', route: '/entrega', moduleName: 'entrega' },
         { icon: Warehouse, label: 'Estoque', desc: 'Materiais e insumos', route: '/estoque', moduleName: 'estoque' },
         { icon: Wallet, label: 'Financeiro', desc: 'Gestão financeira', route: '/financeiro', moduleName: 'financeiro' },
