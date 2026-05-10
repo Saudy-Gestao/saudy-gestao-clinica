@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionIcon,
   Box,
@@ -9,7 +9,6 @@ import {
   ScrollArea,
   SimpleGrid,
   Stack,
-  Tabs,
   Text,
   ThemeIcon,
   useComputedColorScheme,
@@ -217,8 +216,8 @@ function AiChatTab({ isDark, messages, setMessages }: {
                     color: isDark ? 'var(--mantine-color-gray-3)' : 'var(--mantine-color-gray-7)',
                     transition: 'all 100ms',
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = isDark ? 'var(--mantine-color-dark-5)' : '#eff6ff'; (e.currentTarget as HTMLDivElement).style.color = '#2c5be8'; (e.currentTarget as HTMLDivElement).style.borderColor = '#bfdbfe'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = isDark ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)'; (e.currentTarget as HTMLDivElement).style.color = isDark ? 'var(--mantine-color-gray-3)' : 'var(--mantine-color-gray-7)'; (e.currentTarget as HTMLDivElement).style.borderColor = isDark ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)'; }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.background = isDark ? 'var(--mantine-color-dark-5)' : '#eff6ff'; e.currentTarget.style.color = '#2c5be8'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.background = isDark ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)'; e.currentTarget.style.color = isDark ? 'var(--mantine-color-gray-3)' : 'var(--mantine-color-gray-7)'; e.currentTarget.style.borderColor = isDark ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)'; }}
                 >
                   {q}
                 </Box>
