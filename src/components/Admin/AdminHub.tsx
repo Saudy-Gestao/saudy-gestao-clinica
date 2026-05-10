@@ -1,5 +1,5 @@
 import { Box, Stack, Text, Group, Paper, SimpleGrid, Title, ThemeIcon } from '@mantine/core';
-import { Building2, ChevronRight, LayoutGrid, LifeBuoy, MessageSquareText, UserPlus } from 'lucide-react';
+import { BookOpen, Building2, ChevronRight, LayoutGrid, LifeBuoy, MessageSquareText, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StatsCards } from '../StatsCards/StatsCards';
 import { Header } from '../Header/Header';
@@ -29,6 +29,12 @@ const adminModules = [
     title: 'Chamados',
     description: 'Analise tickets enviados pelos usuários e acompanhe o status de cada atendimento.',
     route: '/adm-tickets',
+  },
+  {
+    icon: BookOpen,
+    title: 'Base de Conhecimento',
+    description: 'Revise as respostas geradas pela IA de suporte e aprove as que devem entrar na base.',
+    route: '/adm-knowledge',
   },
 ];
 

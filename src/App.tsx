@@ -19,6 +19,7 @@ import { PossiveisClientes } from './components/Admin/PossiveisClientes';
 import { AdminClients } from './components/Admin/AdminClients';
 import { AdminTickets } from './components/Admin/AdminTickets';
 import { AdminTicketDetails } from './components/Admin/AdminTicketDetails';
+import { AdminKnowledge } from './components/Admin/AdminKnowledge';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
@@ -81,7 +82,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAdmOnly = Boolean(effectiveUser?.isAdmHubOnly);
   const doctorView = isDoctorUser(effectiveUser);
   const adminView = isAdminUser(effectiveUser);
-  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets'];
+  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets', '/adm-knowledge'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {
     return <Navigate to="/dashboard" replace />;
@@ -208,6 +209,10 @@ function App() {
           <Route
             path="/adm-tickets/:id"
             element={<ProtectedRoute><AdminTicketDetails /></ProtectedRoute>}
+          />
+          <Route
+            path="/adm-knowledge"
+            element={<ProtectedRoute><AdminKnowledge /></ProtectedRoute>}
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
