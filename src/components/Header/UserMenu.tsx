@@ -3,8 +3,9 @@ import { Menu, Avatar, Group, UnstyledButton, Switch, Badge } from '@mantine/cor
 import { User, Settings, Moon, Sun, LifeBuoy } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
+import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 import authService from '../../services/authService';
-import { isAdminUser, isDoctorUser } from '../../utils/userRole';
+import { isAdminUser } from '../../utils/userRole';
 import { APP_COLOR_SCHEME_EVENT, applyAppColorScheme, getAppColorScheme, type AppColorScheme } from '../../utils/appColorScheme';
 
 export function UserMenu() {
@@ -16,10 +17,10 @@ export function UserMenu() {
   const isDark = colorScheme === 'dark';
   const isAdmHubScreen = location.pathname === '/adm-hub';
   const { data: myTicketsData } = useMyTicketsQuery();
+  const { data: profileUser } = useCurrentUserProfileQuery();
   const unreadCount = Number(myTicketsData?.unreadCount || 0);
   const currentUser = authService.getCurrentUser() as any;
-  const doctorView = isDoctorUser(currentUser);
-  const adminView = isAdminUser(currentUser);
+  const adminView = isAdminUser(profileUser || currentUser);
 
   useEffect(() => {
     const syncColorScheme = () => {
@@ -53,7 +54,7 @@ export function UserMenu() {
       </Menu.Target>
 
       <Menu.Dropdown>
-        {!isAdmHubScreen && adminView && !doctorView && (
+        {!isAdmHubScreen && adminView && (
           <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
             Configurações
           </Menu.Item>

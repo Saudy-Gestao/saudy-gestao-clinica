@@ -8,6 +8,7 @@ import { theme } from './themes/theme';
 import authService from './services/authService';
 import { APP_COLOR_SCHEME_EVENT, getAppColorScheme, type AppColorScheme } from './utils/appColorScheme';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import { BIGestao } from './components/BI/BIGestao';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
 import { EsqueciSenha } from './components/Auth/EsqueciSenha';
@@ -18,6 +19,7 @@ import { PossiveisClientes } from './components/Admin/PossiveisClientes';
 import { AdminClients } from './components/Admin/AdminClients';
 import { AdminTickets } from './components/Admin/AdminTickets';
 import { AdminTicketDetails } from './components/Admin/AdminTicketDetails';
+import { AdminKnowledge } from './components/Admin/AdminKnowledge';
 import { PreAtendimento } from './components/PreAgendamento/PreAtendimento';
 import { Agendamento } from './components/PreAgendamento/Agendamento';
 import { PreAgendamento } from './components/PreAgendamento/PreAgendamento';
@@ -65,7 +67,8 @@ import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
 import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogin';
 import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
 import patientPortalAuthService from './services/patientPortalAuthService';
-import { isDoctorUser } from './utils/userRole';
+import { isAdminUser, isDoctorUser } from './utils/userRole';
+import { useCurrentUserProfileQuery } from './hooks/useCurrentUserProfileQuery';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const isAuthenticated = authService.isAuthenticated();
@@ -74,9 +77,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   const currentUser = authService.getCurrentUser() as any;
-  const isAdmOnly = Boolean(currentUser?.isAdmHubOnly);
-  const doctorView = isDoctorUser(currentUser);
-  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets'];
+  const { data: profileUser } = useCurrentUserProfileQuery();
+  const effectiveUser = (profileUser || currentUser) as any;
+  const isAdmOnly = Boolean(effectiveUser?.isAdmHubOnly);
+  const doctorView = isDoctorUser(effectiveUser);
+  const adminView = isAdminUser(effectiveUser);
+  const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets', '/adm-knowledge'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {
     return <Navigate to="/dashboard" replace />;
@@ -87,7 +93,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/adm-hub" replace />;
   }
 
-  if (doctorView && location.pathname === '/settings') {
+  if (doctorView && !adminView && location.pathname === '/settings') {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -204,6 +210,10 @@ function App() {
             path="/adm-tickets/:id"
             element={<ProtectedRoute><AdminTicketDetails /></ProtectedRoute>}
           />
+          <Route
+            path="/adm-knowledge"
+            element={<ProtectedRoute><AdminKnowledge /></ProtectedRoute>}
+          />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
           <Route path="/check-in" element={<PublicCheckIn />} />
@@ -213,6 +223,10 @@ function App() {
           <Route 
             path="/dashboard" 
             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+          />
+          <Route
+            path="/bi"
+            element={<ProtectedRoute><BIGestao /></ProtectedRoute>}
           />
           <Route
             path="/fila-atendimento"

@@ -33,6 +33,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'adm-clientes', label: 'Cadastro de Cliente', route: '/cadastro-cliente', prefixes: ['/cadastro-cliente'] },
   { key: 'adm-clientes-edicao', label: 'Gestão de Clientes', route: '/adm-clientes', prefixes: ['/adm-clientes'] },
   { key: 'adm-tickets', label: 'Chamados', route: '/adm-tickets', prefixes: ['/adm-tickets'] },
+  { key: 'bi-gestao', label: 'BI Gestão', route: '/bi', prefixes: ['/bi'] },
   { key: 'pre-atendimento', label: 'Autorização e Recepção', route: '/autorizacao-e-recepcao', prefixes: ['/autorizacao-e-recepcao'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
   { key: 'pre-agendamento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento', '/pre-agendamento'] },
@@ -98,6 +99,9 @@ const normalizeModuleKey = (value: unknown) => {
     'conversas': 'whatsapp-config',
     'meus chamados': 'meus-chamados',
     'configuracoes de laudo': 'laudo',
+    'bi': 'bi-gestao',
+    'bi gestao': 'bi-gestao',
+    'business intelligence': 'bi-gestao',
   };
   if (aliases[compact]) return aliases[compact];
   return compact.replace(/\s+/g, '-');
