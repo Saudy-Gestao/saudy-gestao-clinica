@@ -3,6 +3,13 @@
   padding: 18px 22px 14px;
 }
 
+.pageConsultation {
+  min-height: 100vh;
+  background: #efefef;
+  padding: 12px;
+  color: #1f2430;
+}
+
 .pageDark {
   background: linear-gradient(180deg, #040f32 0%, #030a22 100%);
   color: #ecf2ff;
@@ -398,4 +405,260 @@
   .metaName { font-size: 20px; }
   .scheduleTime { font-size: 24px; }
   .tipsRow { grid-template-columns: 1fr; }
+}
+
+.consultationShell {
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.consultationPatientShell {
+  margin-top: 0;
+  display: block;
+}
+
+.consultationVideoPanel {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  height: 760px;
+  min-height: 760px;
+  max-height: 760px;
+  background: #0a0d14;
+  border: 1px solid #c8c8c8;
+}
+
+.consultationRemoteVideo {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+}
+
+.consultationRemoteVideoDoctor {
+  object-fit: contain;
+}
+
+.consultationRemoteVideoPatient {
+  object-fit: cover;
+}
+
+.consultationRemoteOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #e9eefc;
+  background: rgba(8, 12, 21, 0.56);
+}
+
+.consultationTimerPill {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 5;
+  background: rgba(8, 10, 16, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.consultationFullscreenBtn {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  left: auto;
+  inset-inline-end: 14px;
+  inset-inline-start: auto;
+  z-index: 5;
+  background: #0a2a67;
+  color: #ffffff;
+  width: 52px;
+  height: 52px;
+}
+
+.consultationControls {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.consultationControlBtn {
+  background: #0a2a67;
+  color: #ffffff;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+.consultationControlBtnActive {
+  background: #1453c9;
+  box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.38) inset;
+}
+
+.consultationControlBtnInactive {
+  background: #334a7f;
+  opacity: 0.92;
+}
+
+.consultationControlBtnDanger {
+  background: #d90000 !important;
+  color: #ffffff !important;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  border: 1px solid #ff6b6b;
+}
+
+.consultationLocalPreview {
+  position: absolute;
+  right: 18px;
+  bottom: 86px;
+  z-index: 4;
+  width: 216px;
+  height: 144px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(235, 238, 245, 0.5);
+  background: #161d2d;
+}
+
+.consultationLocalVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
+
+.consultationRecordPanel {
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 760px;
+  min-height: 760px;
+  max-height: 760px;
+}
+
+.consultationRecordTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.consultationRecordTabsDark {
+  border-bottom: 1px solid rgba(145, 177, 252, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.consultationRecordTabsLight {
+  border-bottom: 1px solid #cfcfcf;
+  background: #e8e8e8;
+}
+
+.consultationRecordTabBtn {
+  border: none;
+  background: transparent;
+  height: 38px;
+  font-size: 16px;
+  font-weight: 500;
+  color: inherit;
+  cursor: pointer;
+}
+
+.consultationRecordTabBtnActive {
+  color: #2d76c9;
+  box-shadow: inset 0 -2px 0 #2d76c9;
+}
+
+.consultationRecordBody {
+  padding: 14px 16px 16px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.consultationSubTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #e2e2e2;
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.consultationSubTabBtn {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: transparent;
+  color: #1a1d23;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.consultationSubTabBtnActive {
+  background: #d3d3d3;
+  color: #2d76c9;
+}
+
+@media (max-width: 1360px) {
+  .consultationShell {
+    grid-template-columns: 1fr;
+  }
+
+  .consultationVideoPanel {
+    height: 620px;
+    min-height: 620px;
+    max-height: 620px;
+  }
+
+  .consultationRecordPanel {
+    max-width: 100%;
+    height: auto;
+    min-height: 560px;
+    max-height: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .consultationVideoPanel {
+    height: calc(100vh - 90px);
+    min-height: calc(100vh - 90px);
+    max-height: calc(100vh - 90px);
+  }
+
+  .consultationTimerPill {
+    font-size: 22px;
+    padding: 6px 12px;
+  }
+
+  .consultationControls {
+    gap: 8px;
+    bottom: 10px;
+  }
+
+  .consultationLocalPreview {
+    width: 150px;
+    height: 102px;
+    right: 10px;
+    bottom: 70px;
+  }
 }

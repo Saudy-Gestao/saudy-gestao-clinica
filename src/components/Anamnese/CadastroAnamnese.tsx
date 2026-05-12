@@ -15,10 +15,11 @@ import {
   Table,
   Text,
   useMantineColorScheme,
+  Menu,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
@@ -33,6 +34,7 @@ import procedureAnamnesisTemplateService, {
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useAnamnesisTemplatesQuery } from '../../hooks/useAnamnesisTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 type QuestionForm = AnamnesisQuestionPayload & {
   id: string;
@@ -121,6 +123,8 @@ export function CadastroAnamnese() {
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TemplateForm>(INITIAL_FORM);
   const {
@@ -153,6 +157,16 @@ export function CadastroAnamnese() {
     });
   }, [items, query]);
 
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, page, pageSize]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredItems.length / pageSize)),
+    [filteredItems.length, pageSize],
+  );
+
   useEffect(() => {
     const err: any = templatesError || proceduresError;
     if (err) {
@@ -163,6 +177,16 @@ export function CadastroAnamnese() {
       });
     }
   }, [templatesError, proceduresError]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize, items.length]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const resetForm = () => {
     setForm(INITIAL_FORM);
@@ -391,59 +415,83 @@ export function CadastroAnamnese() {
             ) : (
               <>
                 <Box visibleFrom="sm">
-                  <Table.ScrollContainer minWidth={920}>
-                    <Table highlightOnHover verticalSpacing="md">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Anamnese</Table.Th>
-                          <Table.Th>Procedimento</Table.Th>
-                          <Table.Th>Perguntas</Table.Th>
-                          <Table.Th>Status</Table.Th>
-                          <Table.Th>Ações</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {filteredItems.map((item) => (
-                          <Table.Tr key={item.id}>
-                            <Table.Td>
-                              <Stack gap={2}>
-                                <Text fw={700}>{item.name}</Text>
-                                <Text size="sm" c="dimmed">{item.description || 'Sem descrição'}</Text>
-                              </Stack>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge variant="light" color="blue">
-                                {item.procedure?.name || 'Procedimento não informado'}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>
-                              <Stack gap={4}>
-                                <Text fw={600}>{item.questions.length} pergunta(s)</Text>
-                                <Text size="sm" c="dimmed">
-                                  {(item.questions || []).slice(0, 2).map((question) => question.label).join(' • ') || 'Sem perguntas'}
-                                </Text>
-                              </Stack>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
-                                {item.isActive ? 'Ativa' : 'Inativa'}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>
-                              <Group gap="xs">
-                                <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)} aria-label="Editar anamnese">
-                                  <Pencil size={16} />
-                                </ActionIcon>
-                                <ActionIcon variant="light" color={item.isActive ? 'red' : 'gray'} onClick={() => handleDeactivate(item.id)} aria-label="Desativar anamnese">
-                                  <Power size={16} />
-                                </ActionIcon>
-                              </Group>
-                            </Table.Td>
+                  <PaginatedGrid
+                    totalItems={filteredItems.length}
+                    page={page}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                    isMobile={isMobile}
+                    maxHeight={isMobile ? 500 : 620}
+                    showFooter
+                  >
+                    <Box style={{ minWidth: 920 }}>
+                      <Table highlightOnHover verticalSpacing="md">
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Anamnese</Table.Th>
+                            <Table.Th>Procedimento</Table.Th>
+                            <Table.Th>Perguntas</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                           </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </Table.ScrollContainer>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {paginatedItems.map((item) => (
+                            <Table.Tr key={item.id}>
+                              <Table.Td>
+                                <Stack gap={2}>
+                                  <Text fw={700}>{item.name}</Text>
+                                  <Text size="sm" c="dimmed">{item.description || 'Sem descrição'}</Text>
+                                </Stack>
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge variant="light" color="blue">
+                                  {item.procedure?.name || 'Procedimento não informado'}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td>
+                                <Stack gap={4}>
+                                  <Text fw={600}>{item.questions.length} pergunta(s)</Text>
+                                  <Text size="sm" c="dimmed">
+                                    {(item.questions || []).slice(0, 2).map((question) => question.label).join(' • ') || 'Sem perguntas'}
+                                  </Text>
+                                </Stack>
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
+                                  {item.isActive ? 'Ativa' : 'Inativa'}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td style={{ textAlign: 'center' }}>
+                                <Group justify="center">
+                                  <Menu shadow="md" width={210} position="bottom" withArrow>
+                                    <Menu.Target>
+                                      <ActionIcon variant="light" size="sm" aria-label="Ações da anamnese">
+                                        <MoreVertical size={16} />
+                                      </ActionIcon>
+                                    </Menu.Target>
+                                    <Menu.Dropdown>
+                                      <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openEdit(item)}>
+                                        Editar
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        leftSection={<Power size={14} />}
+                                        color={item.isActive ? 'red' : 'gray'}
+                                        onClick={() => handleDeactivate(item.id)}
+                                      >
+                                        Desativar
+                                      </Menu.Item>
+                                    </Menu.Dropdown>
+                                  </Menu>
+                                </Group>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Box>
+                  </PaginatedGrid>
                 </Box>
                 <Stack hiddenFrom="sm" gap="sm">
                   {filteredItems.map((item) => (

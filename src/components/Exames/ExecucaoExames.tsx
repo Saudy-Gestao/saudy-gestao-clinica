@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -18,10 +18,12 @@ import {
   Text,
   TextInput,
   Textarea,
+  UnstyledButton,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react';
+import { ChevronLeft, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search, Image as ImageIcon } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
@@ -76,6 +78,14 @@ interface ConsultationRow {
   appointmentType: string;
   triageRequired: boolean;
   nursingTemplate: NursingTemplateSummary | null;
+  hasExamImageReceived: boolean;
+  latestExamImage: {
+    id?: string | null;
+    appointmentId?: string | null;
+    dicomStudyUid?: string | null;
+    dicomUrl?: string | null;
+    dicomReceivedAt?: string | null;
+  } | null;
 }
 
 type TriageAnswerForm = {
@@ -88,6 +98,7 @@ type TriageAnswerForm = {
   answerNumber: string;
   orderIndex: number;
 };
+type ExamViewMode = 'hub' | 'pending' | 'completed';
 
 const CLINICAL_QUEUE_TYPE = 'Fila clínica';
 const TRIAGE_WAITING_STATUS = 'Aguardando triagem';
@@ -130,6 +141,12 @@ const statusBadge = (status: string) => {
   if (status === EXAM_DONE_STATUS) return { color: 'green', label: 'Exame concluído' };
   return { color: 'gray', label: status || '-' };
 };
+
+const imageBadge = (row: ConsultationRow) => (
+  row.hasExamImageReceived
+    ? { color: 'teal', label: 'Imagem recebida' }
+    : { color: 'gray', label: 'Aguardando imagem' }
+);
 
 const getExamActionConfig = (row: ConsultationRow) => {
   if (row.triageRequired && row.statusFluxo === TRIAGE_WAITING_STATUS) {
@@ -207,6 +224,7 @@ export function ExecucaoExames() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<ConsultationRow[]>([]);
+  const [viewMode, setViewMode] = useState<ExamViewMode>('hub');
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [triageOpen, setTriageOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<ConsultationRow | null>(null);
@@ -223,6 +241,7 @@ export function ExecucaoExames() {
   const [answers, setAnswers] = useState<TriageAnswerForm[]>([]);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
   const clinicalQueueQuery = useClinicalQueueQuery();
   const appointmentsQuery = useAppointmentsQuery();
 
@@ -247,6 +266,8 @@ export function ExecucaoExames() {
     appointmentType: String(it.appointmentType || it.appointment?.type || ''),
     triageRequired: Boolean(it.triageRequired),
     nursingTemplate: it.nursingTemplate || null,
+    hasExamImageReceived: Boolean(it.hasExamImageReceived || it.hasExamImagesAvailable),
+    latestExamImage: it.latestExamImage || null,
   });
 
   const appointmentCpfById = useMemo(() => {
@@ -290,12 +311,28 @@ export function ExecucaoExames() {
   }, [rows, query]);
 
   const examQueueLoading = clinicalQueueQuery.isLoading && rows.length === 0;
+  const pendingStatuses = useMemo<Set<string>>(
+    () => new Set(EXAM_STATUS_SECTIONS.filter((section) => section.key !== EXAM_DONE_STATUS).map((section) => String(section.key))),
+    [],
+  );
+
+  const pendingCount = useMemo(
+    () => filteredRows.filter((row) => pendingStatuses.has(row.statusFluxo)).length,
+    [filteredRows, pendingStatuses],
+  );
+  const completedCount = useMemo(
+    () => filteredRows.filter((row) => row.statusFluxo === EXAM_DONE_STATUS).length,
+    [filteredRows],
+  );
+
   const groupedRows = useMemo(
-    () => EXAM_STATUS_SECTIONS.map((section) => ({
+    () => EXAM_STATUS_SECTIONS
+      .filter((section) => (viewMode === 'completed' ? section.key === EXAM_DONE_STATUS : section.key !== EXAM_DONE_STATUS))
+      .map((section) => ({
       ...section,
       items: filteredRows.filter((row) => row.statusFluxo === section.key),
     })),
-    [filteredRows],
+    [filteredRows, viewMode],
   );
 
   const updateExamStatus = async (row: ConsultationRow, nextStatus: string) => {
@@ -465,16 +502,47 @@ export function ExecucaoExames() {
       );
     }
 
+    const finishBlockedByMissingImage = action.onClick === 'finish-exam' && !row.hasExamImageReceived;
     return (
       <Button
         size="xs"
         variant={action.variant}
         color={action.color}
         leftSection={action.icon}
-        onClick={() => updateExamStatus(row, EXAM_DONE_STATUS)}
+        onClick={() => {
+          if (finishBlockedByMissingImage) {
+            showNotification({
+              title: 'Imagem pendente',
+              message: 'Não é possível finalizar o exame antes do recebimento das imagens.',
+              color: 'orange',
+            });
+            return;
+          }
+          updateExamStatus(row, EXAM_DONE_STATUS);
+        }}
         loading={loadingId === row.id}
       >
-        {action.label}
+        {finishBlockedByMissingImage ? 'Finalizar exame' : action.label}
+      </Button>
+    );
+  };
+
+  const renderImageAction = (row: ConsultationRow) => {
+    const key = String(
+      row?.latestExamImage?.id
+      || row?.latestExamImage?.dicomStudyUid
+      || '',
+    ).trim();
+    if (!row.hasExamImageReceived || !key) return null;
+    return (
+      <Button
+        size="xs"
+        variant="subtle"
+        color="cyan"
+        leftSection={<ImageIcon size={14} />}
+        onClick={() => navigate(`/dicom-viewer/${encodeURIComponent(key)}`)}
+      >
+        Abrir imagens
       </Button>
     );
   };
@@ -499,21 +567,133 @@ export function ExecucaoExames() {
             </Box>
           </Group>
           <Badge variant="light" color="cyan" radius="sm">
-            Fila de exames
+            {viewMode === 'completed' ? 'Exames concluídos' : 'Fila de exames'}
           </Badge>
         </Group>
 
-        <Box mb={isMobile ? 20 : 30}>
-          <FloatingInput
-            label="Buscar"
-            alwaysFloatLabel
-            placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-            containerProps={{ style: { minHeight: 64 } }}
-          />
-        </Box>
+        {viewMode === 'hub' ? (
+          <Box
+            style={{
+              minHeight: isMobile ? 'auto' : '58vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SimpleGrid
+              cols={{ base: 1, md: 2 }}
+              spacing="xl"
+              style={{ width: '100%', maxWidth: 900 }}
+            >
+              <UnstyledButton
+                onClick={() => setViewMode('pending')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <ClipboardCheck size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Fila de exames</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Triagem, chamada e execução operacional dos exames em andamento.
+                  </Text>
+                  <Badge variant="light" radius="xl" color="cyan" w="fit-content">
+                    {pendingCount} pendente(s)
+                  </Badge>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setViewMode('completed')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <CheckCircle2 size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Exames concluídos</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Consulte os exames já finalizados para acompanhamento operacional.
+                  </Text>
+                  <Badge variant="light" radius="xl" color="green" w="fit-content">
+                    {completedCount} concluído(s)
+                  </Badge>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setViewMode('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {viewMode === 'completed' ? 'Exames concluídos' : 'Fila de exames'}
+                </Text>
+              </Group>
+            </Group>
+
+            <Box mb={isMobile ? 20 : 30}>
+              <FloatingInput
+                label="Buscar"
+                alwaysFloatLabel
+                placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
+                value={query}
+                onChange={(event) => setQuery(event.currentTarget.value)}
+                rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
+                containerProps={{ style: { minHeight: 64 } }}
+              />
+            </Box>
 
         {examQueueLoading ? (
           isMobile ? (
@@ -584,6 +764,7 @@ export function ExecucaoExames() {
                     <Stack gap="sm">
                       {section.items.map((row) => {
                         const badge = statusBadge(row.statusFluxo);
+                        const imageStatus = imageBadge(row);
                         return (
                           <Paper key={row.id} p="md" withBorder radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                             <Stack gap="sm">
@@ -616,10 +797,18 @@ export function ExecucaoExames() {
                               </Box>
 
                               <Group justify="space-between" align="center">
-                                <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
-                                  {row.convenio || 'Particular'}
-                                </Badge>
-                                {renderExamAction(row)}
+                                <Group gap={8}>
+                                  <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
+                                    {row.convenio || 'Particular'}
+                                  </Badge>
+                                  <Badge variant="outline" radius="xl" color={imageStatus.color}>
+                                    {imageStatus.label}
+                                  </Badge>
+                                </Group>
+                                <Group gap={8}>
+                                  {renderImageAction(row)}
+                                  {renderExamAction(row)}
+                                </Group>
                               </Group>
                             </Stack>
                           </Paper>
@@ -635,12 +824,14 @@ export function ExecucaoExames() {
                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Imagem</Table.Th>
                             <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
                           {section.items.map((row) => {
                             const badge = statusBadge(row.statusFluxo);
+                            const imageStatus = imageBadge(row);
                             return (
                               <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                                 <Table.Td>
@@ -688,7 +879,13 @@ export function ExecucaoExames() {
                                   </Badge>
                                 </Table.Td>
                                 <Table.Td>
+                                  <Badge color={imageStatus.color} variant="outline">
+                                    {imageStatus.label}
+                                  </Badge>
+                                </Table.Td>
+                                <Table.Td>
                                   <Group gap={8} justify="flex-end">
+                                    {renderImageAction(row)}
                                     {renderExamAction(row)}
                                   </Group>
                                 </Table.Td>
@@ -705,11 +902,17 @@ export function ExecucaoExames() {
           </Stack>
         ) : (
           <Paper withBorder radius="md" p="xl" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-            <Text ta="center" fw={600}>Nenhum exame na fila no momento</Text>
+            <Text ta="center" fw={600}>
+              {viewMode === 'completed' ? 'Nenhum exame concluído encontrado' : 'Nenhum exame na fila no momento'}
+            </Text>
             <Text ta="center" c="dimmed" size="sm" mt={4}>
-              Assim que um exame entrar em triagem ou execução, ele aparecerá aqui na etapa correspondente.
+              {viewMode === 'completed'
+                ? 'Quando exames forem finalizados, eles aparecerão nesta visualização.'
+                : 'Assim que um exame entrar em triagem ou execução, ele aparecerá aqui na etapa correspondente.'}
             </Text>
           </Paper>
+        )}
+          </>
         )}
       </Box>
 
@@ -870,3 +1073,4 @@ export function ExecucaoExames() {
     </Box>
   );
 }
+

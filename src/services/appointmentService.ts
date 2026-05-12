@@ -5,6 +5,8 @@ export interface AppointmentPayload {
   patientCpf?: string;
   patientId?: string;
   doctorName?: string;
+  roomId?: string;
+  medicalEquipmentId?: string;
   specialty?: string;
   durationMinutes?: number;
   convenio?: string;
@@ -47,6 +49,12 @@ export default {
   async create(payload: AppointmentPayload) {
     const url = '/care/appointments/';
     const res = await api.post(url, payload);
+    return res.data;
+  },
+
+  async getById(id: string) {
+    const url = `/care/appointments/${id}`;
+    const res = await api.get(url);
     return res.data;
   },
 

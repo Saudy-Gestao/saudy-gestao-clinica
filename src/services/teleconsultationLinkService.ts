@@ -91,7 +91,7 @@ const teleconsultationLinkService = {
     return response.data as TeleconsultationEligibility;
   },
 
-  async sendWhatsAppLink(preAttendanceId: string, payload?: { notes?: string }) {
+  async sendWhatsAppLink(preAttendanceId: string, payload?: { notes?: string; sendPatientMessage?: boolean }) {
     const response = await api.post(`/care/teleconsultation-links/pre-attendance/${preAttendanceId}/send-whatsapp-link`, payload || {});
     return response.data as TeleconsultationSendLinkResponse;
   },

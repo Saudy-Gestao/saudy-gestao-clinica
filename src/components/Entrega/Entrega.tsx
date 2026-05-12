@@ -19,6 +19,7 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 
 interface DeliveryRow {
   id: string;
@@ -34,10 +35,23 @@ interface DeliveryRow {
 const EMPTY_DELIVERIES: any[] = [];
 const EMPTY_PATIENTS: any[] = [];
 
+const normalizePatientsData = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.patients)) return data.patients;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.data?.patients)) return data.data.patients;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.data)) return data.data;
+  return EMPTY_PATIENTS;
+};
+
 export function Entrega() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [rows, setRows] = useState<DeliveryRow[]>([]);
   const [savingDelivery, setSavingDelivery] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -58,13 +72,7 @@ export function Entrega() {
     error: patientsError,
   } = usePatientsAdminQuery();
   const deliveries = Array.isArray(deliveriesData) ? deliveriesData : EMPTY_DELIVERIES;
-  const patients = Array.isArray(patientsData)
-    ? patientsData
-    : (Array.isArray((patientsData as any)?.items)
-      ? (patientsData as any).items
-      : (Array.isArray((patientsData as any)?.data)
-        ? (patientsData as any).data
-        : EMPTY_PATIENTS));
+  const patients = normalizePatientsData(patientsData);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
@@ -79,6 +87,14 @@ export function Entrega() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   const filtered = rows.filter((r) => r.nomeCompleto.toLowerCase().includes(query.toLowerCase()));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filtered.length / pageSize)),
+    [filtered.length, pageSize],
+  );
 
   const [form, setForm] = useState({
     paciente: '',
@@ -121,19 +137,21 @@ export function Entrega() {
     });
   }, [deliveriesError, patientsError]);
 
-  const patientsList = useMemo<any[]>(() => {
-    if (Array.isArray(patients)) return patients;
-    if (Array.isArray((patients as any)?.patients)) return (patients as any).patients;
-    if (Array.isArray((patients as any)?.items)) return (patients as any).items;
-    if (Array.isArray((patients as any)?.results)) return (patients as any).results;
-    if (Array.isArray((patients as any)?.data?.patients)) return (patients as any).data.patients;
-    if (Array.isArray((patients as any)?.data)) return (patients as any).data;
-    return [];
-  }, [patients]);
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize, rows.length]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const patientsList = useMemo<any[]>(() => normalizePatientsData(patients), [patients]);
 
   const patientOptions = useMemo(() => patientsList.map((p: any) => {
-    const id = String(p.id ?? p.patientId ?? '');
-    const name = (p.name || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
+    const id = String(p.id ?? p.patientId ?? p._id ?? p.uuid ?? '');
+    const name = (p.name || p.nome || p.fullName || p.patientName || p.email || p.cpf || '').toString().trim();
     const label = name || 'Paciente';
     return { value: id || label, label };
   }), [patientsList]);
@@ -141,7 +159,7 @@ export function Entrega() {
   const patientById = useMemo<Record<string, any>>(() => {
     const byId: Record<string, any> = {};
     patientsList.forEach((p: any) => {
-      const id = String(p.id ?? p.patientId ?? '');
+      const id = String(p.id ?? p.patientId ?? p._id ?? p.uuid ?? '');
       if (id) byId[id] = p;
     });
     return byId;
@@ -466,7 +484,7 @@ export function Entrega() {
           </Group>
         </Box>
 
-        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+        <Box>
           {rowsLoading ? (
             <Stack p="md" gap="sm">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -479,6 +497,16 @@ export function Entrega() {
               ))}
             </Stack>
           ) : (
+            <PaginatedGrid
+              totalItems={filtered.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              isMobile={isMobile}
+              maxHeight={isMobile ? 500 : 620}
+              showFooter
+            >
             <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
               <Table.Thead>
                 <Table.Tr style={{ borderBottom: 'none' }}>
@@ -494,7 +522,7 @@ export function Entrega() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filtered.length > 0 ? filtered.map((r) => (
+                {filtered.length > 0 ? paginatedRows.map((r) => (
                   <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                     <Table.Td>
                       <Group gap={isMobile ? 'xs' : 'sm'}>
@@ -581,6 +609,7 @@ export function Entrega() {
                 )}
               </Table.Tbody>
             </Table>
+            </PaginatedGrid>
           )}
         </Box>
       </Box>

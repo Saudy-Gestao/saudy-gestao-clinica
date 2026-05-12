@@ -6,14 +6,18 @@ import {
   Badge,
   Box,
   Button,
+  Divider,
   Group,
+  Menu,
+  Paper,
+  SimpleGrid,
   Table,
   Text,
-  Stack,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, PhoneCall, Play, CheckCircle2, Search } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Clock3, Copy, FileText, Grid2x2, List, MoreVertical, Play, Search, Video } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
@@ -30,27 +34,69 @@ interface ConsultationRow {
   appointmentId?: string;
   nomeCompleto: string;
   cpf?: string;
+  doctorName?: string;
   convenio?: string;
   agendadoPara: string;
   agenda: string;
   statusFluxo: string;
   appointmentType: string;
+  priority?: string;
+  notes?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
   isTeleconsultation: boolean;
   triageRequired: boolean;
 }
 
-const CLINICAL_QUEUE_TYPE = 'Fila clínica';
 const WAITING_STATUS = 'Aguardando atendimento';
 const CALLED_STATUS = 'Chamado para atendimento';
 const IN_PROGRESS_STATUS = 'Em atendimento';
 const DONE_STATUS = 'Atendimento concluído';
-const ACTIVE_STATUSES = [WAITING_STATUS, CALLED_STATUS, IN_PROGRESS_STATUS];
+const CLINICAL_QUEUE_TYPE = 'Fila clínica';
+const VIEW_MODES = {
+  LIST: 'list',
+  CARDS: 'cards',
+} as const;
+
+type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
+
+const FILTER_KEYS = {
+  ALL: 'all',
+  WAITING: 'waiting',
+  IN_PROGRESS: 'inProgress',
+  TELECONSULT: 'teleconsult',
+  FINALIZED: 'finalized',
+} as const;
+
+type FilterKey = typeof FILTER_KEYS[keyof typeof FILTER_KEYS];
 
 const statusBadge = (status: string) => {
   if (status === WAITING_STATUS) return { color: 'yellow', label: 'Aguardando' };
-  if (status === CALLED_STATUS) return { color: 'blue', label: 'Chamado' };
+  if (status === CALLED_STATUS) return { color: 'blue', label: 'Aguardando' };
   if (status === IN_PROGRESS_STATUS) return { color: 'green', label: 'Em atendimento' };
   return { color: 'gray', label: status || '-' };
+};
+
+const normalizeText = (value?: string | null) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .trim()
+  .toUpperCase();
+
+const isUrgentRow = (row: ConsultationRow) => normalizeText(`${row.priority || ''} ${row.notes || ''}`).includes('URGENTE');
+
+const isWaitingRow = (row: ConsultationRow) => {
+  const status = normalizeText(row.statusFluxo);
+  return status === normalizeText(WAITING_STATUS) || status === normalizeText(CALLED_STATUS);
+};
+
+const isInProgressRow = (row: ConsultationRow) => normalizeText(row.statusFluxo) === normalizeText(IN_PROGRESS_STATUS);
+
+const isFinalizedRow = (row: ConsultationRow) => {
+  const status = normalizeText(row.statusFluxo);
+  if (!status) return false;
+  if (status === normalizeText(DONE_STATUS)) return true;
+  return status.includes('CONCLUID') && (status.includes('ATENDIMENTO') || status.includes('EXAME'));
 };
 
 const getAppointmentTypeLabel = (value?: string | null) => {
@@ -59,53 +105,37 @@ const getAppointmentTypeLabel = (value?: string | null) => {
   return 'Consulta';
 };
 
-const getClinicalActionConfig = (row: ConsultationRow) => {
-  if (row.isTeleconsultation) {
-    return {
-      label: 'Iniciar teleconsulta',
-      color: 'green',
-      variant: 'filled' as const,
-      icon: <Play size={14} />,
-      nextStatus: null as string | null,
-      isTeleconsultationAction: true,
-    };
-  }
+const getChipFilterLabel = (key: FilterKey) => {
+  if (key === FILTER_KEYS.ALL) return 'Todos';
+  if (key === FILTER_KEYS.WAITING) return 'Aguardando';
+  if (key === FILTER_KEYS.IN_PROGRESS) return 'Em Atendimento';
+  if (key === FILTER_KEYS.TELECONSULT) return 'Teleconsulta';
+  return 'Finalizados';
+};
 
-  const status = row.statusFluxo;
-  if (status === WAITING_STATUS) {
-    return {
-      label: 'Chamar',
-      color: 'blue',
-      variant: 'filled' as const,
-      icon: <PhoneCall size={14} />,
-      nextStatus: CALLED_STATUS,
-      isTeleconsultationAction: false,
-    };
-  }
+const rowMatchesFilter = (row: ConsultationRow, filter: FilterKey) => {
+  if (filter === FILTER_KEYS.ALL) return !isFinalizedRow(row);
+  if (filter === FILTER_KEYS.WAITING) return isWaitingRow(row) && !isFinalizedRow(row);
+  if (filter === FILTER_KEYS.IN_PROGRESS) return isInProgressRow(row) && !isFinalizedRow(row);
+  if (filter === FILTER_KEYS.TELECONSULT) return row.isTeleconsultation && !isFinalizedRow(row);
+  return isFinalizedRow(row);
+};
 
-  if (status === CALLED_STATUS) {
-    return {
-      label: 'Iniciar atendimento',
-      color: 'green',
-      variant: 'filled' as const,
-      icon: <Play size={14} />,
-      nextStatus: IN_PROGRESS_STATUS,
-      isTeleconsultationAction: false,
-    };
-  }
+const parseAppointmentDateTime = (row: ConsultationRow) => {
+  const rawDate = String(row.appointmentDate || '').trim();
+  const rawTime = String(row.appointmentTime || '').trim();
+  if (rawDate && rawTime) return `${rawTime} | ${rawDate.split('-').reverse().join('/')}`;
+  if (rawDate) return rawDate.split('-').reverse().join('/');
+  if (rawTime) return rawTime;
+  if (row.agendadoPara && row.agendadoPara !== '-') return row.agendadoPara;
+  if (row.agenda && row.agenda !== '-') return row.agenda;
+  return '-';
+};
 
-  if (status === IN_PROGRESS_STATUS) {
-    return {
-      label: 'Finalizar',
-      color: 'teal',
-      variant: 'light' as const,
-      icon: <CheckCircle2 size={14} />,
-      nextStatus: DONE_STATUS,
-      isTeleconsultationAction: false,
-    };
-  }
-
-  return null;
+const parseComplaint = (row: ConsultationRow) => {
+  const raw = String(row.notes || row.agenda || '').trim();
+  if (!raw || raw === '-') return 'Sem descrição da consulta';
+  return raw;
 };
 
 export function Consulta() {
@@ -115,8 +145,11 @@ export function Consulta() {
   const [rows, setRows] = useState<ConsultationRow[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [loggedDoctorName, setLoggedDoctorName] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>(VIEW_MODES.LIST);
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(FILTER_KEYS.ALL);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const isDark = useComputedColorScheme('light') === 'dark';
   const clinicalQueueQuery = useClinicalQueueQuery();
   const appointmentsQuery = useAppointmentsQuery();
 
@@ -133,11 +166,16 @@ export function Consulta() {
       || it.patientDocument
       || it.patient_document
       || '',
+    doctorName: String(it.doctorName || it.appointment?.doctorName || '').trim(),
     convenio: it.convenio || '',
     agendadoPara: it.scheduledFor || '-',
     agenda: it.agenda || '-',
     statusFluxo: it.queue || WAITING_STATUS,
     appointmentType: String(it.appointmentType || it.appointment?.type || ''),
+    priority: String(it.priority || it.orderPriority || it.appointment?.orderPriority || ''),
+    notes: String(it.notes || it.orderNotes || it.mainComplaint || it.triageNotes || it.appointment?.observations || it.agenda || ''),
+    appointmentDate: String(it.appointment?.date || ''),
+    appointmentTime: String(it.appointment?.time || ''),
     isTeleconsultation: Boolean(it.isTeleconsultation),
     triageRequired: Boolean(it.triageRequired),
   });
@@ -159,7 +197,6 @@ export function Consulta() {
     } catch {
       setLoggedDoctorName('');
     }
-
   }, []);
 
   useEffect(() => {
@@ -172,35 +209,77 @@ export function Consulta() {
             cpf: mapped.cpf || appointmentCpfById[mapped.appointmentId || ''] || '',
           };
         })
-        .filter((item) => ACTIVE_STATUSES.includes(item.statusFluxo))
         .filter((item) => getAppointmentTypeLabel(item.appointmentType) !== 'Exame' && !item.triageRequired)),
     );
   }, [appointmentCpfById, clinicalQueueQuery.data]);
 
+  const counters = useMemo(() => ({
+    [FILTER_KEYS.ALL]: rows.filter((row) => rowMatchesFilter(row, FILTER_KEYS.ALL)).length,
+    [FILTER_KEYS.WAITING]: rows.filter((row) => rowMatchesFilter(row, FILTER_KEYS.WAITING)).length,
+    [FILTER_KEYS.IN_PROGRESS]: rows.filter((row) => rowMatchesFilter(row, FILTER_KEYS.IN_PROGRESS)).length,
+    [FILTER_KEYS.TELECONSULT]: rows.filter((row) => rowMatchesFilter(row, FILTER_KEYS.TELECONSULT)).length,
+    [FILTER_KEYS.FINALIZED]: rows.filter((row) => rowMatchesFilter(row, FILTER_KEYS.FINALIZED)).length,
+  }), [rows]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return rows;
-    return rows.filter((row) =>
-      [row.nomeCompleto, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo]
+    const filteredByChip = rows.filter((row) => rowMatchesFilter(row, activeFilter));
+    if (!normalized) return filteredByChip;
+    return filteredByChip.filter((row) =>
+      [row.nomeCompleto, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo, row.notes, row.doctorName]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized)),
     );
-  }, [rows, query]);
+  }, [rows, query, activeFilter]);
 
-  const updateClinicalStatus = async (row: ConsultationRow, nextStatus: string) => {
+  const openClinicalCare = (row: ConsultationRow) => {
+    navigate(`/consulta/atendimento/${row.id}`);
+  };
+
+  const copyTeleconsultationLink = async (row: ConsultationRow) => {
+    if (!row.appointmentId || !row.isTeleconsultation) return;
     try {
       setLoadingId(row.id);
-      await consultationService.update(row.id, { queue: nextStatus, queueType: CLINICAL_QUEUE_TYPE });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+      const result = await teleconsultationLinkService.sendWhatsAppLinkByAppointment(row.appointmentId, {
+        sendPatientMessage: false,
+      });
+      const patientUrl = String(result?.links?.patientUrl || '').trim();
+      if (!patientUrl) throw new Error('Link do paciente não disponível.');
+      await navigator.clipboard.writeText(patientUrl);
       showNotification({
-        title: 'Fila clínica atualizada',
-        message: `${row.nomeCompleto} agora está em "${nextStatus}".`,
+        title: 'Link copiado',
+        message: 'Link da teleconsulta copiado para a área de transferência.',
         color: 'green',
       });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
-        message: resolveApiErrorMessage(err, 'Erro ao atualizar status do atendimento'),
+        message: resolveApiErrorMessage(err, 'Não foi possível copiar o link da teleconsulta'),
+        color: 'red',
+      });
+    } finally {
+      setLoadingId(null);
+    }
+  };
+  const startInPersonConsultation = async (row: ConsultationRow) => {
+    try {
+      setLoadingId(row.id);
+      const status = normalizeText(row.statusFluxo);
+
+      if (status === normalizeText(WAITING_STATUS)) {
+        await consultationService.update(row.id, { queue: CALLED_STATUS, queueType: CLINICAL_QUEUE_TYPE });
+      }
+
+      if (status !== normalizeText(IN_PROGRESS_STATUS)) {
+        await consultationService.update(row.id, { queue: IN_PROGRESS_STATUS, queueType: CLINICAL_QUEUE_TYPE });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
+      openClinicalCare(row);
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: resolveApiErrorMessage(err, 'Erro ao iniciar consulta'),
         color: 'red',
       });
     } finally {
@@ -247,38 +326,11 @@ export function Consulta() {
       setLoadingId(null);
     }
   };
-
-  const finalizeTeleconsultation = async (row: ConsultationRow) => {
-    try {
-      setLoadingId(row.id);
-
-      if (row.statusFluxo !== IN_PROGRESS_STATUS) {
-        await consultationService.update(row.id, { queue: IN_PROGRESS_STATUS, queueType: CLINICAL_QUEUE_TYPE });
-      }
-
-      await consultationService.update(row.id, { queue: DONE_STATUS, queueType: CLINICAL_QUEUE_TYPE });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.clinicalQueue });
-      showNotification({
-        title: 'Teleconsulta finalizada',
-        message: `${row.nomeCompleto} foi marcado como atendimento concluído.`,
-        color: 'green',
-      });
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Erro ao finalizar teleconsulta',
-        color: 'red',
-      });
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1500} mx="auto">
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
             <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
@@ -289,140 +341,341 @@ export function Consulta() {
                 Consulta
               </Text>
               <Text size="sm" c="dimmed">
-                {loggedDoctorName ? `Fila clínica do(a) Dr(a). ${loggedDoctorName}` : 'Fila clínica de atendimento médico'}
+                {loggedDoctorName ? `Consultas e exames do(a) Dr(a). ${loggedDoctorName}` : 'Consultas e exames'}
               </Text>
             </Box>
           </Group>
-          <Badge variant="light" color="blue" radius="sm">
-            Fila clínica
-          </Badge>
         </Group>
 
-        <Box mb={isMobile ? 20 : 30}>
-          <FloatingInput
-            label="Buscar"
-            alwaysFloatLabel
-            placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-            containerProps={{ style: { minHeight: 64 } }}
-          />
-        </Box>
+        <Paper
+          withBorder
+          p={isMobile ? 'sm' : 'md'}
+          radius="md"
+          style={{
+            background: isDark ? '#031233' : '#fff',
+            borderColor: isDark ? 'rgba(74, 108, 186, 0.3)' : 'var(--mantine-color-gray-3)',
+          }}
+        >
+          {viewMode === VIEW_MODES.LIST && (
+            <Box mt="sm">
+              <FloatingInput
+                label="Buscar"
+                alwaysFloatLabel
+                placeholder="Buscar"
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+                rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
+                containerProps={{ style: { minHeight: 56 } }}
+              />
+            </Box>
+          )}
 
-        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-          <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
-            <Table.Thead>
-              <Table.Tr style={{ borderBottom: 'none' }}>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Paciente</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
-                {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.length > 0 ? filtered.map((row) => {
-                const badge = statusBadge(row.statusFluxo);
-                const action = getClinicalActionConfig(row);
+          <Group justify="space-between" mt="sm" mb="sm" wrap="wrap" gap="xs">
+            <Group gap="xs" wrap="wrap">
+              {(Object.values(FILTER_KEYS) as FilterKey[]).map((chip) => {
+                const isActive = activeFilter === chip;
                 return (
-                  <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                    <Table.Td>
-                      <Group gap={isMobile ? 'xs' : 'sm'}>
-                        {!isMobile && (
-                          <Box
-                            bg={DARK_BLUE}
-                            w={32}
-                            h={32}
-                            style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                          >
-                            <Text c="white" fw={600} size="sm">
-                              {row.nomeCompleto.charAt(0).toUpperCase()}
-                            </Text>
-                          </Box>
-                        )}
-                        <Box>
-                          <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>
-                            {row.nomeCompleto}
-                          </Text>
-                          {!isTablet && (
-                            <Text size="xs" c="dimmed">
-                              CPF: {row.cpf ? formatCPF(row.cpf) : 'Não informado'}
-                            </Text>
-                          )}
-                        </Box>
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>
-                      <Stack gap={2}>
-                        <Text size="xs" fw={600} style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>
-                          {row.agenda || row.agendadoPara || '-'}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {getAppointmentTypeLabel(row.appointmentType)}
-                        </Text>
-                      </Stack>
-                    </Table.Td>
-                    {!isTablet && (
-                      <Table.Td>
-                        <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
-                          {row.convenio || 'Particular'}
-                        </Badge>
-                      </Table.Td>
+                  <Button
+                    key={chip}
+                    size="xs"
+                    radius="sm"
+                    variant={isActive ? 'filled' : 'light'}
+                    color="darkBlue"
+                    onClick={() => setActiveFilter(chip)}
+                    rightSection={(
+                      <Box
+                        px={6}
+                        py={1}
+                        style={{
+                          borderRadius: 4,
+                          background: isActive ? 'rgba(255,255,255,0.16)' : (isDark ? '#0a1d4d' : '#0b1a43'),
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          lineHeight: 1.2,
+                          minWidth: 18,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {counters[chip]}
+                      </Box>
                     )}
-                    <Table.Td>
-                      <Badge color={badge.color} variant="light">
-                        {badge.label}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap={8} justify="flex-end">
-                        {action && (
-                          <Button
-                            size="xs"
-                            variant={action.variant}
-                            color={action.color}
-                            leftSection={action.icon}
-                            onClick={() => {
-                              if (action.isTeleconsultationAction) {
-                                void startTeleconsultation(row);
-                                return;
-                              }
-                              if (action.nextStatus) {
-                                void updateClinicalStatus(row, action.nextStatus);
-                              }
-                            }}
-                            loading={loadingId === row.id}
-                          >
-                            {action.label}
-                          </Button>
-                        )}
-                        {row.isTeleconsultation && (
-                          <Button
-                            size="xs"
-                            variant="light"
-                            color="teal"
-                            leftSection={<CheckCircle2 size={14} />}
-                            onClick={() => { void finalizeTeleconsultation(row); }}
-                            loading={loadingId === row.id}
-                          >
-                            Finalizar teleconsulta
-                          </Button>
-                        )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
+                  >
+                    {getChipFilterLabel(chip)}
+                  </Button>
                 );
-              }) : (
-                <Table.Tr>
-                  <Table.Td colSpan={5}>
-                    <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
-                  </Table.Td>
-                </Table.Tr>
+              })}
+            </Group>
+
+            <Group gap={6}>
+              <ActionIcon
+                variant={viewMode === VIEW_MODES.LIST ? 'filled' : 'light'}
+                color="darkBlue"
+                onClick={() => setViewMode(VIEW_MODES.LIST)}
+                aria-label="Visualização em lista"
+              >
+                <List size={16} />
+              </ActionIcon>
+              <ActionIcon
+                variant={viewMode === VIEW_MODES.CARDS ? 'filled' : 'light'}
+                color="darkBlue"
+                onClick={() => setViewMode(VIEW_MODES.CARDS)}
+                aria-label="Visualização em cards"
+              >
+                <Grid2x2 size={16} />
+              </ActionIcon>
+            </Group>
+          </Group>
+
+          {viewMode === VIEW_MODES.LIST && (
+            <Box style={{ overflowX: 'auto', border: `1px solid ${isDark ? 'rgba(74,108,186,0.35)' : '#e9ecef'}`, borderRadius: 6 }}>
+              <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                <Table.Thead>
+                  <Table.Tr style={{ borderBottom: 'none' }}>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendado para</Table.Th>
+                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
+                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filtered.length > 0 ? filtered.map((row) => {
+                    const badge = statusBadge(row.statusFluxo);
+                    const isFinalized = isFinalizedRow(row);
+                    return (
+                      <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                        <Table.Td>
+                          <Group gap={isMobile ? 'xs' : 'sm'}>
+                            {!isMobile && (
+                              <Box
+                                bg={DARK_BLUE}
+                                w={32}
+                                h={32}
+                                style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                              >
+                                <Text c="white" fw={600} size="sm">
+                                  {row.nomeCompleto.charAt(0).toUpperCase()}
+                                </Text>
+                              </Box>
+                            )}
+                            <Box>
+                              <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>
+                                {row.nomeCompleto}
+                              </Text>
+                              {!isTablet && (
+                                <Text size="xs" c="dimmed">
+                                  CPF: {row.cpf ? formatCPF(row.cpf) : 'Não informado'}
+                                </Text>
+                              )}
+                            </Box>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={badge.color} variant="light">
+                            {badge.label}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{parseAppointmentDateTime(row)}</Text>
+                        </Table.Td>
+                        {!isTablet && (
+                          <Table.Td>
+                            <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
+                              {row.convenio || 'Particular'}
+                            </Badge>
+                          </Table.Td>
+                        )}
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={220} position="bottom-end" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações da consulta">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                {row.isTeleconsultation && !isFinalized && (
+                                  <Menu.Item
+                                    leftSection={<Copy size={14} />}
+                                    disabled={loadingId === row.id}
+                                    onClick={() => { void copyTeleconsultationLink(row); }}
+                                  >
+                                    Copiar link
+                                  </Menu.Item>
+                                )}
+                                {isFinalized ? (
+                                  <Menu.Item
+                                    leftSection={<FileText size={14} />}
+                                    disabled={loadingId === row.id}
+                                    onClick={() => openClinicalCare(row)}
+                                  >
+                                    Prontuário
+                                  </Menu.Item>
+                                ) : (
+                                  <Menu.Item
+                                    leftSection={row.isTeleconsultation ? <Video size={14} /> : <Play size={14} />}
+                                    disabled={loadingId === row.id}
+                                    onClick={() => {
+                                      if (row.isTeleconsultation) {
+                                        void startTeleconsultation(row);
+                                        return;
+                                      }
+                                      void startInPersonConsultation(row);
+                                    }}
+                                  >
+                                    {row.isTeleconsultation ? 'Iniciar teleconsulta' : 'Iniciar consulta'}
+                                  </Menu.Item>
+                                )}
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  }) : (
+                    <Table.Tr>
+                      <Table.Td colSpan={5}>
+                        <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )}
+
+          {viewMode === VIEW_MODES.CARDS && (
+            <Box>
+              {filtered.length > 0 ? (
+                <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
+                  {filtered.map((row) => {
+                    const isFinalized = isFinalizedRow(row);
+                    const dateTimeLabel = parseAppointmentDateTime(row);
+                    const complaint = parseComplaint(row);
+                    const urgent = isUrgentRow(row);
+                    return (
+                      <Paper
+                        key={row.id}
+                        withBorder
+                        p="sm"
+                        radius="md"
+                        style={{
+                          background: isDark ? '#051845' : '#f8f9ff',
+                          borderColor: isDark ? 'rgba(74,108,186,0.45)' : 'var(--mantine-color-gray-3)',
+                        }}
+                      >
+                        <Group justify="space-between" align="flex-start" wrap="nowrap">
+                          <Group align="center" wrap="nowrap" gap="sm" style={{ minWidth: 0 }}>
+                            <Box
+                              style={{
+                                minWidth: 36,
+                                width: 36,
+                                height: 36,
+                                borderRadius: 8,
+                                background: isDark ? '#4d67b4' : '#5d78c9',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: 22,
+                              }}
+                            >
+                              {row.nomeCompleto.slice(0, 1).toUpperCase()}
+                            </Box>
+                            <Box style={{ minWidth: 0 }}>
+                              <Text fw={700} lineClamp={1}>{row.nomeCompleto}</Text>
+                              <Text size="sm" c="dimmed" lineClamp={1}>{row.convenio || 'SulAmerica'}</Text>
+                            </Box>
+                          </Group>
+                          <Box>
+                            {row.isTeleconsultation && <Text fw={700} c="blue.3">Teleconsulta</Text>}
+                            {urgent && (
+                              <Group gap={4} justify="flex-end" mt={row.isTeleconsultation ? 2 : 0}>
+                                <AlertTriangle size={14} color="#f76707" />
+                                <Text c="orange.6" fw={700} size="sm">Urgente</Text>
+                              </Group>
+                            )}
+                          </Box>
+                        </Group>
+
+                        <Group gap={8} mt="sm">
+                          <Clock3 size={14} />
+                          <Text size="sm">{dateTimeLabel}</Text>
+                        </Group>
+
+                        <Text size="sm" mt={8} lineClamp={2}>
+                          <Text component="span" fw={700}>Queixa: </Text>
+                          {complaint}
+                        </Text>
+                        <Text size="sm" mt={2} lineClamp={1}>
+                          <Text component="span" fw={700}>Profissional: </Text>
+                          {row.doctorName || loggedDoctorName || '-'}
+                        </Text>
+
+                        <Divider my="sm" />
+
+                        {isFinalized ? (
+                          <Group gap={8} wrap="nowrap">
+                            <Button
+                              size="sm"
+                              color="darkBlue"
+                              leftSection={<FileText size={14} />}
+                              onClick={() => openClinicalCare(row)}
+                              loading={loadingId === row.id}
+                              style={{ flex: 1 }}
+                            >
+                              Prontuário
+                            </Button>
+                          </Group>
+                        ) : row.isTeleconsultation ? (
+                          <Group gap={8} wrap="nowrap">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              leftSection={<Copy size={14} />}
+                              onClick={() => { void copyTeleconsultationLink(row); }}
+                              loading={loadingId === row.id}
+                              style={{ flex: 1 }}
+                            >
+                              Copiar Link
+                            </Button>
+                            <Button
+                              size="sm"
+                              color="darkBlue"
+                              leftSection={<Video size={14} />}
+                              onClick={() => { void startTeleconsultation(row); }}
+                              loading={loadingId === row.id}
+                              style={{ flex: 1 }}
+                            >
+                              Iniciar teleconsulta
+                            </Button>
+                          </Group>
+                        ) : (
+                          <Group gap={8} wrap="nowrap">
+                            <Button
+                              size="sm"
+                              color="darkBlue"
+                              leftSection={<Play size={14} />}
+                              onClick={() => { void startInPersonConsultation(row); }}
+                              loading={loadingId === row.id}
+                              style={{ flex: 1 }}
+                            >
+                              Iniciar consulta
+                            </Button>
+                          </Group>
+                        )}
+                      </Paper>
+                    );
+                  })}
+                </SimpleGrid>
+              ) : (
+                <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
               )}
-            </Table.Tbody>
-          </Table>
-        </Box>
+            </Box>
+          )}
+        </Paper>
       </Box>
     </Box>
   );

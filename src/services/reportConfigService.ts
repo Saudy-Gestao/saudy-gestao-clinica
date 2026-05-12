@@ -1,7 +1,30 @@
 import api from './api';
 
+export interface ReportLayoutConfig {
+  clinicName: string;
+  title: string;
+  subtitle: string;
+  headerText: string;
+  footerText: string;
+  paperSize: 'A4' | 'Letter';
+  orientation: 'portrait' | 'landscape';
+  marginTopMm: number;
+  marginRightMm: number;
+  marginBottomMm: number;
+  marginLeftMm: number;
+  fontFamily: string;
+  fontSizePx: number;
+  primaryColor: string;
+  showLogo: boolean;
+  logoUrl: string;
+  logoImageDataUrl: string;
+  showPatientInfo: boolean;
+  showSignatures: boolean;
+}
+
 export interface ReportConfigPayload {
-  requiresReviewer: boolean;
+  requiresReviewer?: boolean;
+  reportLayout?: ReportLayoutConfig;
 }
 
 export default {

@@ -8,6 +8,7 @@ import {
   Card,
   Group,
   Loader,
+  MantineProvider,
   Modal,
   Paper,
   Select,
@@ -16,11 +17,12 @@ import {
   Stack,
   Tabs,
   Text,
+  TextInput,
   Textarea,
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { CalendarDays, Check, ClipboardList, Download, Eye, FileClock, FileText, FolderOpen, LogOut, Moon, ShieldCheck, Stethoscope, Sun, X } from 'lucide-react';
+import { CalendarDays, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ShieldCheck, Stethoscope, Sun, X } from 'lucide-react';
 import patientPortalService, {
   type PatientPortalAccessLogItem,
   type PatientPortalAppointmentItem,
@@ -35,6 +37,7 @@ import patientPortalAuthService from '../../services/patientPortalAuthService';
 import { formatCPF } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
+import { theme } from '../../themes/theme';
 import './patient-portal.css';
 
 const formatDateTime = (date?: string | null, time?: string | null) => {
@@ -276,6 +279,7 @@ function PatientPortalDashboardSkeleton() {
 
 export function PatientPortalDashboard() {
   const { isDark, toggleTheme } = usePatientPortalTheme();
+  const portalColorScheme = isDark ? 'dark' : 'light';
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>('upcoming');
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
@@ -303,6 +307,10 @@ export function PatientPortalDashboard() {
   const [preferredDeliveryDate, setPreferredDeliveryDate] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [requestingDeliveryFor, setRequestingDeliveryFor] = useState<string | null>(null);
+  const [generatingShareLinkFor, setGeneratingShareLinkFor] = useState<string | null>(null);
+  const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
+  const [sharedLinkUrl, setSharedLinkUrl] = useState('');
+  const [sharedLinkExpiresAt, setSharedLinkExpiresAt] = useState<string | null>(null);
 
   const patientName = useMemo(() => summary?.patient?.name || 'Paciente', [summary?.patient?.name]);
   const activeProfile = useMemo(
@@ -514,6 +522,47 @@ export function PatientPortalDashboard() {
     setReportDeliveryModalOpen(true);
   };
 
+  const handleGenerateShareLink = async (report: PatientPortalReportItem) => {
+    if (!report?.id) return;
+    setGeneratingShareLinkFor(report.id);
+    try {
+      const response = await patientPortalService.generateReportShareLink(report.id);
+      setSharedLinkUrl(String(response.url || ''));
+      setSharedLinkExpiresAt(response.expiresAt || null);
+      setShareLinkModalOpen(true);
+      showSuccessToast({
+        title: 'Link seguro gerado',
+        message: 'Compartilhe este link com o médico particular. Ele expira automaticamente.',
+      });
+    } catch (error: unknown) {
+      showErrorToast({
+        title: 'Falha ao gerar link',
+        error,
+        fallback: 'Não foi possível gerar o link seguro deste laudo.',
+      });
+    } finally {
+      setGeneratingShareLinkFor(null);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    const value = String(sharedLinkUrl || '').trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      showSuccessToast({
+        title: 'Link copiado',
+        message: 'O link seguro foi copiado para a área de transferência.',
+      });
+    } catch {
+      showErrorToast({
+        title: 'Falha ao copiar',
+        error: new Error('clipboard_copy_failed'),
+        fallback: 'Não foi possível copiar automaticamente. Selecione e copie manualmente.',
+      });
+    }
+  };
+
   const handleRequestPhysicalDelivery = async () => {
     if (!selectedReport?.id) return;
     setRequestingDeliveryFor(selectedReport.id);
@@ -576,11 +625,16 @@ export function PatientPortalDashboard() {
   };
 
   if (loading && !summary) {
-    return <PatientPortalDashboardSkeleton />;
+    return (
+      <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+        <PatientPortalDashboardSkeleton />
+      </MantineProvider>
+    );
   }
 
   return (
-    <Box className="patient-portal-dashboard-page">
+    <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+      <Box className="patient-portal-dashboard-page">
       <a href="#patient-portal-main-content" className="patient-portal-skip-link">Ir para conteúdo principal</a>
       <Box className="patient-portal-dashboard-bg" />
       <Stack className="patient-portal-dashboard-shell" gap="lg" role="main" aria-label="Área do paciente">
@@ -891,6 +945,16 @@ export function PatientPortalDashboard() {
                         <Button size="xs" radius="xl" variant="default" onClick={() => void downloadReportPdf(item)} leftSection={<Download size={14} />}>
                           Baixar PDF
                         </Button>
+                        <Button
+                          size="xs"
+                          radius="xl"
+                          variant="light"
+                          leftSection={<Link2 size={14} />}
+                          onClick={() => void handleGenerateShareLink(item)}
+                          loading={generatingShareLinkFor === item.id}
+                        >
+                          Gerar link seguro
+                        </Button>
                         <Button size="xs" radius="xl" variant="light" onClick={() => openReportDeliveryModal(item)}>
                           Agendar entrega física
                         </Button>
@@ -943,6 +1007,36 @@ export function PatientPortalDashboard() {
           </Group>
         </Stack>
       </Modal>
-    </Box>
+
+      <Modal
+        opened={shareLinkModalOpen}
+        onClose={() => setShareLinkModalOpen(false)}
+        title="Link seguro do laudo"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Compartilhe este link com o médico. O acesso é somente ao PDF deste laudo e expira automaticamente.
+          </Text>
+          <TextInput
+            label="Link de compartilhamento"
+            value={sharedLinkUrl}
+            readOnly
+          />
+          <Text size="xs" c="dimmed">
+            {sharedLinkExpiresAt && dayjs(sharedLinkExpiresAt).isValid()
+              ? `Expira em ${dayjs(sharedLinkExpiresAt).format('DD/MM/YYYY HH:mm')}`
+              : 'Expiração não informada'}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setShareLinkModalOpen(false)}>Fechar</Button>
+            <Button leftSection={<Copy size={14} />} onClick={() => void handleCopyShareLink()}>
+              Copiar link
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+      </Box>
+    </MantineProvider>
   );
 }

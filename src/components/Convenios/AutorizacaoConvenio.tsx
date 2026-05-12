@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 import convenioAuthorizationService, {
   type ConvenioAuthorizationAttachment,
   type ConvenioAuthorizationSourceType,
@@ -80,6 +81,8 @@ export function AutorizacaoConvenio() {
   const [sourceFilter, setSourceFilter] = useState<ConvenioAuthorizationSourceType[]>([]);
   const [statusFilter, setStatusFilter] = useState<ConvenioAuthorizationStatus[]>([]);
   const [insuranceTypeFilter, setInsuranceTypeFilter] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [uploadPreview, setUploadPreview] = useState<{
     item: AuthorizationItem;
@@ -120,8 +123,26 @@ export function AutorizacaoConvenio() {
       return acc;
     }, { pending: 0, authorized: 0, denied: 0 });
   }, [filteredItems]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredItems.length / pageSize)),
+    [filteredItems.length, pageSize],
+  );
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, pageSize, page]);
 
   const tableLoading = loading && items.length === 0;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, sourceFilter, statusFilter, insuranceTypeFilter, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   useEffect(() => {
     if (!error) return;
@@ -371,7 +392,16 @@ export function AutorizacaoConvenio() {
               />
             </Group>
 
-            <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }}>
+            <PaginatedGrid
+              totalItems={filteredItems.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              isMobile={isMobile}
+              maxHeight={isMobile ? 500 : 620}
+              showFooter={!tableLoading}
+            >
                 <Table verticalSpacing="sm" horizontalSpacing="md">
                   <Table.Thead>
                     <Table.Tr>
@@ -418,7 +448,7 @@ export function AutorizacaoConvenio() {
                         </Table.Td>
                       </Table.Tr>
                     ) : (
-                      filteredItems.map((item: AuthorizationItem) => {
+                      paginatedItems.map((item: AuthorizationItem) => {
                         const rowKey = `${item.sourceType}-${item.id}`;
                         const resolvedInsuranceName = resolveInsuranceName(item);
                         return (
@@ -558,7 +588,7 @@ export function AutorizacaoConvenio() {
                     )}
                   </Table.Tbody>
                 </Table>
-              </Box>
+            </PaginatedGrid>
           </Stack>
         </Paper>
       </Box>

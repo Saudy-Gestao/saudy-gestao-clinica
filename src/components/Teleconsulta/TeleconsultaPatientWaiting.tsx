@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { useLocalStorage } from '@mantine/hooks';
-import { Box, Button, Group, Text } from '@mantine/core';
-import { LampDesk, MicOff, PhoneOff, Send, SignalHigh } from 'lucide-react';
+import { ActionIcon, Box, Button, Group, Loader, Radio, Stack, Text, Textarea, TextInput, useMantineColorScheme } from '@mantine/core';
+import { Camera, CheckCircle, LampDesk, Mic, MicOff, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import teleconsultationLinkService, { type TeleconsultationPublicTokenMeta } from '../../services/teleconsultationLinkService';
 import consultationService from '../../services/consultationService';
+import aiQuestionnaireService, { type AiQuestion } from '../../services/aiQuestionnaireService';
+import appointmentService from '../../services/appointmentService';
+import patientService from '../../services/patientService';
 import styles from './TeleconsultaPatientWaiting.module.css';
 
 const DOCTOR = {
@@ -45,13 +47,20 @@ const normalizeCollection = (data: any) => (
       : (Array.isArray(data?.data) ? data.data : []))
 );
 
+const getInitials = (name?: string | null) => {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+};
+
 export function TeleconsultaPatientWaiting() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [colorScheme] = useLocalStorage<'light' | 'dark'>({
-    key: 'mantine-color-scheme',
-    defaultValue: 'light',
-  });
+  const { colorScheme } = useMantineColorScheme();
   const [now, setNow] = useState<Date>(() => new Date());
   const [doctorJoined, setDoctorJoined] = useState(false);
   const [doctorInConsultation, setDoctorInConsultation] = useState(false);
@@ -73,12 +82,25 @@ export function TeleconsultaPatientWaiting() {
     createdAt: string;
   }>>([]);
   const [sendingChat, setSendingChat] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [recordTab, setRecordTab] = useState<'record' | 'patient'>('record');
+  const [questions, setQuestions] = useState<AiQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsSaving, setQuestionsSaving] = useState(false);
+  const [questionsSaved, setQuestionsSaved] = useState(false);
+  const [patientComplaints, setPatientComplaints] = useState('');
+  const [patientData, setPatientData] = useState<any>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const doctorMainVideoRef = useRef<HTMLDivElement | null>(null);
   const chatBodyRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const pollingRef = useRef<number | null>(null);
   const lastEventIdRef = useRef<number>(0);
@@ -173,6 +195,7 @@ export function TeleconsultaPatientWaiting() {
   const topCardLabel = isDoctorRole ? 'Paciente' : 'Médico Responsável';
   const topCardName = isDoctorRole ? patientName : doctorName;
   const topCardDetail = isDoctorRole ? 'Paciente da teleconsulta' : doctorSpecialty;
+  const topCardInitials = getInitials(topCardName);
   const allowJoinFromMinutesBefore = tokenMeta?.window?.allowJoinFromMinutesBefore ?? 10;
   const fromPreparation = params.get('fromPrep') === '1';
   const hasPreparedSession = token ? sessionStorage.getItem(`${PREPARED_SESSION_KEY_PREFIX}${token}`) === '1' : false;
@@ -188,6 +211,38 @@ export function TeleconsultaPatientWaiting() {
     const interval = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!isDoctorRole || !appointmentId) return;
+    setQuestionsLoading(true);
+    aiQuestionnaireService.generate(appointmentId)
+      .then((data) => {
+        setQuestions(data.questions || []);
+        setPatientComplaints(data.patientComplaints || '');
+        if (data.answers && typeof data.answers === 'object') {
+          setAnswers(data.answers as Record<string, string>);
+        }
+      })
+      .catch(() => {
+        showNotification({ title: 'Aviso', message: 'Não foi possível gerar o questionário da IA.', color: 'yellow' });
+      })
+      .finally(() => setQuestionsLoading(false));
+  }, [isDoctorRole, tokenMeta?.appointment?.id]);
+
+  useEffect(() => {
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!isDoctorRole || !appointmentId) return;
+    appointmentService.getById(appointmentId)
+      .then(async (appt: any) => {
+        const pid = String(appt?.patientId || appt?.patient_id || '').trim();
+        if (pid) {
+          const patient = await patientService.getPatientById(pid);
+          setPatientData(patient);
+        }
+      })
+      .catch(() => {});
+  }, [isDoctorRole, tokenMeta?.appointment?.id]);
 
   useEffect(() => {
     const onDoctorJoined = () => setDoctorJoined(true);
@@ -211,6 +266,7 @@ export function TeleconsultaPatientWaiting() {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    cameraTrackRef.current = null;
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
@@ -224,6 +280,9 @@ export function TeleconsultaPatientWaiting() {
 
     setRemoteConnected(false);
     enteringCallRef.current = false;
+    setCallStartedAt(null);
+    setIsMicEnabled(true);
+    setIsCameraEnabled(true);
   };
 
   const resetPeerForReconnect = () => {
@@ -280,6 +339,9 @@ export function TeleconsultaPatientWaiting() {
       audio: { echoCancellation: true, noiseSuppression: true },
     });
     localStreamRef.current = stream;
+    cameraTrackRef.current = stream.getVideoTracks()[0] || null;
+    setIsMicEnabled((stream.getAudioTracks()[0]?.enabled ?? true));
+    setIsCameraEnabled((stream.getVideoTracks()[0]?.enabled ?? true));
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -312,6 +374,27 @@ export function TeleconsultaPatientWaiting() {
 
     peerRef.current = peer;
     return peer;
+  };
+
+  const getVideoSender = () => peerRef.current?.getSenders().find((sender) => sender.track?.kind === 'video') || null;
+
+  const toggleMicrophone = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) return;
+    const nextEnabled = !audioTracks[0].enabled;
+    audioTracks.forEach((track) => {
+      track.enabled = nextEnabled;
+    });
+    setIsMicEnabled(nextEnabled);
+  };
+
+  const toggleCamera = () => {
+    const activeVideoTrack = getVideoSender()?.track || localStreamRef.current?.getVideoTracks()?.[0] || null;
+    if (!activeVideoTrack) return;
+    activeVideoTrack.enabled = !activeVideoTrack.enabled;
+    setIsCameraEnabled(activeVideoTrack.enabled);
   };
 
   const acceptPendingOfferIfAny = async () => {
@@ -348,6 +431,7 @@ export function TeleconsultaPatientWaiting() {
         await updateConsultationQueue(IN_PROGRESS_STATUS);
       }
 
+      setCallStartedAt(Date.now());
       setInCall(true);
       const peer = await ensurePeerConnection();
 
@@ -370,6 +454,7 @@ export function TeleconsultaPatientWaiting() {
       }
     } catch (error: any) {
       setInCall(false);
+      setCallStartedAt(null);
       stopMediaAndPeer();
       showNotification({
         title: 'Falha ao iniciar chamada',
@@ -514,12 +599,12 @@ export function TeleconsultaPatientWaiting() {
 
     if (type === 'hangup') {
       stopMediaAndPeer();
-      setInCall(false);
       if (isDoctorRole) {
         clearPreparedSession();
         navigate('/consulta', { replace: true });
         return;
       }
+      setInCall(false);
       redirectPatientToFinished();
     }
   };
@@ -598,9 +683,13 @@ export function TeleconsultaPatientWaiting() {
   const withinWindow = diffSeconds <= allowJoinFromMinutesBefore * 60;
   const isOverdue = diffSeconds < 0;
 
-  const counterpartReady = isDoctorRole ? patientJoined : doctorJoined;
+  const counterpartReady = isDoctorRole ? patientJoined : doctorInConsultation;
 
   const status = useMemo(() => {
+    if (!isDoctorRole && doctorJoined && !doctorInConsultation) {
+      return { label: 'Médico online. Aguarde ele iniciar a consulta.', color: '#7b90ff' };
+    }
+
     if (!isDoctorRole && doctorInConsultation) {
       return { label: 'Médico na consulta', color: '#58d82e' };
     }
@@ -631,6 +720,12 @@ export function TeleconsultaPatientWaiting() {
   const timeText = (!isDoctorRole && doctorInConsultation) ? 'PRONTO' : counterpartReady ? 'PRONTO' : formatClock(diffSeconds, isOverdue);
   const canJoinConsultation = isDoctorRole || (doctorInConsultation && withinWindow);
   const chatCounterpartName = isDoctorRole ? patientName : doctorName;
+  const doctorInCallMode = inCall && isDoctorRole;
+  const callElapsed = useMemo(() => {
+    if (!inCall || !callStartedAt) return '00:00';
+    const seconds = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000));
+    return formatClock(seconds, false);
+  }, [callStartedAt, inCall, now]);
 
   const formatChatTime = (iso: string) => {
     const date = new Date(iso);
@@ -709,6 +804,27 @@ export function TeleconsultaPatientWaiting() {
     fileInputRef.current?.click();
   };
 
+  const handleSaveAnswers = async () => {
+    const appointmentId = String(tokenMeta?.appointment?.id || '').trim();
+    if (!appointmentId) return;
+    setQuestionsSaving(true);
+    try {
+      const consolidated: Record<string, string> = {};
+      for (const [key, val] of Object.entries(answers)) {
+        if (key.endsWith('__other')) continue;
+        const otherText = answers[`${key}__other`];
+        consolidated[key] = val === 'Outra' && otherText ? `Outra: ${otherText}` : val;
+      }
+      await aiQuestionnaireService.saveAnswers(appointmentId, consolidated);
+      setQuestionsSaved(true);
+      showNotification({ title: 'Respostas salvas', message: 'As respostas do questionário foram salvas com sucesso.', color: 'green' });
+    } catch {
+      showNotification({ title: 'Erro', message: 'Não foi possível salvar as respostas.', color: 'red' });
+    } finally {
+      setQuestionsSaving(false);
+    }
+  };
+
   const handleFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
@@ -767,15 +883,16 @@ export function TeleconsultaPatientWaiting() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-      <Box className={`${styles.page} ${isDark ? styles.pageDark : styles.pageLight}`}>
+    <Box bg={doctorInCallMode ? '#efefef' : 'var(--mantine-color-body)'} style={{ minHeight: '100vh' }}>
+      {isDoctorRole ? <Header /> : null}
+      <Box className={`${styles.page} ${doctorInCallMode ? styles.pageConsultation : (isDark ? styles.pageDark : styles.pageLight)}`}>
         <Box className={styles.wrapper}>
-          <Text className={styles.title}>Teleconsulta</Text>
+          {!doctorInCallMode ? <Text className={styles.title}>Teleconsulta</Text> : null}
 
+          {!doctorInCallMode ? (
           <Box className={`${styles.topCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
             <Box className={styles.topLeft}>
-              <Box className={styles.avatar}>MS</Box>
+              <Box className={styles.avatar}>{topCardInitials}</Box>
               <div>
                 <p className={styles.metaLabel}>{topCardLabel}</p>
                 <p className={styles.metaName}>{topCardName}</p>
@@ -788,47 +905,279 @@ export function TeleconsultaPatientWaiting() {
               <p className={styles.scheduleTime}>{scheduledLabel}</p>
             </Box>
           </Box>
+          ) : null}
 
           {inCall ? (
-            <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`} style={{ padding: 16 }}>
-              <Group justify="space-between" mb="md">
-                <Text fw={700} size="lg">Consulta em andamento</Text>
-                <Button
-                  size="sm"
-                  color="red"
-                  variant="light"
-                  leftSection={<PhoneOff size={16} />}
-                  onClick={() => {
-                    if (!isDoctorRole) {
-                      const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
-                      if (!confirmed) return;
-                    }
-                    stopMediaAndPeer(isDoctorRole ? 'hangup' : 'patient-left');
-                    setInCall(false);
-                    if (isDoctorRole) {
-                      void finalizeDoctorConsultation();
-                      return;
-                    }
-                    redirectPatientToFinished();
-                  }}
-                >
-                  {isDoctorRole ? 'Encerrar e finalizar consulta' : 'Sair da teleconsulta'}
-                </Button>
-              </Group>
-              <Box style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260 }}>
-                  <video ref={localVideoRef} muted autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </Box>
-                <Box style={{ borderRadius: 12, overflow: 'hidden', background: '#000', minHeight: 260, position: 'relative' }}>
-                  <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            isDoctorRole ? (
+              <Box className={styles.consultationShell}>
+                <Box ref={doctorMainVideoRef} className={styles.consultationVideoPanel}>
+                  <Box className={styles.consultationTimerPill}>{callElapsed}</Box>
+
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`${styles.consultationRemoteVideo} ${styles.consultationRemoteVideoDoctor}`}
+                  />
                   {!remoteConnected ? (
-                    <Text size="sm" c="gray.3" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-                      Aguardando conexão da outra ponta...
-                    </Text>
+                    <Box className={styles.consultationRemoteOverlay}>
+                      <Text size="sm">Aguardando vídeo do paciente...</Text>
+                    </Box>
                   ) : null}
+
+                  <Box className={styles.consultationControls}>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isMicEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isMicEnabled ? 'Mutar microfone' : 'Desmutar microfone'}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isCameraEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}
+                      onClick={toggleCamera}
+                    >
+                      {isCameraEnabled ? <Camera size={20} /> : <VideoOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={styles.consultationControlBtnDanger}
+                      variant="filled"
+                      color="red"
+                      radius="md"
+                      size="xl"
+                      aria-label="Encerrar e sair"
+                      onClick={() => {
+                        stopMediaAndPeer('hangup');
+                        void finalizeDoctorConsultation();
+                      }}
+                    >
+                      <PhoneOff size={20} />
+                    </ActionIcon>
+                  </Box>
+
+                  <Box className={styles.consultationLocalPreview}>
+                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
+                  </Box>
+                </Box>
+
+                <Box className={`${styles.consultationRecordPanel} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
+                  <Box className={`${styles.consultationRecordTabs} ${isDark ? styles.consultationRecordTabsDark : styles.consultationRecordTabsLight}`}>
+                    <button
+                      type="button"
+                      className={`${styles.consultationRecordTabBtn} ${recordTab === 'record' ? styles.consultationRecordTabBtnActive : ''}`}
+                      onClick={() => setRecordTab('record')}
+                    >
+                      Prontuário
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.consultationRecordTabBtn} ${recordTab === 'patient' ? styles.consultationRecordTabBtnActive : ''}`}
+                      onClick={() => setRecordTab('patient')}
+                    >
+                      Paciente
+                    </button>
+                  </Box>
+
+                  {recordTab === 'record' ? (
+                    <Box className={styles.consultationRecordBody}>
+                      <Group justify="space-between" align="center" mb="xs">
+                        <Text fw={800} size="xl">Questionário</Text>
+                        <Button
+                          size="sm"
+                          leftSection={questionsSaved ? <CheckCircle size={14} /> : undefined}
+                          onClick={handleSaveAnswers}
+                          loading={questionsSaving}
+                          disabled={questions.length === 0}
+                          style={{ background: questionsSaved ? '#1a7f37' : '#0a2a67', color: '#fff' }}
+                        >
+                          {questionsSaved ? 'Salvo' : 'Salvar'}
+                        </Button>
+                      </Group>
+
+                      {patientComplaints ? (
+                        <Box
+                          mb="sm"
+                          p="xs"
+                          style={{ background: 'rgba(45,118,201,0.08)', borderRadius: 8, borderLeft: '3px solid #2d76c9' }}
+                        >
+                          <Text size="xs" fw={600} c="#2d76c9" mb={2}>Queixa relatada pelo paciente</Text>
+                          <Text size="sm">{patientComplaints}</Text>
+                        </Box>
+                      ) : null}
+
+                      {questionsLoading ? (
+                        <Stack align="center" py="xl" gap="sm">
+                          <Loader size="sm" color="blue" />
+                          <Text size="sm" c="dimmed">Gerando perguntas com IA...</Text>
+                        </Stack>
+                      ) : questions.length === 0 ? (
+                        <Text size="sm" ta="center" py="xl" style={{ opacity: 0.6 }}>
+                          Nenhuma pergunta gerada ainda.
+                        </Text>
+                      ) : (
+                        <Stack gap="md">
+                          {questions.map((q) => {
+                            const answerKey = String(q.id);
+                            const selectedOption = answers[answerKey] || '';
+                            const isOther = q.options && selectedOption === 'Outra';
+                            const otherKey = `${answerKey}__other`;
+                            return (
+                              <Box
+                                key={q.id}
+                                pb="md"
+                                style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
+                              >
+                                <Text size="sm" fw={700} mb={6}>
+                                  {q.id}. {q.question}
+                                </Text>
+                                {q.options && q.options.length > 0 ? (
+                                  <Stack gap={6}>
+                                    <Radio.Group
+                                      value={selectedOption}
+                                      onChange={(val) => {
+                                        setAnswers((prev) => {
+                                          const next = { ...prev, [answerKey]: val };
+                                          if (val !== 'Outra') delete next[otherKey];
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      <Stack gap={6}>
+                                        {q.options.map((opt) => (
+                                          <Radio key={opt} value={opt} label={opt} size="sm" />
+                                        ))}
+                                      </Stack>
+                                    </Radio.Group>
+                                    {isOther && (
+                                      <TextInput
+                                        placeholder="Descreva..."
+                                        value={answers[otherKey] || ''}
+                                        onChange={(e) => { const val = e.currentTarget.value; setAnswers((prev) => ({ ...prev, [otherKey]: val })); }}
+                                        mt={4}
+                                      />
+                                    )}
+                                  </Stack>
+                                ) : (
+                                  <Textarea
+                                    placeholder="Resposta do paciente..."
+                                    value={selectedOption}
+                                    onChange={(e) => { const val = e.currentTarget.value; setAnswers((prev) => ({ ...prev, [answerKey]: val })); }}
+                                    minRows={2}
+                                    autosize
+                                  />
+                                )}
+                              </Box>
+                            );
+                          })}
+                        </Stack>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box className={styles.consultationRecordBody}>
+                      <Text fw={800} size="xl" mb="md">Dados do paciente</Text>
+                      {patientData ? (
+                        <Stack gap="xs">
+                          {[
+                            { label: 'Nome', value: patientData.name },
+                            { label: 'CPF', value: patientData.cpf ? String(patientData.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : null },
+                            { label: 'Data de nascimento', value: patientData.birthDate ? new Date(patientData.birthDate).toLocaleDateString('pt-BR') : null },
+                            { label: 'Sexo', value: patientData.gender === 'MALE' ? 'Masculino' : patientData.gender === 'FEMALE' ? 'Feminino' : patientData.gender },
+                            { label: 'Telefone', value: patientData.cellphone || patientData.phone },
+                            { label: 'E-mail', value: patientData.email },
+                            { label: 'Convênio', value: patientData.healthInsuranceName },
+                            { label: 'Nº convênio', value: patientData.healthInsuranceNumber },
+                            { label: 'Tipo sanguíneo', value: patientData.bloodType },
+                            { label: 'Alergias', value: Array.isArray(patientData.allergies) && patientData.allergies.length > 0 ? patientData.allergies.join(', ') : null },
+                            { label: 'Condições crônicas', value: Array.isArray(patientData.chronicConditions) && patientData.chronicConditions.length > 0 ? patientData.chronicConditions.join(', ') : null },
+                            { label: 'Medicamentos em uso', value: Array.isArray(patientData.currentMedications) && patientData.currentMedications.length > 0 ? patientData.currentMedications.join(', ') : null },
+                            { label: 'Contato de emergência', value: patientData.emergencyContactName ? `${patientData.emergencyContactName}${patientData.emergencyContactPhone ? ` — ${patientData.emergencyContactPhone}` : ''}` : null },
+                            { label: 'Observações', value: patientData.observations },
+                          ].filter((item) => item.value).map((item) => (
+                            <Box key={item.label} pb="xs" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                              <Text size="xs" fw={600} style={{ opacity: 0.55 }}>{item.label}</Text>
+                              <Text size="sm" fw={500}>{item.value}</Text>
+                            </Box>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Stack align="center" py="xl" gap="sm">
+                          <Loader size="sm" color="blue" />
+                          <Text size="sm">Carregando dados do paciente...</Text>
+                        </Stack>
+                      )}
+                    </Box>
+                  )}
                 </Box>
               </Box>
-            </Box>
+            ) : (
+              <Box className={styles.consultationPatientShell}>
+                <Box className={styles.consultationVideoPanel}>
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`${styles.consultationRemoteVideo} ${styles.consultationRemoteVideoPatient}`}
+                  />
+                  {!remoteConnected ? (
+                    <Box className={styles.consultationRemoteOverlay}>
+                      <Text size="sm">Aguardando conexão da outra ponta...</Text>
+                    </Box>
+                  ) : null}
+
+                  <Box className={styles.consultationControls}>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isMicEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isMicEnabled ? 'Mutar microfone' : 'Desmutar microfone'}
+                      onClick={toggleMicrophone}
+                    >
+                      {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={`${styles.consultationControlBtn} ${!isCameraEnabled ? styles.consultationControlBtnInactive : ''}`}
+                      radius="md"
+                      size="xl"
+                      aria-label={isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}
+                      onClick={toggleCamera}
+                    >
+                      {isCameraEnabled ? <Camera size={20} /> : <VideoOff size={20} />}
+                    </ActionIcon>
+                    <ActionIcon
+                      className={styles.consultationControlBtnDanger}
+                      variant="filled"
+                      color="red"
+                      radius="md"
+                      size="xl"
+                      aria-label="Sair da teleconsulta"
+                      onClick={() => {
+                        const confirmed = window.confirm('Deseja realmente sair da teleconsulta?');
+                        if (!confirmed) return;
+                        stopMediaAndPeer('patient-left');
+                        setInCall(false);
+                        setCallStartedAt(null);
+                        showNotification({
+                          title: 'Você saiu da chamada',
+                          message: 'Você pode entrar novamente quando quiser.',
+                          color: 'blue',
+                        });
+                      }}
+                    >
+                      <PhoneOff size={20} />
+                    </ActionIcon>
+                  </Box>
+
+                  <Box className={styles.consultationLocalPreview}>
+                    <video ref={localVideoRef} muted autoPlay playsInline className={styles.consultationLocalVideo} />
+                  </Box>
+                </Box>
+              </Box>
+            )
           ) : (
             <Box className={styles.mainGrid}>
               <Box className={`${styles.waitCard} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
@@ -937,24 +1286,27 @@ export function TeleconsultaPatientWaiting() {
             </Box>
           )}
 
-          {!withinWindow && !isDoctorRole ? (
+          {!doctorInCallMode && !withinWindow && !isDoctorRole ? (
             <Text c="yellow.3" mt={10}>
               A consulta será liberada {allowJoinFromMinutesBefore} minutos antes do horário agendado.
             </Text>
           ) : null}
 
+          {!doctorInCallMode && !inCall ? (
           <Box className={styles.enterRow}>
             <Button size="lg" radius="md" disabled={!canJoinConsultation || !signalingReady || inCall} onClick={() => { void enterConsultation(); }}>
               {isDoctorRole ? 'Entrar na Teleconsulta' : 'Entrar na Consulta'}
             </Button>
           </Box>
+          ) : null}
 
-          {!isDoctorRole && doctorInConsultation && !inCall ? (
+          {!doctorInCallMode && !isDoctorRole && doctorInConsultation && !inCall ? (
             <Text mt={8} c={isDark ? 'green.3' : 'green.8'} ta="right">
               O médico já está na consulta. Clique em "Entrar na Consulta" para participar.
             </Text>
           ) : null}
 
+          {!doctorInCallMode ? (
           <Box className={styles.tipsRow}>
             <Box className={`${styles.tipCard} ${isDark ? styles.tipCardDark : styles.tipCardLight}`}>
               <LampDesk size={24} />
@@ -969,6 +1321,7 @@ export function TeleconsultaPatientWaiting() {
               <Text className={styles.tipText}>Use uma conexão estável</Text>
             </Box>
           </Box>
+          ) : null}
         </Box>
       </Box>
     </Box>

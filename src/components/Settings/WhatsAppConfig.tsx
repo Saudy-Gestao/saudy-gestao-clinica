@@ -65,6 +65,7 @@ interface WhatsAppConfigProps {
 export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const templateTypeLabels: Record<string, string> = {
     APPOINTMENT_CREATED: 'Resumo de Agendamento',
+    TELECONSULTATION_LINK: 'Link de Teleconsulta',
     APPOINTMENT_CONFIRMATION: 'Confirmação de Agendamento',
     NO_SHOW: 'Falta',
     CONFIRMATION_REPLY_CONFIRMED: 'Resposta: Confirmado',
@@ -74,6 +75,8 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const defaultTemplateMessages: Record<string, string> = {
     APPOINTMENT_CREATED:
       'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nSeu atendimento está confirmado:\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n📍 {{local}}\n📎 Para agilizar seu atendimento, pedimos que envie seus documentos pelo link abaixo:\n👉 {{link_documentos}}\nEm caso de necessidade, fale conosco por aqui.',
+    TELECONSULTATION_LINK:
+      'Olá, {{paciente_nome}}! 😊\nSeu acesso para teleconsulta na {{clinica_nome}} foi liberado.\n📅 {{data}} às {{hora}}\n👩‍⚕️ {{profissional}}\n🔗 Acesse por aqui: {{link_documentos}}\nCaso precise de ajuda, responda esta mensagem.',
     APPOINTMENT_CONFIRMATION:
       'Olá, {{paciente_nome}}! 😊\nSomos da {{clinica_nome}}.\nEstamos entrando em contato para confirmar seu agendamento:\n📅 Data: {{data}}\n⏰ Horário: {{hora}}\n👩‍⚕️ Profissional: {{profissional}}\n📍 Local: {{local}}\nPor favor, escolha uma das opções abaixo:\n✅ Confirmar\n❌ Reagendar\nFicamos no aguardo.',
     CONFIRMATION_REPLY_CONFIRMED:
@@ -383,10 +386,17 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; label: string }> = {
       SENT: { color: 'green', label: 'Enviado' },
+      SUBMITTED: { color: 'green', label: 'Enviado' },
+      DELIVERED: { color: 'teal', label: 'Entregue' },
+      READ: { color: 'blue', label: 'Lido' },
       PENDING: { color: 'yellow', label: 'Pendente' },
+      RESPONDED_CONFIRMED: { color: 'green', label: 'Respondido: Confirmado' },
+      RESPONDED_RESCHEDULE: { color: 'orange', label: 'Respondido: Reagendar' },
+      RECEIVED: { color: 'blue', label: 'Recebido' },
       FAILED: { color: 'red', label: 'Falhou' },
     };
-    const config = statusConfig[status] || { color: 'gray', label: status };
+    const normalized = String(status || '').trim().toUpperCase();
+    const config = statusConfig[normalized] || { color: 'gray', label: normalized || 'Sem status' };
     return <Badge color={config.color}>{config.label}</Badge>;
   };
 
@@ -427,6 +437,34 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       return;
     }
 
+    if (template.hsmTemplateApproved) {
+      setToggleLoadingType(template.type);
+      try {
+        await whatsappService.saveTemplate({
+          id: template.id,
+          type: template.type,
+          name: template.name,
+          message: template.message,
+          isActive: true,
+        });
+        notifications.show({
+          title: 'Template ativado',
+          message: 'Template já aprovado na Gupshup e ativado com sucesso.',
+          color: 'green',
+        });
+        await refreshPageData();
+      } catch (toggleError: any) {
+        notifications.show({
+          title: 'Erro',
+          message: resolveApiErrorMessage(toggleError, 'Erro ao ativar template'),
+          color: 'red',
+        });
+      } finally {
+        setToggleLoadingType(null);
+      }
+      return;
+    }
+
     setActivationConfirm({ mode: 'list', templateId: template.id });
   };
 
@@ -434,8 +472,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     if (!activationConfirm) return;
 
     if (activationConfirm.mode === 'form') {
+      const editingTemplate = editingTemplateId
+        ? templates.find((item) => item.id === editingTemplateId)
+        : null;
+      const alreadyApproved = Boolean(editingTemplate?.hsmTemplateApproved);
+
       setTemplateForm((prev) => ({ ...prev, isActive: true }));
-      setSendValidationOnSave(true);
+      setSendValidationOnSave(!alreadyApproved);
       setActivationConfirm(null);
       return;
     }
@@ -448,7 +491,9 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
     setToggleLoadingType(template.type);
     try {
-      await whatsappService.pushTemplateToGupshup(template.id);
+      if (!template.hsmTemplateApproved) {
+        await whatsappService.pushTemplateToGupshup(template.id);
+      }
       await whatsappService.saveTemplate({
         id: template.id,
         type: template.type,
@@ -457,8 +502,10 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         isActive: true,
       });
       notifications.show({
-        title: 'Template enviado para validação',
-        message: 'O template foi ativado e enviado para o Gupshup.',
+        title: template.hsmTemplateApproved ? 'Template ativado' : 'Template enviado para validação',
+        message: template.hsmTemplateApproved
+          ? 'O template foi ativado sem novo envio, pois já está aprovado.'
+          : 'O template foi ativado e enviado para o Gupshup.',
         color: 'green',
       });
       setActivationConfirm(null);
@@ -729,6 +776,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               required
               data={[
                 { value: 'APPOINTMENT_CREATED', label: 'Resumo de Agendamento', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CREATED') },
+                { value: 'TELECONSULTATION_LINK', label: 'Link de Teleconsulta', disabled: !isEditingTemplate && templates.some((template) => template.type === 'TELECONSULTATION_LINK') },
                 { value: 'APPOINTMENT_CONFIRMATION', label: 'Confirmação', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CONFIRMATION') },
                 { value: 'NO_SHOW', label: 'Falta', disabled: !isEditingTemplate && templates.some((template) => template.type === 'NO_SHOW') },
                 { value: 'CONFIRMATION_REPLY_CONFIRMED', label: 'Resposta: Confirmado', disabled: !isEditingTemplate && templates.some((template) => template.type === 'CONFIRMATION_REPLY_CONFIRMED') },

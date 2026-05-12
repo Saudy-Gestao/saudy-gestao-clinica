@@ -14,6 +14,11 @@ export interface CreateProcedurePayload {
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
+  procedureKitBindings?: Array<{
+    inventoryKitId: string;
+    insuranceName?: string | null;
+    isActive?: boolean;
+  }>;
 }
 
 export interface UpdateProcedurePayload {
@@ -30,6 +35,11 @@ export interface UpdateProcedurePayload {
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
+  procedureKitBindings?: Array<{
+    inventoryKitId: string;
+    insuranceName?: string | null;
+    isActive?: boolean;
+  }>;
   isActive?: boolean;
 }
 

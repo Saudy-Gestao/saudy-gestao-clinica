@@ -7,6 +7,7 @@ const CLINICAL_QUEUE_TYPE = 'Fila clínica';
 export const fetchClinicalQueue = async () => {
   const data: any = await consultationService.list({
     queueType: CLINICAL_QUEUE_TYPE,
+    includeCompleted: true,
     limit: 200,
   });
 

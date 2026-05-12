@@ -839,6 +839,8 @@ export function SettingsPage() {
     setUserErrors({});
     setSavingUser(true);
     try {
+      const currentUserId = String(JSON.parse(localStorage.getItem('user') || '{}')?.id || '').trim();
+      let affectedUserId = '';
       const payload: any = { ...userForm };
       if (!payload.doctorId) payload.doctorId = null;
       if (!payload.password) delete payload.password;
@@ -847,9 +849,11 @@ export function SettingsPage() {
 
       if (editingUser) {
         await userService.updateUser(editingUser.id, payload);
+        affectedUserId = String(editingUser.id || '').trim();
         notifications.show({ title: 'Sucesso', message: 'Usuário atualizado', color: 'green' });
       } else {
         const createdUser = await userService.createUser(payload);
+        affectedUserId = String(createdUser?.id || '').trim();
 
         queryClient.setQueryData(queryKeys.settingsUsers, (previous: any) => {
           const list = Array.isArray(previous) ? previous : [];
@@ -871,6 +875,11 @@ export function SettingsPage() {
           setSelectedSectorForUsers(createdSectorId);
         }
       }
+
+      if (currentUserId && affectedUserId && currentUserId === affectedUserId) {
+        await refreshLoggedUserInStorage();
+      }
+
       setUserModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
@@ -1124,6 +1133,34 @@ export function SettingsPage() {
         title: 'Erro',
         message: resolveApiErrorMessage(error, 'Erro ao atualizar tolerância'),
         color: 'red'
+      });
+    } finally {
+      setSavingBranchSettings(false);
+    }
+  };
+
+  const handleToggleDoctorExamScheduling = async (enabled: boolean) => {
+    if (!selectedBranchForSettings) return;
+    setSavingBranchSettings(true);
+    try {
+      const updated = await branchSettingsService.updateBranchSettings(
+        selectedBranchForSettings,
+        { doctorCanScheduleExamFromConsultation: enabled }
+      );
+      setBranchSettings(updated);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.settingsBranchSettings, selectedBranchForSettings] });
+      notifications.show({
+        title: 'Sucesso',
+        message: enabled
+          ? 'Agendamento de exame pelo médico habilitado nesta filial.'
+          : 'Agendamento de exame pelo médico desabilitado nesta filial.',
+        color: 'green',
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erro',
+        message: error.response?.data?.error || 'Erro ao atualizar configuração de agendamento médico',
+        color: 'red',
       });
     } finally {
       setSavingBranchSettings(false);
@@ -1967,6 +2004,36 @@ export function SettingsPage() {
                                                             cursor: savingBranchSettings ? 'not-allowed' : 'pointer',
                                                         },
                                                     }}
+                                                />
+                                            </Group>
+                                        </Paper>
+
+                                        <Paper
+                                            p="lg"
+                                            radius="md"
+                                            withBorder
+                                            style={{
+                                                borderColor: isDark ? 'var(--mantine-color-default-border)' : undefined,
+                                                background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
+                                            }}
+                                        >
+                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                                <Box style={{ flex: 1 }}>
+                                                    <Text fw={600} size="sm" mb={4}>
+                                                        Agendamento Médico de Exame na Consulta
+                                                    </Text>
+                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                        Quando ativado, o médico pode sair da consulta com o exame já agendado
+                                                        (com sugestão de horários livres). Quando desativado, o médico apenas
+                                                        emite o pedido e o agendamento ocorre na recepção.
+                                                    </Text>
+                                                </Box>
+                                                <Switch
+                                                    checked={branchSettings?.doctorCanScheduleExamFromConsultation || false}
+                                                    onChange={(event) => handleToggleDoctorExamScheduling(event.currentTarget.checked)}
+                                                    disabled={savingBranchSettings}
+                                                    size="lg"
+                                                    color={DARK_BLUE}
                                                 />
                                             </Group>
                                         </Paper>

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Popover, Grid, Badge, Skeleton, Checkbox, SimpleGrid, Tabs } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Popover, Grid, Badge, Skeleton, Checkbox, SimpleGrid, Menu, UnstyledButton, useMantineColorScheme } from '@mantine/core';
 import invoiceService from '../services/invoiceService';
 import { useMediaQuery } from '@mantine/hooks';
-import { Plus, ChevronLeft, Calendar as CalendarIcon, Pencil, FileCode2 } from 'lucide-react';
+import { Plus, ChevronLeft, Calendar as CalendarIcon, Pencil, FileCode2, MoreVertical } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../themes/theme';
 import { DatePicker } from '@mantine/dates';
@@ -20,6 +20,7 @@ import { FloatingNumberInput } from '../components/common/FloatingNumberInput';
 import { resolveApiErrorMessage } from '../lib/apiError';
 import tissBatchService from '../services/tissBatchService';
 import { useTissBatchesQuery } from '../hooks/useTissBatchesQuery';
+import { PaginatedGrid } from '../components/common/PaginatedGrid';
 
 interface InvoiceRow {
   id: string | number;
@@ -41,6 +42,8 @@ interface InvoiceRow {
 export function Faturamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { colorScheme } = useMantineColorScheme();
+  const isDarkMode = colorScheme === 'dark';
   const [query, setQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const {
@@ -109,7 +112,9 @@ export function Faturamento() {
   const [dateInput, setDateInput] = useState('');
   const [popoverOpened, setPopoverOpened] = useState(false);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
-  const [activeWorkspace, setActiveWorkspace] = useState<string>('invoices');
+  const [activeWorkspace, setActiveWorkspace] = useState<string>('hub');
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePageSize, setInvoicePageSize] = useState(10);
   const [tissQuery, setTissQuery] = useState('');
   const [tissModalOpen, setTissModalOpen] = useState(false);
   const [tissCompetenceMonth, setTissCompetenceMonth] = useState('');
@@ -225,6 +230,10 @@ export function Faturamento() {
     [invoices],
   );
   const filtered = rows.filter((r) => r.codigo.toLowerCase().includes(query.toLowerCase()) || r.convenio.toLowerCase().includes(query.toLowerCase()));
+  const paginatedFiltered = useMemo(
+    () => filtered.slice((invoicePage - 1) * invoicePageSize, invoicePage * invoicePageSize),
+    [filtered, invoicePage, invoicePageSize],
+  );
   const filteredBatches = useMemo(() => {
     const list = Array.isArray(tissBatches) ? tissBatches : [];
     const q = String(tissQuery || '').trim().toLowerCase();
@@ -246,6 +255,15 @@ export function Faturamento() {
   );
   const canCreateTissBatch = selectedRows.length > 0 && selectedConventions.length === 1;
   const allFilteredSelected = filtered.length > 0 && filtered.every((row) => selectedInvoiceIds.includes(String(row.id)));
+
+  useEffect(() => {
+    setInvoicePage(1);
+  }, [query, activeWorkspace]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filtered.length / invoicePageSize));
+    if (invoicePage > maxPage) setInvoicePage(maxPage);
+  }, [filtered.length, invoicePage, invoicePageSize]);
 
   const toggleInvoiceSelection = (invoiceId: string, checked: boolean) => {
     setSelectedInvoiceIds((current) => {
@@ -646,13 +664,101 @@ export function Faturamento() {
           </Group>
         </Group>
 
-        <Tabs value={activeWorkspace} onChange={(value) => setActiveWorkspace(value || 'invoices')}>
-          <Tabs.List>
-            <Tabs.Tab value="invoices">Faturas ({rows.length})</Tabs.Tab>
-            <Tabs.Tab value="tiss">Lotes TISS ({tissBatches.length})</Tabs.Tab>
-          </Tabs.List>
+        {activeWorkspace === 'hub' ? (
+          <Box py={isMobile ? 'xs' : 'md'}>
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900, margin: '0 auto' }}>
+              <UnstyledButton
+                onClick={() => setActiveWorkspace('invoices')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 240,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <FileCode2 size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Faturas</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Emissão e gestão de faturas, com filtros e ações por registro.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
 
-          <Tabs.Panel value="invoices" pt="md">
+              <UnstyledButton
+                onClick={() => setActiveWorkspace('tiss')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 240,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <FileCode2 size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Lotes TISS</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Gere e acompanhe lotes TISS para envio e retorno de operadoras.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveWorkspace('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>{activeWorkspace === 'invoices' ? 'Faturas' : 'Lotes TISS'}</Text>
+              </Group>
+            </Group>
+
+          {activeWorkspace === 'invoices' && (
+            <>
             <Box mb={isMobile ? 20 : 30}>
               <Group gap="md" align="flex-end">
                 <FloatingInput
@@ -694,9 +800,18 @@ export function Faturamento() {
               )}
             </Box>
 
-            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <PaginatedGrid
+              totalItems={filtered.length}
+              page={invoicePage}
+              pageSize={invoicePageSize}
+              onPageChange={setInvoicePage}
+              onPageSizeChange={setInvoicePageSize}
+              isMobile={isMobile}
+              maxHeight={isMobile ? 500 : 620}
+              showFooter
+            >
               {invoicesLoading ? (
-                <Paper style={{ padding: 24 }}>
+                <Paper style={{ padding: 24, border: '1px solid #e9ecef', borderRadius: 6 }}>
                   <Stack gap="sm">
                     {Array.from({ length: 4 }).map((_, index) => (
                       <Stack key={index} gap="sm">
@@ -707,7 +822,7 @@ export function Faturamento() {
                   </Stack>
                 </Paper>
               ) : (
-                <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+                <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'} style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
                   <Table.Thead>
                     <Table.Tr style={{ borderBottom: 'none' }}>
                       <Table.Th style={{ width: 32 }}>
@@ -726,11 +841,11 @@ export function Faturamento() {
                       <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor</Table.Th>
                       <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Desconto</Table.Th>
                       <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor Total</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {filtered.map((r) => (
+                    {paginatedFiltered.length > 0 ? paginatedFiltered.map((r) => (
                       <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                         <Table.Td>
                           <Checkbox
@@ -792,25 +907,43 @@ export function Faturamento() {
                           <Text size="xs">R${r.valorTotal.toFixed(2)}</Text>
                         </Table.Td>
 
-                        <Table.Td>
-                          <ActionIcon
-                            variant="subtle"
-                            color="blue"
-                            onClick={() => openInvoice(r)}
-                            title="Editar fatura"
-                          >
-                            <Pencil size={16} />
-                          </ActionIcon>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={220} position="bottom-end" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="blue" aria-label="Ações da fatura">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openInvoice(r)}>
+                                  Editar fatura
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
                         </Table.Td>
                       </Table.Tr>
-                    ))}
+                    )) : (
+                      <Table.Tr>
+                        <Table.Td colSpan={isTablet ? 8 : 10}>
+                          <Stack align="center" py="xl" gap={6}>
+                            <Text fw={600}>Nenhuma fatura encontrada</Text>
+                            <Text c="dimmed" size="sm" ta="center">
+                              Cadastre uma nova fatura ou ajuste os filtros para localizar registros.
+                            </Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
                   </Table.Tbody>
                 </Table>
               )}
-            </Box>
-          </Tabs.Panel>
+            </PaginatedGrid>
+            </>
+          )}
 
-          <Tabs.Panel value="tiss" pt="md">
+          {activeWorkspace === 'tiss' && (
             <Paper withBorder p="md" radius="md">
               <Group justify="space-between" mb="md" align="flex-end">
                 <FloatingInput
@@ -897,8 +1030,9 @@ export function Faturamento() {
                 </Stack>
               )}
             </Paper>
-          </Tabs.Panel>
-        </Tabs>
+          )}
+          </>
+        )}
       </Box>
 
       <Modal
@@ -916,7 +1050,7 @@ export function Faturamento() {
       >
         <Box p="lg">
           <Group justify="space-between" align="center" mb="lg">
-            <Text fw={600} size="lg" c="#212529">{editingId ? 'Editar fatura' : 'Novo lançamento'}</Text>
+            <Text fw={600} size="lg" c="var(--mantine-color-text)">{editingId ? 'Editar fatura' : 'Novo lançamento'}</Text>
             <ActionIcon 
               variant="subtle" 
               color="gray" 

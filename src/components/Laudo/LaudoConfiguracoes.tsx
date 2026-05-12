@@ -9,17 +9,25 @@ import {
   Modal,
   Paper,
   Skeleton,
+  SimpleGrid,
   Stack,
   Switch,
   Table,
-  Tabs,
   Text,
   Title,
+  Menu,
+  NumberInput,
+  UnstyledButton,
+  Select,
   useMantineColorScheme,
+  Textarea,
+  ColorInput,
+  FileInput,
+  Image,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, Pencil, Plus, Trash2, MoreVertical, FileText, TextQuote, ListTodo, Settings2 } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
@@ -33,6 +41,9 @@ import reportWorklistService from '../../services/reportWorklistService';
 import reportConfigService from '../../services/reportConfigService';
 import { useReportSettingsQuery } from '../../hooks/useReportSettingsQuery';
 import { queryKeys } from '../../lib/queryKeys';
+import { PaginatedGrid } from '../common/PaginatedGrid';
+import { normalizeReportLayout } from '../../lib/reportLayout';
+import type { ReportLayoutConfig } from '../../services/reportConfigService';
 
 type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
@@ -44,6 +55,32 @@ const decodeHtmlEntities = (value: string) => {
   textarea.innerHTML = value;
   return textarea.value;
 };
+const buildShortcutLabelFromEvent = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const isAltGraph = event.getModifierState?.('AltGraph') ?? false;
+  const parts: string[] = [];
+  // AltGr on pt-BR keyboards is usually reported as Ctrl+Alt. Treat as Alt for UX.
+  if (event.ctrlKey && !isAltGraph) parts.push('Ctrl');
+  if (event.altKey) parts.push('Alt');
+  if (event.shiftKey) parts.push('Shift');
+
+  const rawKey = String(event.key || '');
+  const lowered = rawKey.toLowerCase();
+  if (['control', 'alt', 'shift', 'meta'].includes(lowered)) {
+    return parts.join('+');
+  }
+
+  let keyLabel = rawKey;
+  if (rawKey.length === 1) keyLabel = rawKey.toUpperCase();
+  return [...parts, keyLabel].join('+');
+};
+const normalizeShortcutForValidation = (value: string) => value.toLowerCase().replace(/\s+/g, '');
+const FORBIDDEN_SHORTCUTS = new Set([
+  'alt+f4',
+  'alt+tab',
+  'ctrl+w',
+  'ctrl+f4',
+  'ctrl+shift+w',
+]);
 const DEFAULT_REPORT_GROUPS = ['Tomografia', 'Ressonancia', 'Ultrassonografia', 'Raio-X', 'Mamografia', 'Densitometria'];
 
 interface TemplateItem {
@@ -58,6 +95,7 @@ interface PhraseItem {
   id: string;
   examType: string;
   label: string;
+  shortcut?: string;
   text: string;
 }
 
@@ -82,8 +120,9 @@ export function LaudoConfiguracoes() {
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const [activeTab, setActiveTab] = useState<string | null>('templates');
+  const [activeTab, setActiveTab] = useState<'hub' | 'templates' | 'phrases' | 'worklist' | 'settings'>('hub');
   const [requiresReviewer, setRequiresReviewer] = useState(true);
+  const [reportLayout, setReportLayout] = useState<ReportLayoutConfig>(() => normalizeReportLayout(null));
   const [savingConfig, setSavingConfig] = useState(false);
   const tinyMceContentStyle = isDark
     ? `:root, html { color-scheme: dark; }
@@ -113,6 +152,12 @@ export function LaudoConfiguracoes() {
   const [templateQuery, setTemplateQuery] = useState('');
   const [phraseQuery, setPhraseQuery] = useState('');
   const [worklistQuery, setWorklistQuery] = useState('');
+  const [templatePage, setTemplatePage] = useState(1);
+  const [templatePageSize, setTemplatePageSize] = useState(10);
+  const [phrasePage, setPhrasePage] = useState(1);
+  const [phrasePageSize, setPhrasePageSize] = useState(10);
+  const [worklistPage, setWorklistPage] = useState(1);
+  const [worklistPageSize, setWorklistPageSize] = useState(10);
 
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [phraseModalOpen, setPhraseModalOpen] = useState(false);
@@ -123,7 +168,7 @@ export function LaudoConfiguracoes() {
   const [worklistEditingId, setWorklistEditingId] = useState<string | null>(null);
 
   const [templateForm, setTemplateForm] = useState({ name: '', examType: '', group: '', content: '' });
-  const [phraseForm, setPhraseForm] = useState({ examType: '', label: '', text: '' });
+  const [phraseForm, setPhraseForm] = useState({ examType: '', label: '', shortcut: '', text: '' });
   const [worklistForm, setWorklistForm] = useState({
     patientName: '',
     patientCpf: '',
@@ -169,7 +214,7 @@ export function LaudoConfiguracoes() {
   const filteredPhrases = useMemo(() => {
     const q = phraseQuery.trim().toLowerCase();
     if (!q) return phrases;
-    return phrases.filter((item) => item.label.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || stripHtml(item.text).toLowerCase().includes(q));
+    return phrases.filter((item) => item.label.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || String(item.shortcut || '').toLowerCase().includes(q) || stripHtml(item.text).toLowerCase().includes(q));
   }, [phrases, phraseQuery]);
 
   const filteredWorklist = useMemo(() => {
@@ -177,6 +222,36 @@ export function LaudoConfiguracoes() {
     if (!q) return worklist;
     return worklist.filter((item) => item.patientName.toLowerCase().includes(q) || item.examType.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
   }, [worklist, worklistQuery]);
+
+  const paginatedTemplates = useMemo(() => {
+    const start = (templatePage - 1) * templatePageSize;
+    return filteredTemplates.slice(start, start + templatePageSize);
+  }, [filteredTemplates, templatePage, templatePageSize]);
+
+  const paginatedPhrases = useMemo(() => {
+    const start = (phrasePage - 1) * phrasePageSize;
+    return filteredPhrases.slice(start, start + phrasePageSize);
+  }, [filteredPhrases, phrasePage, phrasePageSize]);
+
+  const paginatedWorklist = useMemo(() => {
+    const start = (worklistPage - 1) * worklistPageSize;
+    return filteredWorklist.slice(start, start + worklistPageSize);
+  }, [filteredWorklist, worklistPage, worklistPageSize]);
+
+  const templateTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredTemplates.length / templatePageSize)),
+    [filteredTemplates.length, templatePageSize],
+  );
+
+  const phraseTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredPhrases.length / phrasePageSize)),
+    [filteredPhrases.length, phrasePageSize],
+  );
+
+  const worklistTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredWorklist.length / worklistPageSize)),
+    [filteredWorklist.length, worklistPageSize],
+  );
 
   const renderTableSkeleton = (columns: number) =>
     Array.from({ length: 5 }).map((_, index) => (
@@ -229,6 +304,7 @@ export function LaudoConfiguracoes() {
       id: String(item.id || ''),
       examType: item.examType || '',
       label: item.label || '',
+      shortcut: item.shortcut || '',
       text: item.text || '',
     })).filter((item: PhraseItem) => item.id);
 
@@ -249,6 +325,7 @@ export function LaudoConfiguracoes() {
     setPhrases(mappedPhrases);
     setWorklist(mappedWorklist);
     setRequiresReviewer(Boolean((configData as any)?.requiresReviewer ?? true));
+    setReportLayout(normalizeReportLayout((configData as any)?.reportLayout));
 
     const examTypes = new Set<string>();
     proceduresList.forEach((item: any) => {
@@ -288,6 +365,36 @@ export function LaudoConfiguracoes() {
     });
   }, [settingsError]);
 
+  useEffect(() => {
+    setTemplatePage(1);
+  }, [templateQuery, templatePageSize, templates.length]);
+
+  useEffect(() => {
+    if (templatePage > templateTotalPages) {
+      setTemplatePage(templateTotalPages);
+    }
+  }, [templatePage, templateTotalPages]);
+
+  useEffect(() => {
+    setPhrasePage(1);
+  }, [phraseQuery, phrasePageSize, phrases.length]);
+
+  useEffect(() => {
+    if (phrasePage > phraseTotalPages) {
+      setPhrasePage(phraseTotalPages);
+    }
+  }, [phrasePage, phraseTotalPages]);
+
+  useEffect(() => {
+    setWorklistPage(1);
+  }, [worklistQuery, worklistPageSize, worklist.length]);
+
+  useEffect(() => {
+    if (worklistPage > worklistTotalPages) {
+      setWorklistPage(worklistTotalPages);
+    }
+  }, [worklistPage, worklistTotalPages]);
+
   const handleRequiresReviewerChange = async (nextValue: boolean) => {
     setRequiresReviewer(nextValue);
     setSavingConfig(true);
@@ -312,6 +419,60 @@ export function LaudoConfiguracoes() {
     }
   };
 
+  const saveReportLayout = async () => {
+    setSavingConfig(true);
+    try {
+      const normalizedLayout = normalizeReportLayout(reportLayout);
+      await reportConfigService.update({ reportLayout: normalizedLayout });
+      setReportLayout(normalizedLayout);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportExamsPageData });
+      showNotification({
+        title: 'Layout atualizado',
+        message: 'A previa do laudo agora usara este layout.',
+        color: 'green',
+      });
+    } catch (err: any) {
+      showNotification({
+        title: 'Erro',
+        message: resolveApiErrorMessage(err, 'Falha ao salvar layout do laudo'),
+        color: 'red',
+      });
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const updateReportLayout = <K extends keyof ReportLayoutConfig>(key: K, value: ReportLayoutConfig[K]) => {
+    setReportLayout((prev) => normalizeReportLayout({ ...prev, [key]: value }));
+  };
+
+  const handleLogoImageUpload = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showNotification({
+        title: 'Arquivo invalido',
+        message: 'Selecione uma imagem para usar como logo.',
+        color: 'red',
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateReportLayout('logoImageDataUrl', String(reader.result || ''));
+      updateReportLayout('showLogo', true);
+    };
+    reader.onerror = () => {
+      showNotification({
+        title: 'Erro',
+        message: 'Nao foi possivel carregar a imagem do logo.',
+        color: 'red',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const openTemplateCreate = () => {
     setTemplateEditingId(null);
     setTemplateForm({ name: '', examType: '', group: '', content: '' });
@@ -320,7 +481,7 @@ export function LaudoConfiguracoes() {
 
   const openPhraseCreate = () => {
     setPhraseEditingId(null);
-    setPhraseForm({ examType: '', label: '', text: '' });
+    setPhraseForm({ examType: '', label: '', shortcut: '', text: '' });
     setPhraseModalOpen(true);
   };
 
@@ -377,17 +538,29 @@ export function LaudoConfiguracoes() {
       return;
     }
 
+    const normalizedShortcut = normalizeShortcutForValidation(phraseForm.shortcut || '');
+    if (FORBIDDEN_SHORTCUTS.has(normalizedShortcut)) {
+      showNotification({
+        title: 'Atalho bloqueado',
+        message: 'Esse atalho é reservado pelo sistema/navegador. Escolha outro.',
+        color: 'yellow',
+      });
+      return;
+    }
+
     try {
       if (phraseEditingId) {
         await reportPhraseService.update(phraseEditingId, {
           examType: phraseForm.examType,
           label: phraseForm.label.trim(),
+          shortcut: phraseForm.shortcut.trim() || undefined,
           text: phraseForm.text,
         });
       } else {
         await reportPhraseService.create({
           examType: phraseForm.examType,
           label: phraseForm.label.trim(),
+          shortcut: phraseForm.shortcut.trim() || undefined,
           text: phraseForm.text,
         });
       }
@@ -449,14 +622,141 @@ export function LaudoConfiguracoes() {
           </Group>
         </Group>
 
-        <Tabs value={activeTab} onChange={setActiveTab}>
-          <Tabs.List>
-            <Tabs.Tab value="templates">Padrões</Tabs.Tab>
-            <Tabs.Tab value="phrases">Frases</Tabs.Tab>
-            <Tabs.Tab value="settings">Configurações</Tabs.Tab>
-          </Tabs.List>
+        {activeTab === 'hub' ? (
+          <Box
+            style={{
+              minHeight: isMobile ? 'auto' : '58vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 920 }}>
+              <UnstyledButton
+                onClick={() => setActiveTab('templates')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Padrões</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Cadastre e gerencie modelos de laudo por tipo de exame.</Text>
+                </Stack>
+              </UnstyledButton>
 
-          <Tabs.Panel value="templates" pt="md">
+              <UnstyledButton
+                onClick={() => setActiveTab('phrases')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <TextQuote size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Frases</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Organize frases frequentes para acelerar o preenchimento de laudos.</Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('worklist')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ListTodo size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Fila Manual</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Gerencie itens da fila de laudo enquanto a integração completa não é usada.</Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('settings')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 150 : 220,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Settings2 size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Configurações</Text>
+                  </Group>
+                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Defina regras globais para finalização e revisão de laudos.</Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {activeTab === 'templates'
+                    ? 'Padrões de Laudo'
+                    : activeTab === 'phrases'
+                      ? 'Frases de Laudo'
+                      : activeTab === 'worklist'
+                        ? 'Fila Manual'
+                        : 'Configurações'}
+                </Text>
+              </Group>
+            </Group>
+
+            {activeTab === 'templates' && (
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
                 <FloatingInput
@@ -468,55 +768,75 @@ export function LaudoConfiguracoes() {
                 />
                 <Button leftSection={<Plus size={16} />} onClick={openTemplateCreate}>Novo padrão</Button>
               </Group>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Nome</Table.Th>
-                    <Table.Th>Exame</Table.Th>
-                    <Table.Th>Grupo</Table.Th>
-                    <Table.Th>Ações</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {settingsLoading && templates.length === 0 ? renderTableSkeleton(4) : filteredTemplates.length === 0 ? (
+              <PaginatedGrid
+                totalItems={filteredTemplates.length}
+                page={templatePage}
+                pageSize={templatePageSize}
+                onPageChange={setTemplatePage}
+                onPageSizeChange={setTemplatePageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={4}>
-                        <Stack align="center" py="lg" gap={6}>
-                          <Text fw={600} size="sm">Nenhum padrão encontrado</Text>
-                          <Text size="sm" c="dimmed">Crie um novo padrão ou ajuste a busca para encontrar um modelo existente.</Text>
-                        </Stack>
-                      </Table.Td>
+                      <Table.Th>Nome</Table.Th>
+                      <Table.Th>Exame</Table.Th>
+                      <Table.Th>Grupo</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
-                  ) : filteredTemplates.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>{item.name}</Table.Td>
-                      <Table.Td>{item.examType}</Table.Td>
-                      <Table.Td>{item.group || '-'}</Table.Td>
-                      <Table.Td>
-                        <Group gap={6}>
-                          <ActionIcon variant="subtle" color="blue" onClick={() => {
-                            setTemplateEditingId(item.id);
-                            setTemplateForm({ name: item.name, examType: item.examType, group: item.group || '', content: item.content });
-                            setTemplateModalOpen(true);
-                          }}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={async () => {
-                            await reportTemplateService.remove(item.id);
-                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
-                          }}>
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {settingsLoading && templates.length === 0 ? renderTableSkeleton(4) : filteredTemplates.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={4}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhum padrão encontrado</Text>
+                            <Text size="sm" c="dimmed">Crie um novo padrão ou ajuste a busca para encontrar um modelo existente.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : paginatedTemplates.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>{item.name}</Table.Td>
+                        <Table.Td>{item.examType}</Table.Td>
+                        <Table.Td>{item.group || '-'}</Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações do padrão">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
+                                  setTemplateEditingId(item.id);
+                                  setTemplateForm({ name: item.name, examType: item.examType, group: item.group || '', content: item.content });
+                                  setTemplateModalOpen(true);
+                                }}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={async () => {
+                                  await reportTemplateService.remove(item.id);
+                                  await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+                                }}>
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
             </Paper>
-          </Tabs.Panel>
+            )}
 
-          <Tabs.Panel value="phrases" pt="md">
+            {activeTab === 'phrases' && (
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
                 <FloatingInput
@@ -528,55 +848,77 @@ export function LaudoConfiguracoes() {
                 />
                 <Button leftSection={<Plus size={16} />} onClick={openPhraseCreate}>Nova frase</Button>
               </Group>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Rótulo</Table.Th>
-                    <Table.Th>Exame</Table.Th>
-                    <Table.Th>Frase</Table.Th>
-                    <Table.Th>Ações</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {settingsLoading && phrases.length === 0 ? renderTableSkeleton(4) : filteredPhrases.length === 0 ? (
+              <PaginatedGrid
+                totalItems={filteredPhrases.length}
+                page={phrasePage}
+                pageSize={phrasePageSize}
+                onPageChange={setPhrasePage}
+                onPageSizeChange={setPhrasePageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={4}>
-                        <Stack align="center" py="lg" gap={6}>
-                          <Text fw={600} size="sm">Nenhuma frase encontrada</Text>
-                          <Text size="sm" c="dimmed">Cadastre frases frequentes para acelerar o preenchimento dos laudos.</Text>
-                        </Stack>
-                      </Table.Td>
+                      <Table.Th>Rótulo</Table.Th>
+                      <Table.Th>Exame</Table.Th>
+                      <Table.Th>Atalho</Table.Th>
+                      <Table.Th>Frase</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
-                  ) : filteredPhrases.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>{decodeHtmlEntities(item.label)}</Table.Td>
-                      <Table.Td>{item.examType}</Table.Td>
-                      <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
-                      <Table.Td>
-                        <Group gap={6}>
-                          <ActionIcon variant="subtle" color="blue" onClick={() => {
-                            setPhraseEditingId(item.id);
-                            setPhraseForm({ examType: item.examType, label: item.label, text: item.text });
-                            setPhraseModalOpen(true);
-                          }}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={async () => {
-                            await reportPhraseService.remove(item.id);
-                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
-                          }}>
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {settingsLoading && phrases.length === 0 ? renderTableSkeleton(5) : filteredPhrases.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={5}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhuma frase encontrada</Text>
+                            <Text size="sm" c="dimmed">Cadastre frases frequentes para acelerar o preenchimento dos laudos.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : paginatedPhrases.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>{decodeHtmlEntities(item.label)}</Table.Td>
+                        <Table.Td>{item.examType}</Table.Td>
+                        <Table.Td>{item.shortcut ? <Badge variant="light" color="indigo">{item.shortcut}</Badge> : '-'}</Table.Td>
+                        <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações da frase">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
+                                  setPhraseEditingId(item.id);
+                                  setPhraseForm({ examType: item.examType, label: item.label, shortcut: item.shortcut || '', text: item.text });
+                                  setPhraseModalOpen(true);
+                                }}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={async () => {
+                                  await reportPhraseService.remove(item.id);
+                                  await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+                                }}>
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
             </Paper>
-          </Tabs.Panel>
+            )}
 
-          <Tabs.Panel value="worklist" pt="md">
+            {activeTab === 'worklist' && (
             <Paper withBorder p="md">
               <Group justify="space-between" mb="sm">
                 <FloatingInput
@@ -588,89 +930,109 @@ export function LaudoConfiguracoes() {
                 />
                 <Button leftSection={<Plus size={16} />} onClick={openWorklistCreate}>Novo item de fila</Button>
               </Group>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Paciente</Table.Th>
-                    <Table.Th>Exame</Table.Th>
-                    <Table.Th>Convênio</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Prioridade</Table.Th>
-                    <Table.Th>Ações</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {settingsLoading && worklist.length === 0 ? renderTableSkeleton(6) : filteredWorklist.length === 0 ? (
+              <PaginatedGrid
+                totalItems={filteredWorklist.length}
+                page={worklistPage}
+                pageSize={worklistPageSize}
+                onPageChange={setWorklistPage}
+                onPageSizeChange={setWorklistPageSize}
+                isMobile={isMobile}
+                maxHeight={isMobile ? 500 : 620}
+                showFooter
+              >
+                <Table striped highlightOnHover>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={6}>
-                        <Stack align="center" py="lg" gap={6}>
-                          <Text fw={600} size="sm">Nenhum item na fila manual</Text>
-                          <Text size="sm" c="dimmed">Use esta aba para montar a fila manualmente enquanto a integração DICOM não estiver completa.</Text>
-                        </Stack>
-                      </Table.Td>
+                      <Table.Th>Paciente</Table.Th>
+                      <Table.Th>Exame</Table.Th>
+                      <Table.Th>Convênio</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Prioridade</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                     </Table.Tr>
-                  ) : filteredWorklist.map((item) => (
-                    <Table.Tr key={item.id}>
-                      <Table.Td>
-                        <Stack gap={0}>
-                          <Text size="sm" fw={500}>{item.patientName}</Text>
-                          <Text size="xs" c="dimmed">CPF: {item.patientCpf || 'Não informado'}</Text>
-                        </Stack>
-                      </Table.Td>
-                      <Table.Td>
-                        <Stack gap={0}>
-                          <Text size="sm">{item.examType}</Text>
-                          <Text size="xs" c="dimmed">{item.scheduledAt || 'Data não informada'}</Text>
-                        </Stack>
-                      </Table.Td>
-                      <Table.Td>{item.convenio ? <Badge variant="outline" color="blue">{item.convenio}</Badge> : '-'}</Table.Td>
-                      <Table.Td>
-                        <Badge color={item.status === 'finalizado' ? 'green' : item.status === 'revisado' ? 'cyan' : item.status === 'laudado' ? 'blue' : 'gray'} variant="light">
-                          {item.status === 'sem_laudo' ? 'Sem laudo' : item.status === 'laudado' ? 'Laudado' : item.status === 'revisado' ? 'Revisado' : 'Finalizado'}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge color={item.priority === 'urgente' ? 'red' : 'gray'} variant="light">
-                          {item.priority}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Group gap={6}>
-                          <ActionIcon variant="subtle" color="blue" onClick={() => {
-                            setWorklistEditingId(item.id);
-                            setWorklistForm({
-                              patientName: item.patientName,
-                              patientCpf: item.patientCpf || '',
-                              examType: item.examType,
-                              scheduledAt: item.scheduledAt || '',
-                              requestingDoctor: item.requestingDoctor || '',
-                              assignedTo: item.assignedTo || '',
-                              convenio: item.convenio || '',
-                              priority: item.priority,
-                              status: item.status,
-                            });
-                            setWorklistModalOpen(true);
-                          }}>
-                            <Pencil size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={async () => {
-                            await reportWorklistService.remove(item.id);
-                            await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
-                          }}>
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {settingsLoading && worklist.length === 0 ? renderTableSkeleton(6) : filteredWorklist.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={6}>
+                          <Stack align="center" py="lg" gap={6}>
+                            <Text fw={600} size="sm">Nenhum item na fila manual</Text>
+                            <Text size="sm" c="dimmed">Use esta aba para montar a fila manualmente enquanto a integração DICOM não estiver completa.</Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : paginatedWorklist.map((item) => (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>
+                          <Stack gap={0}>
+                            <Text size="sm" fw={500}>{item.patientName}</Text>
+                            <Text size="xs" c="dimmed">CPF: {item.patientCpf || 'Não informado'}</Text>
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>
+                          <Stack gap={0}>
+                            <Text size="sm">{item.examType}</Text>
+                            <Text size="xs" c="dimmed">{item.scheduledAt || 'Data não informada'}</Text>
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>{item.convenio ? <Badge variant="outline" color="blue">{item.convenio}</Badge> : '-'}</Table.Td>
+                        <Table.Td>
+                          <Badge color={item.status === 'finalizado' ? 'green' : item.status === 'revisado' ? 'cyan' : item.status === 'laudado' ? 'blue' : 'gray'} variant="light">
+                            {item.status === 'sem_laudo' ? 'Sem laudo' : item.status === 'laudado' ? 'Laudado' : item.status === 'revisado' ? 'Revisado' : 'Finalizado'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={item.priority === 'urgente' ? 'red' : 'gray'} variant="light">
+                            {item.priority}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label="Ações da fila">
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => {
+                                  setWorklistEditingId(item.id);
+                                  setWorklistForm({
+                                    patientName: item.patientName,
+                                    patientCpf: item.patientCpf || '',
+                                    examType: item.examType,
+                                    scheduledAt: item.scheduledAt || '',
+                                    requestingDoctor: item.requestingDoctor || '',
+                                    assignedTo: item.assignedTo || '',
+                                    convenio: item.convenio || '',
+                                    priority: item.priority,
+                                    status: item.status,
+                                  });
+                                  setWorklistModalOpen(true);
+                                }}>
+                                  Editar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={async () => {
+                                  await reportWorklistService.remove(item.id);
+                                  await queryClient.invalidateQueries({ queryKey: queryKeys.reportSettings });
+                                }}>
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </PaginatedGrid>
             </Paper>
-          </Tabs.Panel>
+            )}
 
-          <Tabs.Panel value="settings" pt="md">
+            {activeTab === 'settings' && (
             <Paper withBorder p="md">
-              <Stack>
+              <Stack gap="lg">
                 <Title order={5}>Regras de Finalização</Title>
                 <Switch
                   label="Exigir assinatura de revisor na finalização"
@@ -681,10 +1043,68 @@ export function LaudoConfiguracoes() {
                 <Text size="sm" c="dimmed">
                   Quando habilitado, o laudo só pode ser finalizado após assinatura do emissor e do revisor.
                 </Text>
+
+                <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)', paddingTop: 18 }}>
+                  <Group justify="space-between" align="center" mb="md" wrap="wrap">
+                    <Box>
+                      <Title order={5}>Layout da Prévia</Title>
+                      <Text size="sm" c="dimmed">Estas opções controlam o documento exibido em Prévia no editor de laudo.</Text>
+                    </Box>
+                    <Button bg={DARK_BLUE} c="white" onClick={saveReportLayout} loading={savingConfig}>
+                      Salvar layout
+                    </Button>
+                  </Group>
+
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                    <FloatingInput label="Nome da clínica" value={reportLayout.clinicName} onChange={(event) => updateReportLayout('clinicName', event.currentTarget.value)} />
+                    <FloatingInput label="Título do laudo" value={reportLayout.title} onChange={(event) => updateReportLayout('title', event.currentTarget.value)} />
+                    <FloatingInput label="Subtítulo" value={reportLayout.subtitle} onChange={(event) => updateReportLayout('subtitle', event.currentTarget.value)} />
+                    <FloatingInput label="URL do logo" value={reportLayout.logoUrl} onChange={(event) => updateReportLayout('logoUrl', event.currentTarget.value)} />
+                    <FileInput label="Carregar logo" accept="image/*" clearable onChange={handleLogoImageUpload} />
+                    <Group align="flex-end" gap="sm">
+                      {reportLayout.logoImageDataUrl ? (
+                        <Image src={reportLayout.logoImageDataUrl} alt="Logo carregado" fit="contain" h={54} w={120} radius="sm" />
+                      ) : (
+                        <Text size="sm" c="dimmed">Sem imagem carregada</Text>
+                      )}
+                      <Button
+                        variant="default"
+                        size="xs"
+                        onClick={() => updateReportLayout('logoImageDataUrl', '')}
+                        disabled={!reportLayout.logoImageDataUrl}
+                      >
+                        Remover imagem
+                      </Button>
+                    </Group>
+                    <Select label="Papel" data={[{ value: 'A4', label: 'A4' }, { value: 'Letter', label: 'Carta' }]} value={reportLayout.paperSize} onChange={(value) => updateReportLayout('paperSize', (value as ReportLayoutConfig['paperSize']) || 'A4')} />
+                    <Select label="Orientação" data={[{ value: 'portrait', label: 'Retrato' }, { value: 'landscape', label: 'Paisagem' }]} value={reportLayout.orientation} onChange={(value) => updateReportLayout('orientation', (value as ReportLayoutConfig['orientation']) || 'portrait')} />
+                    <ColorInput label="Cor principal" value={reportLayout.primaryColor} onChange={(value) => updateReportLayout('primaryColor', value)} />
+                    <NumberInput label="Tamanho da fonte" min={10} max={18} value={reportLayout.fontSizePx} onChange={(value) => updateReportLayout('fontSizePx', Number(value) || 13)} />
+                  </SimpleGrid>
+
+                  <SimpleGrid cols={{ base: 2, md: 4 }} spacing="md" mt="md">
+                    <NumberInput label="Margem topo (mm)" min={0} max={60} value={reportLayout.marginTopMm} onChange={(value) => updateReportLayout('marginTopMm', Number(value) || 0)} />
+                    <NumberInput label="Margem direita (mm)" min={0} max={60} value={reportLayout.marginRightMm} onChange={(value) => updateReportLayout('marginRightMm', Number(value) || 0)} />
+                    <NumberInput label="Margem base (mm)" min={0} max={60} value={reportLayout.marginBottomMm} onChange={(value) => updateReportLayout('marginBottomMm', Number(value) || 0)} />
+                    <NumberInput label="Margem esquerda (mm)" min={0} max={60} value={reportLayout.marginLeftMm} onChange={(value) => updateReportLayout('marginLeftMm', Number(value) || 0)} />
+                  </SimpleGrid>
+
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mt="md">
+                    <Textarea label="Texto do cabeçalho" minRows={2} value={reportLayout.headerText} onChange={(event) => updateReportLayout('headerText', event.currentTarget.value)} />
+                    <Textarea label="Rodapé" minRows={2} value={reportLayout.footerText} onChange={(event) => updateReportLayout('footerText', event.currentTarget.value)} />
+                  </SimpleGrid>
+
+                  <Group mt="md" gap="xl" wrap="wrap">
+                    <Switch label="Exibir logo" checked={reportLayout.showLogo} onChange={(event) => updateReportLayout('showLogo', event.currentTarget.checked)} />
+                    <Switch label="Exibir dados do paciente" checked={reportLayout.showPatientInfo} onChange={(event) => updateReportLayout('showPatientInfo', event.currentTarget.checked)} />
+                    <Switch label="Exibir assinaturas" checked={reportLayout.showSignatures} onChange={(event) => updateReportLayout('showSignatures', event.currentTarget.checked)} />
+                  </Group>
+                </Box>
               </Stack>
             </Paper>
-          </Tabs.Panel>
-        </Tabs>
+            )}
+          </>
+        )}
       </Box>
 
       <Modal opened={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateEditingId ? 'Editar padrão' : 'Novo padrão'} centered size="xl">
@@ -756,6 +1176,27 @@ export function LaudoConfiguracoes() {
               setPhraseForm((prev) => ({ ...prev, label: value }));
             }}
             required
+          />
+          <FloatingInput
+            label="Atalho (ex: Ctrl+1)"
+            value={phraseForm.shortcut}
+            placeholder="Pressione a combinação"
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setPhraseForm((prev) => ({ ...prev, shortcut: value }));
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Backspace' || event.key === 'Delete') {
+                event.preventDefault();
+                setPhraseForm((prev) => ({ ...prev, shortcut: '' }));
+                return;
+              }
+
+              const shortcut = buildShortcutLabelFromEvent(event);
+              if (!shortcut) return;
+              event.preventDefault();
+              setPhraseForm((prev) => ({ ...prev, shortcut }));
+            }}
           />
           <Box>
             <Text size="sm" fw={500} mb={6}>Frase</Text>

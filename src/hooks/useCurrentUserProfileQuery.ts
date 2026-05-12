@@ -17,8 +17,12 @@ export const useCurrentUserProfileQuery = () => {
     queryFn: () => userService.getUser(userId),
     enabled: Boolean(userId),
     initialData: cachedUser || undefined,
-    staleTime: 10 * 60 * 1000,
+    // Force a server revalidation on mount even when localStorage has user data.
+    // This avoids stale sessions where accesses/modules were updated recently.
+    initialDataUpdatedAt: 0,
+    staleTime: 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   });
 };

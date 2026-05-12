@@ -14,6 +14,7 @@ import {
   Title,
   Popover,
   ActionIcon,
+  Menu,
   Modal,
   Center,
   Tabs,
@@ -21,10 +22,12 @@ import {
   Loader,
   Skeleton,
   Badge,
-  Image
+  Image,
+  UnstyledButton,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList, Camera, Power } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, ClipboardList, Camera, Power, UserPlus, Users, MoreVertical } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -43,6 +46,7 @@ import { FloatingInput } from '../common/FloatingInput';
 import { FloatingDateInput } from '../common/FloatingDateInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
+import { PaginatedGrid } from '../common/PaginatedGrid';
 import { findExistingCpf } from '../../utils/cpfRegistry';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -184,6 +188,7 @@ export function CadastroPaciente() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   // Ensure the page starts at the top (header) when this route/component mounts
   useEffect(() => {
@@ -270,13 +275,15 @@ export function CadastroPaciente() {
   };
 
   const [form, setForm] = useState<PatientForm>({ ...INITIAL_PATIENT_FORM });
-  const [activeTab, setActiveTab] = useState('cadastro');
+  const [activeTab, setActiveTab] = useState<'hub' | 'cadastro' | 'lista'>('hub');
   const [patients, setPatients] = useState<PatientListItem[]>([]);
   // maps to quickly locate profile id if PIT exists
   const [teaProfileMap, setTeaProfileMap] = useState<Record<string,string>>({});
   const [teaProfileCpfMap, setTeaProfileCpfMap] = useState<Record<string,string>>({});
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
+  const [patientPage, setPatientPage] = useState(1);
+  const [patientPageSize, setPatientPageSize] = useState(10);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PatientListItem | null>(null);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
@@ -359,6 +366,26 @@ export function CadastroPaciente() {
     if (!q) return patients;
     return patients.filter((item) => item.name.toLowerCase().includes(q));
   }, [patients, patientQuery]);
+
+  const paginatedPatients = useMemo(() => {
+    const start = (patientPage - 1) * patientPageSize;
+    return filteredPatients.slice(start, start + patientPageSize);
+  }, [filteredPatients, patientPage, patientPageSize]);
+
+  const patientTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredPatients.length / patientPageSize)),
+    [filteredPatients.length, patientPageSize],
+  );
+
+  useEffect(() => {
+    setPatientPage(1);
+  }, [patientQuery, patientPageSize, patients.length]);
+
+  useEffect(() => {
+    if (patientPage > patientTotalPages) {
+      setPatientPage(patientTotalPages);
+    }
+  }, [patientPage, patientTotalPages]);
 
   const isEditing = Boolean(editingPatientId);
 
@@ -931,6 +958,25 @@ export function CadastroPaciente() {
     }
   };
 
+  const handleViewPatient = (item: PatientListItem) => {
+    setSelectedPatient(item);
+    setDetailsOpen(true);
+  };
+
+  const handleEditPatient = (item: PatientListItem) => {
+    setSelectedPatient(item);
+    setEditingPatientId(item.id);
+    populateFormFromPatient(item.raw);
+    setFacialImage(null);
+    setActiveTab('cadastro');
+  };
+
+  const handleOpenPit = (item: PatientListItem) => {
+    const profileId = teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g, '') || ''];
+    if (!profileId) return;
+    navigate('/tea/pit', { state: { teaProfileId: profileId } });
+  };
+
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
@@ -954,13 +1000,110 @@ export function CadastroPaciente() {
           </Group>
 
         </Group>
-        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'cadastro')} keepMounted={false}>
-          <Tabs.List>
-            <Tabs.Tab value="cadastro">Cadastrar</Tabs.Tab>
-            <Tabs.Tab value="lista">Cadastrados</Tabs.Tab>
-          </Tabs.List>
+        {activeTab === 'hub' ? (
+          <Box
+            style={{
+              minHeight: isMobile ? 'auto' : '58vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+              <UnstyledButton
+                onClick={() => setActiveTab('cadastro')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <UserPlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar paciente</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Registrar novo paciente com dados pessoais, convênio, saúde e endereço.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
 
-          <Tabs.Panel value="cadastro" pt="md">
+              <UnstyledButton
+                onClick={() => setActiveTab('lista')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Users size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Pacientes cadastrados</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Visualize, edite, ative/desative ou remova pacientes já cadastrados.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Group gap="xs">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} />}
+                  onClick={() => setActiveTab('hub')}
+                >
+                  Voltar
+                </Button>
+                <Text fw={600}>
+                  {activeTab === 'cadastro' ? 'Cadastrar paciente' : 'Pacientes cadastrados'}
+                </Text>
+              </Group>
+            </Group>
+
+        <Tabs value={activeTab} onChange={(value) => setActiveTab((value as 'cadastro' | 'lista') || 'cadastro')} keepMounted={false}>
+          <Tabs.Panel value="cadastro" pt={0}>
             <Stack gap="md">
               {isEditing && (
                 <Text size="sm" c="dimmed">
@@ -1305,7 +1448,7 @@ export function CadastroPaciente() {
             </Stack>
           </Tabs.Panel>
 
-          <Tabs.Panel value="lista" pt="md">
+          <Tabs.Panel value="lista" pt={0}>
             <Paper p="md" withBorder radius="md">
               <Group justify="space-between" mb="md" wrap="wrap">
                 <SectionTitle>Pacientes cadastrados</SectionTitle>
@@ -1406,61 +1549,44 @@ export function CadastroPaciente() {
                                 {item.raw?.isActive ? 'Ativo' : 'Inativo'}
                               </Badge>
                             </Group>
-                            <Group gap={6} wrap="nowrap">
-                              <ActionIcon
-                                variant="subtle"
-                                style={{ color: 'var(--mantine-color-text)' }}
-                                onClick={() => {
-                                  setSelectedPatient(item);
-                                  setDetailsOpen(true);
-                                }}
-                              >
-                                <Eye size={16} />
-                              </ActionIcon>
-                              { (teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || '']) && (
-                                <ActionIcon
-                                  variant="subtle"
-                                  title="Abrir PIT desse paciente"
-                                  style={{ color: 'var(--mantine-color-text)' }}
-                                  onClick={() => {
-                                    const profId = teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || ''];
-                                    navigate('/tea/pit', { state: { teaProfileId: profId } });
-                                  }}
-                                >
-                                  <ClipboardList size={16} />
-                                </ActionIcon>
-                              )}
-                              <ActionIcon
-                                variant="subtle"
-                                style={{ color: 'var(--mantine-color-text)' }}
-                                onClick={() => {
-                                  setSelectedPatient(item);
-                                  setEditingPatientId(item.id);
-                                  populateFormFromPatient(item.raw);
-                                  setFacialImage(null);
-                                  setActiveTab('cadastro');
-                                }}
-                              >
-                                <Pencil size={16} />
-                              </ActionIcon>
-                              <ActionIcon
-                                variant="subtle"
-                                color={item.raw?.isActive ? 'orange' : 'green'}
-                                onClick={() => handleToggleActive(item)}
-                                title={item.raw?.isActive ? 'Desativar' : 'Ativar'}
-                              >
-                                <Power size={16} />
-                              </ActionIcon>
-                              <ActionIcon
-                                variant="subtle"
-                                color="red"
-                                onClick={() => {
-                                  setDeleteTarget(item);
-                                  setDeleteConfirmOpen(true);
-                                }}
-                              >
-                                <Trash size={16} />
-                              </ActionIcon>
+                            <Group justify="flex-end">
+                              <Menu shadow="md" width={210} position="bottom-end" withArrow>
+                                <Menu.Target>
+                                  <ActionIcon variant="light" size="sm" aria-label="Ações do paciente">
+                                    <MoreVertical size={16} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  <Menu.Item leftSection={<Eye size={14} />} onClick={() => handleViewPatient(item)}>
+                                    Visualizar
+                                  </Menu.Item>
+                                  {(teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g, '') || '']) && (
+                                    <Menu.Item leftSection={<ClipboardList size={14} />} onClick={() => handleOpenPit(item)}>
+                                      Abrir PIT
+                                    </Menu.Item>
+                                  )}
+                                  <Menu.Item leftSection={<Pencil size={14} />} onClick={() => handleEditPatient(item)}>
+                                    Editar
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={<Power size={14} />}
+                                    color={item.raw?.isActive ? 'orange' : 'green'}
+                                    onClick={() => handleToggleActive(item)}
+                                  >
+                                    {item.raw?.isActive ? 'Desativar' : 'Ativar'}
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={<Trash size={14} />}
+                                    color="red"
+                                    onClick={() => {
+                                      setDeleteTarget(item);
+                                      setDeleteConfirmOpen(true);
+                                    }}
+                                  >
+                                    Excluir
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
                             </Group>
                           </Stack>
                         </Paper>
@@ -1468,7 +1594,16 @@ export function CadastroPaciente() {
                     </Stack>
                   )
                 ) : (
-                <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <PaginatedGrid
+                  totalItems={filteredPatients.length}
+                  page={patientPage}
+                  pageSize={patientPageSize}
+                  onPageChange={setPatientPage}
+                  onPageSizeChange={setPatientPageSize}
+                  isMobile={isMobile}
+                  maxHeight={isMobile ? 500 : 620}
+                  showFooter
+                >
                   <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                     <Table.Thead>
                       <Table.Tr style={{ borderBottom: 'none' }}>
@@ -1483,7 +1618,7 @@ export function CadastroPaciente() {
                     <Table.Tbody>
                       {filteredPatients.length === 0 ? (
                         <Table.Tr>
-                          <Table.Td colSpan={6}>
+                          <Table.Td colSpan={isTablet ? 2 : 6}>
                             <Stack align="center" py="lg" gap={6}>
                               <Text fw={600} size="sm">Nenhum paciente encontrado</Text>
                               <Text size="sm" c="dimmed" ta="center">Ajuste a busca ou cadastre um novo paciente.</Text>
@@ -1491,7 +1626,7 @@ export function CadastroPaciente() {
                           </Table.Td>
                         </Table.Tr>
                       ) : (
-                        filteredPatients.map((item) => (
+                        paginatedPatients.map((item) => (
                           <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
                             <Table.Td>
                               <Text fw={600} size="sm">{item.name}</Text>
@@ -1525,62 +1660,44 @@ export function CadastroPaciente() {
                               </Table.Td>
                             )}
                             <Table.Td>
-                              <Group gap={4} wrap="nowrap">
-                                <ActionIcon
-                                  variant="subtle"
-                                  style={{ color: 'var(--mantine-color-text)' }}
-                                  onClick={() => {
-                                    setSelectedPatient(item);
-                                    setDetailsOpen(true);
-                                  }}
-                                >
-                                  <Eye size={16} />
-                                </ActionIcon>
-                                { (teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || '']) && (
-                                  <ActionIcon
-                                    variant="subtle"
-                                    title="Abrir PIT desse paciente"
-                                    style={{ color: 'var(--mantine-color-text)' }}
-                                    onClick={() => {
-                                      const profId = teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g,'') || ''];
-                                      console.log('navigating to pit', profId, item);
-                                      navigate('/tea/pit', { state: { teaProfileId: profId } });
-                                    }}
-                                  >
-                                    <ClipboardList size={16} />
-                                  </ActionIcon>
-                                )}
-                                <ActionIcon
-                                  variant="subtle"
-                                  style={{ color: 'var(--mantine-color-text)' }}
-                                  onClick={() => {
-                                    setSelectedPatient(item);
-                                    setEditingPatientId(item.id);
-                                    populateFormFromPatient(item.raw);
-                                    setFacialImage(null);
-                                    setActiveTab('cadastro');
-                                  }}
-                                >
-                                  <Pencil size={16} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color={item.raw?.isActive ? 'orange' : 'green'}
-                                  onClick={() => handleToggleActive(item)}
-                                  title={item.raw?.isActive ? 'Desativar' : 'Ativar'}
-                                >
-                                  <Power size={16} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={() => {
-                                    setDeleteTarget(item);
-                                    setDeleteConfirmOpen(true);
-                                  }}
-                                >
-                                  <Trash size={16} />
-                                </ActionIcon>
+                              <Group justify="flex-end">
+                                <Menu shadow="md" width={220} position="bottom-end" withArrow>
+                                  <Menu.Target>
+                                    <ActionIcon variant="light" size="sm" aria-label="Ações do paciente">
+                                      <MoreVertical size={16} />
+                                    </ActionIcon>
+                                  </Menu.Target>
+                                  <Menu.Dropdown>
+                                    <Menu.Item leftSection={<Eye size={14} />} onClick={() => handleViewPatient(item)}>
+                                      Visualizar
+                                    </Menu.Item>
+                                    {(teaProfileMap[item.id] || teaProfileCpfMap[item.cpf?.replace(/\D/g, '') || '']) && (
+                                      <Menu.Item leftSection={<ClipboardList size={14} />} onClick={() => handleOpenPit(item)}>
+                                        Abrir PIT
+                                      </Menu.Item>
+                                    )}
+                                    <Menu.Item leftSection={<Pencil size={14} />} onClick={() => handleEditPatient(item)}>
+                                      Editar
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      leftSection={<Power size={14} />}
+                                      color={item.raw?.isActive ? 'orange' : 'green'}
+                                      onClick={() => handleToggleActive(item)}
+                                    >
+                                      {item.raw?.isActive ? 'Desativar' : 'Ativar'}
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      leftSection={<Trash size={14} />}
+                                      color="red"
+                                      onClick={() => {
+                                        setDeleteTarget(item);
+                                        setDeleteConfirmOpen(true);
+                                      }}
+                                    >
+                                      Excluir
+                                    </Menu.Item>
+                                  </Menu.Dropdown>
+                                </Menu>
                               </Group>
                             </Table.Td>
                           </Table.Tr>
@@ -1588,12 +1705,14 @@ export function CadastroPaciente() {
                       )}
                     </Table.Tbody>
                   </Table>
-                </Box>
+                </PaginatedGrid>
                 )
               )}
             </Paper>
           </Tabs.Panel>
         </Tabs>
+          </>
+        )}
 
         <Modal
           opened={detailsOpen}
