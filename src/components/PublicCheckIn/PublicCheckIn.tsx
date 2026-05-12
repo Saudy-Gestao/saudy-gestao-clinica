@@ -438,6 +438,12 @@ const formatCpf = (value?: string | null) => {
   return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 };
 
+const maskCpf = (value?: string | null) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length !== 11) return formatCpf(value);
+  return `***.***.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
 const onlyDigits = (value?: string | null) => String(value || '').replace(/\D/g, '');
 
 const statusConfig: Record<string, { color: string }> = {
@@ -1153,7 +1159,7 @@ export function PublicCheckIn() {
                             {checkInResult.patient?.name || recognitionResult?.patient?.name || t.unknownPatient}
                           </Text>
                           {(checkInResult.patient?.cpf || recognitionResult?.patient?.cpf) && (
-                            <Text c="dimmed">{t.cpfPrefix}: {formatCpf(checkInResult.patient?.cpf || recognitionResult?.patient?.cpf)}</Text>
+                            <Text c="dimmed">{t.cpfPrefix}: {maskCpf(checkInResult.patient?.cpf || recognitionResult?.patient?.cpf)}</Text>
                           )}
                         </Box>
                       </Group>

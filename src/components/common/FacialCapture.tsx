@@ -3,6 +3,7 @@ import { Modal, Button, Group, Stack, Text, Center, Box, Loader } from '@mantine
 import { Camera, X, Check } from 'lucide-react';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import { showNotification } from '@mantine/notifications';
+import { LGPDBiometricConsent } from './LGPDBiometricConsent';
 
 interface FacialCaptureProps {
   opened: boolean;
@@ -10,6 +11,8 @@ interface FacialCaptureProps {
   onCapture: (imageBase64: string) => void;
   title?: string;
   description?: string;
+  /** When true, skips the LGPD consent step (e.g. staff-only internal flows where consent was given at enrollment) */
+  skipConsent?: boolean;
 }
 
 export function FacialCapture({
@@ -17,26 +20,36 @@ export function FacialCapture({
   onClose,
   onCapture,
   title = 'Captura Facial',
-  description = 'Posicione seu rosto no centro da câmera'
+  description = 'Posicione seu rosto no centro da câmera',
+  skipConsent = false,
 }: FacialCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [consentGiven, setConsentGiven] = useState(skipConsent);
+
+  // Reset consent state when modal opens/closes
+  useEffect(() => {
+    if (!opened) {
+      setConsentGiven(skipConsent);
+      setCapturedImage(null);
+    }
+  }, [opened, skipConsent]);
 
   useEffect(() => {
-    if (opened) {
+    if (opened && consentGiven) {
       startCamera();
     } else {
       stopCamera();
-      setCapturedImage(null);
     }
 
     return () => {
       stopCamera();
     };
-  }, [opened]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, consentGiven]);
 
   useEffect(() => {
     if (!opened || capturedImage || !stream || !videoRef.current) return;
@@ -50,11 +63,11 @@ export function FacialCapture({
       setLoading(true);
       const mediaStream = await facialRecognitionService.startWebcam();
       setStream(mediaStream);
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      
+
       setLoading(false);
     } catch (error: any) {
       showNotification({
@@ -119,6 +132,21 @@ export function FacialCapture({
     stopCamera();
     await startCamera();
   };
+
+  const handleConsentDecline = () => {
+    onClose();
+  };
+
+  // Show LGPD consent modal first if consent not yet given
+  if (!consentGiven) {
+    return (
+      <LGPDBiometricConsent
+        opened={opened}
+        onAccept={() => setConsentGiven(true)}
+        onDecline={handleConsentDecline}
+      />
+    );
+  }
 
   return (
     <Modal

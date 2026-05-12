@@ -21,8 +21,9 @@ class PublicCheckInSessionService {
     const response = await authApi.post<AuthResponse>('/auth/login', credentials);
 
     if (response.data.token) {
-      localStorage.setItem(TOTEM_TOKEN_KEY, response.data.token);
-      localStorage.setItem(TOTEM_USER_KEY, JSON.stringify(response.data.user));
+      // sessionStorage is cleared when the tab closes, reducing PII exposure on shared devices (totems)
+      sessionStorage.setItem(TOTEM_TOKEN_KEY, response.data.token);
+      sessionStorage.setItem(TOTEM_USER_KEY, JSON.stringify(response.data.user));
       this.emitChanged();
     }
 
@@ -30,17 +31,17 @@ class PublicCheckInSessionService {
   }
 
   logout(): void {
-    localStorage.removeItem(TOTEM_TOKEN_KEY);
-    localStorage.removeItem(TOTEM_USER_KEY);
+    sessionStorage.removeItem(TOTEM_TOKEN_KEY);
+    sessionStorage.removeItem(TOTEM_USER_KEY);
     this.emitChanged();
   }
 
   getToken(): string | null {
-    return localStorage.getItem(TOTEM_TOKEN_KEY);
+    return sessionStorage.getItem(TOTEM_TOKEN_KEY);
   }
 
   getCurrentUser(): User | null {
-    const userStr = localStorage.getItem(TOTEM_USER_KEY);
+    const userStr = sessionStorage.getItem(TOTEM_USER_KEY);
     if (!userStr) return null;
 
     try {

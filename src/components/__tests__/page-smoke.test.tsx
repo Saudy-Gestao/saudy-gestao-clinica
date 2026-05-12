@@ -197,6 +197,7 @@ vi.mock('lucide-react', () => {
     'Activity',
     'AlarmClock',
     'AlertCircle',
+    'AlertTriangle',
     'ArrowLeft',
     'ArrowRight',
     'BarChart3',

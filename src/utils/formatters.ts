@@ -38,6 +38,13 @@ export const formatCPF = (s: string) => {
   return v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 };
 
+// Masks CPF for display — shows only last 2 digits: ***.***.*89-10
+export const maskCPF = (s: string) => {
+  const v = onlyDigits(s).slice(0, 11);
+  if (v.length < 11) return formatCPF(s);
+  return `***.***.${v.slice(6, 9)}-${v.slice(9)}`;
+};
+
 export const formatCNPJ = (s: string) => {
   const v = onlyDigits(s).slice(0, 14);
   if (!v) return '';

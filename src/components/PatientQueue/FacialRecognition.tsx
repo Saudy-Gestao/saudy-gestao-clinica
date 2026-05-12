@@ -7,6 +7,7 @@ import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
+import { maskCPF } from '../../utils/formatters';
 import { usePatientTodayAppointmentsQuery } from '../../hooks/usePatientTodayAppointmentsQuery';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
@@ -185,7 +186,7 @@ export function FacialRecognition() {
                       </Box>
                       <Box style={{ flex: 1 }}>
                         <Text fw={600} size="lg">{recognitionResult.patient.name}</Text>
-                        <Text size="sm" c="dimmed">CPF: {recognitionResult.patient.cpf}</Text>
+                        <Text size="sm" c="dimmed">CPF: {maskCPF(recognitionResult.patient.cpf)}</Text>
                       </Box>
                     </Group>
                   </Card>

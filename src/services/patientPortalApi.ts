@@ -9,7 +9,9 @@ const patientPortalApi = axios.create({
 
 patientPortalApi.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(TOKEN_KEY);
+    // sessionStorage is the primary store (cleared on tab close); fall back to
+    // localStorage to remain compatible with any existing sessions.
+    const token = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,6 +28,9 @@ patientPortalApi.interceptors.response.use(
     const isAuthEndpoint = requestUrl.includes('/auth/patient-portal/request-code') || requestUrl.includes('/auth/patient-portal/verify-code');
 
     if (status === 401 && !isAuthEndpoint) {
+      // Clear from both storages to cover migrated and legacy sessions
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem('patient_portal_user');
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem('patient_portal_user');
       if (typeof window !== 'undefined') {

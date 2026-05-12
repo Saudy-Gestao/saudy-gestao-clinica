@@ -102,9 +102,8 @@ const teleconsultationLinkService = {
   },
 
   async resolvePublicToken(token: string) {
-    const response = await publicApi.get('/care/teleconsultation-links/public', {
-      params: { token },
-    });
+    // Use path param to avoid token appearing in server logs and browser history
+    const response = await publicApi.get(`/care/teleconsultation-links/public/${encodeURIComponent(token)}`);
     return response.data as TeleconsultationPublicTokenMeta;
   },
 
@@ -119,15 +118,19 @@ const teleconsultationLinkService = {
   },
 
   async pullPublicSignals(token: string, lastEventId = 0, limit = 40) {
+    // Send token via header to avoid it appearing in server logs and browser history
     const response = await publicApi.get('/care/teleconsultation-links/public/signal', {
-      params: { token, lastEventId, limit },
+      params: { lastEventId, limit },
+      headers: { 'X-Public-Token': token },
     });
     return response.data as { events: TeleconsultationSignalEvent[]; lastEventId: number };
   },
 
   async listPublicMessages(token: string, limit = 100) {
+    // Send token via header to avoid it appearing in server logs and browser history
     const response = await publicApi.get('/care/teleconsultation-links/public/messages', {
-      params: { token, limit },
+      params: { limit },
+      headers: { 'X-Public-Token': token },
     });
     return response.data as { items: TeleconsultationPersistedMessage[] };
   },

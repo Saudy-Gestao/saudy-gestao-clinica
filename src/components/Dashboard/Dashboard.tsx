@@ -47,18 +47,9 @@ export function Dashboard() {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const unitId = user?.branchId || user?.branch?.id || '';
 
-      console.log('🔍 Iniciando reconhecimento facial...', { unitId });
-
       const result: FacialScanResponse = await facialRecognitionService.scanFace({
         image: imageBase64,
         id_unidade: unitId,
-      });
-
-      console.log('✅ Resposta do reconhecimento facial:', result);
-      console.log('📊 Detalhes:', {
-        patient: result.patient,
-        trust: result.trust,
-        message: result.message
       });
 
       // Verificar se reconheceu algum paciente
@@ -69,8 +60,6 @@ export function Dashboard() {
           nome: result.patient.name,
           cpf: result.patient.cpf,
         };
-
-        console.log('👤 Dados do paciente reconhecido:', patientData);
 
         setRecognizedPatient(patientData);
 
@@ -83,7 +72,6 @@ export function Dashboard() {
           color: 'green',
         });
       } else {
-        console.warn('⚠️ Resposta sem dados de paciente:', result);
         showNotification({
           title: 'Paciente não encontrado',
           message: 'Nenhum paciente foi identificado com esta face. Verifique se o cadastro facial foi realizado.',
@@ -91,13 +79,6 @@ export function Dashboard() {
         });
       }
     } catch (error: any) {
-      console.error('❌ Erro no reconhecimento facial:', error);
-      console.error('Detalhes do erro:', {
-        response: error?.response?.data,
-        message: error?.message,
-        status: error?.response?.status
-      });
-      
       showNotification({
         title: 'Erro no reconhecimento',
         message: resolveApiErrorMessage(error, 'Não foi possível reconhecer o paciente.'),

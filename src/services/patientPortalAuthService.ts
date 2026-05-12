@@ -49,8 +49,9 @@ class PatientPortalAuthService {
     }).then((response) => response.data);
 
     if (data?.token) {
-      localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.patient || null));
+      // sessionStorage is cleared when the browser tab closes, reducing PII exposure
+      sessionStorage.setItem(TOKEN_KEY, data.token);
+      sessionStorage.setItem(USER_KEY, JSON.stringify(data.patient || null));
       window.dispatchEvent(new Event('patient-auth:changed'));
     }
 
@@ -62,29 +63,29 @@ class PatientPortalAuthService {
       .then((response) => response.data);
 
     if (data?.token) {
-      localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.patient || null));
+      sessionStorage.setItem(TOKEN_KEY, data.token);
+      sessionStorage.setItem(USER_KEY, JSON.stringify(data.patient || null));
       window.dispatchEvent(new Event('patient-auth:changed'));
     }
     return data;
   }
 
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
     window.dispatchEvent(new Event('patient-auth:changed'));
   }
 
   isAuthenticated() {
-    return Boolean(localStorage.getItem(TOKEN_KEY));
+    return Boolean(sessionStorage.getItem(TOKEN_KEY));
   }
 
   getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   }
 
   getCurrentUser() {
-    const raw = localStorage.getItem(USER_KEY);
+    const raw = sessionStorage.getItem(USER_KEY);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as PatientPortalUser;
