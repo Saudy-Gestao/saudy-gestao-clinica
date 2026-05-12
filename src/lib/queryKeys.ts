@@ -36,6 +36,7 @@ export const queryKeys = {
   reportAddendumDraft: ['report-addendum-draft'] as const,
   whatsappConfig: ['whatsapp-config'] as const,
   whatsappConversations: ['whatsapp-conversations'] as const,
+  whatsappConversationTemplates: ['whatsapp-conversation-templates'] as const,
   whatsappConversationOperators: ['whatsapp-conversation-operators'] as const,
   whatsappConversationFlows: ['whatsapp-conversation-flows'] as const,
   settingsCompanies: ['settings-companies'] as const,

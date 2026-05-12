@@ -19,6 +19,7 @@ import {
   SimpleGrid,
   Stack,
   Switch,
+  Tabs,
   Text,
   TextInput,
   Textarea,
@@ -34,11 +35,15 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronUp,
+  Clipboard,
+  Copy,
   Download,
+  FileText,
   Info,
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   RefreshCcw,
   Search,
   Send,
@@ -62,6 +67,7 @@ import whatsappConversationService, {
   type HumanConversationPatientInfo,
   type HumanConversationProtocolSummary,
   type HumanConversationSettings,
+  type HumanConversationTemplate,
 } from '../../services/whatsappConversationService';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 
@@ -284,6 +290,7 @@ export function Conversations() {
   const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentUserQuery = useCurrentUserProfileQuery();
   const currentUserId = String((currentUserQuery.data as any)?.id || '');
 
@@ -293,9 +300,13 @@ export function Conversations() {
   const [mineOnly, setMineOnly] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messageDraft, setMessageDraft] = useState('');
+  const [messageDraftSelection, setMessageDraftSelection] = useState({ start: 0, end: 0 });
   const [messageSearch, setMessageSearch] = useState('');
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [operatorsModalOpen, setOperatorsModalOpen] = useState(false);
+  const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
+  const [templateForm, setTemplateForm] = useState({ name: '', text: '' });
+  const [templateSearch, setTemplateSearch] = useState('');
   const [settingsScope, setSettingsScope] = useState<HumanConversationConfigScope>('COMPANY');
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
@@ -336,6 +347,19 @@ export function Conversations() {
     queryKey: [...queryKeys.whatsappConversationOperators, settingsScope],
     queryFn: () => whatsappConversationService.listOperators(settingsScope),
     refetchInterval: 20_000,
+  });
+
+  const currentOperatorConfig = useMemo(
+    () => (operatorsQuery.data?.items || []).find((operator) => operator.userId === currentUserId) || null,
+    [currentUserId, operatorsQuery.data?.items],
+  );
+  const isCurrentOperatorActive = Boolean(currentOperatorConfig?.isActive);
+
+  const templatesQuery = useQuery({
+    queryKey: queryKeys.whatsappConversationTemplates,
+    queryFn: () => whatsappConversationService.listTemplates(),
+    enabled: isCurrentOperatorActive,
+    staleTime: 30_000,
   });
 
   const items = conversationsQuery.data || [];
@@ -504,15 +528,97 @@ export function Conversations() {
     },
   });
 
+  const createTemplateMutation = useMutation({
+    mutationFn: (payload: { name: string; text: string }) => whatsappConversationService.createTemplate(payload),
+    onSuccess: async () => {
+      setTemplateForm({ name: '', text: '' });
+      notifications.show({
+        title: 'Template criado',
+        message: 'O template já está disponível para uso.',
+        color: 'green',
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationTemplates });
+    },
+    onError: (error: any) => {
+      notifications.show({
+        title: 'Erro ao criar template',
+        message: resolveApiErrorMessage(error, 'Não foi possível salvar o template.'),
+        color: 'red',
+      });
+    },
+  });
+
   const flowOptions = (flowsQuery.data || []).map((flow: HumanConversationFlow) => ({
     value: flow.key,
     label: flow.label,
   }));
 
+  const filteredTemplates = useMemo(() => {
+    const query = templateSearch.trim().toLowerCase();
+    const templates = templatesQuery.data || [];
+    if (!query) return templates;
+    return templates.filter((template) => (
+      template.name.toLowerCase().includes(query)
+      || template.text.toLowerCase().includes(query)
+      || String(template.createdByName || '').toLowerCase().includes(query)
+    ));
+  }, [templateSearch, templatesQuery.data]);
+
   const handleSaveOperator = async (operator: HumanConversationOperatorConfig) => {
     const draft = operatorDrafts[operator.userId];
     if (!draft) return;
     await saveOperatorMutation.mutateAsync({ userId: operator.userId, payload: draft });
+  };
+
+  const rememberMessageSelection = () => {
+    const textarea = messageTextareaRef.current;
+    if (!textarea) return;
+    setMessageDraftSelection({
+      start: textarea.selectionStart ?? messageDraft.length,
+      end: textarea.selectionEnd ?? messageDraft.length,
+    });
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!templateForm.name.trim()) {
+      notifications.show({ title: 'Nome obrigatório', message: 'Informe um nome para o template.', color: 'yellow' });
+      return;
+    }
+    if (!templateForm.text.trim()) {
+      notifications.show({ title: 'Texto obrigatório', message: 'Informe o texto do template.', color: 'yellow' });
+      return;
+    }
+
+    await createTemplateMutation.mutateAsync({
+      name: templateForm.name.trim(),
+      text: templateForm.text,
+    });
+  };
+
+  const handleCopyTemplate = async (template: HumanConversationTemplate) => {
+    try {
+      await navigator.clipboard.writeText(template.text);
+      notifications.show({ title: 'Template copiado', message: 'O texto foi copiado preservando a formatação.', color: 'green' });
+    } catch {
+      notifications.show({ title: 'Não foi possível copiar', message: 'Copie manualmente pelo texto do template.', color: 'red' });
+    }
+  };
+
+  const handleInsertTemplate = (template: HumanConversationTemplate) => {
+    const textarea = messageTextareaRef.current;
+    const start = textarea?.selectionStart ?? messageDraftSelection.start ?? messageDraft.length;
+    const end = textarea?.selectionEnd ?? messageDraftSelection.end ?? start;
+    const nextDraft = `${messageDraft.slice(0, start)}${template.text}${messageDraft.slice(end)}`;
+    const nextCursor = start + template.text.length;
+
+    setMessageDraft(nextDraft);
+    setTemplatesModalOpen(false);
+
+    window.setTimeout(() => {
+      messageTextareaRef.current?.focus();
+      messageTextareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+      setMessageDraftSelection({ start: nextCursor, end: nextCursor });
+    }, 0);
   };
 
   const selectedPatient = messagesQuery.data?.patient || null;
@@ -820,6 +926,11 @@ export function Conversations() {
                 </Box>
               </Group>
               <Group gap="xs">
+                {isCurrentOperatorActive ? (
+                  <Button variant="light" leftSection={<FileText size={16} />} onClick={() => setTemplatesModalOpen(true)}>
+                    Templates
+                  </Button>
+                ) : null}
                 <Button variant="light" leftSection={<Settings size={16} />} onClick={() => setOperatorsModalOpen(true)}>
                   Operadores
                 </Button>
@@ -1136,11 +1247,22 @@ export function Conversations() {
                   <Card radius="lg" withBorder padding="md" mt="md">
                     <Stack gap="xs">
                       <Textarea
+                        ref={messageTextareaRef}
                         label="Responder ao paciente"
                         minRows={4}
                         placeholder="Digite a mensagem do atendimento humano"
                         value={messageDraft}
-                        onChange={(event) => setMessageDraft(event.currentTarget.value)}
+                        onClick={rememberMessageSelection}
+                        onKeyUp={rememberMessageSelection}
+                        onSelect={rememberMessageSelection}
+                        onFocus={rememberMessageSelection}
+                        onChange={(event) => {
+                          setMessageDraft(event.currentTarget.value);
+                          setMessageDraftSelection({
+                            start: event.currentTarget.selectionStart ?? event.currentTarget.value.length,
+                            end: event.currentTarget.selectionEnd ?? event.currentTarget.value.length,
+                          });
+                        }}
                       />
                       <Group justify="flex-end">
                         <Button
@@ -1166,6 +1288,159 @@ export function Conversations() {
           </Stack>
         </Box>
       </Box>
+
+      <Modal
+        opened={templatesModalOpen}
+        onClose={() => setTemplatesModalOpen(false)}
+        title="Templates"
+        size="xl"
+      >
+        <Tabs defaultValue="use" keepMounted={false}>
+          <Tabs.List grow>
+            <Tabs.Tab value="use" leftSection={<FileText size={14} />}>
+              Usar templates
+            </Tabs.Tab>
+            <Tabs.Tab value="create" leftSection={<Plus size={14} />}>
+              Criar template
+            </Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="use" pt="md">
+            <Stack gap="sm">
+              <Group align="flex-end" wrap="nowrap">
+                <TextInput
+                  label="Buscar template"
+                  placeholder="Nome, texto ou criador"
+                  leftSection={<Search size={16} />}
+                  value={templateSearch}
+                  onChange={(event) => setTemplateSearch(event.currentTarget.value)}
+                  style={{ flex: 1 }}
+                />
+                <Tooltip label="Atualizar templates">
+                  <ActionIcon
+                    variant="light"
+                    size="lg"
+                    onClick={() => templatesQuery.refetch()}
+                    loading={templatesQuery.isFetching}
+                    aria-label="Atualizar templates"
+                  >
+                    <RefreshCcw size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {filteredTemplates.length} de {(templatesQuery.data || []).length} template(s)
+                </Text>
+                {selectedConversation?.humanStatus === 'CLOSED' ? (
+                  <Badge color="gray" variant="light">Conversa encerrada</Badge>
+                ) : null}
+              </Group>
+
+              <ScrollArea h={520} offsetScrollbars>
+                <Stack gap="sm" pr="xs">
+                  {filteredTemplates.map((template) => (
+                    <Paper key={template.id} withBorder radius="md" p="md">
+                      <Stack gap="xs">
+                        <Group justify="space-between" align="flex-start" wrap="nowrap">
+                          <Box style={{ minWidth: 0 }}>
+                            <Text fw={700} lineClamp={1}>{template.name}</Text>
+                            {template.createdByName ? (
+                              <Text size="xs" c="dimmed">Criado por {template.createdByName}</Text>
+                            ) : null}
+                          </Box>
+                          <Group gap="xs" wrap="nowrap">
+                            <Tooltip label="Copiar template">
+                              <ActionIcon
+                                variant="light"
+                                onClick={() => void handleCopyTemplate(template)}
+                                aria-label={`Copiar template ${template.name}`}
+                              >
+                                <Copy size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Button
+                              leftSection={<Clipboard size={14} />}
+                              onClick={() => handleInsertTemplate(template)}
+                              disabled={selectedConversation?.humanStatus === 'CLOSED'}
+                            >
+                              Inserir
+                            </Button>
+                          </Group>
+                        </Group>
+                        <Paper
+                          radius="md"
+                          p="sm"
+                          style={{
+                            background: colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
+                            maxHeight: 180,
+                            overflow: 'auto',
+                          }}
+                        >
+                          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{template.text}</Text>
+                        </Paper>
+                      </Stack>
+                    </Paper>
+                  ))}
+                  {templatesQuery.isFetching && !(templatesQuery.data || []).length ? (
+                    <Text size="sm" c="dimmed">Carregando templates...</Text>
+                  ) : null}
+                  {!templatesQuery.isFetching && !(templatesQuery.data || []).length ? (
+                    <Text size="sm" c="dimmed">Nenhum template criado ainda.</Text>
+                  ) : null}
+                  {!templatesQuery.isFetching && (templatesQuery.data || []).length > 0 && !filteredTemplates.length ? (
+                    <Text size="sm" c="dimmed">Nenhum template encontrado para essa busca.</Text>
+                  ) : null}
+                </Stack>
+              </ScrollArea>
+            </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="create" pt="md">
+            <Paper withBorder radius="md" p="md">
+              <Stack gap="sm">
+                <TextInput
+                  label="Nome do template"
+                  placeholder="Ex.: Confirmação de dados"
+                  value={templateForm.name}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setTemplateForm((current) => ({
+                      ...current,
+                      name: value,
+                    }));
+                  }}
+                />
+                <Textarea
+                  label="Texto do template"
+                  placeholder="Digite o texto exatamente como ele deve ser usado"
+                  minRows={10}
+                  autosize
+                  value={templateForm.text}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setTemplateForm((current) => ({
+                      ...current,
+                      text: value,
+                    }));
+                  }}
+                />
+                <Group justify="flex-end">
+                  <Button
+                    leftSection={<Plus size={14} />}
+                    onClick={() => void handleCreateTemplate()}
+                    loading={createTemplateMutation.isPending}
+                    disabled={!templateForm.name.trim() || !templateForm.text.trim()}
+                  >
+                    Criar template
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          </Tabs.Panel>
+        </Tabs>
+      </Modal>
 
       <Modal
         opened={operatorsModalOpen}

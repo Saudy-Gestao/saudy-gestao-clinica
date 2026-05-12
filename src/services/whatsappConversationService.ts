@@ -95,6 +95,17 @@ export interface HumanConversationSettings {
   closeWarningMinutes: number;
 }
 
+export interface HumanConversationTemplate {
+  id: string;
+  companyId: string;
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  name: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const whatsappConversationService = {
   async listFlows(): Promise<HumanConversationFlow[]> {
     const res = await api.get('/care/whatsapp/conversations/flows');
@@ -125,6 +136,16 @@ const whatsappConversationService = {
         items: fallbackRes.data?.items || [],
       };
     }
+  },
+
+  async listTemplates(): Promise<HumanConversationTemplate[]> {
+    const res = await api.get('/care/whatsapp/conversations/templates');
+    return res.data?.items || [];
+  },
+
+  async createTemplate(payload: { name: string; text: string }): Promise<HumanConversationTemplate> {
+    const res = await api.post('/care/whatsapp/conversations/templates', payload);
+    return res.data;
   },
 
   async saveSettings(payload: {
