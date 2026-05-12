@@ -18,6 +18,13 @@ export default defineConfig({
         'src/setupTests.ts',
       ],
       reporter: ['text', 'lcov'],
+      // thresholds: {
+      //   perFile: true,
+      //   statements: 85,
+      //   branches: 85,
+      //   functions: 85,
+      //   lines: 85,
+      // },
     },
   },
 });
