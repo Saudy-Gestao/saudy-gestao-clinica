@@ -192,8 +192,8 @@ vi.mock('@tabler/icons-react', () =>
   ]),
 );
 
-vi.mock('lucide-react', () =>
-  makeIconModule([
+vi.mock('lucide-react', () => {
+  const icons = makeIconModule([
     'Activity',
     'AlarmClock',
     'AlertCircle',
@@ -234,6 +234,7 @@ vi.mock('lucide-react', () =>
     'Edit',
     'Eye',
     'EyeOff',
+    'FileArchive',
     'FileClock',
     'FileCode2',
     'FileSearch',
@@ -244,7 +245,9 @@ vi.mock('lucide-react', () =>
     'FolderOpen',
     'GitBranch',
     'Glasses',
+    'Grid2x2',
     'History',
+    'Images',
     'LampDesk',
     'Layers3',
     'Layers',
@@ -253,6 +256,7 @@ vi.mock('lucide-react', () =>
     'LifeBuoy',
     'LinkIcon',
     'List',
+    'ListTodo',
     'LoaderCircle',
     'Lock',
     'LockKeyhole',
@@ -276,6 +280,7 @@ vi.mock('lucide-react', () =>
     'PanelLeftOpen',
     'Paperclip',
     'Package',
+    'PackageOpen',
     'Pause',
     'PenTool',
     'Pencil',
@@ -297,6 +302,7 @@ vi.mock('lucide-react', () =>
     'Search',
     'Send',
     'Settings',
+    'Settings2',
     'Shield',
     'ShieldCheck',
     'SignalHigh',
@@ -304,6 +310,7 @@ vi.mock('lucide-react', () =>
     'SquarePen',
     'Stethoscope',
     'Sun',
+    'TextQuote',
     'Trash',
     'Trash2',
     'Upload',
@@ -318,10 +325,21 @@ vi.mock('lucide-react', () =>
     'Waypoints',
     'Wifi',
     'WifiOff',
+    'Wrench',
     'X',
     'ZoomIn',
-  ]),
-);
+  ]);
+
+  return new Proxy(icons, {
+    get: (target, prop: string | symbol) => {
+      if (prop in target || prop === 'then') {
+        return target[prop as keyof typeof target];
+      }
+
+      return iconMock;
+    },
+  });
+});
 
 vi.mock('axios', () => ({
   default: {
