@@ -122,7 +122,7 @@ const INITIAL_NOVO_PACIENTE: NovoPatiente = {
   observacoes: '',
 };
 
-export const normalizePhoneForApi = (value?: string) => {
+const normalizePhoneForApi = (value?: string) => {
   const digits = onlyDigits(value || '');
   if (digits.length <= 11) return digits;
   if (digits.length === 12 && digits.startsWith('55')) return digits.slice(2);
@@ -132,194 +132,17 @@ export const normalizePhoneForApi = (value?: string) => {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const normalizeAppointmentIdForApi = (value?: string) => {
+const normalizeAppointmentIdForApi = (value?: string) => {
   const id = String(value || '').trim();
   if (!id) return undefined;
   return UUID_REGEX.test(id) ? id : undefined;
 };
 
-export const isConsultationAppointmentFkError = (error: any) => {
+const isConsultationAppointmentFkError = (error: any) => {
   const details = String(error?.response?.data?.details || '');
   const message = String(resolveApiErrorMessage(error, ''));
   return details.includes('consultations_appointmentId_fkey')
     || message.toLowerCase().includes('foreign key constraint');
-};
-
-export const RECEPTION_IN_PROGRESS_STATUS = 'Em atendimento na recepção';
-export const RECEPTION_CHECKLIST_STATUS = 'Checklist em andamento';
-export const RECEPTION_DONE_STATUS = 'Recepção concluída';
-export const ACTIVE_RECEPTION_STATUSES = [RECEPTION_IN_PROGRESS_STATUS, RECEPTION_CHECKLIST_STATUS];
-
-export function isPrivateCare(patient: { convenio?: string | null } | null) {
-  const convenio = (patient?.convenio || '').trim().toLowerCase();
-  return !convenio || convenio === 'particular';
-}
-
-export const getReceptionStatusColor = (status?: string) => {
-  const normalized = String(status || '').trim();
-  if (normalized === RECEPTION_IN_PROGRESS_STATUS) return 'blue';
-  if (normalized === RECEPTION_CHECKLIST_STATUS) return 'violet';
-  if (normalized === RECEPTION_DONE_STATUS) return 'green';
-  return 'gray';
-};
-
-export const hasValidPreAttendanceId = (value?: string | null) => {
-  const normalized = String(value || '').trim();
-  return Boolean(normalized) && !normalized.startsWith('tmp-');
-};
-
-export const extractDoctorNameFromAgenda = (agenda?: string | null) => {
-  const value = String(agenda || '').trim();
-  if (!value) return '';
-  const parts = value.split('Ã¢â‚¬Â¢').map((item) => item.trim()).filter(Boolean);
-  if (parts.length === 0) return '';
-  return parts[parts.length - 1];
-};
-
-export const getAgendaSummary = (agenda?: string | null) => {
-  const value = String(agenda || '').trim();
-  if (!value) {
-    return {
-      horario: 'Não informado',
-      procedimento: 'Não informado',
-    };
-  }
-
-  const parts = value.split(' • ').map((item) => item.trim()).filter(Boolean);
-  return {
-    horario: parts[0] || value,
-    procedimento: parts[1] || value,
-  };
-};
-
-export const normalizeComparableText = (value?: string | null): string => {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-};
-
-export const parseDisplayDateToApi = (value?: string | null) => {
-  const normalized = String(value || '').trim();
-  const match = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!match) return undefined;
-  return `${match[3]}-${match[2]}-${match[1]}`;
-};
-
-export const normalizeChecklistGenderForApi = (value?: string | null) => {
-  const normalized = String(value || '').trim().toUpperCase();
-  if (!normalized) return undefined;
-  if (normalized === 'M' || normalized === 'MASCULINO' || normalized === 'MALE') return 'MALE';
-  if (normalized === 'F' || normalized === 'FEMININO' || normalized === 'FEMALE') return 'FEMALE';
-  if (normalized === 'O' || normalized === 'OUTRO' || normalized === 'OTHER') return 'OTHER';
-  return undefined;
-};
-
-export const formatDateDisplay = (value?: string) => {
-  if (!value) return '';
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
-    const [y, m, d] = value.split('T')[0].split('-');
-    return `${d}/${m}/${y}`;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-};
-
-export const getChecklistAppointmentDate = (patient: Record<string, any> | null) => {
-  const rawDate = patient?.appointmentDate || patient?.date || patient?.scheduledDate;
-  return formatDateDisplay(rawDate) || 'Não informada';
-};
-
-export const isSameReceptionPatient = (left: Patient, right: Patient) => {
-  const leftAppointmentId = String(left.appointmentId || '').trim();
-  const rightAppointmentId = String(right.appointmentId || '').trim();
-  if (leftAppointmentId && rightAppointmentId && leftAppointmentId === rightAppointmentId) return true;
-
-  const leftPatientId = String(left.patientId || '').trim();
-  const rightPatientId = String(right.patientId || '').trim();
-  if (leftPatientId && rightPatientId && leftPatientId === rightPatientId) return true;
-
-  const leftCpf = onlyDigits(left.cpf || '');
-  const rightCpf = onlyDigits(right.cpf || '');
-  if (leftCpf && rightCpf && leftCpf === rightCpf) return true;
-
-  return false;
-};
-
-export const dedupeReceptionPatients = (items: Patient[]): Patient[] => {
-  const deduped: Patient[] = [];
-
-  for (const item of items) {
-    const existingIndex = deduped.findIndex((current) => isSameReceptionPatient(current, item));
-    if (existingIndex === -1) {
-      deduped.push(item);
-      continue;
-    }
-
-    const existing = deduped[existingIndex];
-    const shouldReplace =
-      (!hasValidPreAttendanceId(existing.id) && hasValidPreAttendanceId(item.id))
-      || ((existing.status || '') !== RECEPTION_CHECKLIST_STATUS && (item.status || '') === RECEPTION_CHECKLIST_STATUS);
-
-    if (shouldReplace) {
-      deduped[existingIndex] = item;
-    }
-  }
-
-  return deduped;
-};
-
-export const mapApiToPatient = (it: any): Patient => {
-  const raw = it?.item || it?.data || it;
-  const id = raw?.id || raw?.preAttendanceId || raw?.pre_attendance_id || raw?.preAttendance?.id || raw?.pre_attendance?.id || '';
-  const nomeCompleto = (raw?.fullName || raw?.full_name || raw?.name || raw?.patientName || raw?.patient_name || raw?.patient?.name || '').toString().trim();
-
-  return {
-    id: String(id),
-    patientId: raw?.patientId || raw?.patient_id || raw?.patient?.id || undefined,
-    appointmentId: raw?.appointmentId || raw?.appointment_id || undefined,
-    nomeCompleto,
-    cpf: raw?.cpf || raw?.patientCpf || raw?.patient_cpf || raw?.patient?.cpf || '',
-    dataNascimento: raw?.birthDate || raw?.birth_date || '',
-    sexo: raw?.gender || raw?.sexo || '',
-    telefone: raw?.phone || raw?.cellphone || '',
-    email: raw?.email || '',
-    endereco: raw?.address || raw?.endereco || '',
-    convenio: raw?.convenio || raw?.insurance || raw?.healthInsuranceName || '',
-    tipoConvenio: raw?.convenioType || raw?.convenio_type || '',
-    validadeConvenio: raw?.convenioValidUntil || raw?.convenio_valid_until || raw?.healthInsuranceExpiry || raw?.healthInsuranceValidity || '',
-    numCarteira: raw?.convenioNumber || raw?.convenio_number || raw?.healthInsuranceNumber || '',
-    statusAutorizacao: raw?.convenioStatus || raw?.convenio_status || '',
-    observacoesConvenio: raw?.convenioNotes || raw?.convenio_notes || '',
-    pressaoArterial: raw?.bloodPressure || raw?.blood_pressure || '',
-    frequenciaCardiaca: raw?.heartRate || raw?.heart_rate || '',
-    temperatura: raw?.temperature || '',
-    saturacao: raw?.oxygenSaturation || raw?.oxygen_saturation || '',
-    peso: raw?.weight || '',
-    altura: raw?.height || '',
-    glicemia: raw?.glucose || '',
-    imc: raw?.bmi || '',
-    queixaPrincipal: raw?.mainComplaint || raw?.main_complaint || '',
-    historiaDoenca: raw?.diseaseHistory || raw?.disease_history || '',
-    alergias: raw?.allergies || '',
-    medicamentos: raw?.medications || '',
-    antecedentes: raw?.antecedentes || '',
-    observacoesTriagem: raw?.triageNotes || raw?.triage_notes || '',
-    observacoes: raw?.notes || raw?.observacoes || '',
-    totem: raw?.totem ?? undefined,
-    status: raw?.status || '',
-    fila: raw?.queue || raw?.fila || '',
-    tipoFila: raw?.queueType || raw?.queue_type || raw?.tipoFila || '',
-    agenda: raw?.agenda || '',
-    doctorId: raw?.doctorId || raw?.doctor_id || raw?.doctor?.id || '',
-    doctorName: raw?.doctorName || raw?.doctor_name || raw?.doctor?.name || '',
-  };
 };
 
 export function PreAtendimento() {
@@ -369,6 +192,10 @@ export function PreAtendimento() {
   });
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const RECEPTION_IN_PROGRESS_STATUS = 'Em atendimento na recepção';
+  const RECEPTION_CHECKLIST_STATUS = 'Checklist em andamento';
+  const RECEPTION_DONE_STATUS = 'Recepção concluída';
+  const ACTIVE_RECEPTION_STATUSES = [RECEPTION_IN_PROGRESS_STATUS, RECEPTION_CHECKLIST_STATUS];
   const receptionQueueQuery = useReceptionQueueQuery();
   const patientsQuery = usePatientsAdminQuery();
   const insurancesQuery = useInsurancesAdminQuery();
@@ -417,9 +244,35 @@ export function PreAtendimento() {
     justifyContent: 'center',
     background: isDarkMode ? 'rgba(10, 17, 40, 0.22)' : '#ffffff',
   } as const;
+  function isPrivateCare(patient: Patient | null) {
+    const convenio = (patient?.convenio || '').trim().toLowerCase();
+    return !convenio || convenio === 'particular';
+  }
+
+  const getReceptionStatusColor = (status?: string) => {
+    const normalized = String(status || '').trim();
+    if (normalized === RECEPTION_IN_PROGRESS_STATUS) return 'blue';
+    if (normalized === RECEPTION_CHECKLIST_STATUS) return 'violet';
+    if (normalized === RECEPTION_DONE_STATUS) return 'green';
+    return 'gray';
+  };
+
+  const hasValidPreAttendanceId = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    return Boolean(normalized) && !normalized.startsWith('tmp-');
+  };
+
   const canEditPayment = checklistData.atendimentoParticular;
   const invalidateReceptionQueue = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.receptionQueue });
+  };
+
+  const extractDoctorNameFromAgenda = (agenda?: string | null) => {
+    const value = String(agenda || '').trim();
+    if (!value) return '';
+    const parts = value.split('Ã¢â‚¬Â¢').map((item) => item.trim()).filter(Boolean);
+    if (parts.length === 0) return '';
+    return parts[parts.length - 1];
   };
 
   const resetChecklist = () => {
@@ -548,6 +401,51 @@ export function PreAtendimento() {
     }
   };
 
+  const getAgendaSummary = (agenda?: string | null) => {
+    const value = String(agenda || '').trim();
+    if (!value) {
+      return {
+        horario: 'Não informado',
+        procedimento: 'Não informado',
+      };
+    }
+
+    const parts = value.split(' • ').map((item) => item.trim()).filter(Boolean);
+    return {
+      horario: parts[0] || value,
+      procedimento: parts[1] || value,
+    };
+  };
+
+  const getChecklistAppointmentDate = (patient: Patient | null) => {
+    const rawDate = (patient as any)?.appointmentDate || (patient as any)?.date || (patient as any)?.scheduledDate;
+    return formatDateDisplay(rawDate) || 'Não informada';
+  };
+
+  const normalizeComparableText = (value?: string | null): string => {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+  };
+
+  const parseDisplayDateToApi = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    const match = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return undefined;
+    return `${match[3]}-${match[2]}-${match[1]}`;
+  };
+
+  const normalizeChecklistGenderForApi = (value?: string | null) => {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (!normalized) return undefined;
+    if (normalized === 'M' || normalized === 'MASCULINO' || normalized === 'MALE') return 'MALE';
+    if (normalized === 'F' || normalized === 'FEMININO' || normalized === 'FEMALE') return 'FEMALE';
+    if (normalized === 'O' || normalized === 'OUTRO' || normalized === 'OTHER') return 'OTHER';
+    return undefined;
+  };
+
   const updateChecklistPatientField = <K extends keyof Patient>(field: K, value: Patient[K]) => {
     setChecklistPatient((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
@@ -586,6 +484,107 @@ export function PreAtendimento() {
         color: 'red',
       });
     }
+  };
+
+  const formatDateDisplay = (value?: string) => {
+    if (!value) return '';
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const [y, m, d] = value.split('T')[0].split('-');
+      return `${d}/${m}/${y}`;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const isSameReceptionPatient = (left: Patient, right: Patient) => {
+    const leftAppointmentId = String(left.appointmentId || '').trim();
+    const rightAppointmentId = String(right.appointmentId || '').trim();
+    if (leftAppointmentId && rightAppointmentId && leftAppointmentId === rightAppointmentId) return true;
+
+    const leftPatientId = String(left.patientId || '').trim();
+    const rightPatientId = String(right.patientId || '').trim();
+    if (leftPatientId && rightPatientId && leftPatientId === rightPatientId) return true;
+
+    const leftCpf = onlyDigits(left.cpf || '');
+    const rightCpf = onlyDigits(right.cpf || '');
+    if (leftCpf && rightCpf && leftCpf === rightCpf) return true;
+
+    return false;
+  };
+
+  const dedupeReceptionPatients = (items: Patient[]): Patient[] => {
+    const deduped: Patient[] = [];
+
+    for (const item of items) {
+      const existingIndex = deduped.findIndex((current) => isSameReceptionPatient(current, item));
+      if (existingIndex === -1) {
+        deduped.push(item);
+        continue;
+      }
+
+      const existing = deduped[existingIndex];
+      const shouldReplace =
+        (!hasValidPreAttendanceId(existing.id) && hasValidPreAttendanceId(item.id))
+        || ((existing.status || '') !== RECEPTION_CHECKLIST_STATUS && (item.status || '') === RECEPTION_CHECKLIST_STATUS);
+
+      if (shouldReplace) {
+        deduped[existingIndex] = item;
+      }
+    }
+
+    return deduped;
+  };
+
+  const mapApiToPatient = (it: any): Patient => {
+    const raw = it?.item || it?.data || it;
+    const id = raw?.id || raw?.preAttendanceId || raw?.pre_attendance_id || raw?.preAttendance?.id || raw?.pre_attendance?.id || '';
+    const nomeCompleto = (raw?.fullName || raw?.full_name || raw?.name || raw?.patientName || raw?.patient_name || raw?.patient?.name || '').toString().trim();
+
+    return {
+      id: String(id),
+      patientId: raw?.patientId || raw?.patient_id || raw?.patient?.id || undefined,
+      appointmentId: raw?.appointmentId || raw?.appointment_id || undefined,
+      nomeCompleto,
+      cpf: raw?.cpf || raw?.patientCpf || raw?.patient_cpf || raw?.patient?.cpf || '',
+      dataNascimento: raw?.birthDate || raw?.birth_date || '',
+      sexo: raw?.gender || raw?.sexo || '',
+      telefone: raw?.phone || raw?.cellphone || '',
+      email: raw?.email || '',
+      endereco: raw?.address || raw?.endereco || '',
+      convenio: raw?.convenio || raw?.insurance || raw?.healthInsuranceName || '',
+      tipoConvenio: raw?.convenioType || raw?.convenio_type || '',
+      validadeConvenio: raw?.convenioValidUntil || raw?.convenio_valid_until || raw?.healthInsuranceExpiry || raw?.healthInsuranceValidity || '',
+      numCarteira: raw?.convenioNumber || raw?.convenio_number || raw?.healthInsuranceNumber || '',
+      statusAutorizacao: raw?.convenioStatus || raw?.convenio_status || '',
+      observacoesConvenio: raw?.convenioNotes || raw?.convenio_notes || '',
+      pressaoArterial: raw?.bloodPressure || raw?.blood_pressure || '',
+      frequenciaCardiaca: raw?.heartRate || raw?.heart_rate || '',
+      temperatura: raw?.temperature || '',
+      saturacao: raw?.oxygenSaturation || raw?.oxygen_saturation || '',
+      peso: raw?.weight || '',
+      altura: raw?.height || '',
+      glicemia: raw?.glucose || '',
+      imc: raw?.bmi || '',
+      queixaPrincipal: raw?.mainComplaint || raw?.main_complaint || '',
+      historiaDoenca: raw?.diseaseHistory || raw?.disease_history || '',
+      alergias: raw?.allergies || '',
+      medicamentos: raw?.medications || '',
+      antecedentes: raw?.antecedentes || '',
+      observacoesTriagem: raw?.triageNotes || raw?.triage_notes || '',
+      observacoes: raw?.notes || raw?.observacoes || '',
+      totem: raw?.totem ?? undefined,
+      status: raw?.status || '',
+      fila: raw?.queue || raw?.fila || '',
+      tipoFila: raw?.queueType || raw?.queue_type || raw?.tipoFila || '',
+      agenda: raw?.agenda || '',
+      doctorId: raw?.doctorId || raw?.doctor_id || raw?.doctor?.id || '',
+      doctorName: raw?.doctorName || raw?.doctor_name || raw?.doctor?.name || '',
+    };
   };
 
   const resolvePatientWithValidPreAttendanceId = async (patient: Patient): Promise<Patient | null> => {

@@ -1,48 +1,41 @@
-import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CadastroCliente } from '../CadastroCliente';
 import companyService from '../../../services/companyService';
+import bcrypt from 'bcryptjs';
 import { vi, describe, it, beforeEach, expect } from 'vitest';
 import '@testing-library/jest-dom';
 
 vi.mock('../../../services/companyService');
 const mockedService = vi.mocked(companyService as any);
 
-vi.mock('../../Header/Header', () => ({
-  Header: () => null,
+vi.mock('bcryptjs', () => ({
+  default: {
+    hash: vi.fn(),
+  },
 }));
 
-describe('CadastroCliente component integration', () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
+// bcrypt is the default export; vi.mocked should wrap the whole import
+const mockedBcrypt = vi.mocked(bcrypt as any);
 
+describe('CadastroCliente component integration', () => {
   beforeEach(() => {
     mockedService.createCompany.mockReset();
+    mockedBcrypt.hash.mockReset();
   });
 
   it('fills steps and calls companyService.createCompany with correct payload', async () => {
     // arrange
-    mockedService.createCompany.mockResolvedValue({
-      id: 'xyz',
-      company: { id: 'company-1' },
-      branches: [],
-    });
+    mockedBcrypt.hash.mockResolvedValue('hashedpw');
+    mockedService.createCompany.mockResolvedValue({ id: 'xyz' });
 
     render(
       <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <CadastroCliente />
-          </MantineProvider>
-        </QueryClientProvider>
+        <MantineProvider>
+          <CadastroCliente />
+        </MantineProvider>
       </BrowserRouter>
     );
 
@@ -76,6 +69,7 @@ describe('CadastroCliente component integration', () => {
     await userEvent.click(submitBtn);
 
     await waitFor(() => {
+      expect(mockedBcrypt.hash).toHaveBeenCalled();
       expect(mockedService.createCompany).toHaveBeenCalledWith(
         expect.objectContaining({
           admin: expect.objectContaining({ name: 'Alice', email: 'alice@example.com' }),
@@ -84,5 +78,5 @@ describe('CadastroCliente component integration', () => {
         })
       );
     });
-  }, 15000);
+  });
 });
