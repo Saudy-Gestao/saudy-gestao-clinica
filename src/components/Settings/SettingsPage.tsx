@@ -1076,6 +1076,7 @@ export function SettingsPage() {
     try {
       const newAccess = await accessService.cloneTemplate(template);
       notifications.show({ title: 'Sucesso', message: `Perfil "${newAccess.description}" criado com base no template`, color: 'green' });
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       if (currentUser?.id && newAccess?.id) {
         await userService.addAccessToUser(currentUser.id, newAccess.id);
       }
