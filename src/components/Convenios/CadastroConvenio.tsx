@@ -15,9 +15,12 @@ import {
   Paper,
   Skeleton,
   Menu,
+  SimpleGrid,
+  UnstyledButton,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical } from 'lucide-react';
+import { useComputedColorScheme } from '@mantine/core';
+import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical, FilePlus, List } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -50,6 +53,8 @@ export function CadastroConvenio() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
+  const isDarkMode = useComputedColorScheme('light') === 'dark';
+  const [activeTab, setActiveTab] = useState<'hub' | 'lista'>('hub');
 
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<InsuranceRow[]>([]);
@@ -280,32 +285,92 @@ export function CadastroConvenio() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => activeTab === 'hub' ? navigate('/dashboard') : setActiveTab('hub')}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
               <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Convenios
+                Convênios
               </Text>
               <Text size="sm" c="dimmed">
-                Cadastro de convenios
+                {activeTab === 'hub' ? 'Gestão de convênios' : 'Convênios cadastrados'}
               </Text>
             </Box>
           </Group>
 
-          <Group>
+          {activeTab === 'lista' && (
             <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => navigate('/convenios/novo')} size={isMobile ? 'sm' : 'md'}>
-              Novo convenio
+              Novo convênio
             </Button>
-          </Group>
+          )}
         </Group>
 
+        {activeTab === 'hub' ? (
+          <Box style={{ minHeight: isMobile ? 'auto' : '58vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
+              <UnstyledButton
+                onClick={() => navigate('/convenios/novo')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FilePlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar convênio</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Registre um novo convênio com procedimentos aceitos, valores e prazos de autorização.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('lista')}
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <List size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Convênios cadastrados</Text>
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Consulte, edite e gerencie os convênios já cadastrados.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+            </SimpleGrid>
+          </Box>
+        ) : (
+          <>
         <Box mb={isMobile ? 20 : 30}>
           <FloatingInput
             label="Buscar convênios"
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            placeholder={isMobile ? 'Buscar...' : 'Buscar convenio por nome ou codigo...'}
+            placeholder={isMobile ? 'Buscar...' : 'Buscar convênio por nome ou código...'}
           />
         </Box>
 
@@ -491,6 +556,8 @@ export function CadastroConvenio() {
               </Table>
             </PaginatedGrid>
           )
+        )}
+          </>
         )}
       </Box>
 

@@ -236,6 +236,7 @@ vi.mock('lucide-react', () => {
     'Eye',
     'EyeOff',
     'FileArchive',
+    'FilePlus',
     'FileClock',
     'FileCode2',
     'FileSearch',
