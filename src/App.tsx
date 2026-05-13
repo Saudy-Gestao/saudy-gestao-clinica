@@ -42,6 +42,7 @@ import { CadastroMedico } from './components/Medicos/CadastroMedico';
 import { CadastroPaciente } from './components/Patient/CadastroPaciente';
 import { CadastroProcedimento } from './components/Procedimentos/CadastroProcedimento';
 import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
+import { ConvenioForm } from './components/Convenios/ConvenioForm';
 import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
@@ -336,6 +337,14 @@ function App() {
           <Route
             path="/cadastro-convenio"
             element={<ProtectedRoute><CadastroConvenio /></ProtectedRoute>}
+          />
+          <Route
+            path="/convenios/novo"
+            element={<ProtectedRoute><ConvenioForm /></ProtectedRoute>}
+          />
+          <Route
+            path="/convenios/:id"
+            element={<ProtectedRoute><ConvenioForm /></ProtectedRoute>}
           />
           <Route
             path="/autorizacao-convenio"

@@ -36,7 +36,6 @@ import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
-import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
@@ -48,9 +47,6 @@ interface ProcedureForm {
   appointmentType: 'CONSULTA' | 'EXAME';
   tussCode: string;
   tussTableCode: string;
-  acceptsInsurance: boolean;
-  acceptedInsurances: string[];
-  acceptedSubInsurances: Record<string, string[]>;
   durationMinutes?: number | null;
   supportsTeleconsultation: boolean;
   modalities: string[];
@@ -73,8 +69,6 @@ interface ProcedureItem {
   appointmentType: 'CONSULTA' | 'EXAME';
   tussCode?: string;
   tussTableCode?: string;
-  acceptsInsurance: boolean;
-  acceptedInsurances: string[];
   supportsTeleconsultation: boolean;
   modalities: string[];
   doctorIds: string[];
@@ -89,9 +83,6 @@ const INITIAL_FORM: ProcedureForm = {
   appointmentType: 'CONSULTA',
   tussCode: '',
   tussTableCode: '',
-  acceptsInsurance: false,
-  acceptedInsurances: [],
-  acceptedSubInsurances: {},
   durationMinutes: null,
   supportsTeleconsultation: false,
   modalities: [],
@@ -125,8 +116,6 @@ export function CadastroProcedimento() {
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [doctorOptions, setDoctorOptions] = useState<{ value: string; label: string }[]>([]);
   const [doctorDirectory, setDoctorDirectory] = useState<Record<string, { name?: string }>>({});
-  const [loadingInsurances, setLoadingInsurances] = useState(false);
-  const [insuranceCatalog, setInsuranceCatalog] = useState<Array<{ value: string; label: string; subInsurances: string[] }>>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -134,8 +123,6 @@ export function CadastroProcedimento() {
   const [lastSaveAction, setLastSaveAction] = useState<'create' | 'update'>('create');
   const [editingProcedureId, setEditingProcedureId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'hub' | 'cadastro' | 'lista'>('hub');
-  const [customInsuranceInput, setCustomInsuranceInput] = useState('');
-  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [procedurePage, setProcedurePage] = useState(1);
   const [procedurePageSize, setProcedurePageSize] = useState(10);
@@ -146,11 +133,9 @@ export function CadastroProcedimento() {
   const [inventoryKitOptions, setInventoryKitOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [inventoryKitLabelById, setInventoryKitLabelById] = useState<Record<string, string>>({});
   const [selectedBindingKitId, setSelectedBindingKitId] = useState<string | null>(null);
-  const [selectedBindingInsurance, setSelectedBindingInsurance] = useState<string | null>(null);
   const [loadingKits, setLoadingKits] = useState(false);
   const proceduresQuery = useProceduresAdminQuery();
   const doctorsQuery = useDoctorsAdminQuery();
-  const insurancesQuery = useInsurancesAdminQuery();
   const inventoryItemsQuery = useInventoryItemsQuery();
 
   const doctorLabelById = useMemo(() => {
@@ -181,26 +166,6 @@ export function CadastroProcedimento() {
     { value: 'Domiciliar', label: 'Domiciliar' },
     { value: 'Emergencial', label: 'Emergencial' },
   ];
-
-  const insuranceOptions = useMemo(() => {
-    const merged = insuranceCatalog.map((item) => ({ value: item.value, label: item.label }));
-    form.acceptedInsurances.forEach((insurance) => {
-      const name = String(insurance || '').trim();
-      if (!name) return;
-      if (!merged.some((opt) => opt.value === name)) {
-        merged.push({ value: name, label: name });
-      }
-    });
-    return merged.sort((a, b) => a.label.localeCompare(b.label));
-  }, [insuranceCatalog, form.acceptedInsurances]);
-
-  const subInsuranceOptions = useMemo<Record<string, { value: string; label: string }[]>>(
-    () => insuranceCatalog.reduce<Record<string, { value: string; label: string }[]>>((acc, item) => {
-      acc[item.value] = (item.subInsurances || []).map((sub) => ({ value: sub, label: sub }));
-      return acc;
-    }, {}),
-    [insuranceCatalog],
-  );
 
   useEffect(() => {
     setProcedurePage(1);
@@ -235,8 +200,6 @@ export function CadastroProcedimento() {
       appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
       tussCode: String(it.tussCode || '').trim() || undefined,
       tussTableCode: String(it.tussTableCode || '').trim() || undefined,
-      acceptsInsurance: Boolean(it.acceptsInsurance),
-      acceptedInsurances: Array.isArray(it.acceptedInsurances) ? it.acceptedInsurances : [],
       supportsTeleconsultation: Array.isArray(it.modalities) ? it.modalities.includes(TELECONSULT_MODALITY) : false,
       modalities: Array.isArray(it.modalities)
         ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
@@ -291,48 +254,6 @@ export function CadastroProcedimento() {
     setDoctorOptions(options);
     setDoctorDirectory(directory);
   }, [doctorsQuery.data]);
-
-  useEffect(() => {
-    setLoadingInsurances(insurancesQuery.isFetching);
-  }, [insurancesQuery.isFetching]);
-
-  useEffect(() => {
-    if (!insurancesQuery.error) return;
-    const err: any = insurancesQuery.error;
-    showNotification({
-      title: 'Erro',
-      message: resolveApiErrorMessage(err, 'Erro ao carregar convênios'),
-      color: 'red',
-    });
-  }, [insurancesQuery.error]);
-
-  useEffect(() => {
-    const data: any = insurancesQuery.data;
-    const list: any[] = Array.isArray(data)
-      ? data
-      : (Array.isArray(data?.items)
-        ? data.items
-        : (Array.isArray(data?.data?.items)
-          ? data.data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : [])));
-
-    const mapped = list
-      .filter((item: any) => item?.isActive !== false)
-      .map((item: any) => {
-        const name = String(item?.name || item?.nome || '').trim();
-        if (!name) return null;
-        const subInsurances = Array.isArray(item?.subInsurances)
-          ? item.subInsurances.map((sub: any) => String(sub?.name || sub || '').trim()).filter(Boolean)
-          : [];
-        return { value: name, label: name, subInsurances };
-      })
-      .filter((item: { value: string; label: string; subInsurances: string[] } | null): item is { value: string; label: string; subInsurances: string[] } => Boolean(item))
-      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
-
-    setInsuranceCatalog(mapped);
-  }, [insurancesQuery.data]);
 
   useEffect(() => {
     setLoadingMaterials(inventoryItemsQuery.isFetching);
@@ -437,9 +358,6 @@ export function CadastroProcedimento() {
         durationMinutes: form.durationMinutes ?? null,
         tussCode: form.tussCode.trim() || null,
         tussTableCode: form.tussTableCode.trim() || null,
-        acceptsInsurance: form.acceptsInsurance,
-        acceptedInsurances: form.acceptsInsurance ? form.acceptedInsurances : [],
-        acceptedSubInsurances: form.acceptsInsurance ? form.acceptedSubInsurances : {},
         modalities: [
           ...form.modalities.filter((modality) => modality !== TELECONSULT_MODALITY),
           ...(form.appointmentType === 'CONSULTA' && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
@@ -503,45 +421,6 @@ export function CadastroProcedimento() {
     setSelectedBindingKitId(null);
     setSelectedBindingInsurance(null);
     navigate('/dashboard');
-  };
-
-  const handleAcceptsInsuranceChange = (checked: boolean) => {
-    setForm((prev) => ({
-      ...prev,
-      acceptsInsurance: checked,
-      acceptedInsurances: checked ? prev.acceptedInsurances : [],
-      procedureKitBindings: checked
-        ? prev.procedureKitBindings
-        : prev.procedureKitBindings.filter((binding) => !binding.insuranceName),
-    }));
-    setCustomInsuranceInput('');
-    if (checked) {
-      setShowInsuranceModal(true);
-    }
-  };
-
-  const handleCloseInsuranceModal = () => {
-    // Se não há convênios aceitos, desativa o acceptsInsurance
-    if (form.acceptedInsurances.length === 0) {
-      setForm((prev) => ({
-        ...prev,
-        acceptsInsurance: false,
-      }));
-    }
-    setShowInsuranceModal(false);
-    setCustomInsuranceInput('');
-  };
-
-  const handleAddCustomInsurance = () => {
-    if (!customInsuranceInput.trim()) return;
-    const trimmed = customInsuranceInput.trim();
-    if (!form.acceptedInsurances.includes(trimmed)) {
-      setForm((prev) => ({
-        ...prev,
-        acceptedInsurances: [...prev.acceptedInsurances, trimmed],
-      }));
-    }
-    setCustomInsuranceInput('');
   };
 
   const handleNameChange = (value: string) => {
@@ -608,19 +487,8 @@ export function CadastroProcedimento() {
       return;
     }
 
-    const insuranceName = String(selectedBindingInsurance || '').trim() || null;
-    if (insuranceName && !form.acceptsInsurance) {
-      showNotification({
-        title: 'Convênio desabilitado',
-        message: 'Ative "Aceita convênio" para criar vínculo por convênio.',
-        color: 'yellow',
-      });
-      return;
-    }
-
     const duplicate = form.procedureKitBindings.some((binding) =>
-      binding.inventoryKitId === selectedBindingKitId
-      && String(binding.insuranceName || '').trim().toLowerCase() === String(insuranceName || '').toLowerCase(),
+      binding.inventoryKitId === selectedBindingKitId,
     );
     if (duplicate) {
       showNotification({
@@ -639,14 +507,13 @@ export function CadastroProcedimento() {
           id: createBindingId(),
           inventoryKitId: selectedBindingKitId,
           inventoryKitName: inventoryKitLabelById[selectedBindingKitId] || selectedBindingKitId,
-          insuranceName,
+          insuranceName: null,
           isActive: true,
         },
       ],
     }));
 
     setSelectedBindingKitId(null);
-    setSelectedBindingInsurance(null);
   };
 
   const handleRemoveKitBinding = (bindingId: string) => {
@@ -693,9 +560,6 @@ export function CadastroProcedimento() {
           : null,
         tussCode: String(data.tussCode || '').trim(),
         tussTableCode: String(data.tussTableCode || '').trim(),
-        acceptsInsurance: Boolean(data.acceptsInsurance),
-        acceptedInsurances: Array.isArray(data.acceptedInsurances) ? data.acceptedInsurances : [],
-        acceptedSubInsurances: (data.acceptedSubInsurances && typeof data.acceptedSubInsurances === 'object') ? data.acceptedSubInsurances : {},
         supportsTeleconsultation: Array.isArray(data.modalities) ? data.modalities.includes(TELECONSULT_MODALITY) : false,
         modalities: Array.isArray(data.modalities)
           ? data.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
@@ -729,7 +593,6 @@ export function CadastroProcedimento() {
       setEditingProcedureId(procedureId);
       setActiveTab('cadastro');
       setSelectedBindingKitId(null);
-      setSelectedBindingInsurance(null);
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -925,13 +788,8 @@ export function CadastroProcedimento() {
                   onChange={(e) => handleDescriptionChange(e?.currentTarget?.value ?? '')}
                 />
 
-                <SectionTitle>Convenios e Modalidades</SectionTitle>
+                <SectionTitle>Modalidades</SectionTitle>
                 <Group align="flex-end" gap="md" wrap="wrap">
-                  <Switch
-                    label="Aceita convenio"
-                    checked={form.acceptsInsurance}
-                    onChange={(e) => handleAcceptsInsuranceChange(e?.currentTarget?.checked ?? !form.acceptsInsurance)}
-                  />
                   <Switch
                     label="Suporta teleconsulta"
                     checked={form.supportsTeleconsultation}
@@ -941,20 +799,6 @@ export function CadastroProcedimento() {
                       setForm((prev) => ({ ...prev, supportsTeleconsultation: checked }));
                     }}
                   />
-                  {form.acceptsInsurance && form.acceptedInsurances.length > 0 && (
-                    <Group gap="xs" align="center">
-                      <Text size="sm" c="dimmed">
-                        {form.acceptedInsurances.length} convênio(s) adicionado(s)
-                      </Text>
-                      <ActionIcon
-                        variant="subtle"
-                        size="sm"
-                        onClick={() => setShowInsuranceModal(true)}
-                      >
-                        <Pencil size={16} />
-                      </ActionIcon>
-                    </Group>
-                  )}
                 </Group>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
@@ -1053,32 +897,19 @@ export function CadastroProcedimento() {
                   </Table>
                 </Box>
 
-                <SectionTitle>Kits de insumos (por procedimento/convênio)</SectionTitle>
+                <SectionTitle>Kits de insumos</SectionTitle>
                 <Text size="sm" c="dimmed" mb="sm">
-                  O cadastro do kit é feito no módulo Estoque. Aqui você apenas vincula os kits ao procedimento (padrão e por convênio).
+                  O cadastro do kit é feito no módulo Estoque. Aqui você apenas vincula os kits ao procedimento.
                 </Text>
 
-                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="md">
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <FloatingSelect
                     label="Kit do estoque"
                     placeholder="Selecione o kit"
-                    data={[
-                      ...inventoryKitOptions,
-                    ]}
+                    data={inventoryKitOptions}
                     value={selectedBindingKitId}
                     onChange={setSelectedBindingKitId}
                     rightSection={loadingKits ? <Loader size={16} /> : undefined}
-                    searchable
-                  />
-                  <FloatingSelect
-                    label="Convênio (opcional)"
-                    data={[
-                      { value: '__NONE__', label: 'Sem convênio (padrão)' },
-                      ...form.acceptedInsurances.map((insurance) => ({ value: insurance, label: insurance })),
-                    ]}
-                    value={selectedBindingInsurance ?? '__NONE__'}
-                    onChange={(value) => setSelectedBindingInsurance(value && value !== '__NONE__' ? String(value) : null)}
-                    disabled={!form.acceptsInsurance && form.acceptedInsurances.length === 0}
                     searchable
                   />
                   <Group align="end">
@@ -1245,9 +1076,6 @@ export function CadastroProcedimento() {
                                       Teleconsulta
                                     </Badge>
                                   )}
-                                  <Badge color={item.acceptsInsurance ? 'teal' : 'gray'} variant="light" size="sm">
-                                    {item.acceptsInsurance ? 'Aceita convênio' : 'Particular'}
-                                  </Badge>
                                 </Group>
                                 <Text size="xs" c="dimmed">
                                   {item.modalities.length ? item.modalities.join(', ') : 'Sem modalidades'} • {item.doctorsCount} médico(s) • {item.materialsCount} material(is)
@@ -1356,13 +1184,6 @@ export function CadastroProcedimento() {
                                 )}
                                 {!isTablet && (
                                   <Table.Td>
-                                    <Badge color={item.acceptsInsurance ? 'teal' : 'gray'} variant="light" size="sm">
-                                      {item.acceptsInsurance ? 'Aceita convênio' : 'Particular'}
-                                    </Badge>
-                                  </Table.Td>
-                                )}
-                                {!isTablet && (
-                                  <Table.Td>
                                     <Text size="sm">{item.modalities.length ? item.modalities.join(', ') : '-'}</Text>
                                   </Table.Td>
                                 )}
@@ -1428,150 +1249,6 @@ export function CadastroProcedimento() {
           )}
         </Stack>
       </Box>
-
-      <Modal
-        opened={showInsuranceModal}
-        onClose={handleCloseInsuranceModal}
-        title="Convênios Aceitos"
-        size="md"
-        centered
-      >
-        <Stack gap="md">
-          <FloatingMultiSelect
-            label="Convênios aceitos"
-            data={insuranceOptions}
-            value={form.acceptedInsurances}
-            onChange={(values) => {
-              setForm((prev) => ({ ...prev, acceptedInsurances: values }));
-            }}
-            searchable
-            maxDropdownHeight={220}
-            nothingFoundMessage="Nenhum convênio encontrado"
-            disabled={loadingInsurances}
-          />
-
-          {form.acceptedInsurances.filter((insurance) => Array.isArray(subInsuranceOptions[insurance]) && subInsuranceOptions[insurance].length > 0).map((insurance) => (
-            <FloatingMultiSelect
-              key={insurance}
-              label={`Sub-convênios de ${insurance}`}
-              data={subInsuranceOptions[insurance] || []}
-              value={form.acceptedSubInsurances[insurance] || []}
-              onChange={(values) => setForm((prev) => ({
-                ...prev,
-                acceptedSubInsurances: {
-                  ...prev.acceptedSubInsurances,
-                  [insurance]: values,
-                },
-              }))}
-              searchable
-              maxDropdownHeight={220}
-            />
-          ))}
-
-          <Group gap="xs" align="flex-end">
-            <FloatingInput
-              label="Outro convênio?"
-              placeholder="Digite um convênio customizado"
-              value={customInsuranceInput}
-              onChange={(e) => setCustomInsuranceInput(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddCustomInsurance();
-                }
-              }}
-              style={{ flex: 1 }}
-            />
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleAddCustomInsurance}
-            >
-              +
-            </Button>
-          </Group>
-
-          {form.acceptedInsurances.length > 0 && (
-            <Stack gap="xs">
-              <Text size="sm" fw={500}>Convênios selecionados:</Text>
-              <Group gap="xs" wrap="wrap">
-                {form.acceptedInsurances.map((insurance) => (
-                  <Stack key={insurance} gap={2}>
-                    <Paper
-                      p="xs"
-                      style={{
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        backgroundColor: 'var(--mantine-color-default)',
-                        border: '1px solid var(--mantine-color-default-border)',
-                      }}
-                    >
-                      <Text size="sm" c="var(--mantine-color-text)">{insurance}</Text>
-                      <ActionIcon
-                        size="xs"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => setForm((prev) => ({
-                          ...prev,
-                          acceptedInsurances: prev.acceptedInsurances.filter((v) => v !== insurance),
-                          acceptedSubInsurances: Object.fromEntries(
-                            Object.entries(prev.acceptedSubInsurances).filter(([key]) => key !== insurance)
-                          ),
-                        }))}
-                      >
-                        ×
-                      </ActionIcon>
-                    </Paper>
-                    {form.acceptedSubInsurances[insurance] && form.acceptedSubInsurances[insurance].length > 0 && (
-                      <Group gap={4} pl="sm" wrap="wrap">
-                        {form.acceptedSubInsurances[insurance].map((sub) => (
-                          <Paper
-                            key={sub}
-                            p={4}
-                            style={{
-                              borderRadius: 6,
-                              border: '1px solid var(--mantine-color-blue-6)',
-                              backgroundColor: 'rgba(0, 31, 84, 0.22)',
-                            }}
-                          >
-                            <Text size="xs" c="var(--mantine-color-blue-1)">{sub}</Text>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              radius="xl"
-                              onClick={() => setForm((prev) => ({
-                                ...prev,
-                                acceptedSubInsurances: {
-                                  ...prev.acceptedSubInsurances,
-                                  [insurance]: prev.acceptedSubInsurances[insurance].filter((v) => v !== sub),
-                                },
-                              }))}
-                              style={{ padding: 0 }}
-                            >
-                              ×
-                            </ActionIcon>
-                          </Paper>
-                        ))}
-                      </Group>
-                    )}
-                  </Stack>
-                ))}
-              </Group>
-            </Stack>
-          )}
-
-          <Group justify="flex-end" gap="md">
-            <Button variant="default" onClick={handleCloseInsuranceModal}>
-              Fechar
-            </Button>
-            <Button bg={DARK_BLUE} c="white" onClick={handleCloseInsuranceModal}>
-              Salvar
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
 
       <ResultModal
         opened={showSuccessModal}

@@ -309,7 +309,6 @@ export type PatientPortalSchedulingProcedure = {
   description: string | null;
   appointmentType: string;
   durationMinutes: number | null;
-  acceptsInsurance: boolean;
   modalities: string[];
 };
 

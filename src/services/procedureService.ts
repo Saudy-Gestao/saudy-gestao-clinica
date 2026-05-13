@@ -8,9 +8,6 @@ export interface CreateProcedurePayload {
   durationMinutes?: number | null;
   tussCode?: string | null;
   tussTableCode?: string | null;
-  acceptsInsurance?: boolean;
-  acceptedInsurances?: string[];
-  acceptedSubInsurances?: Record<string, string[]>;
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
@@ -29,9 +26,6 @@ export interface UpdateProcedurePayload {
   durationMinutes?: number | null;
   tussCode?: string | null;
   tussTableCode?: string | null;
-  acceptsInsurance?: boolean;
-  acceptedInsurances?: string[];
-  acceptedSubInsurances?: Record<string, string[]>;
   modalities?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
@@ -64,7 +58,6 @@ export default {
 
   async listProcedures(params?: {
     search?: string;
-    acceptsInsurance?: boolean;
     doctorId?: string;
     limit?: number;
     offset?: number;

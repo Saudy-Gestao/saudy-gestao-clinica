@@ -70,6 +70,26 @@ describe('insuranceService', () => {
     await insuranceService.deleteInsurance('i1');
     expect(mockedApi.delete).toHaveBeenCalledWith('/procedures/insurances/i1');
   });
+  it('getInsurance', async () => {
+    await insuranceService.getInsurance('i1');
+    expect(mockedApi.get).toHaveBeenCalledWith('/procedures/insurances/i1');
+  });
+  it('listInsuranceProcedures', async () => {
+    await insuranceService.listInsuranceProcedures('i1', { isActive: true });
+    expect(mockedApi.get).toHaveBeenCalledWith('/procedures/insurances/i1/procedures', { params: { isActive: true } });
+  });
+  it('addInsuranceProcedure', async () => {
+    await insuranceService.addInsuranceProcedure('i1', { procedureId: 'p1', price: 100 });
+    expect(mockedApi.post).toHaveBeenCalledWith('/procedures/insurances/i1/procedures', { procedureId: 'p1', price: 100 });
+  });
+  it('updateInsuranceProcedure', async () => {
+    await insuranceService.updateInsuranceProcedure('i1', 'ip1', { price: 200 });
+    expect(mockedApi.put).toHaveBeenCalledWith('/procedures/insurances/i1/procedures/ip1', { price: 200 });
+  });
+  it('removeInsuranceProcedure', async () => {
+    await insuranceService.removeInsuranceProcedure('i1', 'ip1');
+    expect(mockedApi.delete).toHaveBeenCalledWith('/procedures/insurances/i1/procedures/ip1');
+  });
 });
 
 // ─── medicalEquipmentService ──────────────────────────────────────────────────

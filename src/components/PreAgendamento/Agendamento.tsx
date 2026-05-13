@@ -113,8 +113,6 @@ interface ProcedureMeta {
   durationMinutes?: number | null;
   doctorIds: string[];
   doctorNames: string[];
-  acceptsInsurance: boolean;
-  acceptedInsurances: string[];
   supportsTeleconsultation: boolean;
 }
 interface RoomScheduleMeta {
@@ -1017,10 +1015,6 @@ export function Agendamento() {
         doctorNames: linkedDoctors
           .map((doctor: any) => String(doctor?.doctorName || doctor?.name || '').trim())
           .filter(Boolean),
-        acceptsInsurance: Boolean(item.acceptsInsurance),
-        acceptedInsurances: Array.isArray(item.acceptedInsurances)
-          ?item.acceptedInsurances.map((insurance: any) => String(insurance || '').trim()).filter(Boolean)
-          : [],
         supportsTeleconsultation:
           normalizeProcedureAppointmentType(item.appointmentType) === 'CONSULTA'
           && (
@@ -1065,17 +1059,9 @@ export function Agendamento() {
     agendadosPage * agendadosPageSize,
   );
 
-  const getInsuranceIncompatibleProcedures = (insuranceName: string, procedureNames: string[]): string[] => {
-    if (isParticularInsurance(insuranceName)) return [];
-    const normalizedInsurance = normalizeComparableText(insuranceName);
-    return procedureNames.filter((procedureName) => {
-      const meta = procedureMetaByName[procedureName];
-      if (!meta) return false;
-      if (!meta.acceptsInsurance) return true;
-      const acceptedInsurances = (meta.acceptedInsurances || []).map(normalizeComparableText);
-      if (acceptedInsurances.length === 0) return true;
-      return !acceptedInsurances.includes(normalizedInsurance);
-    });
+  const getInsuranceIncompatibleProcedures = (_insuranceName: string, _procedureNames: string[]): string[] => {
+    // Insurance-procedure compatibility is now managed in ConvenioForm / InsuranceProcedure table
+    return [];
   };
   const handleProcedureSelectionChange = (values: string[]) => {
     const selectedTypes = new Set(

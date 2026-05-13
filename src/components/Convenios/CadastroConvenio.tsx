@@ -330,7 +330,7 @@ export function CadastroConvenio() {
           </Group>
 
           <Group>
-            <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => openModal()} size={isMobile ? 'sm' : 'md'}>
+            <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => navigate('/convenios/novo')} size={isMobile ? 'sm' : 'md'}>
               Novo convenio
             </Button>
           </Group>
@@ -420,7 +420,7 @@ export function CadastroConvenio() {
                       </Badge>
                     </Group>
                     <Group gap={8} mt="md" wrap="nowrap">
-                      <ActionIcon variant="light" color="blue" onClick={() => openModal(it)}>
+                      <ActionIcon variant="light" color="blue" onClick={() => navigate(`/convenios/${it.id}`)}>
                         <Pencil size={16} />
                       </ActionIcon>
                       <ActionIcon
@@ -503,7 +503,7 @@ export function CadastroConvenio() {
                                 </ActionIcon>
                               </Menu.Target>
                               <Menu.Dropdown>
-                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openModal(it)}>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => navigate(`/convenios/${it.id}`)}>
                                   Editar
                                 </Menu.Item>
                                 <Menu.Item
