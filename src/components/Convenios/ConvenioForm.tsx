@@ -21,7 +21,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { ChevronLeft, Plus, Trash2, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
@@ -514,7 +514,7 @@ function ProceduresTab({
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>TUSS</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Sub-convênio</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valor / Prazo autorização</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 60 }}>Ações</Table.Th>
+                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 90 }}>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -561,7 +561,7 @@ function ProceduresTab({
                         </Button>
                       </Group>
                     ) : (
-                      <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => { setEditingId(item.id); setEditPrice(item.price ?? ''); setEditAuthDays(item.authorizationDays ?? ''); }} title="Clique para editar">
+                      <Group gap={4}>
                         <Text size="sm" fw={500} c={item.price != null ? 'green' : 'dimmed'}>
                           {item.price != null ? formatCurrency(Number(item.price)) : '—'}
                         </Text>
@@ -572,15 +572,25 @@ function ProceduresTab({
                     )}
                   </Table.Td>
                   <Table.Td style={{ textAlign: 'center' }}>
-                    <ActionIcon
-                      variant="light"
-                      color="red"
-                      size="sm"
-                      loading={removing === item.id}
-                      onClick={() => handleRemove(item.id)}
-                    >
-                      <Trash2 size={14} />
-                    </ActionIcon>
+                    <Group gap={4} justify="center">
+                      <ActionIcon
+                        variant="light"
+                        color="blue"
+                        size="sm"
+                        onClick={() => { setEditingId(item.id); setEditPrice(item.price ?? ''); setEditAuthDays(item.authorizationDays ?? ''); }}
+                      >
+                        <Pencil size={14} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        size="sm"
+                        loading={removing === item.id}
+                        onClick={() => handleRemove(item.id)}
+                      >
+                        <Trash2 size={14} />
+                      </ActionIcon>
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
