@@ -4,6 +4,7 @@ import type { Module } from './moduleService';
 export interface Access {
   id: string;
   description: string;
+  isTemplate?: boolean;
   modules: Module[];
 }
 
@@ -35,6 +36,14 @@ const accessService = {
 
   deleteAccess: async (id: string): Promise<void> => {
     const response = await api.delete(`/auth/accesses/${id}`);
+    return response.data;
+  },
+
+  cloneTemplate: async (template: Access): Promise<Access> => {
+    const response = await api.post('/auth/accesses', {
+      description: `${template.description} (personalizado)`,
+      moduleIds: template.modules.map((m) => m.id),
+    });
     return response.data;
   },
 };

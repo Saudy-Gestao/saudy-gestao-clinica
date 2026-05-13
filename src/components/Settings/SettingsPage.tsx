@@ -646,6 +646,21 @@ export function SettingsPage() {
     setBranchModalOpen(true);
   };
 
+  const [creatingDefaultSectors, setCreatingDefaultSectors] = useState(false);
+  const handleCreateDefaultSectors = async () => {
+    if (!selectedBranchForSectors) return;
+    setCreatingDefaultSectors(true);
+    try {
+      await sectorService.createDefaultSectors(selectedBranchForSectors);
+      notifications.show({ title: 'Sucesso', message: 'Setores padrão criados', color: 'green' });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsSectors });
+    } catch (error: any) {
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao criar setores padrão'), color: 'red' });
+    } finally {
+      setCreatingDefaultSectors(false);
+    }
+  };
+
   const handleSaveBranch = async () => {
     if (!selectedCompanyId) return;
 
@@ -1054,6 +1069,19 @@ export function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settingsUsers });
     } catch (error: any) {
       notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao excluir acesso'), color: 'red' });
+    }
+  };
+
+  const handleCloneTemplate = async (template: any) => {
+    try {
+      const newAccess = await accessService.cloneTemplate(template);
+      notifications.show({ title: 'Sucesso', message: `Perfil "${newAccess.description}" criado com base no template`, color: 'green' });
+      if (currentUser?.id && newAccess?.id) {
+        await userService.addAccessToUser(currentUser.id, newAccess.id);
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settingsAccesses });
+    } catch (error: any) {
+      notifications.show({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao criar perfil'), color: 'red' });
     }
   };
 
@@ -1475,7 +1503,18 @@ export function SettingsPage() {
                      <Box>
                         <Group justify="space-between" mb="md">
                             <SectionTitle title="Setores" desc="Organize os setores por filial." />
-                            <Button leftSection={<Plus size={16} />} onClick={openSectorModalForCreate} bg={DARK_BLUE} disabled={!selectedBranchForSectors}>Novo Setor</Button>
+                            <Group gap="xs">
+                                <Button
+                                  variant="light"
+                                  leftSection={<Copy size={16} />}
+                                  onClick={handleCreateDefaultSectors}
+                                  loading={creatingDefaultSectors}
+                                  disabled={!selectedBranchForSectors}
+                                >
+                                  Setores Padrão
+                                </Button>
+                                <Button leftSection={<Plus size={16} />} onClick={openSectorModalForCreate} bg={DARK_BLUE} disabled={!selectedBranchForSectors}>Novo Setor</Button>
+                            </Group>
                         </Group>
 
                         <Select 
@@ -1760,52 +1799,119 @@ export function SettingsPage() {
                             <Button leftSection={<Plus size={16} />} onClick={openAccessModalForCreate} bg={DARK_BLUE}>Novo Acesso</Button>
                         </Group>
 
-                        <Box style={{ overflowX: 'hidden', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                          <Table horizontalSpacing="md" verticalSpacing="md" style={{ tableLayout: 'fixed', width: '100%' }}>
+                        {/* Perfis padrão */}
+                        {(accessesList || []).some((a: any) => a.isTemplate) && (
+                          <Box mb="lg">
+                            <Text size="sm" fw={600} c="dimmed" mb="xs" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perfis Padrão</Text>
+                            <Box style={{ overflowX: 'hidden', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                              <Table horizontalSpacing="md" verticalSpacing="md" style={{ tableLayout: 'fixed', width: '100%' }}>
                                 <Table.Thead>
-                                    <Table.Tr style={{ borderBottom: 'none' }}>
-                                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: '220px' }}>Descrição</Table.Th>
-                                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
-                                        <Table.Th style={{ width: '100px' }}></Table.Th>
-                                    </Table.Tr>
+                                  <Table.Tr style={{ borderBottom: 'none' }}>
+                                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: '240px' }}>Descrição</Table.Th>
+                                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
+                                    <Table.Th style={{ width: '120px' }}></Table.Th>
+                                  </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {(accessesList || []).map(access => (
-                                        <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                                  <Table.Td style={{ width: '220px' }}><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
-                                            <Table.Td>
-                                              <Box style={{ overflowX: 'auto' }}>
-                                                <Group gap={4} wrap="nowrap">
-                                                  {(access.modules || []).map((module: any) => (
-                                                    <Text 
-                                                      key={module.id} 
-                                                      size="xs" 
-                                                      c="dimmed"
-                                                      style={{ 
-                                                        padding: '2px 8px', 
-                                                        background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff', 
-                                                        borderRadius: 4,
-                                                        whiteSpace: 'nowrap',
-                                                        flexShrink: 0,
-                                                      }}
-                                                    >
-                                                      {module.label}
-                                                    </Text>
-                                                  )) || <Text size="xs" c="dimmed">Nenhum módulo</Text>}
-                                                </Group>
-                                              </Box>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Group gap={4} justify="flex-end">
-                                                    <ActionIcon variant="subtle" color="blue" onClick={() => openAccessModalForEdit(access)}><Edit size={16} /></ActionIcon>
-                                                    <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir acesso', 'Deseja realmente excluir este acesso?', () => handleDeleteAccess(access.id))}><Trash size={16} /></ActionIcon>
-                                                </Group>
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    ))}
-                                    {accessesList.length === 0 && <Table.Tr><Table.Td colSpan={3} align="center">Nenhum acesso cadastrado</Table.Td></Table.Tr>}
+                                  {(accessesList || []).filter((a: any) => a.isTemplate).map((access: any) => (
+                                    <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                                      <Table.Td style={{ width: '240px' }}>
+                                        <Group gap={6}>
+                                          <Text size="sm" fw={500}>{access.description}</Text>
+                                          <Badge size="xs" variant="light" color="blue">Padrão</Badge>
+                                        </Group>
+                                      </Table.Td>
+                                      <Table.Td>
+                                        <Box style={{ overflowX: 'auto' }}>
+                                          <Group gap={4} wrap="nowrap">
+                                            {(access.modules || []).map((module: any) => (
+                                              <Text
+                                                key={module.id}
+                                                size="xs"
+                                                c="dimmed"
+                                                style={{
+                                                  padding: '2px 8px',
+                                                  background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff',
+                                                  borderRadius: 4,
+                                                  whiteSpace: 'nowrap',
+                                                  flexShrink: 0,
+                                                }}
+                                              >
+                                                {module.label}
+                                              </Text>
+                                            ))}
+                                          </Group>
+                                        </Box>
+                                      </Table.Td>
+                                      <Table.Td>
+                                        <Group gap={4} justify="flex-end">
+                                          <ActionIcon variant="subtle" color="blue" title="Usar como base" onClick={() => handleCloneTemplate(access)}>
+                                            <Copy size={16} />
+                                          </ActionIcon>
+                                        </Group>
+                                      </Table.Td>
+                                    </Table.Tr>
+                                  ))}
                                 </Table.Tbody>
+                              </Table>
+                            </Box>
+                          </Box>
+                        )}
+
+                        {/* Perfis personalizados */}
+                        <Box>
+                          {(accessesList || []).some((a: any) => !a.isTemplate) && (
+                            <Text size="sm" fw={600} c="dimmed" mb="xs" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perfis Personalizados</Text>
+                          )}
+                          <Box style={{ overflowX: 'hidden', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                            <Table horizontalSpacing="md" verticalSpacing="md" style={{ tableLayout: 'fixed', width: '100%' }}>
+                              <Table.Thead>
+                                <Table.Tr style={{ borderBottom: 'none' }}>
+                                  <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: '220px' }}>Descrição</Table.Th>
+                                  <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
+                                  <Table.Th style={{ width: '100px' }}></Table.Th>
+                                </Table.Tr>
+                              </Table.Thead>
+                              <Table.Tbody>
+                                {(accessesList || []).filter((a: any) => !a.isTemplate).map((access: any) => (
+                                  <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                                    <Table.Td style={{ width: '220px' }}><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
+                                    <Table.Td>
+                                      <Box style={{ overflowX: 'auto' }}>
+                                        <Group gap={4} wrap="nowrap">
+                                          {(access.modules || []).map((module: any) => (
+                                            <Text
+                                              key={module.id}
+                                              size="xs"
+                                              c="dimmed"
+                                              style={{
+                                                padding: '2px 8px',
+                                                background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff',
+                                                borderRadius: 4,
+                                                whiteSpace: 'nowrap',
+                                                flexShrink: 0,
+                                              }}
+                                            >
+                                              {module.label}
+                                            </Text>
+                                          )) || <Text size="xs" c="dimmed">Nenhum módulo</Text>}
+                                        </Group>
+                                      </Box>
+                                    </Table.Td>
+                                    <Table.Td>
+                                      <Group gap={4} justify="flex-end">
+                                        <ActionIcon variant="subtle" color="blue" onClick={() => openAccessModalForEdit(access)}><Edit size={16} /></ActionIcon>
+                                        <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir acesso', 'Deseja realmente excluir este acesso?', () => handleDeleteAccess(access.id))}><Trash size={16} /></ActionIcon>
+                                      </Group>
+                                    </Table.Td>
+                                  </Table.Tr>
+                                ))}
+                                {(accessesList || []).filter((a: any) => !a.isTemplate).length === 0 && (
+                                  <Table.Tr><Table.Td colSpan={3} align="center"><Text size="sm" c="dimmed" py="md">Nenhum perfil personalizado. Use um perfil padrão como base.</Text></Table.Td></Table.Tr>
+                                )}
+                              </Table.Tbody>
                             </Table>
+                          </Box>
                         </Box>
                         <Modal
                           opened={accessModalOpen}
