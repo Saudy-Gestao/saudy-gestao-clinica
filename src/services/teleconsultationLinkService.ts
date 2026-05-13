@@ -31,7 +31,7 @@ export interface TeleconsultationSendLinkResponse {
     expiresAt: string;
   };
   whatsapp?: {
-    provider: 'gupshup' | 'mock' | string;
+    provider: 'meta' | 'mock' | string;
     to?: string | null;
     message: string;
     providerMessageId?: string | null;

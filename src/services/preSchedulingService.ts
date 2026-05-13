@@ -176,7 +176,7 @@ const preSchedulingService = {
       publicUrl: string;
       hasAnamnesis?: boolean;
       whatsapp: {
-        provider: 'mock' | 'gupshup';
+        provider: 'mock' | 'meta';
         to?: string | null;
         message: string;
         status?: string;

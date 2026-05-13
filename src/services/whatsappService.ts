@@ -148,7 +148,7 @@ export default {
     await api.delete(`/care/whatsapp/templates/${id}`);
   },
 
-  async syncHsmStatus(): Promise<{ synced: number; created: number; updated: number; gupshupTemplates: Record<string, { status: string; id: string | null }> }> {
+  async syncHsmStatus(): Promise<{ synced: number; created: number; updated: number; metaTemplates: Record<string, { status: string; id: string | null }> }> {
     const res = await api.post('/care/whatsapp/templates/sync-hsm', {});
     return res.data;
   },
@@ -158,8 +158,8 @@ export default {
     return res.data;
   },
 
-  async pushTemplateToGupshup(id: string): Promise<{ success: boolean; gupshupResponse: any }> {
-    const res = await api.post(`/care/whatsapp/templates/${id}/push-to-gupshup`, {});
+  async pushTemplateToMeta(id: string): Promise<{ success: boolean; metaResponse: any }> {
+    const res = await api.post(`/care/whatsapp/templates/${id}/push-to-meta`, {});
     return res.data;
   },
 

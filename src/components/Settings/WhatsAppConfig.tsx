@@ -238,7 +238,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
       if (shouldSendForValidation) {
         try {
-          await whatsappService.pushTemplateToGupshup(saved.id);
+          await whatsappService.pushTemplateToMeta(saved.id);
           await whatsappService.saveTemplate({
             id: saved.id,
             type: saved.type,
@@ -247,13 +247,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             isActive: true,
           });
           notifications.show({
-            title: 'Template salvo e enviado para o Gupshup',
+            title: 'Template salvo e enviado para validação',
             message: 'Aguarde a aprovação da Meta para usar HSM.',
             color: 'green',
           });
         } catch (pushError: any) {
           notifications.show({
-            title: 'Erro ao enviar template para Gupshup',
+            title: 'Erro ao enviar template para validação',
             message: resolveApiErrorMessage(pushError, 'O template foi mantido desativado porque o envio falhou.'),
             color: 'yellow',
             autoClose: 8000,
@@ -449,7 +449,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         });
         notifications.show({
           title: 'Template ativado',
-          message: 'Template já aprovado na Gupshup e ativado com sucesso.',
+          message: 'Template já aprovado na Meta e ativado com sucesso.',
           color: 'green',
         });
         await refreshPageData();
@@ -492,7 +492,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     setToggleLoadingType(template.type);
     try {
       if (!template.hsmTemplateApproved) {
-        await whatsappService.pushTemplateToGupshup(template.id);
+        await whatsappService.pushTemplateToMeta(template.id);
       }
       await whatsappService.saveTemplate({
         id: template.id,
@@ -505,7 +505,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
         title: template.hsmTemplateApproved ? 'Template ativado' : 'Template enviado para validação',
         message: template.hsmTemplateApproved
           ? 'O template foi ativado sem novo envio, pois já está aprovado.'
-          : 'O template foi ativado e enviado para o Gupshup.',
+          : 'O template foi ativado e enviado para validação na Meta.',
         color: 'green',
       });
       setActivationConfirm(null);
@@ -532,7 +532,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
           onClose={() => setShowAlert(false)}
         >
           <Text size="sm">
-            <strong>Importante:</strong> Você precisa configurar sua conta na Gupshup e obter aprovação
+            <strong>Importante:</strong> Você precisa configurar suas credenciais no Meta Business Manager e obter aprovação
             do WhatsApp Business API antes de usar este recurso.
           </Text>
         </Alert>
@@ -605,7 +605,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                         </Badge>
                         {template.importedFromGupshupSync && (
                           <Badge size="sm" variant="outline" color="teal">
-                            Importado da Gupshup
+                            Importado da Meta
                           </Badge>
                         )}
                         {template.hsmTemplateName && (
@@ -802,7 +802,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
             />
             <Text size="xs" c="dimmed" mt={-8}>
-              O nome interno na Gupshup será gerado automaticamente a partir deste título, normalizado e com UUID no final.
+              O nome interno do template será gerado automaticamente a partir deste título, normalizado e com UUID no final.
             </Text>
 
             <div>
@@ -894,7 +894,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       >
         <Stack gap="md">
           <Text size="sm">
-            Deseja enviar este template para validação na Gupshup?
+            Deseja enviar este template para validação na Meta?
             Se confirmar, o toggle será ativado.
           </Text>
           <Group justify="flex-end">

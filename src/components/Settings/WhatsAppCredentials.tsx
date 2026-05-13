@@ -183,7 +183,7 @@ export function WhatsAppCredentials({
     <>
       <Box>
         <Group justify="space-between" mb="sm">
-          <Text size="sm" fw={500}>Credenciais Gupshup</Text>
+          <Text size="sm" fw={500}>Credenciais WhatsApp (Meta)</Text>
           <Group gap="xs">
             {!editing && hasExistingConfig && (
               <Button size="xs" variant="light" onClick={handleEdit}>
@@ -212,12 +212,8 @@ export function WhatsAppCredentials({
               </Group>
             ) : null}
             <Group gap="xs">
-              <Text size="xs" c="dimmed">API Key:</Text>
+              <Text size="xs" c="dimmed">Token de acesso:</Text>
               <Text size="xs">{displayValues.accountSid}</Text>
-            </Group>
-            <Group gap="xs">
-              <Text size="xs" c="dimmed">App Name:</Text>
-              <Text size="xs">{displayValues.authToken}</Text>
             </Group>
             <Group gap="xs">
               <Text size="xs" c="dimmed">Número:</Text>
@@ -225,7 +221,7 @@ export function WhatsAppCredentials({
             </Group>
             {displayValues.appId && (
               <Group gap="xs">
-                <Text size="xs" c="dimmed">App ID:</Text>
+                <Text size="xs" c="dimmed">Phone Number ID:</Text>
                 <Text size="xs">{displayValues.appId}</Text>
               </Group>
             )}
@@ -244,12 +240,8 @@ export function WhatsAppCredentials({
                 </Group>
               ) : null}
               <Group gap="xs">
-                <Text size="xs" c="dimmed">API Key:</Text>
+                <Text size="xs" c="dimmed">Token de acesso:</Text>
                 <Text size="xs">{displayValues.accountSid}</Text>
-              </Group>
-              <Group gap="xs">
-                <Text size="xs" c="dimmed">App Name:</Text>
-                <Text size="xs">{displayValues.authToken}</Text>
               </Group>
               <Group gap="xs">
                 <Text size="xs" c="dimmed">Número:</Text>
@@ -257,7 +249,7 @@ export function WhatsAppCredentials({
               </Group>
               {displayValues.appId ? (
                 <Group gap="xs">
-                  <Text size="xs" c="dimmed">App ID:</Text>
+                  <Text size="xs" c="dimmed">Phone Number ID:</Text>
                   <Text size="xs">{displayValues.appId}</Text>
                 </Group>
               ) : null}
@@ -296,22 +288,12 @@ export function WhatsAppCredentials({
               {(!isBranchScope || useBranchOverride) ? (
                 <>
                   <TextInput
-                    label="API Key"
-                    placeholder="Ex: abc123xyz..."
+                    label="Token de acesso (EAAxxxx...)"
+                    placeholder="Ex: EAAxxxx..."
+                    description="System User Token gerado no Meta Business Manager"
                     required
                     value={configForm.accountSid}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, accountSid: e.target.value }))}
-                    disabled={!editing && hasExistingConfig}
-                  />
-
-                  <TextInput
-                    label="App Name"
-                    placeholder={hasExistingConfig ? "Deixe vazio para manter o atual" : "Digite o nome do seu app no Gupshup"}
-                    description={hasExistingConfig ? "App Name atual configurado. Preencha apenas se quiser alterar." : undefined}
-                    required={!hasExistingConfig}
-                    type="password"
-                    value={configForm.authToken}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, authToken: e.target.value }))}
                     disabled={!editing && hasExistingConfig}
                   />
 
@@ -326,9 +308,9 @@ export function WhatsAppCredentials({
                   />
 
                   <TextInput
-                    label="App ID (Gupshup)"
-                    placeholder="Ex: c0e21bb7-6e0d-4e2a-a0da-dcf67af1bab5"
-                    description="UUID do seu app no Gupshup — necessário para sincronizar status de templates HSM aprovados"
+                    label="Phone Number ID"
+                    placeholder="Ex: 953770747829483"
+                    description="ID do número de telefone no Meta Business Manager"
                     value={configForm.appId}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, appId: e.target.value }))}
                     disabled={!editing && hasExistingConfig}
