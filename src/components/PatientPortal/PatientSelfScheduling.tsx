@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
-import { Badge, Button, Group, Loader, SegmentedControl, Textarea } from '@mantine/core';
+import { Badge, Button, Group, Loader, Select, SegmentedControl, TextInput, Textarea } from '@mantine/core';
 import {
-  Activity, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
-  Clock, MapPin, Moon, Stethoscope, Sun, Sunrise, User, Video,
+  Activity, AlertCircle, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
+  Clock, MapPin, Moon, ShieldCheck, ShieldOff, Stethoscope, Sun, Sunrise, User, Video,
 } from 'lucide-react';
 import patientPortalService, {
   type PatientPortalAvailableSlotDay,
   type PatientPortalCreatedAppointment,
+  type PatientPortalInsuranceCheckResult,
   type PatientPortalSchedulingBranch,
   type PatientPortalSchedulingDoctor,
   type PatientPortalSchedulingProcedure,
@@ -17,7 +18,7 @@ import { showErrorToast, showSuccessToast } from '../../lib/toast';
 
 dayjs.locale('pt-br');
 
-type Step = 'branch' | 'type' | 'procedure' | 'doctor' | 'slot' | 'confirm' | 'success';
+type Step = 'branch' | 'type' | 'procedure' | 'insurance' | 'doctor' | 'slot' | 'confirm' | 'success';
 type ApptType = 'CONSULTA' | 'EXAME';
 type Modality = 'Presencial' | 'Teleconsulta';
 
@@ -69,9 +70,9 @@ const col = (extra?: React.CSSProperties): React.CSSProperties => ({
   display: 'flex', flexDirection: 'column', ...extra,
 });
 
-const STEP_ORDER: Step[] = ['branch','type','procedure','doctor','slot','confirm'];
+const STEP_ORDER: Step[] = ['branch','type','procedure','insurance','doctor','slot','confirm'];
 const STEP_SHORT: Record<Step, string> = {
-  branch: 'Unidade', type: 'Tipo', procedure: 'Proc.', doctor: 'Prof.', slot: 'Horário', confirm: 'Confirmar', success: '',
+  branch: 'Unidade', type: 'Tipo', procedure: 'Proc.', insurance: 'Convênio', doctor: 'Prof.', slot: 'Horário', confirm: 'Confirmar', success: '',
 };
 
 export default function PatientSelfScheduling() {
@@ -93,7 +94,25 @@ export default function PatientSelfScheduling() {
   const [saving, setSaving]             = useState(false);
   const [done, setDone]                 = useState<PatientPortalCreatedAppointment | null>(null);
 
+  // Insurance step state
+  const [patientInsuranceName, setPatientInsuranceName]   = useState<string | null>(null);
+  const [patientInsuranceNumber, setPatientInsuranceNumber] = useState<string | null>(null);
+  const [insuranceCheckResult, setInsuranceCheckResult]   = useState<PatientPortalInsuranceCheckResult | null>(null);
+  const [loadingInsuranceCheck, setLoadingInsuranceCheck] = useState(false);
+  const [insuranceMode, setInsuranceMode]                 = useState<'same' | 'change' | null>(null);
+  const [newInsuranceName, setNewInsuranceName]           = useState<string | null>(null);
+  const [newInsuranceNumber, setNewInsuranceNumber]       = useState('');
+  const [systemInsurances, setSystemInsurances]           = useState<{ id: string; name: string }[]>([]);
+  const [authorizationDays, setAuthorizationDays]         = useState<number | null>(null);
+
   function go(s: Step) { setStep(s); setKey(k => k+1); }
+
+  useEffect(() => {
+    patientPortalService.getSummary().then(d => {
+      setPatientInsuranceName(d.patient.healthInsuranceName ?? null);
+      setPatientInsuranceNumber(d.patient.healthInsuranceNumber ?? null);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoadingBranches(true);
@@ -148,14 +167,21 @@ export default function PatientSelfScheduling() {
     setLoadingSlots(true);
     setSlotDays([]); setDayIdx(0);
     patientPortalService.getAvailableSlots({ doctorName: sel.doctor.name, procedureId: sel.procedure.id, branchId: sel.branch?.id })
-      .then(d => { setSlotDays(d.availableSlots); setSlotDur(d.slotDurationMinutes); })
+      .then(d => {
+        const minDate = authorizationDays ? dayjs().add(authorizationDays, 'day') : null;
+        const filtered = minDate
+          ? d.availableSlots.filter(day => !dayjs(day.date).isBefore(minDate, 'day'))
+          : d.availableSlots;
+        setSlotDays(filtered);
+        setSlotDur(d.slotDurationMinutes);
+      })
       .catch((error: unknown) => showErrorToast({
         title: 'Falha ao carregar horários',
         error,
         fallback: 'Não foi possível carregar os horários disponíveis.',
       }))
       .finally(() => setLoadingSlots(false));
-  }, [sel.doctor, sel.procedure]);
+  }, [sel.doctor, sel.procedure, authorizationDays]);
 
   const filtered = procs.filter(p => {
     const t = (p.appointmentType||'').toUpperCase();
@@ -191,7 +217,11 @@ export default function PatientSelfScheduling() {
     } finally { setSaving(false); }
   }
 
-  function reset() { setSel(INIT); setDocs([]); setSlotDays([]); setDone(null); go(branches.length > 1 ? 'branch' : 'type'); }
+  function reset() {
+    setSel(INIT); setDocs([]); setSlotDays([]); setDone(null);
+    setInsuranceMode(null); setInsuranceCheckResult(null); setNewInsuranceName(null); setNewInsuranceNumber(''); setAuthorizationDays(null);
+    go(branches.length > 1 ? 'branch' : 'type');
+  }
 
   // ---------- stepper ----------
   const stepIdx = STEP_ORDER.indexOf(step);
@@ -391,7 +421,15 @@ export default function PatientSelfScheduling() {
                     <span style={{ fontWeight:600, fontSize:14 }}>{p.name}</span>
                     {p.durationMinutes && <span style={{ fontSize:12, color:'var(--mantine-color-dimmed)', marginTop:2 }}>{p.durationMinutes} min de duração</span>}
                   </>}
-                  onClick={() => { setSel(s=>({...s,procedure:p,doctor:null,date:'',time:''})); go('doctor'); }}
+                  onClick={() => {
+                    setSel(s=>({...s,procedure:p,doctor:null,date:'',time:''}));
+                    setInsuranceMode(null);
+                    setInsuranceCheckResult(null);
+                    setNewInsuranceName(null);
+                    setNewInsuranceNumber('');
+                    setAuthorizationDays(null);
+                    go('insurance');
+                  }}
                 />
               ))}
             </ListBox>
@@ -399,11 +437,248 @@ export default function PatientSelfScheduling() {
     </div>
   );
 
+  // ===================== INSURANCE =====================
+  if (step === 'insurance') {
+    const checkInsurance = async (insuranceName: string) => {
+      if (!sel.procedure) return;
+      setLoadingInsuranceCheck(true);
+      try {
+        const result = await patientPortalService.checkInsuranceCoverage({ procedureId: sel.procedure.id, insuranceName });
+        setInsuranceCheckResult(result);
+        if (result.covered) setAuthorizationDays(result.authorizationDays ?? null);
+        else setAuthorizationDays(null);
+      } catch {
+        setInsuranceCheckResult({ covered: false, authorizationDays: null, insuranceId: null, insuranceName });
+        setAuthorizationDays(null);
+      } finally {
+        setLoadingInsuranceCheck(false);
+      }
+    };
+
+    const handleSameInsurance = async () => {
+      setInsuranceMode('same');
+      if (patientInsuranceName) await checkInsurance(patientInsuranceName);
+    };
+
+    const handleChangeInsurance = async () => {
+      setInsuranceMode('change');
+      setInsuranceCheckResult(null);
+      if (systemInsurances.length === 0) {
+        try {
+          const data = await patientPortalService.listSchedulingInsurances();
+          setSystemInsurances(data.insurances);
+        } catch {}
+      }
+    };
+
+    const handleNewInsuranceSelected = async (name: string | null) => {
+      setNewInsuranceName(name);
+      setInsuranceCheckResult(null);
+      if (name && sel.procedure) await checkInsurance(name);
+    };
+
+    const proceedToDoctor = async () => {
+      // If changing insurance, persist updated insurance info
+      const finalInsuranceName = insuranceMode === 'change' ? newInsuranceName : patientInsuranceName;
+      const finalInsuranceNumber = insuranceMode === 'change' ? (newInsuranceNumber || null) : patientInsuranceNumber;
+      if (insuranceMode === 'change' && newInsuranceName) {
+        setPatientInsuranceName(newInsuranceName);
+        setPatientInsuranceNumber(newInsuranceNumber || null);
+        patientPortalService.updatePatientInsurance({ insuranceName: finalInsuranceName, insuranceNumber: finalInsuranceNumber }).catch(() => {});
+      }
+      go('doctor');
+    };
+
+    const showNewInsuranceForm = insuranceMode === 'change';
+    const newInsuranceNotInSystem = showNewInsuranceForm && newInsuranceName !== null && !systemInsurances.find(i => i.name === newInsuranceName);
+
+    return (
+      <div key={key} style={{ animation:'pp2In 280ms cubic-bezier(.22,1,.36,1) both', padding:'8px 0 40px' }}>
+        <Progress />
+        <BackBtn to="procedure"/>
+        <h2 style={{ margin:'0 0 6px', fontSize:22, fontWeight:800, letterSpacing:'-0.4px' }}>Seu convênio</h2>
+        <p style={{ margin:'0 0 28px', fontSize:14, color:'var(--mantine-color-dimmed)' }}>
+          Verifique as informações do seu convênio para este procedimento
+        </p>
+
+        {/* Initial question: same insurance? */}
+        {insuranceMode === null && (
+          <>
+            {patientInsuranceName ? (
+              <>
+                <div style={{ border:'1.5px solid var(--mantine-color-default-border)', borderRadius:14, padding:'16px 20px', marginBottom:20 }}>
+                  <p style={{ margin:'0 0 4px', fontSize:12, color:'var(--mantine-color-dimmed)', fontWeight:600, textTransform:'uppercase', letterSpacing:0.5 }}>Convênio cadastrado</p>
+                  <p style={{ margin:0, fontSize:16, fontWeight:700 }}>{patientInsuranceName}</p>
+                  {patientInsuranceNumber && <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--mantine-color-dimmed)' }}>Carteirinha: {patientInsuranceNumber}</p>}
+                </div>
+                <p style={{ margin:'0 0 16px', fontSize:14, fontWeight:600 }}>Este convênio ainda é o mesmo?</p>
+                <div style={{ display:'flex', gap:12 }}>
+                  <Button flex={1} variant="default" radius="xl" onClick={handleSameInsurance}>Sim, é o mesmo</Button>
+                  <Button flex={1} variant="default" radius="xl" onClick={handleChangeInsurance}>Não, mudei de convênio</Button>
+                </div>
+                <Button variant="subtle" size="sm" mt="md" color="gray" fullWidth onClick={() => { setAuthorizationDays(null); go('doctor'); }}>
+                  Continuar como particular
+                </Button>
+              </>
+            ) : (
+              <>
+                <p style={{ margin:'0 0 16px', fontSize:14, color:'var(--mantine-color-dimmed)' }}>Nenhum convênio cadastrado em seu perfil.</p>
+                <div style={{ display:'flex', gap:12 }}>
+                  <Button flex={1} variant="default" radius="xl" onClick={handleChangeInsurance}>Informar convênio</Button>
+                  <Button flex={1} variant="filled" radius="xl" onClick={() => { setAuthorizationDays(null); go('doctor'); }}>Continuar como particular</Button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Same insurance: loading or result */}
+        {insuranceMode === 'same' && (
+          <>
+            {loadingInsuranceCheck ? (
+              <CenterLoader/>
+            ) : insuranceCheckResult ? (
+              insuranceCheckResult.covered ? (
+                <div style={{ border:'1.5px solid var(--mantine-color-green-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(18,184,134,0.05)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                    <ShieldCheck size={20} color="var(--mantine-color-teal-6)"/>
+                    <span style={{ fontWeight:700, fontSize:15 }}>Procedimento coberto!</span>
+                  </div>
+                  {insuranceCheckResult.authorizationDays != null && insuranceCheckResult.authorizationDays > 0 ? (
+                    <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)', lineHeight:1.5 }}>
+                      Este convênio leva aproximadamente <strong>{insuranceCheckResult.authorizationDays} dias</strong> para autorizar.<br/>
+                      As datas disponíveis serão mostradas a partir de <strong>{dayjs().add(insuranceCheckResult.authorizationDays, 'day').format('DD/MM/YYYY')}</strong>.
+                    </p>
+                  ) : (
+                    <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>Sem prazo de autorização — você pode agendar para qualquer data disponível.</p>
+                  )}
+                </div>
+              ) : (
+                <div style={{ border:'1.5px solid var(--mantine-color-orange-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                    <ShieldOff size={20} color="var(--mantine-color-orange-6)"/>
+                    <span style={{ fontWeight:700, fontSize:15 }}>Procedimento não coberto</span>
+                  </div>
+                  <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>
+                    Seu convênio <strong>{patientInsuranceName}</strong> não cobre este procedimento. Você pode continuar como particular.
+                  </p>
+                </div>
+              )
+            ) : null}
+            {!loadingInsuranceCheck && insuranceCheckResult && (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {insuranceCheckResult.covered && (
+                  <Button fullWidth radius="xl" size="md" fw={700} rightSection={<ChevronRight size={16}/>} onClick={proceedToDoctor}>
+                    Continuar com convênio
+                  </Button>
+                )}
+                <Button fullWidth variant={insuranceCheckResult.covered ? 'subtle' : 'filled'} radius="xl" size="md" fw={700}
+                  onClick={() => { setAuthorizationDays(null); go('doctor'); }}>
+                  Continuar como particular
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Change insurance */}
+        {insuranceMode === 'change' && (
+          <>
+            <Select
+              label="Selecione seu novo convênio"
+              placeholder="Buscar convênio..."
+              searchable
+              clearable
+              mb="md"
+              data={systemInsurances.map(i => ({ value: i.name, label: i.name }))}
+              value={newInsuranceName}
+              onChange={handleNewInsuranceSelected}
+            />
+            {newInsuranceName && (
+              <TextInput
+                label="Número da carteirinha"
+                placeholder="Ex: 1234567890"
+                mb="md"
+                value={newInsuranceNumber}
+                onChange={e => setNewInsuranceNumber(e.currentTarget.value)}
+              />
+            )}
+
+            {newInsuranceName && !newInsuranceNotInSystem && (
+              <>
+                {loadingInsuranceCheck ? (
+                  <CenterLoader/>
+                ) : insuranceCheckResult ? (
+                  insuranceCheckResult.covered ? (
+                    <div style={{ border:'1.5px solid var(--mantine-color-green-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(18,184,134,0.05)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                        <ShieldCheck size={20} color="var(--mantine-color-teal-6)"/>
+                        <span style={{ fontWeight:700, fontSize:15 }}>Procedimento coberto!</span>
+                      </div>
+                      {insuranceCheckResult.authorizationDays != null && insuranceCheckResult.authorizationDays > 0 ? (
+                        <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)', lineHeight:1.5 }}>
+                          Este convênio leva aproximadamente <strong>{insuranceCheckResult.authorizationDays} dias</strong> para autorizar.<br/>
+                          As datas disponíveis serão mostradas a partir de <strong>{dayjs().add(insuranceCheckResult.authorizationDays, 'day').format('DD/MM/YYYY')}</strong>.
+                        </p>
+                      ) : (
+                        <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>Sem prazo de autorização — você pode agendar para qualquer data disponível.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ border:'1.5px solid var(--mantine-color-orange-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                        <ShieldOff size={20} color="var(--mantine-color-orange-6)"/>
+                        <span style={{ fontWeight:700, fontSize:15 }}>Procedimento não coberto</span>
+                      </div>
+                      <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>
+                        Este convênio não cobre o procedimento selecionado. Você pode continuar como particular.
+                      </p>
+                    </div>
+                  )
+                ) : null}
+              </>
+            )}
+
+            {newInsuranceName && newInsuranceNotInSystem && (
+              <div style={{ border:'1.5px solid var(--mantine-color-orange-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                  <AlertCircle size={20} color="var(--mantine-color-orange-6)"/>
+                  <span style={{ fontWeight:700, fontSize:15 }}>Convênio não encontrado</span>
+                </div>
+                <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>
+                  Este convênio não está cadastrado na clínica. Você pode continuar como particular ou entrar em contato para verificar.
+                </p>
+              </div>
+            )}
+
+            {!loadingInsuranceCheck && (
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop: 8 }}>
+                {insuranceCheckResult?.covered && (
+                  <Button fullWidth radius="xl" size="md" fw={700} rightSection={<ChevronRight size={16}/>} onClick={proceedToDoctor}>
+                    Continuar com convênio
+                  </Button>
+                )}
+                <Button
+                  fullWidth
+                  variant={insuranceCheckResult?.covered ? 'subtle' : 'filled'}
+                  radius="xl" size="md" fw={700}
+                  onClick={() => { setAuthorizationDays(null); go('doctor'); }}
+                >
+                  Continuar como particular
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
   // ===================== DOCTOR =====================
   if (step === 'doctor') return (
     <div key={key} style={{ animation:'pp2In 280ms cubic-bezier(.22,1,.36,1) both', padding:'8px 0 40px' }}>
       <Progress />
-      <BackBtn to="procedure"/>
+      <BackBtn to="insurance"/>
       <div style={row({ gap:10, marginBottom:20 })}>
         <h2 style={{ margin:0, fontSize:22, fontWeight:800, letterSpacing:'-0.4px' }}>Escolha o profissional</h2>
         <Badge variant="light" color="blue" radius="xl" size="sm">{sel.procedure?.name}</Badge>

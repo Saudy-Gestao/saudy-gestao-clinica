@@ -8,6 +8,9 @@ export type PatientPortalSummary = {
     birthDate: string | null;
     email: string | null;
     cellphone: string | null;
+    hasHealthInsurance: boolean;
+    healthInsuranceName: string | null;
+    healthInsuranceNumber: string | null;
   };
   stats: {
     consultationsCount: number;
@@ -282,6 +285,20 @@ class PatientPortalService {
     ).then((r) => r.data);
   }
 
+  listSchedulingInsurances() {
+    return api.get<{ insurances: { id: string; name: string }[] }>('/auth/patient-portal/scheduling/insurances')
+      .then((r) => r.data);
+  }
+
+  checkInsuranceCoverage(params: { procedureId: string; insuranceName: string }) {
+    return api.get<PatientPortalInsuranceCheckResult>('/auth/patient-portal/scheduling/insurance-check', { params })
+      .then((r) => r.data);
+  }
+
+  updatePatientInsurance(payload: { insuranceName: string | null; insuranceNumber: string | null }) {
+    return api.put<{ ok: boolean }>('/auth/patient-portal/me/insurance', payload).then((r) => r.data);
+  }
+
   getReportDicomSeries(reportId: string) {
     return api.get<PatientPortalDicomSeriesResponse>(`/auth/patient-portal/me/reports/${reportId}/dicom/series`)
       .then((r) => r.data);
@@ -357,6 +374,13 @@ export type PatientPortalDicomFileItem = {
   seriesUid: string | null;
   instanceId: string | null;
   url: string;
+};
+
+export type PatientPortalInsuranceCheckResult = {
+  covered: boolean;
+  authorizationDays: number | null;
+  insuranceId: string | null;
+  insuranceName: string | null;
 };
 
 export type PatientPortalCreatedAppointment = {

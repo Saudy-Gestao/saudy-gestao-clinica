@@ -307,6 +307,7 @@ vi.mock('lucide-react', () => {
     'Settings2',
     'Shield',
     'ShieldCheck',
+    'ShieldOff',
     'SignalHigh',
     'SpellCheck',
     'SquarePen',
