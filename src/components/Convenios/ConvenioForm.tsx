@@ -31,7 +31,8 @@ import procedureService from '../../services/procedureService';
 import { useInsuranceDetailQuery } from '../../hooks/useInsuranceDetailQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { formatCurrency } from '../../utils/formatters';
+const formatCurrency = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 interface ProcedureOption {
   id: string;
@@ -310,7 +311,7 @@ function ProceduresTab({
   };
 
   const subInsuranceOptions = [
-    { value: '', label: 'Convênio principal' },
+    { value: '__main__', label: 'Convênio principal' },
     ...subInsurances.map((s) => ({ value: s.id, label: s.name })),
   ];
 
@@ -383,8 +384,8 @@ function ProceduresTab({
                 label="Sub-convênio (opcional)"
                 placeholder="Convênio principal"
                 data={subInsuranceOptions}
-                value={selectedSubInsuranceId ?? ''}
-                onChange={(v) => setSelectedSubInsuranceId(v || null)}
+                value={selectedSubInsuranceId ?? '__main__'}
+                onChange={(v) => setSelectedSubInsuranceId(v && v !== '__main__' ? v : null)}
                 clearable
               />
             )}
