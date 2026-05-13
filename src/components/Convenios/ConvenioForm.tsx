@@ -207,7 +207,7 @@ function ProceduresTab({
   const [procedureOptions, setProcedureOptions] = useState<ProcedureOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [searchAdd, setSearchAdd] = useState('');
-  const [selectKey, setSelectKey] = useState(0);
+  const [selectedProcedureOption, setSelectedProcedureOption] = useState<ProcedureOption | null>(null);
 
   const [adding, setAdding] = useState(false);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
@@ -235,7 +235,10 @@ function ProceduresTab({
   }, [loadLinked]);
 
   useEffect(() => {
-    if (!searchAdd.trim()) { setProcedureOptions([]); return; }
+    if (!searchAdd.trim()) {
+      if (!selectedProcedureId) setProcedureOptions([]);
+      return;
+    }
     setLoadingOptions(true);
     const timer = setTimeout(async () => {
       try {
@@ -249,7 +252,7 @@ function ProceduresTab({
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchAdd]);
+  }, [searchAdd, selectedProcedureId]);
 
   const linkedProcedureIds = new Set(linked.filter((l) => !l.subInsuranceId).map((l) => l.procedureId));
 
@@ -267,11 +270,11 @@ function ProceduresTab({
       });
       notifications.show({ title: 'Adicionado', message: 'Procedimento vinculado ao convênio', color: 'green' });
       setSelectedProcedureId(null);
+      setSelectedProcedureOption(null);
       setSelectedSubInsuranceId(null);
       setAddPrice('');
       setSearchAdd('');
       setProcedureOptions([]);
-      setSelectKey((k) => k + 1);
       setAdding(false);
       await loadLinked();
       queryClient.invalidateQueries({ queryKey: queryKeys.insuranceProcedures });
@@ -338,17 +341,32 @@ function ProceduresTab({
             <Text fw={600} size="sm">Vincular procedimento</Text>
 
             <Select
-              key={selectKey}
               label="Procedimento"
               placeholder="Buscar por nome..."
               searchable
-              data={procedureOptions.map((opt) => ({
-                value: opt.id,
-                label: opt.tussCode ? `${opt.name} (${opt.tussCode})` : opt.name,
-                disabled: linkedProcedureIds.has(opt.id),
-              }))}
+              data={(() => {
+                const opts = procedureOptions.map((opt) => ({
+                  value: opt.id,
+                  label: opt.tussCode ? `${opt.name} (${opt.tussCode})` : opt.name,
+                  disabled: linkedProcedureIds.has(opt.id),
+                }));
+                if (selectedProcedureOption && !opts.find((o) => o.value === selectedProcedureOption.id)) {
+                  opts.unshift({
+                    value: selectedProcedureOption.id,
+                    label: selectedProcedureOption.tussCode
+                      ? `${selectedProcedureOption.name} (${selectedProcedureOption.tussCode})`
+                      : selectedProcedureOption.name,
+                    disabled: false,
+                  });
+                }
+                return opts;
+              })()}
               value={selectedProcedureId}
-              onChange={setSelectedProcedureId}
+              onChange={(v) => {
+                setSelectedProcedureId(v);
+                const opt = procedureOptions.find((o) => o.id === v) ?? null;
+                setSelectedProcedureOption(opt);
+              }}
               searchValue={searchAdd}
               onSearchChange={setSearchAdd}
               nothingFoundMessage={loadingOptions ? 'Buscando...' : searchAdd.trim() ? 'Nenhum procedimento encontrado' : 'Digite para buscar'}
@@ -379,7 +397,7 @@ function ProceduresTab({
             />
 
             <Group justify="flex-end">
-              <Button variant="default" size="sm" onClick={() => { setAdding(false); setSearchAdd(''); setSelectedProcedureId(null); setAddPrice(''); setSelectKey((k) => k + 1); }}>
+              <Button variant="default" size="sm" onClick={() => { setAdding(false); setSearchAdd(''); setSelectedProcedureId(null); setSelectedProcedureOption(null); setProcedureOptions([]); setAddPrice(''); }}>
                 Cancelar
               </Button>
               <Button
