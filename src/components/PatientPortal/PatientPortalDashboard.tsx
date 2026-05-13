@@ -23,10 +23,9 @@ import {
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { CalendarDays, CalendarPlus, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ScanLine, ShieldCheck, Stethoscope, Sun, X } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ScanLine, Stethoscope, Sun, X } from 'lucide-react';
 import PatientSelfScheduling from './PatientSelfScheduling';
 import patientPortalService, {
-  type PatientPortalAccessLogItem,
   type PatientPortalAppointmentItem,
   type PatientPortalDeliveryRequestItem,
   type PatientPortalDocumentItem,
@@ -302,7 +301,6 @@ export function PatientPortalDashboard() {
   const [exams, setExams] = useState<PatientPortalAppointmentItem[]>([]);
   const [reports, setReports] = useState<PatientPortalReportItem[]>([]);
   const [documents, setDocuments] = useState<PatientPortalDocumentItem[]>([]);
-  const [accessLogs, setAccessLogs] = useState<PatientPortalAccessLogItem[]>([]);
   const [deliveryRequests, setDeliveryRequests] = useState<PatientPortalDeliveryRequestItem[]>([]);
   const [upcomingConsultations, setUpcomingConsultations] = useState<PatientPortalUpcomingConsultationItem[]>([]);
   const [openingPreSchedulingFor, setOpeningPreSchedulingFor] = useState<string | null>(null);
@@ -382,12 +380,8 @@ export function PatientPortalDashboard() {
   const loadDocuments = async () => {
     setLoadingDocuments(true);
     try {
-      const [documentsData, accessLogsData] = await Promise.all([
-        patientPortalService.listDocuments({ limit: 100, offset: 0 }),
-        patientPortalService.listAccessLogs({ limit: 10 }),
-      ]);
+      const documentsData = await patientPortalService.listDocuments({ limit: 100, offset: 0 });
       setDocuments(documentsData.items || []);
-      setAccessLogs(accessLogsData.items || []);
     } finally {
       setLoadingDocuments(false);
     }

@@ -18,13 +18,16 @@ function dicomBufferToDataUrl(buffer: ArrayBuffer): string | null {
     const ww = image.maxPixelValue - image.minPixelValue || 1;
     const wc = image.minPixelValue + ww / 2;
     const pixels = buildDisplayPixels(image, wc, ww, false);
+    // Ensure an ArrayBuffer-backed view to satisfy ImageData typing across runtimes.
+    const imageBuffer = pixels.buffer.slice(pixels.byteOffset, pixels.byteOffset + pixels.byteLength) as ArrayBuffer;
+    const imagePixels = new Uint8ClampedArray(imageBuffer);
 
     const canvas = document.createElement('canvas');
     canvas.width = columns;
     canvas.height = rows;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.putImageData(new ImageData(pixels, columns, rows), 0, 0);
+    ctx.putImageData(new ImageData(imagePixels, columns, rows), 0, 0);
     return canvas.toDataURL('image/jpeg', 0.92);
   } catch {
     return null;
