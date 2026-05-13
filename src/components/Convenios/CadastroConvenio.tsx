@@ -156,42 +156,6 @@ export function CadastroConvenio() {
     setItems(mapped);
   }, [insurancesQuery.data]);
 
-  const openModal = (item?: InsuranceRow) => {
-    if (item) {
-      setEditingId(item.id);
-      setForm({
-        name: item.name || '',
-        code: item.code || '',
-        description: item.description || '',
-        tissRegistroAns: item.tissRegistroAns || '',
-        tissOperadoraCnpj: item.tissOperadoraCnpj || '',
-        tissVersao: item.tissVersao || '3.05.00',
-        tissPrestadorCnpj: item.tissPrestadorCnpj || '',
-        tissPrestadorCnes: item.tissPrestadorCnes || '',
-        tissCodigoPrestadorOperadora: item.tissCodigoPrestadorOperadora || '',
-        isActive: item.isActive ?? true,
-        subInsurances: Array.isArray(item.subInsurances) ? item.subInsurances : [],
-      });
-    } else {
-      setEditingId(null);
-      setForm({
-        name: '',
-        code: '',
-        description: '',
-        tissRegistroAns: '',
-        tissOperadoraCnpj: '',
-        tissVersao: '3.05.00',
-        tissPrestadorCnpj: '',
-        tissPrestadorCnes: '',
-        tissCodigoPrestadorOperadora: '',
-        isActive: true,
-        subInsurances: [],
-      });
-    }
-    setSubInsuranceInput('');
-    setModalOpen(true);
-  };
-
   const handleSave = async () => {
     if (!form.name.trim()) {
       showNotification({ title: 'Erro', message: 'Nome do convenio e obrigatorio', color: 'red' });

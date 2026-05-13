@@ -59,7 +59,6 @@ function InfoTab({
   saving,
   onSave,
   isNew,
-  isMobile,
 }: {
   form: any;
   setForm: any;

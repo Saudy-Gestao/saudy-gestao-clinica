@@ -14,7 +14,6 @@ import {
   Loader,
   Table,
   Badge,
-  Modal,
   Skeleton,
   Menu,
   UnstyledButton,
@@ -379,7 +378,7 @@ export function CadastroProcedimento() {
         setSelectedMaterialId(null);
         setSelectedMaterialQuantity(1);
         setSelectedBindingKitId(null);
-        setSelectedBindingInsurance(null);
+
         setActiveTab('lista');
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
@@ -391,7 +390,7 @@ export function CadastroProcedimento() {
         setSelectedMaterialId(null);
         setSelectedMaterialQuantity(1);
         setSelectedBindingKitId(null);
-        setSelectedBindingInsurance(null);
+
         setProcedureQuery('');
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
@@ -411,7 +410,6 @@ export function CadastroProcedimento() {
       setSelectedMaterialId(null);
       setSelectedMaterialQuantity(1);
       setSelectedBindingKitId(null);
-      setSelectedBindingInsurance(null);
       setActiveTab('lista');
       return;
     }
@@ -419,7 +417,6 @@ export function CadastroProcedimento() {
     setSelectedMaterialId(null);
     setSelectedMaterialQuantity(1);
     setSelectedBindingKitId(null);
-    setSelectedBindingInsurance(null);
     navigate('/dashboard');
   };
 
