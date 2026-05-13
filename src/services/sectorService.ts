@@ -25,6 +25,11 @@ const sectorService = {
     const response = await api.delete(`/auth/sectors/${id}`);
     return response.data;
   },
+
+  createDefaultSectors: async (branchId: string) => {
+    const response = await api.post(`/auth/branches/${branchId}/default-sectors`);
+    return response.data;
+  },
 };
 
 export default sectorService;
