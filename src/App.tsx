@@ -60,6 +60,7 @@ import { TeaDesmarcacaoLote } from './components/TEA/TeaDesmarcacaoLote';
 import { TeaAgendaSemanal } from './components/TEA/TeaAgendaSemanal';
 import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
 import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
+import { PrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicy';
 import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
 import { TicketFab } from './components/common/TicketFab';
 import { MyTicketsPage } from './components/Tickets/MyTicketsPage';
@@ -221,6 +222,7 @@ function App() {
           />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/esqueci-a-senha" element={<EsqueciSenha />} />
+          <Route path="/privacidade" element={<PrivacyPolicy />} />
           <Route path="/check-in" element={<PublicCheckIn />} />
           <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
           <Route path="/pre-atendimento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
