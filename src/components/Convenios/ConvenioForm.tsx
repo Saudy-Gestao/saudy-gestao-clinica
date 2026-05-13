@@ -11,17 +11,17 @@ import {
   Switch,
   Tabs,
   Table,
-  Badge,
+
   Paper,
   NumberInput,
   Select,
   Skeleton,
   Menu,
-  TextInput,
+
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { ChevronLeft, Plus, Trash2, MoreVertical, Search } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, MoreVertical } from 'lucide-react';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { FloatingInput } from '../common/FloatingInput';
@@ -207,6 +207,7 @@ function ProceduresTab({
   const [procedureOptions, setProcedureOptions] = useState<ProcedureOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [searchAdd, setSearchAdd] = useState('');
+  const [selectKey, setSelectKey] = useState(0);
 
   const [adding, setAdding] = useState(false);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
@@ -270,6 +271,7 @@ function ProceduresTab({
       setAddPrice('');
       setSearchAdd('');
       setProcedureOptions([]);
+      setSelectKey((k) => k + 1);
       setAdding(false);
       await loadLinked();
       queryClient.invalidateQueries({ queryKey: queryKeys.insuranceProcedures });
@@ -335,48 +337,23 @@ function ProceduresTab({
           <Stack gap="sm">
             <Text fw={600} size="sm">Vincular procedimento</Text>
 
-            <TextInput
-              placeholder="Buscar procedimento por nome..."
-              leftSection={<Search size={16} />}
-              value={searchAdd}
-              onChange={(e) => {
-                setSearchAdd(e.currentTarget.value);
-                setSelectedProcedureId(null);
-              }}
+            <Select
+              key={selectKey}
+              label="Procedimento"
+              placeholder="Buscar por nome..."
+              searchable
+              data={procedureOptions.map((opt) => ({
+                value: opt.id,
+                label: opt.tussCode ? `${opt.name} (${opt.tussCode})` : opt.name,
+                disabled: linkedProcedureIds.has(opt.id),
+              }))}
+              value={selectedProcedureId}
+              onChange={setSelectedProcedureId}
+              searchValue={searchAdd}
+              onSearchChange={setSearchAdd}
+              nothingFoundMessage={loadingOptions ? 'Buscando...' : searchAdd.trim() ? 'Nenhum procedimento encontrado' : 'Digite para buscar'}
+              filter={({ options }) => options}
             />
-
-            {loadingOptions && <Skeleton height={36} radius="sm" />}
-
-            {!loadingOptions && procedureOptions.length > 0 && (
-              <Box style={{ border: '1px solid #dee2e6', borderRadius: 6, overflow: 'hidden' }}>
-                {procedureOptions.map((opt) => {
-                  const alreadyLinked = linkedProcedureIds.has(opt.id);
-                  return (
-                    <Box
-                      key={opt.id}
-                      p="xs"
-                      style={{
-                        cursor: alreadyLinked ? 'not-allowed' : 'pointer',
-                        background: selectedProcedureId === opt.id ? '#e7f5ff' : 'transparent',
-                        borderBottom: '1px solid #f1f3f5',
-                        opacity: alreadyLinked ? 0.5 : 1,
-                      }}
-                      onClick={() => {
-                        if (!alreadyLinked) setSelectedProcedureId(opt.id);
-                      }}
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <Text size="sm">{opt.name}</Text>
-                        <Group gap={6}>
-                          {opt.tussCode && <Badge size="xs" variant="outline">{opt.tussCode}</Badge>}
-                          {alreadyLinked && <Badge size="xs" color="gray">já vinculado</Badge>}
-                        </Group>
-                      </Group>
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
 
             {subInsurances.length > 0 && (
               <Select
@@ -402,7 +379,7 @@ function ProceduresTab({
             />
 
             <Group justify="flex-end">
-              <Button variant="default" size="sm" onClick={() => { setAdding(false); setSearchAdd(''); setSelectedProcedureId(null); setAddPrice(''); }}>
+              <Button variant="default" size="sm" onClick={() => { setAdding(false); setSearchAdd(''); setSelectedProcedureId(null); setAddPrice(''); setSelectKey((k) => k + 1); }}>
                 Cancelar
               </Button>
               <Button
