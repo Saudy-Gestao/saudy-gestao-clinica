@@ -9,23 +9,24 @@ interface FloatingInputProps extends ComponentPropsWithoutRef<'input'> {
   containerProps?: ComponentPropsWithoutRef<typeof Box>;
   error?: string;
   alwaysFloatLabel?: boolean;
+  disableMask?: boolean;
 }
 
-export function FloatingInput({ label, rightSection, containerProps, error, alwaysFloatLabel = false, ...props }: FloatingInputProps) {
+export function FloatingInput({ label, rightSection, containerProps, error, alwaysFloatLabel = false, disableMask = false, ...props }: FloatingInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const labelText = useMemo(() => (typeof label === 'string' ? label.toLowerCase() : ''), [label]);
   const isPhoneField = useMemo(() => (
-    /telefone|celular|whatsapp/.test(labelText) && props.type !== 'password'
-  ), [labelText, props.type]);
+    !disableMask && /telefone|celular|whatsapp/.test(labelText) && props.type !== 'password'
+  ), [disableMask, labelText, props.type]);
   const isCpfField = useMemo(() => (
-    /(^|\b)cpf(\b|$)/.test(labelText) && props.type !== 'password'
-  ), [labelText, props.type]);
+    !disableMask && /(^|\b)cpf(\b|$)/.test(labelText) && props.type !== 'password'
+  ), [disableMask, labelText, props.type]);
   const isCnpjField = useMemo(() => (
-    /(^|\b)cnpj(\b|$)/.test(labelText) && props.type !== 'password'
-  ), [labelText, props.type]);
+    !disableMask && /(^|\b)cnpj(\b|$)/.test(labelText) && props.type !== 'password'
+  ), [disableMask, labelText, props.type]);
   const isBirthDateField = useMemo(() => (
-    /(data de nascimento|nascimento|data nascimento)/.test(labelText) && props.type !== 'date' && props.type !== 'password'
-  ), [labelText, props.type]);
+    !disableMask && /(data de nascimento|nascimento|data nascimento)/.test(labelText) && props.type !== 'date' && props.type !== 'password'
+  ), [disableMask, labelText, props.type]);
   const isEmailByLabel = useMemo(() => (
     /(^|\b)e-?mail(\b|$)/.test(labelText) && !/usuario|usuário/.test(labelText)
   ), [labelText]);

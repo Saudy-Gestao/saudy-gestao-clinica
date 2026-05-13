@@ -66,6 +66,7 @@ import { MyTicketsPage } from './components/Tickets/MyTicketsPage';
 import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
 import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogin';
 import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
+import { PatientPortalDicomViewer } from './components/PatientPortal/PatientPortalDicomViewer';
 import patientPortalAuthService from './services/patientPortalAuthService';
 import { isAdminUser, isDoctorUser } from './utils/userRole';
 import { useCurrentUserProfileQuery } from './hooks/useCurrentUserProfileQuery';
@@ -181,6 +182,10 @@ function App() {
           <Route
             path="/portal"
             element={<PatientPortalProtectedRoute><PatientPortalDashboard /></PatientPortalProtectedRoute>}
+          />
+          <Route
+            path="/portal/dicom/:reportId"
+            element={<PatientPortalProtectedRoute><PatientPortalDicomViewer /></PatientPortalProtectedRoute>}
           />
           <Route 
             path="/adm" 

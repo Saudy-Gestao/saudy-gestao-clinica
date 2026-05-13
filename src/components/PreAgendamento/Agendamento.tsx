@@ -39,6 +39,7 @@ import appointmentAttachmentService from '../../services/appointmentAttachmentSe
 import type { AppointmentAttachment } from '../../services/appointmentAttachmentService';
 import { formatCPF } from '../../utils/formatters';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
+import { usePreSchedulingsQuery } from '../../hooks/usePreSchedulingsQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
@@ -314,6 +315,51 @@ const normalizeDateOnly = (value: unknown): string => {
   if (!parsed.isValid()) return raw;
   return parsed.format('YYYY-MM-DD');
 };
+const normalizeTimeOnly = (value: unknown): string => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  const timeMatch = raw.match(/\b(\d{1,2}):(\d{2})/);
+  if (timeMatch) return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+  const parsed = dayjs(raw);
+  return parsed.isValid() ?parsed.format('HH:mm') : raw;
+};
+const firstPresent = (...values: unknown[]): unknown => values.find((value) => {
+  if (value === null || value === undefined) return false;
+  return String(value).trim() !== '';
+});
+const extractAppointmentDate = (appointment: any): string => normalizeDateOnly(firstPresent(
+  appointment?.date,
+  appointment?.data,
+  appointment?.scheduledFor,
+  appointment?.scheduled_for,
+  appointment?.scheduledAt,
+  appointment?.scheduled_at,
+  appointment?.scheduledDate,
+  appointment?.scheduled_date,
+  appointment?.appointmentDate,
+  appointment?.appointment_date,
+  appointment?.startAt,
+  appointment?.start_at,
+  appointment?.startsAt,
+  appointment?.starts_at,
+));
+const extractAppointmentTime = (appointment: any): string => normalizeTimeOnly(firstPresent(
+  appointment?.time,
+  appointment?.hora,
+  appointment?.scheduledTime,
+  appointment?.scheduled_time,
+  appointment?.scheduledFor,
+  appointment?.scheduled_for,
+  appointment?.scheduledAt,
+  appointment?.scheduled_at,
+  appointment?.appointmentTime,
+  appointment?.appointment_time,
+  appointment?.startAt,
+  appointment?.start_at,
+  appointment?.startsAt,
+  appointment?.starts_at,
+));
 const resolveTurnoFromTime = (time?: string): 'Manhã' | 'Tarde' | 'Noite' | null => {
   const [hourRaw] = String(time || '').split(':');
   const hour = Number(hourRaw);
@@ -519,13 +565,6 @@ export function Agendamento() {
   const [detailAttachments, setDetailAttachments] = useState<AppointmentAttachment[]>([]);
   const [detailAttachmentsLoading, setDetailAttachmentsLoading] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-  const appointmentsQuery = useAppointmentsQuery();
-  const patientsQuery = usePatientsAdminQuery();
-  const insurancesQuery = useInsurancesAdminQuery();
-  const doctorsQuery = useDoctorsAdminQuery();
-  const proceduresCatalogQuery = useProceduresAdminQuery();
-  const roomsQuery = useRoomsAdminQuery();
-  const medicalEquipmentsQuery = useMedicalEquipmentsQuery();
   // Estados para os filtros
   const [especialidade, setEspecialidade] = useState<string | null>(null);
   const [convenio, setConvenio] = useState<string | null>(null);
@@ -535,6 +574,15 @@ export function Agendamento() {
   const [pickerOpened, setPickerOpened] = useState(false);
   const [tempDateFilter, setTempDateFilter] = useState<Date | null>(new Date());
   const [viewedDate, setViewedDate] = useState<Date>(new Date());
+  const appointmentDateFilter = dataHoraFiltro ?formatDateForApi(dataHoraFiltro) : undefined;
+  const appointmentsQuery = useAppointmentsQuery({ date: appointmentDateFilter });
+  const preSchedulingsQuery = usePreSchedulingsQuery({});
+  const patientsQuery = usePatientsAdminQuery();
+  const insurancesQuery = useInsurancesAdminQuery();
+  const doctorsQuery = useDoctorsAdminQuery();
+  const proceduresCatalogQuery = useProceduresAdminQuery();
+  const roomsQuery = useRoomsAdminQuery();
+  const medicalEquipmentsQuery = useMedicalEquipmentsQuery();
   dayjs.locale('pt-br');
   const resetSchedulingForm = (keepDate: Date | null = dataHoraFiltro || new Date()) => {
     setNovoAgendamento({
@@ -581,21 +629,40 @@ export function Agendamento() {
     patientId: it.patientId || it.patient_id || it.patient?.id || undefined,
     pacienteNome: it.patientName || it.patient_name || it.patient?.name || it.pacienteNome || '',
     pacienteCPF: it.patientCpf || it.patient_cpf || it.patient?.cpf || it.pacienteCPF || '',
-    medicoNome: it.doctorName || it.doctor_name || it.doctor?.name || it.medicoNome || '',
+    medicoNome: it.doctorName || it.doctor_name || it.professionalName || it.professional_name || it.doctor?.name || it.professional?.name || it.medicoNome || '',
     roomId: String(it.roomId || it.room_id || '').trim() || undefined,
     medicalEquipmentId: String(it.medicalEquipmentId || it.medical_equipment_id || '').trim() || undefined,
-    especialidade: it.specialty || it.procedure || it.procedureName || it.procedimento || it.especialidade || '',
+    especialidade: it.specialty || it.procedure || it.procedureName || it.procedure_name || it.procedure?.name || it.procedimento || it.especialidade || '',
     convenio: it.convenio || it.insurance || it.healthInsuranceName || '',
     convenioNumber: it.convenioNumber || it.convenio_number || it.healthInsuranceNumber || it.insuranceCardNumber || '',
     convenioValidUntil: it.convenioValidUntil || it.convenio_valid_until || it.healthInsuranceExpiry || it.healthInsuranceValidity || '',
     convenioStatus: it.convenioStatus || it.convenio_status || '',
-    data: normalizeDateOnly(it.date || it.data || ''),
-    hora: it.time || it.hora || '',
-    tipoConsulta: it.type || it.tipoConsulta || 'CONSULTA',
+    data: extractAppointmentDate(it),
+    hora: extractAppointmentTime(it),
+    tipoConsulta: it.type || it.appointmentType || it.appointment_type || it.procedure?.appointmentType || it.tipoConsulta || 'CONSULTA',
     modalidadeAtendimento: getAppointmentModalityFromObservation(it.observations || it.observacoes || ''),
     status: normalizeAppointmentStatus(it.status),
     observacoes: stripTeleconsultationMarker(it.observations || it.observacoes || ''),
     totem: it.totem ?? undefined,
+    durationMinutes: Number.isFinite(Number(it.durationMinutes)) ?Number(it.durationMinutes) : null,
+  });
+  const mapPreSchedulingToAgendamento = (it: any): Agendamento => ({
+    id: String(it.appointmentId || it.appointment_id || it.id),
+    patientId: it.patientId || it.patient_id || undefined,
+    pacienteNome: it.patientName || it.patient_name || '',
+    pacienteCPF: it.patientCpf || it.patient_cpf || '',
+    medicoNome: it.doctorName || it.doctor_name || '',
+    especialidade: it.specialty || it.procedureName || it.procedure_name || '',
+    convenio: it.convenio || it.insurance || '',
+    convenioNumber: '',
+    convenioValidUntil: '',
+    convenioStatus: '',
+    data: extractAppointmentDate(it),
+    hora: extractAppointmentTime(it),
+    tipoConsulta: it.type || it.appointmentType || it.appointment_type || 'CONSULTA',
+    modalidadeAtendimento: it.isTeleconsultation ? 'Teleconsulta' : 'Presencial',
+    status: normalizeAppointmentStatus(it.appointmentStatus || it.appointment_status || 'AGENDADO'),
+    observacoes: '',
     durationMinutes: Number.isFinite(Number(it.durationMinutes)) ?Number(it.durationMinutes) : null,
   });
   const getResumoLinha = (agendamento: Agendamento) => {
@@ -711,15 +778,65 @@ export function Agendamento() {
     }
   }, [appointmentsQuery.error]);
   useEffect(() => {
+    if (appointmentDateFilter) return;
+
     const list = Array.isArray(appointmentsQuery.data) ?appointmentsQuery.data : [];
+    const preSchedulingList = Array.isArray(preSchedulingsQuery.data) ?preSchedulingsQuery.data : [];
+    const mappedAppointments = list
+      .map(mapApiToAgendamento)
+      .filter((item) => !isTeaReturnAppointment(item.tipoConsulta));
+    const appointmentIds = new Set(mappedAppointments.map((item) => String(item.id)));
+    const fallbackPreSchedulings = preSchedulingList
+      .map(mapPreSchedulingToAgendamento)
+      .filter((item) => item.id && item.data && !appointmentIds.has(String(item.id)))
+      .filter((item) => !isTeaReturnAppointment(item.tipoConsulta));
+
     setAgendamentos(
       sortAgendamentosByDateTime(
-        list
-          .map(mapApiToAgendamento)
-          .filter((item) => !isTeaReturnAppointment(item.tipoConsulta)),
+        [...mappedAppointments, ...fallbackPreSchedulings],
       ),
     );
-  }, [appointmentsQuery.data]);
+  }, [appointmentDateFilter, appointmentsQuery.data, preSchedulingsQuery.data]);
+  useEffect(() => {
+    if (!appointmentDateFilter) return;
+    let ignore = false;
+
+    const loadAppointmentsForSelectedDate = async () => {
+      try {
+        const data = await appointmentService.list({ date: appointmentDateFilter, limit: 2000, offset: 0 });
+        const list = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.items)
+            ? data.items
+            : (Array.isArray(data?.data)
+              ? data.data
+              : []));
+
+        if (ignore) return;
+
+        setAgendamentos(
+          sortAgendamentosByDateTime(
+            list
+              .map(mapApiToAgendamento)
+              .filter((item: Agendamento) => !isTeaReturnAppointment(item.tipoConsulta)),
+          ),
+        );
+      } catch (err: any) {
+        if (ignore) return;
+        showNotification({
+          title: 'Erro',
+          message: err?.response?.data?.message || err?.message || 'Erro ao carregar agendamentos do dia',
+          color: 'red',
+        });
+      }
+    };
+
+    void loadAppointmentsForSelectedDate();
+
+    return () => {
+      ignore = true;
+    };
+  }, [appointmentDateFilter]);
   useEffect(() => {
     setPatientsLoading(patientsQuery.isFetching);
   }, [patientsQuery.isFetching]);
@@ -3918,6 +4035,7 @@ export function Agendamento() {
               <FloatingInput
                 label={isMobile ?'Buscar' : 'Buscar por paciente, CPF ou médico'}
                 alwaysFloatLabel
+                disableMask
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.currentTarget.value)}
                 rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}

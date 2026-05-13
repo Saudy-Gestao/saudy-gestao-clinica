@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   ActionIcon,
@@ -22,7 +23,8 @@ import {
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { CalendarDays, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ShieldCheck, Stethoscope, Sun, X } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ScanLine, ShieldCheck, Stethoscope, Sun, X } from 'lucide-react';
+import PatientSelfScheduling from './PatientSelfScheduling';
 import patientPortalService, {
   type PatientPortalAccessLogItem,
   type PatientPortalAppointmentItem,
@@ -278,10 +280,13 @@ function PatientPortalDashboardSkeleton() {
 }
 
 export function PatientPortalDashboard() {
+  const navigate = useNavigate();
   const { isDark, toggleTheme } = usePatientPortalTheme();
   const portalColorScheme = isDark ? 'dark' : 'light';
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string | null>('upcoming');
+  const [activeTab, setActiveTab] = useState<string | null>('consultations');
+  const [consultationsView, setConsultationsView] = useState<'upcoming' | 'history'>('upcoming');
+  const [examsView, setExamsView] = useState<'upcoming' | 'history'>('upcoming');
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
   const [loadingConsultations, setLoadingConsultations] = useState(false);
   const [loadingExams, setLoadingExams] = useState(false);
@@ -610,7 +615,10 @@ export function PatientPortalDashboard() {
 
   useEffect(() => {
     if (!activeTab) return;
-    if (activeTab === 'consultations' && consultations.length === 0 && !loadingConsultations) void loadConsultations();
+    if (activeTab === 'consultations') {
+      if (upcomingConsultations.length === 0 && !loadingUpcoming) void loadUpcoming();
+      if (consultations.length === 0 && !loadingConsultations) void loadConsultations();
+    }
     if (activeTab === 'exams' && exams.length === 0 && !loadingExams) void loadExams();
     if (activeTab === 'documents' && documents.length === 0 && !loadingDocuments) void loadDocuments();
     if (profiles.length === 0 && !loadingProfiles) void loadProfiles();
@@ -714,118 +722,146 @@ export function PatientPortalDashboard() {
         <Paper className="patient-portal-content-card" withBorder id="patient-portal-main-content">
           <Tabs value={activeTab} onChange={setActiveTab} classNames={{ tab: 'patient-portal-tab', list: 'patient-portal-tab-list' }}>
             <Tabs.List grow>
-              <Tabs.Tab value="upcoming" leftSection={<CalendarDays size={14} />}>Próximas consultas</Tabs.Tab>
+              <Tabs.Tab value="schedule" leftSection={<CalendarPlus size={14} />}>Agendar</Tabs.Tab>
               <Tabs.Tab value="consultations" leftSection={<Stethoscope size={14} />}>Consultas</Tabs.Tab>
               <Tabs.Tab value="exams" leftSection={<CalendarDays size={14} />}>Exames</Tabs.Tab>
               <Tabs.Tab value="documents" leftSection={<FolderOpen size={14} />}>Documentos</Tabs.Tab>
               <Tabs.Tab value="reports" leftSection={<ClipboardList size={14} />}>Laudos</Tabs.Tab>
             </Tabs.List>
 
-            <Tabs.Panel value="upcoming" pt="md">
-              {loadingUpcoming ? (
-                <SkeletonCards count={3} />
-              ) : (
-                <Stack gap="sm">
-                  {upcomingConsultations.map((appointment) => {
-                  const hasAnamnesis = Boolean(appointment.preScheduling?.hasAnamnesis);
-                  const actionLabel = hasAnamnesis ? 'Preencher anamnese' : 'Visualizar preparo';
-                  return (
-                    <RecordCard
-                      key={appointment.id}
-                      kind="consultation"
-                      title={appointment.specialty || 'Consulta'}
-                      subtitle={formatDateTime(appointment.date, appointment.time)}
-                      status={appointment.status}
-                      details={appointment.doctorName ? `Médico(a): ${appointment.doctorName}` : 'Médico não informado'}
-                      badges={
-                        <>
-                          {hasAnamnesis ? <Badge variant="light" color="grape">Anamnese disponível</Badge> : null}
-                          {appointment.preScheduling?.interactionCompleted ? <Badge variant="light" color="teal">Preparo já enviado</Badge> : null}
-                        </>
-                      }
-                      action={(
-                        <Button
-                          size="sm"
-                          radius="xl"
-                          className="patient-portal-record-action"
-                          loading={openingPreSchedulingFor === appointment.id}
-                          disabled={!appointment.preScheduling?.canPrepare}
-                          onClick={() => void openPreSchedulingFlow(appointment)}
-                        >
-                          {actionLabel}
-                        </Button>
-                      )}
-                      timeline={(
-                        <UpcomingTimeline
-                          kind="consultation"
-                          isUpcoming
-                          appointmentStatus={appointment.status}
-                          hasAnamnesis={hasAnamnesis}
-                          anamnesisAnswered={Boolean(appointment.preScheduling?.anamnesisAnswered)}
-                          interactionCompleted={Boolean(appointment.preScheduling?.interactionCompleted)}
-                          canPrepare={Boolean(appointment.preScheduling?.canPrepare)}
-                        />
-                      )}
-                    />
-                  );
-                  })}
-                  {upcomingConsultations.length === 0 ? <EmptyState message="Você não possui consultas futuras no momento." /> : null}
-                </Stack>
-              )}
+            <Tabs.Panel value="schedule" pt="md">
+              <PatientSelfScheduling />
             </Tabs.Panel>
 
             <Tabs.Panel value="consultations" pt="md">
-              {loadingConsultations ? (
-                <SkeletonCards count={3} />
+              <Group mb="md" gap={8}>
+                <Button
+                  size="xs" radius="xl"
+                  variant={consultationsView === 'upcoming' ? 'filled' : 'light'}
+                  onClick={() => setConsultationsView('upcoming')}
+                >
+                  Próximas
+                </Button>
+                <Button
+                  size="xs" radius="xl"
+                  variant={consultationsView === 'history' ? 'filled' : 'light'}
+                  onClick={() => setConsultationsView('history')}
+                >
+                  Histórico
+                </Button>
+              </Group>
+              {consultationsView === 'upcoming' ? (
+                loadingUpcoming ? <SkeletonCards count={3} /> : (
+                  <Stack gap="sm">
+                    {upcomingConsultations.map((appointment) => {
+                      const hasAnamnesis = Boolean(appointment.preScheduling?.hasAnamnesis);
+                      const actionLabel = hasAnamnesis ? 'Preencher anamnese' : 'Visualizar preparo';
+                      return (
+                        <RecordCard
+                          key={appointment.id}
+                          kind="consultation"
+                          title={appointment.specialty || 'Consulta'}
+                          subtitle={formatDateTime(appointment.date, appointment.time)}
+                          status={appointment.status}
+                          details={appointment.doctorName ? `Médico(a): ${appointment.doctorName}` : 'Médico não informado'}
+                          badges={
+                            <>
+                              {hasAnamnesis ? <Badge variant="light" color="grape">Anamnese disponível</Badge> : null}
+                              {appointment.preScheduling?.interactionCompleted ? <Badge variant="light" color="teal">Preparo já enviado</Badge> : null}
+                            </>
+                          }
+                          action={(
+                            <Button
+                              size="sm" radius="xl"
+                              className="patient-portal-record-action"
+                              loading={openingPreSchedulingFor === appointment.id}
+                              disabled={!appointment.preScheduling?.canPrepare}
+                              onClick={() => void openPreSchedulingFlow(appointment)}
+                            >
+                              {actionLabel}
+                            </Button>
+                          )}
+                          timeline={(
+                            <UpcomingTimeline
+                              kind="consultation" isUpcoming
+                              appointmentStatus={appointment.status}
+                              hasAnamnesis={hasAnamnesis}
+                              anamnesisAnswered={Boolean(appointment.preScheduling?.anamnesisAnswered)}
+                              interactionCompleted={Boolean(appointment.preScheduling?.interactionCompleted)}
+                              canPrepare={Boolean(appointment.preScheduling?.canPrepare)}
+                            />
+                          )}
+                        />
+                      );
+                    })}
+                    {upcomingConsultations.length === 0 ? <EmptyState message="Você não possui consultas futuras no momento." /> : null}
+                  </Stack>
+                )
               ) : (
-                <Stack gap="sm">
-                {consultations.map((item) => (
-                  <RecordCard
-                    key={item.id}
-                    kind="consultation"
-                    title={item.specialty || 'Consulta'}
-                    subtitle={formatDateTime(item.date, item.time)}
-                    status={item.status}
-                    details={item.doctorName ? `Médico(a): ${item.doctorName}` : undefined}
-                    extra={item.convenio ? `Convênio: ${item.convenio}` : undefined}
-                    timeline={(
-                      <UpcomingTimeline
+                loadingConsultations ? <SkeletonCards count={3} /> : (
+                  <Stack gap="sm">
+                    {consultations.map((item) => (
+                      <RecordCard
+                        key={item.id}
                         kind="consultation"
-                        appointmentStatus={item.status}
+                        title={item.specialty || 'Consulta'}
+                        subtitle={formatDateTime(item.date, item.time)}
+                        status={item.status}
+                        details={item.doctorName ? `Médico(a): ${item.doctorName}` : undefined}
+                        extra={item.convenio ? `Convênio: ${item.convenio}` : undefined}
+                        timeline={<UpcomingTimeline kind="consultation" appointmentStatus={item.status} />}
                       />
-                    )}
-                  />
-                ))}
-                {consultations.length === 0 ? <EmptyState message="Nenhuma consulta encontrada no momento." /> : null}
-                </Stack>
+                    ))}
+                    {consultations.length === 0 ? <EmptyState message="Nenhuma consulta no histórico." /> : null}
+                  </Stack>
+                )
               )}
             </Tabs.Panel>
 
             <Tabs.Panel value="exams" pt="md">
-              {loadingExams ? (
-                <SkeletonCards count={3} />
-              ) : (
-                <Stack gap="sm">
-                {exams.map((item) => (
-                  <RecordCard
-                    key={item.id}
-                    kind="exam"
-                    title={item.specialty || 'Exame'}
-                    subtitle={formatDateTime(item.date, item.time)}
-                    status={item.status}
-                    details={item.doctorName ? `Solicitante: ${item.doctorName}` : undefined}
-                    extra={item.accessionNumber ? `Código: ${item.accessionNumber}` : undefined}
-                    timeline={(
-                      <UpcomingTimeline
+              <Group mb="md" gap={8}>
+                <Button
+                  size="xs" radius="xl"
+                  variant={examsView === 'upcoming' ? 'filled' : 'light'}
+                  onClick={() => setExamsView('upcoming')}
+                >
+                  Próximos
+                </Button>
+                <Button
+                  size="xs" radius="xl"
+                  variant={examsView === 'history' ? 'filled' : 'light'}
+                  onClick={() => setExamsView('history')}
+                >
+                  Histórico
+                </Button>
+              </Group>
+              {loadingExams ? <SkeletonCards count={3} /> : (() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const filtered = exams.filter((e) =>
+                  examsView === 'upcoming'
+                    ? (e.date ?? '') >= today
+                    : (e.date ?? '') < today,
+                );
+                return (
+                  <Stack gap="sm">
+                    {filtered.map((item) => (
+                      <RecordCard
+                        key={item.id}
                         kind="exam"
-                        appointmentStatus={item.status}
+                        title={item.specialty || 'Exame'}
+                        subtitle={formatDateTime(item.date, item.time)}
+                        status={item.status}
+                        details={item.doctorName ? `Solicitante: ${item.doctorName}` : undefined}
+                        extra={item.accessionNumber ? `Código: ${item.accessionNumber}` : undefined}
+                        timeline={<UpcomingTimeline kind="exam" appointmentStatus={item.status} />}
                       />
-                    )}
-                  />
-                ))}
-                {exams.length === 0 ? <EmptyState message="Nenhum exame encontrado no momento." /> : null}
-                </Stack>
-              )}
+                    ))}
+                    {filtered.length === 0 ? (
+                      <EmptyState message={examsView === 'upcoming' ? 'Nenhum exame agendado.' : 'Nenhum exame no histórico.'} />
+                    ) : null}
+                  </Stack>
+                );
+              })()}
             </Tabs.Panel>
 
             <Tabs.Panel value="documents" pt="md">
@@ -833,32 +869,6 @@ export function PatientPortalDashboard() {
                 <SkeletonCards count={3} />
               ) : (
                 <Stack gap="sm">
-                  <Card className="patient-portal-record-card" withBorder radius="md">
-                    <Stack gap="xs">
-                      <Group gap="xs">
-                        <ShieldCheck size={16} />
-                        <Text fw={700}>Atividade recente de acesso</Text>
-                      </Group>
-                      {accessLogs.length === 0 ? (
-                        <Text size="sm" c="dimmed">Nenhuma atividade recente registrada.</Text>
-                      ) : (
-                        <Stack gap={6}>
-                          {accessLogs.slice(0, 5).map((entry) => (
-                            <Group key={entry.id} justify="space-between" wrap="wrap">
-                              <Text size="sm">{dayjs(entry.createdAt).isValid() ? dayjs(entry.createdAt).format('DD/MM/YYYY HH:mm') : '-'}</Text>
-                              <Badge
-                                variant="light"
-                                color={entry.status === 'SUCCESS' ? 'teal' : (entry.status === 'RATE_LIMITED' || entry.status === 'BLOCKED' ? 'orange' : 'red')}
-                              >
-                                {entry.status}
-                              </Badge>
-                            </Group>
-                          ))}
-                        </Stack>
-                      )}
-                    </Stack>
-                  </Card>
-
                   {documents.map((doc) => (
                     <Card key={doc.id} className="patient-portal-record-card" withBorder radius="md">
                       <Stack gap={8}>
@@ -941,7 +951,19 @@ export function PatientPortalDashboard() {
                       {(item.conclusion || item.description) ? (
                         <Text size="xs" c="dimmed">{item.conclusion || item.description}</Text>
                       ) : null}
-                      <Group justify="flex-end">
+                      <Group justify="flex-end" wrap="wrap">
+                        {item.worklistItem && (
+                          <Button
+                            size="xs"
+                            radius="xl"
+                            variant="filled"
+                            color="blue"
+                            leftSection={<ScanLine size={14} />}
+                            onClick={() => navigate(`/portal/dicom/${item.id}`)}
+                          >
+                            Ver imagens
+                          </Button>
+                        )}
                         <Button size="xs" radius="xl" variant="default" onClick={() => void downloadReportPdf(item)} leftSection={<Download size={14} />}>
                           Baixar PDF
                         </Button>

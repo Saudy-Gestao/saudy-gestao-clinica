@@ -250,6 +250,128 @@ class PatientPortalService {
     });
     return response.data as Blob;
   }
+
+  listSchedulingBranches() {
+    return api.get<{ branches: PatientPortalSchedulingBranch[]; defaultBranchId: string | null }>('/auth/patient-portal/scheduling/branches')
+      .then((r) => r.data);
+  }
+
+  listSchedulingProcedures(branchId?: string) {
+    return api.get<{ procedures: PatientPortalSchedulingProcedure[]; branch: { name: string; address: string } | null }>('/auth/patient-portal/scheduling/procedures', {
+      params: branchId ? { branchId } : undefined,
+    }).then((r) => r.data);
+  }
+
+  listSchedulingDoctors(procedureId?: string, branchId?: string) {
+    return api.get<{ doctors: PatientPortalSchedulingDoctor[] }>('/auth/patient-portal/scheduling/doctors', {
+      params: { ...(procedureId ? { procedureId } : {}), ...(branchId ? { branchId } : {}) },
+    }).then((r) => r.data);
+  }
+
+  getAvailableSlots(params: { doctorName: string; procedureId?: string; branchId?: string }) {
+    return api.get<{ availableSlots: PatientPortalAvailableSlotDay[]; slotDurationMinutes: number }>(
+      '/auth/patient-portal/scheduling/available-slots',
+      { params },
+    ).then((r) => r.data);
+  }
+
+  createSelfScheduledAppointment(payload: PatientPortalSelfSchedulePayload) {
+    return api.post<PatientPortalCreatedAppointment>(
+      '/auth/patient-portal/scheduling/appointments',
+      payload,
+    ).then((r) => r.data);
+  }
+
+  getReportDicomSeries(reportId: string) {
+    return api.get<PatientPortalDicomSeriesResponse>(`/auth/patient-portal/me/reports/${reportId}/dicom/series`)
+      .then((r) => r.data);
+  }
+
+  getReportDicomFiles(reportId: string, seriesUid?: string) {
+    return api.get<{ files: PatientPortalDicomFileItem[] }>(
+      `/auth/patient-portal/me/reports/${reportId}/dicom/files`,
+      { params: seriesUid ? { seriesUid } : undefined },
+    ).then((r) => r.data);
+  }
+
+  async downloadDicomFile(reportId: string, fileId: string): Promise<ArrayBuffer> {
+    const res = await api.get(
+      `/auth/patient-portal/me/reports/${reportId}/dicom/images/${fileId}`,
+      { responseType: 'arraybuffer' },
+    );
+    return res.data as ArrayBuffer;
+  }
 }
+
+export type PatientPortalSchedulingProcedure = {
+  id: string;
+  name: string;
+  description: string | null;
+  appointmentType: string;
+  durationMinutes: number | null;
+  acceptsInsurance: boolean;
+  modalities: string[];
+};
+
+export type PatientPortalSchedulingDoctor = {
+  id: string;
+  name: string;
+  specialty: string | null;
+  crm: string;
+};
+
+export type PatientPortalAvailableSlotDay = {
+  date: string;
+  slots: string[];
+};
+
+export type PatientPortalSchedulingBranch = {
+  id: string;
+  tradeName: string;
+  address: string;
+};
+
+export type PatientPortalSelfSchedulePayload = {
+  procedureId: string;
+  doctorName: string;
+  date: string;
+  time: string;
+  modalidadeAtendimento?: 'Presencial' | 'Teleconsulta';
+  observations?: string;
+  branchId?: string;
+};
+
+export type PatientPortalDicomSeriesItem = {
+  seriesUid: string | null;
+  instancesCount: number;
+};
+
+export type PatientPortalDicomSeriesResponse = {
+  reportId: string;
+  worklistItemId: string;
+  series: PatientPortalDicomSeriesItem[];
+  totalInstances: number;
+};
+
+export type PatientPortalDicomFileItem = {
+  id: string;
+  seriesUid: string | null;
+  instanceId: string | null;
+  url: string;
+};
+
+export type PatientPortalCreatedAppointment = {
+  id: string;
+  date: string | null;
+  time: string | null;
+  specialty: string | null;
+  doctorName: string | null;
+  status: string | null;
+  type: string | null;
+  durationMinutes: number | null;
+  createdAt: string;
+  branchName: string | null;
+  branchAddress: string | null;
+};
 
 export default new PatientPortalService();
