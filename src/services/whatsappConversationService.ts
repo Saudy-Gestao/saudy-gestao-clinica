@@ -95,6 +95,21 @@ export interface HumanConversationSettings {
   closeWarningMinutes: number;
 }
 
+export interface HumanConversationMedia {
+  id: string;
+  conversationId: string;
+  branchId: string;
+  phone: string;
+  appointmentId?: string | null;
+  mediaType: string;
+  mediaUrl?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  mediaId?: string | null;
+  providerMessageId?: string | null;
+  createdAt: string;
+}
+
 export interface HumanConversationTemplate {
   id: string;
   companyId: string;
@@ -102,6 +117,7 @@ export interface HumanConversationTemplate {
   createdByName?: string | null;
   name: string;
   text: string;
+  shortcut: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +161,20 @@ const whatsappConversationService = {
 
   async createTemplate(payload: { name: string; text: string }): Promise<HumanConversationTemplate> {
     const res = await api.post('/care/whatsapp/conversations/templates', payload);
+    return res.data;
+  },
+
+  async updateTemplate(id: string, payload: { name?: string; text?: string }): Promise<HumanConversationTemplate> {
+    const res = await api.put(`/care/whatsapp/conversations/templates/${id}`, payload);
+    return res.data;
+  },
+
+  async deleteTemplate(id: string): Promise<void> {
+    await api.delete(`/care/whatsapp/conversations/templates/${id}`);
+  },
+
+  async saveTemplateShortcut(templateId: string, shortcut: string | null): Promise<{ shortcut: string | null }> {
+    const res = await api.put(`/care/whatsapp/conversations/templates/${templateId}/shortcut`, { shortcut });
     return res.data;
   },
 
@@ -225,6 +255,7 @@ const whatsappConversationService = {
       recent: HumanConversationPatientAppointment[];
     };
     items: HumanConversationMessage[];
+    media?: HumanConversationMedia[];
   }> {
     const res = await api.get(`/care/whatsapp/conversations/${conversationId}/messages`, { params });
     return res.data;

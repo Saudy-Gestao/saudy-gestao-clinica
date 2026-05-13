@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -40,14 +41,17 @@ import {
   Download,
   FileText,
   Info,
+  Keyboard,
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Plus,
   RefreshCcw,
   Search,
   Send,
   Settings,
+  Trash2,
   UserCheck,
   XCircle,
 } from 'lucide-react';
@@ -307,6 +311,10 @@ export function Conversations() {
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState({ name: '', text: '' });
   const [templateSearch, setTemplateSearch] = useState('');
+  const [editingTemplate, setEditingTemplate] = useState<{ id: string; name: string; text: string } | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [editingShortcutTemplateId, setEditingShortcutTemplateId] = useState<string | null>(null);
+  const [shortcutInputValue, setShortcutInputValue] = useState('');
   const [settingsScope, setSettingsScope] = useState<HumanConversationConfigScope>('COMPANY');
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const [protocolModalOpen, setProtocolModalOpen] = useState(false);
@@ -532,19 +540,48 @@ export function Conversations() {
     mutationFn: (payload: { name: string; text: string }) => whatsappConversationService.createTemplate(payload),
     onSuccess: async () => {
       setTemplateForm({ name: '', text: '' });
-      notifications.show({
-        title: 'Template criado',
-        message: 'O template já está disponível para uso.',
-        color: 'green',
-      });
+      notifications.show({ title: 'Template criado', message: 'O template já está disponível para uso.', color: 'green' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationTemplates });
     },
     onError: (error: any) => {
-      notifications.show({
-        title: 'Erro ao criar template',
-        message: resolveApiErrorMessage(error, 'Não foi possível salvar o template.'),
-        color: 'red',
-      });
+      notifications.show({ title: 'Erro ao criar template', message: resolveApiErrorMessage(error, 'Não foi possível salvar o template.'), color: 'red' });
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: { name?: string; text?: string } }) =>
+      whatsappConversationService.updateTemplate(id, payload),
+    onSuccess: async () => {
+      setEditingTemplate(null);
+      notifications.show({ title: 'Template atualizado', message: 'As alterações foram salvas.', color: 'green' });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationTemplates });
+    },
+    onError: (error: any) => {
+      notifications.show({ title: 'Erro ao atualizar template', message: resolveApiErrorMessage(error, 'Não foi possível atualizar o template.'), color: 'red' });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: string) => whatsappConversationService.deleteTemplate(id),
+    onSuccess: async () => {
+      setDeletingTemplateId(null);
+      notifications.show({ title: 'Template excluído', message: 'O template foi removido.', color: 'green' });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationTemplates });
+    },
+    onError: (error: any) => {
+      notifications.show({ title: 'Erro ao excluir template', message: resolveApiErrorMessage(error, 'Não foi possível excluir o template.'), color: 'red' });
+    },
+  });
+
+  const saveShortcutMutation = useMutation({
+    mutationFn: ({ templateId, shortcut }: { templateId: string; shortcut: string | null }) =>
+      whatsappConversationService.saveTemplateShortcut(templateId, shortcut),
+    onSuccess: async () => {
+      setEditingShortcutTemplateId(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.whatsappConversationTemplates });
+    },
+    onError: (error: any) => {
+      notifications.show({ title: 'Erro ao salvar atalho', message: resolveApiErrorMessage(error, 'Não foi possível salvar o atalho.'), color: 'red' });
     },
   });
 
@@ -604,6 +641,30 @@ export function Conversations() {
     }
   };
 
+  const handleShortcutKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const templates = templatesQuery.data || [];
+    if (!templates.length) return;
+
+    // Build the shortcut key string from the event (e.g. "ctrl+1", "alt+c")
+    const parts: string[] = [];
+    if (event.ctrlKey) parts.push('ctrl');
+    if (event.altKey) parts.push('alt');
+    if (event.shiftKey) parts.push('shift');
+    const key = event.key.toLowerCase();
+    if (!['control', 'alt', 'shift', 'meta'].includes(key)) parts.push(key);
+    const pressed = parts.join('+');
+
+    const match = templates.find((t) => {
+      if (!t.shortcut) return false;
+      return t.shortcut.trim().toLowerCase() === pressed;
+    });
+
+    if (match) {
+      event.preventDefault();
+      handleInsertTemplate(match);
+    }
+  };
+
   const handleInsertTemplate = (template: HumanConversationTemplate) => {
     const textarea = messageTextareaRef.current;
     const start = textarea?.selectionStart ?? messageDraftSelection.start ?? messageDraft.length;
@@ -623,6 +684,7 @@ export function Conversations() {
 
   const selectedPatient = messagesQuery.data?.patient || null;
   const selectedPatientAppointments = messagesQuery.data?.appointments || { next: null, recent: [] };
+  const conversationMedia = messagesQuery.data?.media || [];
   const rawMessages = messagesQuery.data?.items || [];
   const currentConversation = messagesQuery.data?.conversation || selectedConversation;
 
@@ -843,6 +905,31 @@ export function Conversations() {
             : <Text size="sm" c="dimmed">Nenhum atendimento anterior encontrado.</Text>}
         </Stack>
       </Box>
+
+      {conversationMedia.length > 0 && (
+        <Box>
+          <Text fw={600} mb="xs">Documentos recebidos</Text>
+          <Stack gap="xs">
+            {conversationMedia.map((m) => (
+              <Paper key={m.id} withBorder radius="sm" p="xs">
+                <Group gap="xs" wrap="nowrap">
+                  <Text size="sm" style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
+                    {m.fileName || m.mediaType}
+                  </Text>
+                  {m.appointmentId && (
+                    <Badge size="xs" variant="light" color="green">Vinculado</Badge>
+                  )}
+                  {m.mediaUrl && (
+                    <Anchor href={m.mediaUrl} target="_blank" rel="noopener noreferrer" size="xs">
+                      Abrir
+                    </Anchor>
+                  )}
+                </Group>
+              </Paper>
+            ))}
+          </Stack>
+        </Box>
+      )}
     </Stack>
   );
 
@@ -1256,6 +1343,7 @@ export function Conversations() {
                         onKeyUp={rememberMessageSelection}
                         onSelect={rememberMessageSelection}
                         onFocus={rememberMessageSelection}
+                        onKeyDown={handleShortcutKeyDown}
                         onChange={(event) => {
                           setMessageDraft(event.currentTarget.value);
                           setMessageDraftSelection({
@@ -1345,12 +1433,50 @@ export function Conversations() {
                       <Stack gap="xs">
                         <Group justify="space-between" align="flex-start" wrap="nowrap">
                           <Box style={{ minWidth: 0 }}>
-                            <Text fw={700} lineClamp={1}>{template.name}</Text>
+                            <Group gap="xs" align="center">
+                              <Text fw={700} lineClamp={1}>{template.name}</Text>
+                              {template.shortcut ? (
+                                <Badge size="xs" variant="light" color="grape">⌨ {template.shortcut}</Badge>
+                              ) : null}
+                            </Group>
                             {template.createdByName ? (
                               <Text size="xs" c="dimmed">Criado por {template.createdByName}</Text>
                             ) : null}
                           </Box>
                           <Group gap="xs" wrap="nowrap">
+                            <Tooltip label="Meu atalho de teclado">
+                              <ActionIcon
+                                variant="light"
+                                color="grape"
+                                onClick={() => {
+                                  setEditingShortcutTemplateId(template.id);
+                                  setShortcutInputValue(template.shortcut || '');
+                                }}
+                                aria-label={`Definir atalho para ${template.name}`}
+                              >
+                                <Keyboard size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Editar template">
+                              <ActionIcon
+                                variant="light"
+                                color="blue"
+                                onClick={() => setEditingTemplate({ id: template.id, name: template.name, text: template.text })}
+                                aria-label={`Editar template ${template.name}`}
+                              >
+                                <Pencil size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Excluir template">
+                              <ActionIcon
+                                variant="light"
+                                color="red"
+                                onClick={() => setDeletingTemplateId(template.id)}
+                                aria-label={`Excluir template ${template.name}`}
+                              >
+                                <Trash2 size={16} />
+                              </ActionIcon>
+                            </Tooltip>
                             <Tooltip label="Copiar template">
                               <ActionIcon
                                 variant="light"
@@ -1369,6 +1495,61 @@ export function Conversations() {
                             </Button>
                           </Group>
                         </Group>
+
+                        {/* Shortcut editing inline */}
+                        {editingShortcutTemplateId === template.id && (
+                          <Paper withBorder radius="sm" p="sm" style={{ background: colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-grape-0)' }}>
+                            <Stack gap="xs">
+                              <Text size="xs" c="dimmed">
+                                Digite o atalho desejado no campo abaixo, ou pressione a combinação de teclas diretamente.
+                                Só você verá e poderá usar este atalho.
+                              </Text>
+                              <Group gap="xs" wrap="nowrap">
+                                <TextInput
+                                  size="xs"
+                                  placeholder="Ex.: ctrl+1, alt+c"
+                                  value={shortcutInputValue}
+                                  style={{ flex: 1 }}
+                                  onChange={(e) => setShortcutInputValue(e.currentTarget.value)}
+                                  onKeyDown={(e) => {
+                                    const parts: string[] = [];
+                                    if (e.ctrlKey) parts.push('ctrl');
+                                    if (e.altKey) parts.push('alt');
+                                    if (e.shiftKey) parts.push('shift');
+                                    const key = e.key.toLowerCase();
+                                    if (!['control', 'alt', 'shift', 'meta'].includes(key)) parts.push(key);
+                                    if (parts.length > 1) {
+                                      e.preventDefault();
+                                      setShortcutInputValue(parts.join('+'));
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="xs"
+                                  loading={saveShortcutMutation.isPending}
+                                  onClick={() => void saveShortcutMutation.mutateAsync({ templateId: template.id, shortcut: shortcutInputValue.trim() || null })}
+                                >
+                                  Salvar
+                                </Button>
+                                {template.shortcut && (
+                                  <Button
+                                    size="xs"
+                                    variant="subtle"
+                                    color="red"
+                                    loading={saveShortcutMutation.isPending}
+                                    onClick={() => void saveShortcutMutation.mutateAsync({ templateId: template.id, shortcut: null })}
+                                  >
+                                    Remover
+                                  </Button>
+                                )}
+                                <Button size="xs" variant="subtle" onClick={() => setEditingShortcutTemplateId(null)}>
+                                  Cancelar
+                                </Button>
+                              </Group>
+                            </Stack>
+                          </Paper>
+                        )}
+
                         <Paper
                           radius="md"
                           p="sm"
@@ -1406,10 +1587,7 @@ export function Conversations() {
                   value={templateForm.name}
                   onChange={(event) => {
                     const value = event.currentTarget.value;
-                    setTemplateForm((current) => ({
-                      ...current,
-                      name: value,
-                    }));
+                    setTemplateForm((current) => ({ ...current, name: value }));
                   }}
                 />
                 <Textarea
@@ -1420,10 +1598,7 @@ export function Conversations() {
                   value={templateForm.text}
                   onChange={(event) => {
                     const value = event.currentTarget.value;
-                    setTemplateForm((current) => ({
-                      ...current,
-                      text: value,
-                    }));
+                    setTemplateForm((current) => ({ ...current, text: value }));
                   }}
                 />
                 <Group justify="flex-end">
@@ -1440,6 +1615,63 @@ export function Conversations() {
             </Paper>
           </Tabs.Panel>
         </Tabs>
+      </Modal>
+
+      {/* Edit template modal */}
+      <Modal
+        opened={Boolean(editingTemplate)}
+        onClose={() => setEditingTemplate(null)}
+        title="Editar template"
+        size="lg"
+      >
+        {editingTemplate && (
+          <Stack gap="sm">
+            <TextInput
+              label="Nome do template"
+              value={editingTemplate.name}
+              onChange={(e) => setEditingTemplate((prev) => prev ? { ...prev, name: e.currentTarget.value } : prev)}
+            />
+            <Textarea
+              label="Texto do template"
+              minRows={10}
+              autosize
+              value={editingTemplate.text}
+              onChange={(e) => setEditingTemplate((prev) => prev ? { ...prev, text: e.currentTarget.value } : prev)}
+            />
+            <Group justify="flex-end" gap="xs">
+              <Button variant="subtle" onClick={() => setEditingTemplate(null)}>Cancelar</Button>
+              <Button
+                loading={updateTemplateMutation.isPending}
+                disabled={!editingTemplate.name.trim() || !editingTemplate.text.trim()}
+                onClick={() => void updateTemplateMutation.mutateAsync({ id: editingTemplate.id, payload: { name: editingTemplate.name.trim(), text: editingTemplate.text } })}
+              >
+                Salvar alterações
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
+
+      {/* Delete template confirmation modal */}
+      <Modal
+        opened={Boolean(deletingTemplateId)}
+        onClose={() => setDeletingTemplateId(null)}
+        title="Excluir template"
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">Tem certeza que deseja excluir este template? Essa ação não pode ser desfeita.</Text>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="subtle" onClick={() => setDeletingTemplateId(null)}>Cancelar</Button>
+            <Button
+              color="red"
+              loading={deleteTemplateMutation.isPending}
+              onClick={() => deletingTemplateId && void deleteTemplateMutation.mutateAsync(deletingTemplateId)}
+            >
+              Excluir
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       <Modal
