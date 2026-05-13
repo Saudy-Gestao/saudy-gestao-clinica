@@ -46,6 +46,7 @@ interface LinkedProcedure {
   procedureId: string;
   subInsuranceId?: string | null;
   price?: number | null;
+  authorizationDays?: number | null;
   isActive: boolean;
   procedure: { id: string; name: string; tussCode?: string | null; appointmentType?: string };
   subInsurance?: { id: string; name: string } | null;
@@ -213,10 +214,12 @@ function ProceduresTab({
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedSubInsuranceId, setSelectedSubInsuranceId] = useState<string | null>(null);
   const [addPrice, setAddPrice] = useState<number | string>('');
+  const [addAuthDays, setAddAuthDays] = useState<number | string>('');
   const [saving, setSaving] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number | string>('');
+  const [editAuthDays, setEditAuthDays] = useState<number | string>('');
 
   const loadLinked = useCallback(async () => {
     setLoadingLinked(true);
@@ -267,12 +270,14 @@ function ProceduresTab({
         procedureId: selectedProcedureId,
         subInsuranceId: selectedSubInsuranceId || null,
         price: addPrice !== '' ? Number(addPrice) : null,
+        authorizationDays: addAuthDays !== '' ? Number(addAuthDays) : null,
       });
       notifications.show({ title: 'Adicionado', message: 'Procedimento vinculado ao convênio', color: 'green' });
       setSelectedProcedureId(null);
       setSelectedProcedureOption(null);
       setSelectedSubInsuranceId(null);
       setAddPrice('');
+      setAddAuthDays('');
       setSearchAdd('');
       setProcedureOptions([]);
       setAdding(false);
@@ -290,6 +295,7 @@ function ProceduresTab({
     try {
       await insuranceService.updateInsuranceProcedure(insuranceId, id, {
         price: editPrice !== '' ? Number(editPrice) : null,
+        authorizationDays: editAuthDays !== '' ? Number(editAuthDays) : null,
       });
       notifications.show({ title: 'Salvo', message: 'Valor atualizado', color: 'green' });
       setEditingId(null);
@@ -384,20 +390,30 @@ function ProceduresTab({
               />
             )}
 
-            <NumberInput
-              label="Valor pago pelo convênio (R$)"
-              placeholder="0,00"
-              decimalScale={2}
-              fixedDecimalScale
-              decimalSeparator=","
-              thousandSeparator="."
-              prefix="R$ "
-              value={addPrice}
-              onChange={setAddPrice}
-            />
+            <Group grow>
+              <NumberInput
+                label="Valor pago pelo convênio (R$)"
+                placeholder="0,00"
+                decimalScale={2}
+                fixedDecimalScale
+                decimalSeparator=","
+                thousandSeparator="."
+                prefix="R$ "
+                value={addPrice}
+                onChange={setAddPrice}
+              />
+              <NumberInput
+                label="Prazo de autorização (dias)"
+                placeholder="Ex: 7"
+                min={0}
+                allowDecimal={false}
+                value={addAuthDays}
+                onChange={setAddAuthDays}
+              />
+            </Group>
 
             <Group justify="flex-end">
-              <Button variant="default" size="sm" onClick={() => { setAdding(false); setSearchAdd(''); setSelectedProcedureId(null); setSelectedProcedureOption(null); setProcedureOptions([]); setAddPrice(''); }}>
+              <Button variant="default" size="sm" onClick={() => { setAdding(false); setSearchAdd(''); setSelectedProcedureId(null); setSelectedProcedureOption(null); setProcedureOptions([]); setAddPrice(''); setAddAuthDays(''); }}>
                 Cancelar
               </Button>
               <Button
@@ -434,7 +450,7 @@ function ProceduresTab({
                   {item.subInsurance && <Text size="xs" c="dimmed">{item.subInsurance.name}</Text>}
                   {item.procedure.tussCode && <Text size="xs" c="dimmed">TUSS: {item.procedure.tussCode}</Text>}
                   {editingId === item.id ? (
-                    <Group gap="xs" mt={4}>
+                    <Group gap="xs" mt={4} wrap="wrap">
                       <NumberInput
                         size="xs"
                         placeholder="R$ 0,00"
@@ -447,13 +463,27 @@ function ProceduresTab({
                         onChange={setEditPrice}
                         style={{ width: 120 }}
                       />
+                      <NumberInput
+                        size="xs"
+                        placeholder="Dias"
+                        min={0}
+                        allowDecimal={false}
+                        value={editAuthDays}
+                        onChange={setEditAuthDays}
+                        style={{ width: 80 }}
+                      />
                       <Button size="compact-xs" bg={DARK_BLUE} loading={saving === item.id} onClick={() => handleSaveEdit(item.id)}>Salvar</Button>
                       <Button size="compact-xs" variant="default" onClick={() => setEditingId(null)}>Cancelar</Button>
                     </Group>
                   ) : (
-                    <Text size="sm" fw={500} c={item.price != null ? 'green' : 'dimmed'} mt={4}>
-                      {item.price != null ? formatCurrency(Number(item.price)) : 'Sem valor definido'}
-                    </Text>
+                    <Group gap={6} mt={4}>
+                      <Text size="sm" fw={500} c={item.price != null ? 'green' : 'dimmed'}>
+                        {item.price != null ? formatCurrency(Number(item.price)) : 'Sem valor'}
+                      </Text>
+                      {item.authorizationDays != null && (
+                        <Text size="xs" c="dimmed">· {item.authorizationDays}d autorização</Text>
+                      )}
+                    </Group>
                   )}
                 </Stack>
                 <Menu shadow="md" width={180}>
@@ -463,7 +493,7 @@ function ProceduresTab({
                     </ActionIcon>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    <Menu.Item onClick={() => { setEditingId(item.id); setEditPrice(item.price ?? ''); }}>
+                    <Menu.Item onClick={() => { setEditingId(item.id); setEditPrice(item.price ?? ''); setEditAuthDays(item.authorizationDays ?? ''); }}>
                       Editar valor
                     </Menu.Item>
                     <Menu.Item color="red" onClick={() => handleRemove(item.id)} disabled={removing === item.id}>
@@ -483,7 +513,7 @@ function ProceduresTab({
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Procedimento</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>TUSS</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Sub-convênio</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valor do convênio</Table.Th>
+                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valor / Prazo autorização</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 60 }}>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -501,7 +531,7 @@ function ProceduresTab({
                   </Table.Td>
                   <Table.Td>
                     {editingId === item.id ? (
-                      <Group gap="xs" wrap="nowrap">
+                      <Group gap="xs" wrap="wrap">
                         <NumberInput
                           size="xs"
                           placeholder="R$ 0,00"
@@ -512,7 +542,16 @@ function ProceduresTab({
                           prefix="R$ "
                           value={editPrice}
                           onChange={setEditPrice}
-                          style={{ width: 130 }}
+                          style={{ width: 120 }}
+                        />
+                        <NumberInput
+                          size="xs"
+                          placeholder="Dias"
+                          min={0}
+                          allowDecimal={false}
+                          value={editAuthDays}
+                          onChange={setEditAuthDays}
+                          style={{ width: 70 }}
                         />
                         <Button size="compact-xs" bg={DARK_BLUE} loading={saving === item.id} onClick={() => handleSaveEdit(item.id)}>
                           Salvar
@@ -522,16 +561,14 @@ function ProceduresTab({
                         </Button>
                       </Group>
                     ) : (
-                      <Text
-                        size="sm"
-                        fw={500}
-                        c={item.price != null ? 'green' : 'dimmed'}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => { setEditingId(item.id); setEditPrice(item.price ?? ''); }}
-                        title="Clique para editar"
-                      >
-                        {item.price != null ? formatCurrency(Number(item.price)) : '—'}
-                      </Text>
+                      <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => { setEditingId(item.id); setEditPrice(item.price ?? ''); setEditAuthDays(item.authorizationDays ?? ''); }} title="Clique para editar">
+                        <Text size="sm" fw={500} c={item.price != null ? 'green' : 'dimmed'}>
+                          {item.price != null ? formatCurrency(Number(item.price)) : '—'}
+                        </Text>
+                        {item.authorizationDays != null && (
+                          <Text size="xs" c="dimmed">({item.authorizationDays}d)</Text>
+                        )}
+                      </Group>
                     )}
                   </Table.Td>
                   <Table.Td style={{ textAlign: 'center' }}>

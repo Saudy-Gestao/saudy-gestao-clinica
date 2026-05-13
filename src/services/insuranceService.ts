@@ -18,11 +18,13 @@ export interface InsuranceProcedurePayload {
   procedureId: string;
   subInsuranceId?: string | null;
   price?: number | null;
+  authorizationDays?: number | null;
   isActive?: boolean;
 }
 
 export interface UpdateInsuranceProcedurePayload {
   price?: number | null;
+  authorizationDays?: number | null;
   isActive?: boolean;
   subInsuranceId?: string | null;
 }
