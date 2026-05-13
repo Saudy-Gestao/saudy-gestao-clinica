@@ -2,8 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import appointmentService from '../services/appointmentService';
 import { queryKeys } from '../lib/queryKeys';
 
-export const fetchAppointments = async () => {
-  const data: any = await appointmentService.list({ limit: 2000, offset: 0 });
+type AppointmentQueryParams = {
+  date?: string;
+};
+
+export const fetchAppointments = async (params: AppointmentQueryParams = {}) => {
+  const data: any = await appointmentService.list({
+    limit: 2000,
+    offset: 0,
+    ...(params.date ? { date: params.date } : {}),
+  });
   return Array.isArray(data)
     ? data
     : (Array.isArray(data?.items)
@@ -13,8 +21,8 @@ export const fetchAppointments = async () => {
         : []));
 };
 
-export const useAppointmentsQuery = () => useQuery({
-  queryKey: queryKeys.appointments,
-  queryFn: fetchAppointments,
+export const useAppointmentsQuery = (params: AppointmentQueryParams = {}) => useQuery({
+  queryKey: params.date ? [...queryKeys.appointments, params.date] : queryKeys.appointments,
+  queryFn: () => fetchAppointments(params),
   refetchInterval: 10_000,
 });

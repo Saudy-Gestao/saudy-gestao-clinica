@@ -469,6 +469,332 @@
   width: 36%;
 }
 
+/* ============================================================
+   PATIENT SELF-SCHEDULING v2
+   ============================================================ */
+
+/* Step wrapper */
+.pp2-step {
+  animation: pp2In 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  padding: 4px 0 40px;
+}
+@keyframes pp2In {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress bar */
+.pp2-progress { margin-bottom: 28px; }
+.pp2-progress-bar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--mantine-color-default-border);
+  overflow: hidden;
+}
+.pp2-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--mantine-color-blue-5), var(--mantine-color-blue-4));
+  border-radius: 99px;
+  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Heading block */
+.pp2-heading { margin-bottom: 24px; }
+.pp2-title { font-size: 22px !important; letter-spacing: -0.4px; }
+
+/* Back nav */
+.pp2-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.pp2-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+  padding: 0;
+  transition: color 150ms;
+}
+.pp2-back:hover { color: var(--mantine-color-text); }
+
+/* Spinner / empty */
+.pp2-spinner {
+  display: flex; justify-content: center; padding: 48px 0;
+}
+
+/* ── TYPE SELECTION ───────────────────────────────────── */
+.pp2-type-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 480px) {
+  .pp2-type-row { grid-template-columns: 1fr; }
+}
+
+.pp2-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 24px 32px;
+  border-radius: 20px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+  cursor: pointer;
+  transition: border-color 180ms, box-shadow 180ms, transform 180ms;
+  animation: pp2In 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pp2-type-btn:nth-child(2) { animation-delay: 60ms; }
+
+.pp2-type-btn:hover { transform: translateY(-3px); }
+.pp2-type-btn:active { transform: translateY(0); }
+
+.pp2-type-btn--consulta:hover {
+  border-color: var(--mantine-color-blue-5);
+  box-shadow: 0 8px 28px rgba(34,139,230,0.14);
+}
+.pp2-type-btn--exame:hover {
+  border-color: var(--mantine-color-teal-5);
+  box-shadow: 0 8px 28px rgba(18,184,134,0.14);
+}
+
+.pp2-type-icon {
+  width: 72px; height: 72px;
+  border-radius: 22px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 2px;
+  transition: transform 180ms;
+}
+.pp2-type-btn:hover .pp2-type-icon { transform: scale(1.07); }
+.pp2-type-btn--consulta .pp2-type-icon { background: rgba(34,139,230,0.1); color: var(--mantine-color-blue-6); }
+.pp2-type-btn--exame    .pp2-type-icon { background: rgba(18,184,134,0.1); color: var(--mantine-color-teal-6); }
+
+/* ── LIST (procedures & doctors) ──────────────────────── */
+.pp2-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 16px;
+  overflow: hidden;
+  max-width: 540px;
+}
+
+.pp2-list-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--mantine-color-default);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  animation: pp2In 300ms cubic-bezier(0.22,1,0.36,1) both;
+  transition: background 140ms;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+.pp2-list-item:last-child { border-bottom: none; }
+.pp2-list-item:hover { background: var(--mantine-color-default-hover); }
+
+.pp2-list-content { flex: 1; min-width: 0; }
+
+.pp2-list-arrow {
+  color: var(--mantine-color-dimmed);
+  flex-shrink: 0;
+  transition: transform 150ms;
+}
+.pp2-list-item:hover .pp2-list-arrow { transform: translateX(3px); }
+
+/* Doctor avatar */
+.pp2-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--mantine-color-blue-5), var(--mantine-color-violet-5));
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+/* ── DATE STRIP ───────────────────────────────────────── */
+.pp2-date-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 24px;
+  scrollbar-width: none;
+}
+.pp2-date-strip::-webkit-scrollbar { display: none; }
+
+.pp2-date-chip {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 58px; padding: 10px 8px;
+  border-radius: 14px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+  flex-shrink: 0; cursor: pointer;
+  transition: border-color 150ms, background 150ms, transform 150ms;
+}
+.pp2-date-chip:hover { transform: translateY(-2px); border-color: var(--mantine-color-blue-3); }
+.pp2-date-chip--on {
+  border-color: var(--mantine-color-blue-6) !important;
+  background: var(--mantine-color-blue-filled) !important;
+}
+.pp2-date-chip--on .pp2-dc-wd,
+.pp2-date-chip--on .pp2-dc-d,
+.pp2-date-chip--on .pp2-dc-m { color: #fff !important; }
+
+.pp2-dc-wd { font-size: 10px; font-weight: 700; color: var(--mantine-color-dimmed); text-transform: uppercase; letter-spacing: 0.5px; }
+.pp2-dc-d  { font-size: 20px; font-weight: 800; line-height: 1.1; color: var(--mantine-color-text); }
+.pp2-dc-m  { font-size: 10px; color: var(--mantine-color-dimmed); text-transform: uppercase; }
+.pp2-dc-badge {
+  margin-top: 4px; font-size: 9px; font-weight: 700;
+  background: var(--mantine-color-orange-5); color: #fff;
+  border-radius: 6px; padding: 1px 5px;
+}
+
+/* ── TIME SLOTS ───────────────────────────────────────── */
+.pp2-slots-wrap {
+  animation: pp2In 220ms cubic-bezier(0.22,1,0.36,1) both;
+  margin-bottom: 8px;
+}
+.pp2-period-icon {
+  display: flex; color: var(--mantine-color-dimmed);
+}
+.pp2-time-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.pp2-time-chip {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+  font-size: 13px; font-weight: 600;
+  color: var(--mantine-color-text);
+  cursor: pointer;
+  transition: border-color 130ms, background 130ms, color 130ms, transform 130ms, box-shadow 130ms;
+}
+.pp2-time-chip:hover {
+  border-color: var(--mantine-color-blue-4);
+  background: var(--mantine-color-blue-0);
+  transform: translateY(-1px);
+}
+.pp2-time-chip--on {
+  border-color: var(--mantine-color-blue-6) !important;
+  background: var(--mantine-color-blue-filled) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 10px rgba(34,139,230,0.25);
+  transform: translateY(-1px);
+}
+
+/* ── CONFIRM CARD ─────────────────────────────────────── */
+.pp2-confirm-card {
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 18px;
+  overflow: hidden;
+  max-width: 540px;
+}
+.pp2-confirm-hero {
+  padding: 24px 22px 20px;
+  background: linear-gradient(120deg, var(--mantine-color-blue-6), var(--mantine-color-blue-9));
+  color: #fff;
+}
+.pp2-confirm-hero .mantine-Text-root { color: #fff !important; }
+.pp2-confirm-body { padding: 6px 0; }
+
+.pp2-confirm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+.pp2-confirm-row:last-child { border-bottom: none; }
+.pp2-confirm-row-icon { color: var(--mantine-color-dimmed); margin-top: 1px; flex-shrink: 0; display: flex; }
+.pp2-confirm-row-label { font-size: 13px; color: var(--mantine-color-dimmed); min-width: 80px; flex-shrink: 0; }
+.pp2-confirm-row-value { font-size: 13px; font-weight: 600; color: var(--mantine-color-text); }
+
+/* ── SUCCESS ──────────────────────────────────────────── */
+.pp2-success {
+  display: flex; flex-direction: column; align-items: center; padding: 24px 0 16px;
+}
+.pp2-success-ring {
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  border: 2px solid rgba(18,184,134,0.25);
+  background: rgba(18,184,134,0.08);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--mantine-color-teal-6);
+  animation: pp2Pop 500ms cubic-bezier(0.175,0.885,0.32,1.275) both;
+}
+@keyframes pp2Pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.pp2-summary-box {
+  width: 100%; max-width: 400px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.pp2-summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+.pp2-summary-row:last-child { border-bottom: none; }
+.pp2-summary-label { font-size: 13px; color: var(--mantine-color-dimmed); }
+.pp2-summary-value { font-size: 13px; font-weight: 600; color: var(--mantine-color-text); }
+
+/* ── DARK MODE ────────────────────────────────────────── */
+html[data-patient-portal-theme='dark'] .pp2-progress-bar {
+  background: rgba(255,255,255,0.08);
+}
+html[data-patient-portal-theme='dark'] .pp2-type-btn {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.09);
+}
+html[data-patient-portal-theme='dark'] .pp2-type-btn--consulta:hover {
+  border-color: var(--mantine-color-blue-5);
+  box-shadow: 0 8px 28px rgba(34,139,230,0.2);
+}
+html[data-patient-portal-theme='dark'] .pp2-type-btn--exame:hover {
+  border-color: var(--mantine-color-teal-5);
+  box-shadow: 0 8px 28px rgba(18,184,134,0.2);
+}
+html[data-patient-portal-theme='dark'] .pp2-list,
+html[data-patient-portal-theme='dark'] .pp2-list-item,
+html[data-patient-portal-theme='dark'] .pp2-date-chip,
+html[data-patient-portal-theme='dark'] .pp2-time-chip,
+html[data-patient-portal-theme='dark'] .pp2-confirm-card,
+html[data-patient-portal-theme='dark'] .pp2-summary-box {
+  border-color: rgba(255,255,255,0.08);
+}
+html[data-patient-portal-theme='dark'] .pp2-list-item,
+html[data-patient-portal-theme='dark'] .pp2-date-chip,
+html[data-patient-portal-theme='dark'] .pp2-time-chip {
+  background: rgba(255,255,255,0.04);
+}
+html[data-patient-portal-theme='dark'] .pp2-list-item { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-patient-portal-theme='dark'] .pp2-list-item:hover { background: rgba(255,255,255,0.07); }
+html[data-patient-portal-theme='dark'] .pp2-time-chip:hover { background: rgba(34,139,230,0.12); border-color: var(--mantine-color-blue-6); }
+html[data-patient-portal-theme='dark'] .pp2-confirm-row { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-patient-portal-theme='dark'] .pp2-summary-row { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-patient-portal-theme='dark'] .pp2-success-ring {
+  background: rgba(18,184,134,0.1);
+  border-color: rgba(18,184,134,0.2);
+}
+
 @keyframes patientPortalFadeIn {
   from {
     opacity: 0;
@@ -927,4 +1253,620 @@ html[data-patient-portal-theme='dark'] .patient-portal-timeline-step--noshow .pa
   html[data-patient-portal-theme='dark'] .patient-portal-timeline-step--current .patient-portal-timeline-line {
     animation: none !important;
   }
+}
+
+.patient-portal-selectable-card {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.patient-portal-selectable-card:hover {
+  border-color: var(--mantine-color-blue-4);
+  box-shadow: 0 0 0 2px var(--mantine-color-blue-1);
+}
+
+/* ============================================================
+   PATIENT SELF-SCHEDULING
+   ============================================================ */
+
+/* Step container — slide-up + fade on each step change */
+.pp-sched-step {
+  animation: ppSchedStepIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  padding-bottom: 32px;
+}
+
+@keyframes ppSchedStepIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- STEPPER ---------- */
+.pp-sched-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 4px;
+}
+
+.pp-sched-stepper-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.pp-sched-stepper-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--mantine-color-gray-3);
+  background: white;
+  color: var(--mantine-color-dimmed);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 220ms ease;
+}
+
+.pp-sched-stepper-item--done .pp-sched-stepper-dot {
+  border-color: var(--mantine-color-blue-5);
+  background: var(--mantine-color-blue-5);
+  color: white;
+}
+
+.pp-sched-stepper-item--active .pp-sched-stepper-dot {
+  border-color: var(--mantine-color-blue-6);
+  background: var(--mantine-color-blue-0);
+  color: var(--mantine-color-blue-7);
+  box-shadow: 0 0 0 4px rgba(34, 139, 230, 0.15);
+}
+
+.pp-sched-stepper-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  white-space: nowrap;
+  transition: color 220ms ease;
+}
+
+.pp-sched-stepper-item--active .pp-sched-stepper-label {
+  color: var(--mantine-color-blue-7);
+  font-weight: 700;
+}
+
+.pp-sched-stepper-item--done .pp-sched-stepper-label {
+  color: var(--mantine-color-blue-5);
+}
+
+.pp-sched-stepper-line {
+  flex: 1;
+  height: 2px;
+  background: var(--mantine-color-gray-2);
+  margin: 0 6px;
+  border-radius: 2px;
+  transition: background 220ms ease;
+}
+
+.pp-sched-stepper-item--done .pp-sched-stepper-line {
+  background: var(--mantine-color-blue-4);
+}
+
+/* ---------- TITLES ---------- */
+.pp-sched-title {
+  font-size: 17px !important;
+  letter-spacing: -0.3px;
+}
+
+/* ---------- LOADING / EMPTY ---------- */
+.pp-sched-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 48px 0;
+}
+
+.pp-sched-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 0;
+  color: var(--mantine-color-dimmed);
+}
+
+/* ---------- TYPE SELECTION ---------- */
+.pp-sched-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+@media (max-width: 480px) {
+  .pp-sched-type-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pp-sched-type-card {
+  position: relative;
+  border: 2px solid var(--mantine-color-default-border);
+  border-radius: 18px;
+  padding: 32px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  animation: ppSchedCardIn 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+  overflow: hidden;
+  background: var(--mantine-color-default);
+}
+
+.pp-sched-type-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  border-radius: 16px;
+}
+
+.pp-sched-type-card--consulta::before {
+  background: linear-gradient(145deg, rgba(34, 139, 230, 0.06), transparent 60%);
+}
+
+.pp-sched-type-card--exame::before {
+  background: linear-gradient(145deg, rgba(18, 184, 134, 0.06), transparent 60%);
+}
+
+.pp-sched-type-card:hover::before {
+  opacity: 1;
+}
+
+.pp-sched-type-card--consulta:hover {
+  border-color: var(--mantine-color-blue-5);
+  box-shadow: 0 6px 24px rgba(34, 139, 230, 0.14);
+  transform: translateY(-3px);
+}
+
+.pp-sched-type-card--exame:hover {
+  border-color: var(--mantine-color-teal-5);
+  box-shadow: 0 6px 24px rgba(18, 184, 134, 0.14);
+  transform: translateY(-3px);
+}
+
+.pp-sched-type-card:active {
+  transform: translateY(0);
+}
+
+.pp-sched-type-icon {
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 200ms ease;
+}
+
+.pp-sched-type-card--consulta .pp-sched-type-icon {
+  background: rgba(34, 139, 230, 0.1);
+  color: var(--mantine-color-blue-6);
+}
+
+.pp-sched-type-card--exame .pp-sched-type-icon {
+  background: rgba(18, 184, 134, 0.1);
+  color: var(--mantine-color-teal-6);
+}
+
+.pp-sched-type-card:hover .pp-sched-type-icon {
+  transform: scale(1.08);
+}
+
+.pp-sched-type-arrow {
+  position: absolute;
+  bottom: 22px;
+  right: 22px;
+  color: var(--mantine-color-dimmed);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.pp-sched-type-card:hover .pp-sched-type-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ---------- SPECIALTY GRID ---------- */
+.pp-sched-specialty-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  max-width: 520px;
+}
+
+.pp-sched-specialty-card {
+  position: relative;
+  background: var(--mantine-color-default);
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  animation: ppSchedCardIn 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.pp-sched-specialty-card:hover {
+  border-color: var(--mantine-color-blue-4);
+  box-shadow: 0 4px 16px rgba(34, 139, 230, 0.1);
+  transform: translateX(3px);
+}
+
+.pp-sched-specialty-card:active {
+  transform: translateX(0);
+}
+
+.pp-sched-specialty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 180ms ease;
+}
+
+.pp-sched-specialty-card:hover .pp-sched-specialty-icon {
+  transform: scale(1.06);
+}
+
+.pp-sched-specialty-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-sched-specialty-arrow {
+  color: var(--mantine-color-dimmed);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  flex-shrink: 0;
+}
+
+.pp-sched-specialty-card:hover .pp-sched-specialty-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@keyframes ppSchedCardIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---------- DOCTOR CARDS ---------- */
+.pp-sched-doctor-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 14px;
+  background: var(--mantine-color-default);
+  cursor: pointer;
+  animation: ppSchedCardIn 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  width: 100%;
+  text-align: left;
+}
+
+.pp-sched-doctor-card:hover {
+  border-color: var(--mantine-color-violet-4);
+  box-shadow: 0 4px 16px rgba(121, 80, 242, 0.1);
+  transform: translateX(3px);
+}
+
+.pp-sched-doctor-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--mantine-color-violet-5), var(--mantine-color-blue-5));
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.pp-sched-doctor-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-sched-doctor-arrow {
+  color: var(--mantine-color-dimmed);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+  transform: translateX(-4px);
+  flex-shrink: 0;
+}
+
+.pp-sched-doctor-card:hover .pp-sched-doctor-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ---------- MODALIDADE ---------- */
+.pp-sched-modalidade {
+  margin-top: 16px;
+}
+
+/* ---------- DATE STRIP ---------- */
+.pp-sched-date-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.pp-sched-date-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.pp-sched-date-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 66px;
+  padding: 12px 10px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 14px;
+  background: var(--mantine-color-default);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.pp-sched-date-chip:hover {
+  border-color: var(--mantine-color-blue-3);
+  transform: translateY(-2px);
+}
+
+.pp-sched-date-chip--selected {
+  border-color: var(--mantine-color-blue-6) !important;
+  background: var(--mantine-color-blue-0) !important;
+  box-shadow: 0 0 0 3px rgba(34, 139, 230, 0.12);
+}
+
+.pp-sched-date-chip-weekday {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pp-sched-date-chip-day {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--mantine-color-text);
+  transition: color 180ms ease;
+}
+
+.pp-sched-date-chip--selected .pp-sched-date-chip-day {
+  color: var(--mantine-color-blue-7);
+}
+
+.pp-sched-date-chip-month {
+  font-size: 10px;
+  color: var(--mantine-color-dimmed);
+  text-transform: uppercase;
+}
+
+.pp-sched-date-chip-urgency {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--mantine-color-orange-6);
+  background: var(--mantine-color-orange-0);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+/* ---------- TIME GRID ---------- */
+.pp-sched-slots-container {
+  animation: ppSchedStepIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pp-sched-time-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.pp-sched-time-chip {
+  padding: 9px 18px;
+  border: 1.5px solid var(--mantine-color-default-border);
+  border-radius: 10px;
+  background: var(--mantine-color-default);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mantine-color-text);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease, color 150ms ease;
+}
+
+.pp-sched-time-chip:hover {
+  border-color: var(--mantine-color-blue-4);
+  background: var(--mantine-color-blue-0);
+  transform: translateY(-1px);
+}
+
+.pp-sched-time-chip--selected {
+  border-color: var(--mantine-color-blue-6) !important;
+  background: var(--mantine-color-blue-6) !important;
+  color: white !important;
+  box-shadow: 0 3px 10px rgba(34, 139, 230, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ---------- CTA BUTTON ---------- */
+.pp-sched-cta {
+  font-weight: 700 !important;
+  letter-spacing: 0.2px;
+}
+
+/* ---------- CONFIRM CARD ---------- */
+.pp-sched-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  background: linear-gradient(120deg, var(--mantine-color-blue-6), var(--mantine-color-blue-8));
+  color: white;
+}
+
+.pp-sched-confirm-header .mantine-Text-root {
+  color: white !important;
+}
+
+.pp-sched-confirm-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--mantine-color-yellow-0);
+  border: 1px solid var(--mantine-color-yellow-3);
+  color: var(--mantine-color-yellow-9);
+}
+
+.pp-sched-confirm-notice .mantine-Text-root {
+  color: var(--mantine-color-yellow-9) !important;
+  line-height: 1.4;
+}
+
+/* ---------- SUCCESS ---------- */
+.pp-sched-success-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0 8px;
+}
+
+.pp-sched-success-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.12), rgba(18, 184, 134, 0.04));
+  border: 2px solid rgba(18, 184, 134, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-teal-6);
+  animation: ppSchedSuccessPop 520ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes ppSchedSuccessPop {
+  from { opacity: 0; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ============================================================
+   DARK MODE OVERRIDES
+   ============================================================ */
+
+html[data-patient-portal-theme='dark'] .pp-sched-stepper-dot {
+  background: transparent;
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-dark-2);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-stepper-item--done .pp-sched-stepper-dot {
+  background: var(--mantine-color-blue-7);
+  border-color: var(--mantine-color-blue-7);
+  color: white;
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-stepper-item--active .pp-sched-stepper-dot {
+  background: rgba(34, 139, 230, 0.12);
+  border-color: var(--mantine-color-blue-5);
+  color: var(--mantine-color-blue-3);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-stepper-line {
+  background: var(--mantine-color-dark-4);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-type-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-type-card--consulta:hover {
+  border-color: var(--mantine-color-blue-6);
+  box-shadow: 0 6px 24px rgba(34, 139, 230, 0.2);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-type-card--exame:hover {
+  border-color: var(--mantine-color-teal-6);
+  box-shadow: 0 6px 24px rgba(18, 184, 134, 0.2);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-specialty-card,
+html[data-patient-portal-theme='dark'] .pp-sched-doctor-card,
+html[data-patient-portal-theme='dark'] .pp-sched-date-chip,
+html[data-patient-portal-theme='dark'] .pp-sched-time-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-specialty-card:hover,
+html[data-patient-portal-theme='dark'] .pp-sched-doctor-card:hover {
+  border-color: var(--mantine-color-blue-6);
+  box-shadow: 0 4px 16px rgba(34, 139, 230, 0.18);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-date-chip--selected {
+  background: rgba(34, 139, 230, 0.15) !important;
+  border-color: var(--mantine-color-blue-5) !important;
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-time-chip--selected {
+  background: var(--mantine-color-blue-7) !important;
+  border-color: var(--mantine-color-blue-7) !important;
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-confirm-notice {
+  background: rgba(252, 196, 25, 0.08);
+  border-color: rgba(252, 196, 25, 0.2);
+  color: var(--mantine-color-yellow-4);
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-confirm-notice .mantine-Text-root {
+  color: var(--mantine-color-yellow-4) !important;
+}
+
+html[data-patient-portal-theme='dark'] .pp-sched-success-icon {
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.15), rgba(18, 184, 134, 0.05));
+  border-color: rgba(18, 184, 134, 0.25);
 }
