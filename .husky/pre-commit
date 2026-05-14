@@ -1,1 +1,1 @@
-npm run test:coverage
+yarn run test:coverage
