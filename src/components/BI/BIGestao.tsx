@@ -1,4 +1,4 @@
-import React, { useMemo, useState, type ElementType, type CSSProperties } from 'react';
+﻿import React, { useMemo, useState, type ElementType, type CSSProperties } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDroppable, useDraggable, useDndContext, pointerWithin, getFirstCollision,
@@ -690,6 +690,21 @@ type InsightsResult = {
 };
 
 const WIDGET_CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
+const AI_WIDGET_CARD_PREFIX = 'ai_widget::';
+
+function AIWidgetHeader({ title }: { title: string }) {
+  return (
+    <Group gap="xs" align="flex-start" mb="sm" wrap="nowrap">
+      <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={22} mt={2}>
+        <Sparkles size={12} />
+      </ThemeIcon>
+      <Box style={{ minWidth: 0 }}>
+        <Text fw={700} style={{ fontSize: 14, lineHeight: 1.25 }}>{title}</Text>
+        <Text size="xs" c="dimmed" style={{ lineHeight: 1.25 }}>Informação gerada por IA</Text>
+      </Box>
+    </Group>
+  );
+}
 
 function WidgetCardContent({
   widget,
@@ -737,7 +752,7 @@ function WidgetCardContent({
 
       {widget.type === 'metric' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <Text size="sm" c="dimmed" fw={600} pr={90} mb="sm">{widget.title}</Text>
+          <AIWidgetHeader title={widget.title} />
           <Text fw={750} style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', lineHeight: 1 }}>{widget.value}</Text>
           {widget.hint && <Text size="xs" c="dimmed" mt={8}>{widget.hint}</Text>}
         </Paper>
@@ -745,7 +760,7 @@ function WidgetCardContent({
 
       {widget.type === 'text' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Text fw={700} mb="xs" pr={90}>{widget.title}</Text>
+          <AIWidgetHeader title={widget.title} />
           <ScrollArea style={{ flex: 1 }} offsetScrollbars>
             <Text size="sm" lh={1.7} c={textColor}>{widget.content}</Text>
           </ScrollArea>
@@ -754,7 +769,7 @@ function WidgetCardContent({
 
       {widget.type === 'bar_chart' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+          <AIWidgetHeader title={widget.title} />
           {widget.data && widget.data.length > 0 ? (
             <Box style={{ flex: 1, minHeight: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -775,7 +790,7 @@ function WidgetCardContent({
 
       {widget.type === 'area_chart' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+          <AIWidgetHeader title={widget.title} />
           {widget.data && widget.data.length > 0 ? (
             <Box style={{ flex: 1, minHeight: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -803,7 +818,7 @@ function WidgetCardContent({
           : raw;
         return (
           <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+            <AIWidgetHeader title={widget.title} />
             {pieData.length > 0 ? (
               <Box style={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -823,7 +838,7 @@ function WidgetCardContent({
 
       {widget.type === 'ranking' && widget.items && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+          <AIWidgetHeader title={widget.title} />
           <ScrollArea style={{ flex: 1 }} offsetScrollbars>
             <Stack gap="xs">
               {widget.items.map((item, i) => (
@@ -952,7 +967,7 @@ export function BIGestao() {
   const [insightsResult, setInsightsResult] = useState<InsightsResult | null>(null);
   const [showNewDataAnimation, setShowNewDataAnimation] = useState(false);
 
-  // ── Painel Personalizável ──────────────────────────────────────────────────
+  // Painel Personalizável
 
   const [panelCustom, setPanelCustom] = useState<Record<string, PanelCustomState>>(() => {
     try {
@@ -1123,7 +1138,7 @@ export function BIGestao() {
     });
   };
 
-  // ── Tab layout state ────────────────────────────────────────────────────────
+  // ── Tab layout state ─────────────────────────────────────────────────────────
 
   const [tabLayouts, setTabLayouts] = useState<Record<string, TabLayoutState>>(() => {
     try {
@@ -1166,7 +1181,7 @@ export function BIGestao() {
     setRestoreModalOpen(false);
   };
 
-  // ── Abas customizadas (criadas pelo usuário via "+") ─────────────────────────
+  // Abas customizadas (criadas pelo usuário via "+")
   const [customTabs, setCustomTabs] = useState<{ id: string; label: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('bi_custom_tabs') || '[]'); } catch { return []; }
   });
@@ -1250,7 +1265,8 @@ export function BIGestao() {
     const { active, over } = e;
     if (!over) return;
     const layout = getTabLayout(tabId);
-    const visibleIds = layout.order.filter((id) => !layout.hidden.includes(id));
+    const aiVisibleIds = (panelCustom[tabId]?.widgets || []).map((w) => `${AI_WIDGET_CARD_PREFIX}${tabId}::${w.id}`);
+    const visibleIds = [...layout.order.filter((id) => !layout.hidden.includes(id)), ...aiVisibleIds.filter((id) => !layout.hidden.includes(id))];
     const draggedId = String(active.id);
     if (!visibleIds.includes(draggedId)) return;
 
@@ -1303,7 +1319,7 @@ export function BIGestao() {
     // Normalize: pack each row from left, remove trailing empty rows
     const normalized = dedupeEmptyRows(newMatrix.map((row) => packRow(row)));
     const newVisibleOrder = normalized.flat().filter(Boolean) as string[];
-    const hiddenIds = layout.order.filter((id) => layout.hidden.includes(id));
+    const hiddenIds = [...layout.order, ...aiVisibleIds].filter((id) => layout.hidden.includes(id));
     const newOrder = [...newVisibleOrder, ...hiddenIds];
 
     setTabLayouts((prev) => {
@@ -1381,16 +1397,12 @@ export function BIGestao() {
     const draft = customPromptDraft[tabId] ?? ps.prompt;
     return (
       <Stack gap="md" mt="md">
-        <Divider
-          label={<Group gap="xs"><Sparkles size={13} /><Text size="xs" fw={600} c="dimmed">Widgets com IA</Text></Group>}
-          labelPosition="left"
-        />
         <Paper p="md" withBorder style={{ background: panelBg, borderColor: 'rgba(10,37,104,0.18)' }}>
           <Group gap="xs" mb="xs">
             <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={28}>
               <Sparkles size={14} />
             </ThemeIcon>
-            <Text fw={700} size="sm">Adicionar widgets com IA — {tabLabel}</Text>
+            <Text fw={700} size="sm">Descreva o que quer ver em "{tabLabel}"</Text>
           </Group>
           <Text size="xs" c="dimmed" mb="sm">
             Gere cards e análises personalizados para complementar os dados desta aba.
@@ -1438,33 +1450,31 @@ export function BIGestao() {
           </Paper>
         )}
 
-        {!ps.loading && ps.widgets.length > 0 && (
-          <DndContext
-            sensors={dndSensors}
-            collisionDetection={gridCollision}
-            onDragStart={handleDndStart}
-            onDragEnd={handleDndEnd}
-          >
-            <WidgetGrid
-              widgets={ps.widgets}
-              rowsLayout={ps.rowsLayout}
-              heights={ps.heights}
-              panelBg={panelBg}
-              colorScheme={colorScheme}
-              chartGridColor={chartGridColor}
-              isDragActive={!!activeDragId}
-              onDelete={(id) => handleDeleteWidget(tabId, id)}
-              onResize={(id, h) => handleResizeWidget(tabId, id, h)}
-            />
-            <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-              {activeDragId && ps.widgets.find((x) => x.id === activeDragId) ? (
-                <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        )}
       </Stack>
     );
+  };
+
+  const buildTabCardsForGrid = (tabId: string, visibleOrder: string[], cardNodes: Record<string, React.ReactNode>) => {
+    const aiWidgets = panelCustom[tabId]?.widgets || [];
+    const aiCards = aiWidgets.map((widget) => ({
+      id: `${AI_WIDGET_CARD_PREFIX}${tabId}::${widget.id}`,
+      node: (
+        <WidgetCardContent
+          widget={widget}
+          panelBg={panelBg}
+          colorScheme={colorScheme}
+          chartGridColor={chartGridColor}
+          onDelete={() => handleDeleteWidget(tabId, widget.id)}
+        />
+      ),
+    }));
+    const aiCardIds = aiCards.map((card) => card.id);
+    const mergedOrder = [...visibleOrder, ...aiCardIds.filter((id) => !visibleOrder.includes(id))];
+    const mergedNodes = new Map<string, React.ReactNode>([
+      ...Object.entries(cardNodes),
+      ...aiCards.map((card) => [card.id, card.node] as const),
+    ]);
+    return mergedOrder.map((id) => ({ id, node: mergedNodes.get(id) })).filter((c) => !!c.node);
   };
 
   const buildInsightsPayload = () => ({
@@ -2154,7 +2164,7 @@ export function BIGestao() {
           centered
         >
           <Text size="sm" c="dimmed" mb="md">
-            Dê um nome para a nova aba. Depois você poderá usar a IA para gerar os cards que desejar.
+            D? um nome para a nova aba. Depois você poder? usar a IA para gerar os cards que desejar.
           </Text>
           <input
             autoFocus
@@ -2307,7 +2317,7 @@ export function BIGestao() {
                       onClick={() => setActivePanel(tab.value)}
                       style={{ padding: '6px 8px 6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 650, fontSize: 13, color: '#fff' }}
                     >
-                      {isCustom ? `✦ ${tab.label}` : tab.label}
+                      {tab.label}
                     </Box>
                     <Tooltip label={`Excluir aba "${tab.label}"`} withArrow>
                       <Box
@@ -2375,7 +2385,7 @@ export function BIGestao() {
           </Group>
         </ScrollArea>
 
-        {/* ── Painel Personalizável ─────────────────────────────────────────── */}
+        {/* Painel Personalizável */}
         {customTabs.some((ct) => ct.id === activePanel) && (() => {
           const panelId = activePanel;
           const panelLabel = customTabs.find((ct) => ct.id === panelId)?.label ?? panelId;
@@ -2572,21 +2582,21 @@ export function BIGestao() {
                   Resetar layout
                 </Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2696,21 +2706,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2787,21 +2797,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2879,21 +2889,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2954,21 +2964,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3016,21 +3026,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3078,21 +3088,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3141,21 +3151,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3204,21 +3214,21 @@ export function BIGestao() {
                 {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
                 <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
               </Group>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
-                  cards={visibleOrder.map((id) => ({ id, node: cardNodes[id] })).filter((c) => !!c.node)}
+                  cards={buildTabCardsForGrid(tabId, visibleOrder, cardNodes)}
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
-                  onDelete={(id) => handleTabCardHide(tabId, id)}
+                  onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
-                  {activeDragId && cardNodes[activeDragId] ? (
+                  {activeDragId ? (
                     <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
                   ) : null}
                 </DragOverlay>
               </DndContext>
-              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3231,3 +3241,10 @@ export function BIGestao() {
     </>
   );
 }
+
+
+
+
+
+
+
