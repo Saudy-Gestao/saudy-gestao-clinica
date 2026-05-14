@@ -95,6 +95,8 @@ import biService from '../../services/biService';
 
 function EmptyCell({ id, minHeight }: { id: string; minHeight: number }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const { active } = useDndContext();
+  const hasActiveDrag = !!active;
   return (
     <div
       ref={setNodeRef}
@@ -107,25 +109,79 @@ function EmptyCell({ id, minHeight }: { id: string; minHeight: number }) {
         transition: 'border-color 0.15s, background 0.15s',
       }}
     >
-      {isOver && <Text size="xs" c="dimmed" style={{ pointerEvents: 'none' }}>Soltar aqui</Text>}
+      {isOver && hasActiveDrag ? (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: 8,
+            border: '1.5px solid rgba(59,130,246,0.75)',
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(15,118,110,0.12))',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text size="xs" c="blue.2" fw={700} style={{ pointerEvents: 'none' }}>Pré-visualização</Text>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function InsertZone({ id }: { id: string }) {
+function InsertZone({ id, previewPercent }: { id: string; previewPercent: number }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
       style={{
         flexShrink: 0,
-        width: isOver ? 24 : 8,
+        width: isOver ? `${previewPercent}%` : 8,
         borderRadius: 4,
         background: isOver ? '#3b82f6' : 'rgba(128,128,128,0.18)',
         transition: 'width 0.12s, background 0.12s',
         alignSelf: 'stretch',
       }}
     />
+  );
+}
+
+function RowDropZone({ id, minHeight, previewPercent }: { id: string; minHeight: number; previewPercent: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minHeight,
+        border: `2px dashed ${isOver ? '#3b82f6' : 'rgba(128,128,128,0.13)'}`,
+        borderRadius: 8,
+        background: isOver ? 'rgba(59,130,246,0.07)' : 'transparent',
+        transition: 'border-color 0.15s, background 0.15s',
+        display: 'flex',
+        alignItems: 'stretch',
+      }}
+    >
+      {isOver ? (
+        <div
+          style={{
+            width: `${previewPercent}%`,
+            minWidth: 120,
+            borderRadius: 8,
+            border: '1.5px solid rgba(59,130,246,0.75)',
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(15,118,110,0.12))',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text size="xs" c="blue.2" fw={700} style={{ pointerEvents: 'none' }}>
+            Pré-visualização ({Math.round(previewPercent)}%)
+          </Text>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -218,6 +274,8 @@ function dedupeEmptyRows(matrix: (string | null)[][]): (string | null)[][] {
     result.push(row);
     lastWasEmpty = isEmpty;
   }
+  // Remove leading empty rows so cards always snap back to the top.
+  while (result.length > 0 && result[0].every((c) => c === null)) result.shift();
   // Remove trailing empty rows (the UI always adds one extra)
   while (result.length > 0 && result[result.length - 1].every((c) => c === null)) result.pop();
   return result;
@@ -343,19 +401,15 @@ function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize 
 
         if (isEmptyRow) {
           return (
-            <div key={rowIdx} style={{ display: 'flex', gap: 12 }}>
-              {Array.from({ length: MAX_PER_ROW }, (_, i) => (
-                <EmptyCell key={i} id={`grid-cell-${rowIdx}-col-${i}`} minHeight={200} />
-              ))}
-            </div>
+            <RowDropZone key={rowIdx} id={`grid-row-${rowIdx}`} minHeight={200} previewPercent={100} />
           );
         }
 
-        const isFull = cardIds.length >= MAX_PER_ROW;
-        const showInserts = isDragActive && !isFull;
+        const showInserts = isDragActive;
+        const previewPercent = 100 / Math.min(MAX_PER_ROW, cardIds.length + 1);
         return (
           <div key={rowIdx} style={{ display: 'flex', alignItems: 'stretch', gap: showInserts ? 0 : 12 }}>
-            {showInserts && <InsertZone id={`grid-insert-${rowIdx}-0`} />}
+            {showInserts && <InsertZone id={`grid-insert-${rowIdx}-0`} previewPercent={previewPercent} />}
             {cardIds.map((id, i) => (
               <React.Fragment key={id}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -370,7 +424,7 @@ function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize 
                     {cardMap.get(id)}
                   </StaticDraggableCardShell>
                 </div>
-                {showInserts && <InsertZone id={`grid-insert-${rowIdx}-${i + 1}`} />}
+                {showInserts && <InsertZone id={`grid-insert-${rowIdx}-${i + 1}`} previewPercent={previewPercent} />}
               </React.Fragment>
             ))}
           </div>
@@ -883,19 +937,15 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
 
         if (isEmptyRow) {
           return (
-            <div key={rowIdx} style={{ display: 'flex', gap: 12 }}>
-              {Array.from({ length: MAX_PER_ROW }, (_, i) => (
-                <EmptyCell key={i} id={`grid-cell-${rowIdx}-col-${i}`} minHeight={ROW_HEIGHT_PX} />
-              ))}
-            </div>
+            <RowDropZone key={rowIdx} id={`grid-row-${rowIdx}`} minHeight={ROW_HEIGHT_PX} previewPercent={100} />
           );
         }
 
-        const isFull = rowWidgets.length >= MAX_PER_ROW;
-        const showInserts = isDragActive && !isFull;
+        const showInserts = isDragActive;
+        const previewPercent = 100 / Math.min(MAX_PER_ROW, rowWidgets.length + 1);
         return (
           <div key={rowIdx} style={{ display: 'flex', alignItems: 'stretch', gap: showInserts ? 0 : 12 }}>
-            {showInserts && <InsertZone id={`grid-insert-${rowIdx}-0`} />}
+            {showInserts && <InsertZone id={`grid-insert-${rowIdx}-0`} previewPercent={previewPercent} />}
             {rowWidgets.map((widget, i) => {
               const heightPx = heights[widget.id] ?? DEFAULT_HEIGHT_PX[widget.type] ?? ROW_HEIGHT_PX;
               return (
@@ -917,7 +967,7 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
                       />
                     </DraggableWidgetShell>
                   </div>
-                  {showInserts && <InsertZone id={`grid-insert-${rowIdx}-${i + 1}`} />}
+                  {showInserts && <InsertZone id={`grid-insert-${rowIdx}-${i + 1}`} previewPercent={previewPercent} />}
                 </React.Fragment>
               );
             })}
@@ -1299,7 +1349,7 @@ export function BIGestao() {
         rowCards.slice(MAX_PER_ROW).forEach((id, i) => { overflow[i] = id; });
         newMatrix.splice(toR + 1, 0, overflow);
       }
-    } else if (overId.startsWith('grid-cell-')) {
+    } else if (overId.startsWith('grid-cell-') || overId.startsWith('grid-row-')) {
       const toR = parseInt(overId.split('-')[2]);
       while (newMatrix.length <= toR) newMatrix.push(Array(MAX_PER_ROW).fill(null));
       newMatrix[fromR][fromC] = null;
@@ -1355,7 +1405,7 @@ export function BIGestao() {
 
     const newMatrix: (GeneratedWidget | null)[][] = matrix.map((row) => [...row]);
 
-    if (overId.startsWith('grid-cell-')) {
+    if (overId.startsWith('grid-cell-') || overId.startsWith('grid-row-')) {
       const parts = overId.split('-');
       const toR = parseInt(parts[2]);
       while (newMatrix.length <= toR) newMatrix.push(Array(MAX_PER_ROW).fill(null));
@@ -1383,6 +1433,7 @@ export function BIGestao() {
     const normalized = newMatrix
       .map((row): (GeneratedWidget | null)[] => { const cards = row.filter(Boolean) as GeneratedWidget[]; return [...cards, ...Array(MAX_PER_ROW - cards.length).fill(null)]; })
       .filter((row, i, arr) => row.some(Boolean) || (i < arr.length - 1 && arr[i + 1].some(Boolean)));
+    while (normalized.length > 0 && normalized[0].every((c) => c === null)) normalized.shift();
     while (normalized.length > 0 && normalized[normalized.length - 1].every((c) => c === null)) normalized.pop();
 
     const newRowsLayout = normalized.map((row) => row.map((w) => w?.id ?? null));
