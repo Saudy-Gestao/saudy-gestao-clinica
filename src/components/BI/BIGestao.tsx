@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState, type ElementType, type CSSProperties } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
-  useDroppable, useDraggable, useDndContext, pointerWithin, getFirstCollision,
+  useDroppable, useDraggable, pointerWithin, getFirstCollision,
   type DragStartEvent, type DragEndEvent, type CollisionDetection, type Modifier,
 } from '@dnd-kit/core';
 
@@ -23,7 +23,6 @@ import {
   ScrollArea,
   Select,
   SimpleGrid,
-  Skeleton,
   Stack,
   Text,
   TextInput,
@@ -95,43 +94,6 @@ import { useBIAuthorizationsQuery, useBIClinicalQuery, useBICommunicationQuery, 
 import { DARK_BLUE } from '../../themes/theme';
 import biService from '../../services/biService';
 
-function EmptyCell({ id, minHeight }: { id: string; minHeight: number }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  const { active } = useDndContext();
-  const hasActiveDrag = !!active;
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        flex: 1, minWidth: 0, minHeight,
-        border: `2px dashed ${isOver ? '#3b82f6' : 'rgba(128,128,128,0.13)'}`,
-        borderRadius: 8,
-        background: isOver ? 'rgba(59,130,246,0.07)' : 'transparent',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'border-color 0.15s, background 0.15s',
-      }}
-    >
-      {isOver && hasActiveDrag ? (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 8,
-            border: '1.5px solid rgba(59,130,246,0.75)',
-            background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(15,118,110,0.12))',
-            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text size="xs" c="blue.2" fw={700} style={{ pointerEvents: 'none' }}>Pré-visualização</Text>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function InsertZone({ id, previewPercent }: { id: string; previewPercent: number }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
@@ -187,11 +149,10 @@ function RowDropZone({ id, minHeight, previewPercent }: { id: string; minHeight:
   );
 }
 
-function DraggableWidgetShell({ widget, heightPx, flex, onResize, isDragActive, children }: {
+function DraggableWidgetShell({ widget, heightPx, flex, isDragActive, children }: {
   widget: GeneratedWidget;
   heightPx: number;
   flex: number;
-  onResize: (h: number) => void;
   isDragActive: boolean;
   children: React.ReactNode;
 }) {
@@ -322,11 +283,10 @@ function buildDisplayMatrix(ids: string[], rowsLayout: (string | null)[][] | nul
   return dedupeEmptyRows(raw);
 }
 
-function StaticDraggableCardShell({ id, heightPx, flex, onResize, isDragActive, onDelete, onEdit, children }: {
+function StaticDraggableCardShell({ id, heightPx, flex, isDragActive, onDelete, onEdit, children }: {
   id: string;
   heightPx: number;
   flex: number;
-  onResize: (h: number) => void;
   isDragActive: boolean;
   onDelete?: () => void;
   onEdit?: () => void;
@@ -392,12 +352,11 @@ function StaticDraggableCardShell({ id, heightPx, flex, onResize, isDragActive, 
   );
 }
 
-function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize, onEdit }: {
+function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onEdit }: {
   cards: { id: string; node: React.ReactNode }[];
   rowsLayout: (string | null)[][] | null;
   isDragActive: boolean;
   onDelete: (id: string) => void;
-  onResize: (id: string, h: number) => void;
   onEdit: (id: string) => void;
 }) {
   const cardMap = new Map(cards.map((c) => [c.id, c.node]));
@@ -433,7 +392,6 @@ function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize,
                     isDragActive={isDragActive}
                     onDelete={() => onDelete(id)}
                     onEdit={() => onEdit(id)}
-                    onResize={(h) => onResize(id, h)}
                   >
                     {cardMap.get(id)}
                   </StaticDraggableCardShell>
@@ -482,15 +440,6 @@ const DEFAULT_HEIGHT_PX: Record<string, number> = {
   metric: 220, text: 260, bar_chart: 300, area_chart: 300, pie_chart: 300, ranking: 280,
 };
 
-/** Computes row groups from ordered widgets array (sequential chunks of MAX_PER_ROW). */
-function computeRows(widgets: GeneratedWidget[]): GeneratedWidget[][] {
-  const rows: GeneratedWidget[][] = [];
-  for (let i = 0; i < widgets.length; i += MAX_PER_ROW) {
-    rows.push(widgets.slice(i, i + MAX_PER_ROW));
-  }
-  return rows;
-}
-
 /** Builds a left-packed 4-column matrix of GeneratedWidgets from rowsLayout. */
 function buildWidgetMatrix(widgets: GeneratedWidget[], rowsLayout: (string | null)[][] | null): (GeneratedWidget | null)[][] {
   const empty = (): (GeneratedWidget | null)[] => Array(MAX_PER_ROW).fill(null);
@@ -532,11 +481,6 @@ function buildWidgetMatrix(widgets: GeneratedWidget[], rowsLayout: (string | nul
   // Remove trailing empty rows
   while (raw.length > 0 && raw[raw.length - 1].every((c) => c === null)) raw.pop();
   return raw;
-}
-
-/** @deprecated use buildWidgetMatrix */
-function computeDisplayRows(widgets: GeneratedWidget[], rowsLayout: (string | null)[][] | null): GeneratedWidget[][] {
-  return buildWidgetMatrix(widgets, rowsLayout).map((row) => row.filter(Boolean) as GeneratedWidget[]).filter((r) => r.length > 0);
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -621,47 +565,6 @@ const withFunnelColors = (items: any[] = []) => {
 };
 
 const formatHours = (minutes: number) => `${integerFormatter.format(Math.round(minutes / 60))}h`;
-
-function KpiCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone,
-  loading,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: ElementType;
-  tone: string;
-  loading?: boolean;
-}) {
-  return (
-    <Paper p="lg" withBorder shadow="sm" style={{ height: '100%', borderColor: 'var(--mantine-color-default-border)' }}>
-      {loading ? (
-        <Stack gap="sm">
-          <Skeleton height={14} width="55%" radius="xl" />
-          <Skeleton height={36} width="42%" radius="md" />
-          <Skeleton height={12} width="72%" radius="xl" />
-        </Stack>
-      ) : (
-        <Stack gap="md">
-          <Group justify="space-between" align="flex-start" wrap="nowrap">
-            <Text size="sm" c="dimmed" fw={600}>{label}</Text>
-            <ThemeIcon variant="light" color={tone} radius="md" size={38}>
-              <Icon size={20} />
-            </ThemeIcon>
-          </Group>
-          <Box>
-            <Text fw={750} style={{ fontSize: 'clamp(1.7rem, 2.5vw, 2.35rem)', lineHeight: 1 }}>{value}</Text>
-            <Text size="xs" c="dimmed" mt={8}>{hint}</Text>
-          </Box>
-        </Stack>
-      )}
-    </Paper>
-  );
-}
 
 function MetricTile({
   label,
@@ -939,7 +842,7 @@ function WidgetCardContent({
   );
 }
 
-function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartGridColor, isDragActive, onDelete, onResize, getWidgetSubtitle, onEditWidgetTitle }: {
+function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartGridColor, isDragActive, onDelete, getWidgetSubtitle, onEditWidgetTitle }: {
   widgets: GeneratedWidget[];
   rowsLayout: (string | null)[][] | null;
   heights: WidgetHeights;
@@ -948,7 +851,6 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
   chartGridColor: string;
   isDragActive: boolean;
   onDelete: (id: string) => void;
-  onResize: (id: string, h: number) => void;
   getWidgetSubtitle: (widget: GeneratedWidget) => string;
   onEditWidgetTitle: (widget: GeneratedWidget) => void;
 }) {
@@ -960,7 +862,6 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
       {allRows.map((row, rowIdx) => {
         const rowWidgets = (row as (GeneratedWidget | null)[]).filter((w): w is GeneratedWidget => !!w);
         const isEmptyRow = rowWidgets.length === 0;
-        const rowMaxH = Math.max(...rowWidgets.map((w) => heights[w.id] ?? DEFAULT_HEIGHT_PX[w.type] ?? ROW_HEIGHT_PX), ROW_HEIGHT_PX);
 
         if (isEmptyRow) {
           return (
@@ -983,7 +884,6 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
                       heightPx={heightPx}
                       flex={1}
                       isDragActive={isDragActive}
-                      onResize={(h) => onResize(widget.id, h)}
                     >
                       <WidgetCardContent
                         widget={widget}
@@ -1243,17 +1143,6 @@ export function BIGestao() {
     });
   };
 
-  const handleResizeWidget = (panelId: string, widgetId: string, heightPx: number) => {
-    setPanelCustom((prev) => {
-      const cur = prev[panelId];
-      if (!cur) return prev;
-      const heights = { ...cur.heights, [widgetId]: heightPx };
-      const next: Record<string, PanelCustomState> = { ...prev, [panelId]: { ...cur, heights, layout: [] } };
-      persistCustom(next);
-      return next;
-    });
-  };
-
   // ── Tab layout state ─────────────────────────────────────────────────────────
 
   const [tabLayouts, setTabLayouts] = useState<Record<string, TabLayoutState>>(() => {
@@ -1353,15 +1242,6 @@ export function BIGestao() {
         ? cur.rowsLayout.map((row) => row.map((id) => (id === cardId ? null : id))).filter((row) => row.some((id) => id !== null))
         : null;
       const next = { ...prev, [tabId]: { ...cur, hidden: [...cur.hidden.filter((id) => id !== cardId), cardId], rowsLayout: newRowsLayout } };
-      persistTabLayouts(next);
-      return next;
-    });
-  };
-
-  const handleTabCardResize = (tabId: string, cardId: string, heightPx: number) => {
-    setTabLayouts((prev) => {
-      const cur = getTabLayout(tabId);
-      const next = { ...prev, [tabId]: { ...cur, heights: { ...cur.heights, [cardId]: heightPx } } };
       persistTabLayouts(next);
       return next;
     });
@@ -1706,15 +1586,6 @@ export function BIGestao() {
   const inventoryQuery = useInventoryItemsQuery();
   const teaProfilesQuery = useTeaProfilesQuery();
   const sectorsQuery = useSettingsSectorsQuery();
-
-  const loading = [
-    appointmentsQuery,
-    clinicalQueueQuery,
-    preSchedulingsQuery,
-    financeQuery,
-    invoicesQuery,
-    reportsQuery,
-  ].some((query) => query.isLoading);
 
   const today = dayjs();
   const { startDate, endDate, periodLabel } = useMemo(() => {
@@ -2659,7 +2530,6 @@ export function BIGestao() {
                     chartGridColor={chartGridColor}
                     isDragActive={!!activeDragId}
                     onDelete={(id) => handleDeleteWidget(panelId, id)}
-                    onResize={(id, h) => handleResizeWidget(panelId, id, h)}
                     getWidgetSubtitle={(widget) => getEditedTitle('ai', panelId, widget.id, widget.title, 'Informação gerada por IA').subtitle}
                     onEditWidgetTitle={(widget) => {
                       const current = getEditedTitle('ai', panelId, widget.id, widget.title, 'Informação gerada por IA');
@@ -2669,7 +2539,6 @@ export function BIGestao() {
                   <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                     {activeDragId ? (() => {
                       const w = ps.widgets.find((x) => x.id === activeDragId);
-                      const h = w ? (ps.heights[w.id] ?? DEFAULT_HEIGHT_PX[w.type] ?? ROW_HEIGHT_PX) : ROW_HEIGHT_PX;
                       return w ? (
                         <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }}>
                           <WidgetCardContent
@@ -2801,7 +2670,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -2926,7 +2794,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3018,7 +2885,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3111,7 +2977,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3128,7 +2993,6 @@ export function BIGestao() {
           const tabId = 'recursos';
           const layout = getTabLayout(tabId);
           const visibleOrder = layout.order.filter((id) => !layout.hidden.includes(id));
-          const getH = (id: string) => layout.heights[id] ?? DEFAULT_CARD_HEIGHTS[id] ?? 280;
           const cardNodes: Record<string, React.ReactNode> = {
             res_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
@@ -3187,7 +3051,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3204,7 +3067,6 @@ export function BIGestao() {
           const tabId = 'convenios';
           const layout = getTabLayout(tabId);
           const visibleOrder = layout.order.filter((id) => !layout.hidden.includes(id));
-          const getH = (id: string) => layout.heights[id] ?? DEFAULT_CARD_HEIGHTS[id] ?? 300;
           const cardNodes: Record<string, React.ReactNode> = {
             conv_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
@@ -3250,7 +3112,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3267,7 +3128,6 @@ export function BIGestao() {
           const tabId = 'tea';
           const layout = getTabLayout(tabId);
           const visibleOrder = layout.order.filter((id) => !layout.hidden.includes(id));
-          const getH = (id: string) => layout.heights[id] ?? DEFAULT_CARD_HEIGHTS[id] ?? 300;
           const cardNodes: Record<string, React.ReactNode> = {
             tea_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
@@ -3313,7 +3173,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3330,7 +3189,6 @@ export function BIGestao() {
           const tabId = 'laudos';
           const layout = getTabLayout(tabId);
           const visibleOrder = layout.order.filter((id) => !layout.hidden.includes(id));
-          const getH = (id: string) => layout.heights[id] ?? DEFAULT_CARD_HEIGHTS[id] ?? 300;
           const cardNodes: Record<string, React.ReactNode> = {
             laud_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
@@ -3377,7 +3235,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
@@ -3441,7 +3298,6 @@ export function BIGestao() {
                   rowsLayout={layout.rowsLayout}
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
-                  onResize={(id, h) => handleTabCardResize(tabId, id, h)}
                   onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
