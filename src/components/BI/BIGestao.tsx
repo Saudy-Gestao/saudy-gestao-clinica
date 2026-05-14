@@ -172,6 +172,12 @@ type TabLayoutState = {
   rowsLayout: (string | null)[][] | null;
 };
 
+const TAB_LABELS: Record<string, string> = {
+  executivo: 'Executivo', operacao: 'Operação', financeiro: 'Financeiro',
+  clinico: 'Clínico', recursos: 'Recursos', convenios: 'Convênios',
+  tea: 'TEA', laudos: 'Laudos', comunicacao: 'Comunicação',
+};
+
 const DEFAULT_TAB_CARDS: Record<string, string[]> = {
   executivo:   ['exec_trend', 'exec_funnel', 'exec_alerts'],
   operacao:    ['op_metrics', 'op_rooms', 'op_demand', 'op_equipments', 'op_professionals'],
@@ -1370,6 +1376,97 @@ export function BIGestao() {
 
 
 
+  const renderTabAISection = (tabId: string, tabLabel: string) => {
+    const ps = panelCustom[tabId] || { widgets: [], prompt: '', loading: false, error: null, rowsLayout: null, heights: {}, layout: [] };
+    const draft = customPromptDraft[tabId] ?? ps.prompt;
+    return (
+      <Stack gap="md" mt="md">
+        <Divider
+          label={<Group gap="xs"><Sparkles size={13} /><Text size="xs" fw={600} c="dimmed">Widgets com IA</Text></Group>}
+          labelPosition="left"
+        />
+        <Paper p="md" withBorder style={{ background: panelBg, borderColor: 'rgba(10,37,104,0.18)' }}>
+          <Group gap="xs" mb="xs">
+            <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={28}>
+              <Sparkles size={14} />
+            </ThemeIcon>
+            <Text fw={700} size="sm">Adicionar widgets com IA — {tabLabel}</Text>
+          </Group>
+          <Text size="xs" c="dimmed" mb="sm">
+            Gere cards e análises personalizados para complementar os dados desta aba.
+          </Text>
+          <Group gap="xs" align="flex-end">
+            <Textarea
+              style={{ flex: 1 }}
+              placeholder="Ex: Quero ver um ranking dos 5 médicos com mais atendimentos e a taxa de cancelamento..."
+              value={draft}
+              onChange={(e) => { const val = e.currentTarget.value; setCustomPromptDraft((p) => ({ ...p, [tabId]: val })); }}
+              minRows={2}
+              autosize
+              onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleGenerateWidgets(tabId, tabLabel, draft); }}
+            />
+            <Tooltip label="Gerar (Ctrl+Enter)">
+              <ActionIcon
+                size="xl"
+                variant="gradient"
+                gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
+                radius="md"
+                loading={ps.loading}
+                disabled={!draft.trim()}
+                onClick={() => handleGenerateWidgets(tabId, tabLabel, draft)}
+              >
+                <Send size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </Paper>
+
+        {ps.error && (
+          <Alert color="red" title="Erro ao gerar widgets" icon={<XCircle size={16} />}>{ps.error}</Alert>
+        )}
+
+        {ps.loading && (
+          <Paper p="xl" withBorder style={{ background: panelBg }}>
+            <Stack align="center" gap="md" py="lg">
+              <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} size={48} radius="xl"
+                style={{ animation: 'bi-pulse 1.6s ease-in-out infinite' }}>
+                <Sparkles size={22} />
+              </ThemeIcon>
+              <Text fw={600}>Gerando widgets com IA...</Text>
+              <Loader size="sm" color="darkBlue" />
+            </Stack>
+          </Paper>
+        )}
+
+        {!ps.loading && ps.widgets.length > 0 && (
+          <DndContext
+            sensors={dndSensors}
+            collisionDetection={gridCollision}
+            onDragStart={handleDndStart}
+            onDragEnd={handleDndEnd}
+          >
+            <WidgetGrid
+              widgets={ps.widgets}
+              rowsLayout={ps.rowsLayout}
+              heights={ps.heights}
+              panelBg={panelBg}
+              colorScheme={colorScheme}
+              chartGridColor={chartGridColor}
+              isDragActive={!!activeDragId}
+              onDelete={(id) => handleDeleteWidget(tabId, id)}
+              onResize={(id, h) => handleResizeWidget(tabId, id, h)}
+            />
+            <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
+              {activeDragId && ps.widgets.find((x) => x.id === activeDragId) ? (
+                <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }} />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+      </Stack>
+    );
+  };
+
   const buildInsightsPayload = () => ({
     data: {
       overview: biOverviewQuery.data,
@@ -2489,6 +2586,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2612,6 +2710,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2702,6 +2801,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2793,6 +2893,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2867,6 +2968,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2928,6 +3030,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -2989,6 +3092,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3051,6 +3155,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
@@ -3113,6 +3218,7 @@ export function BIGestao() {
                   ) : null}
                 </DragOverlay>
               </DndContext>
+              {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
             </Stack>
           );
         })()}
