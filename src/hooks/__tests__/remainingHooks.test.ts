@@ -49,6 +49,7 @@ import { fetchWhatsAppConfig, useWhatsAppConfigQuery } from '../useWhatsAppConfi
 import { fetchConvenioAuthorizations, useConvenioAuthorizationsQuery } from '../useConvenioAuthorizationsQuery';
 import { fetchPatientQueue, usePatientQueueQuery } from '../usePatientQueueQuery';
 import { fetchPatientTodayAppointments, usePatientTodayAppointmentsQuery } from '../usePatientTodayAppointmentsQuery';
+import { useInsuranceDetailQuery, useInsuranceProceduresQuery } from '../useInsuranceDetailQuery';
 import { fetchReportExamsPageData, useReportExamsPageDataQuery } from '../useReportExamsPageDataQuery';
 import { fetchReportSettingsData, useReportSettingsQuery } from '../useReportSettingsQuery';
 import {
@@ -70,7 +71,7 @@ vi.mock('../../services/appointmentService', () => ({ default: { list: vi.fn() }
 vi.mock('../../services/consultationService', () => ({ default: { list: vi.fn() } }));
 vi.mock('../../services/deliveryService', () => ({ default: { getDeliveries: vi.fn() } }));
 vi.mock('../../services/inventoryService', () => ({ default: { getItems: vi.fn() } }));
-vi.mock('../../services/patientService', () => ({ default: { getById: vi.fn(), listPatients: vi.fn() } }));
+vi.mock('../../services/patientService', () => ({ default: { getById: vi.fn(), getPatientById: vi.fn(), listPatients: vi.fn() } }));
 vi.mock('../../services/preAttendanceService', () => ({ default: { list: vi.fn() } }));
 vi.mock('../../services/procedureService', () => ({ default: { listProcedures: vi.fn() } }));
 vi.mock('../../services/reportService', () => ({ default: { list: vi.fn() } }));
@@ -79,7 +80,7 @@ vi.mock('../../services/reportConfigService', () => ({ default: { get: vi.fn() }
 vi.mock('../../services/reportPhraseService', () => ({ default: { list: vi.fn() } }));
 vi.mock('../../services/reportTemplateService', () => ({ default: { list: vi.fn() } }));
 vi.mock('../../services/reportWorklistService', () => ({ default: { list: vi.fn() } }));
-vi.mock('../../services/insuranceService', () => ({ default: { listInsurances: vi.fn() } }));
+vi.mock('../../services/insuranceService', () => ({ default: { listInsurances: vi.fn(), getInsurance: vi.fn(), listInsuranceProcedures: vi.fn() } }));
 vi.mock('../../services/sectorService', () => ({ default: { listSectors: vi.fn() } }));
 vi.mock('../../services/ticketService', () => ({ default: { list: vi.fn(), listMine: vi.fn() } }));
 vi.mock('../../services/userService', () => ({ default: { getUser: vi.fn() } }));
@@ -95,7 +96,7 @@ vi.mock('../../services/teaProfileService', () => ({
 }));
 vi.mock('../../services/teaPreReservationService', () => ({
   default: {
-    list: vi.fn(),
+    listCreated: vi.fn(),
     listCancellationTherapies: vi.fn(),
   },
 }));
@@ -152,7 +153,7 @@ beforeEach(() => {
   vi.mocked(teaProfileService.getPit).mockResolvedValue({ id: 'pit1' } as any);
   vi.mocked(teaProfileService.listEvolutions).mockResolvedValue({ items: rows } as any);
   vi.mocked(teaProfileService.getReport).mockResolvedValue({} as any);
-  vi.mocked(teaPreReservationService.list).mockResolvedValue({ items: rows } as any);
+  vi.mocked(teaPreReservationService.listCreated).mockResolvedValue({ items: rows } as any);
   vi.mocked(teaPreReservationService.listCancellationTherapies).mockResolvedValue({ items: rows } as any);
   vi.mocked(teaEvolutionTemplateService.list).mockResolvedValue({ items: rows } as any);
   vi.mocked(whatsappService.listTemplates).mockResolvedValue(rows as any);
@@ -170,7 +171,7 @@ beforeEach(() => {
   vi.mocked(biService.getTea).mockResolvedValue({} as any);
   vi.mocked(biService.getReports).mockResolvedValue({} as any);
   vi.mocked(biService.getCommunication).mockResolvedValue({} as any);
-  vi.mocked(patientService.getById).mockResolvedValue({ id: 'p1' } as any);
+  vi.mocked(patientService.getPatientById).mockResolvedValue({ id: 'p1' } as any);
 });
 
 describe('fetchAppointments', () => {
@@ -691,6 +692,32 @@ describe('hook query key configurations', () => {
   it('useReportSettingsQuery uses correct key', () => {
     useReportSettingsQuery();
     expect(mockedUseQuery).toHaveBeenLastCalledWith(expect.objectContaining({ queryKey: queryKeys.reportSettings }));
+  });
+
+  it('useInsuranceDetailQuery uses dynamic key and is disabled without id', () => {
+    useInsuranceDetailQuery(undefined);
+    expect(mockedUseQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      queryKey: [...queryKeys.insuranceDetail, undefined],
+      enabled: false,
+    }));
+    useInsuranceDetailQuery('ins1');
+    expect(mockedUseQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      queryKey: [...queryKeys.insuranceDetail, 'ins1'],
+      enabled: true,
+    }));
+  });
+
+  it('useInsuranceProceduresQuery uses dynamic key and is disabled without id', () => {
+    useInsuranceProceduresQuery(undefined);
+    expect(mockedUseQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      queryKey: [...queryKeys.insuranceProcedures, undefined],
+      enabled: false,
+    }));
+    useInsuranceProceduresQuery('ins1');
+    expect(mockedUseQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      queryKey: [...queryKeys.insuranceProcedures, 'ins1'],
+      enabled: true,
+    }));
   });
 });
 
