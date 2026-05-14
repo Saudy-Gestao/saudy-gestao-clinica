@@ -51,6 +51,30 @@ const biService = {
     return response.data;
   },
 
+  async generateWidgets(
+    data: Record<string, unknown>,
+    period: { startDate: string; endDate: string },
+    filters: Record<string, unknown>,
+    panelName: string,
+    userPrompt: string,
+  ) {
+    const response = await api.post('/admin/bi/widgets', { data, period, filters, panelName, userPrompt });
+    return response.data as {
+      widgets: {
+        id: string;
+        type: 'metric' | 'text' | 'bar_chart' | 'area_chart' | 'pie_chart' | 'ranking';
+        title: string;
+        value?: string;
+        hint?: string;
+        color?: string;
+        content?: string;
+        data?: { label: string; value: number }[];
+        items?: { label: string; value: string; score?: number }[];
+      }[];
+      generatedAt: string;
+    };
+  },
+
   async getInsights(
     data: Record<string, unknown>,
     period: { startDate: string; endDate: string },

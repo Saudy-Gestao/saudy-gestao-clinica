@@ -1,4 +1,11 @@
-import { useMemo, useState, type ElementType } from 'react';
+import { useMemo, useRef, useState, type ElementType, type CSSProperties } from 'react';
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDroppable, useDraggable, useDndContext, pointerWithin, getFirstCollision,
+  type DragStartEvent, type DragEndEvent, type CollisionDetection,
+} from '@dnd-kit/core';
+
+
 import {
   ActionIcon,
   Alert,
@@ -10,17 +17,19 @@ import {
   Group,
   List,
   Loader,
+  Modal,
   Paper,
   Progress,
   ScrollArea,
-  SegmentedControl,
   Select,
   SimpleGrid,
   Skeleton,
   Stack,
   Text,
+  Textarea,
   ThemeIcon,
   Title,
+  Tooltip,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +39,7 @@ import {
   BarChart3,
   CalendarCheck,
   CheckCircle2,
+  GripVertical,
   Clock3,
   DollarSign,
   FileCheck2,
@@ -39,9 +49,11 @@ import {
   Lightbulb,
   LineChart as LineChartIcon,
   PackageCheck,
+  Send,
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Users,
@@ -55,6 +67,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend as ChartLegend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -78,7 +91,147 @@ import { useBIAuthorizationsQuery, useBIClinicalQuery, useBICommunicationQuery, 
 import { DARK_BLUE } from '../../themes/theme';
 import biService from '../../services/biService';
 
+function EmptyCell({ id, minHeight }: { id: string; minHeight: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        flex: 1, minWidth: 0, minHeight,
+        border: `2px dashed ${isOver ? '#3b82f6' : 'rgba(128,128,128,0.22)'}`,
+        borderRadius: 8,
+        background: isOver ? 'rgba(59,130,246,0.07)' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'border-color 0.15s, background 0.15s',
+      }}
+    >
+      <Text size="xs" c="dimmed" style={{ pointerEvents: 'none' }}>Soltar aqui</Text>
+    </div>
+  );
+}
+
+function DraggableWidgetShell({ widget, heightPx, flex, onResize, isDragActive, children }: {
+  widget: GeneratedWidget;
+  heightPx: number;
+  flex: number;
+  onResize: (h: number) => void;
+  isDragActive: boolean;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: widget.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: widget.id });
+  const resizeStartY = useRef<number | null>(null);
+  const resizeStartH = useRef<number>(heightPx);
+
+  const setRef = (node: HTMLDivElement | null) => { setDragRef(node); setDropRef(node); };
+
+  const style: CSSProperties = {
+    flex, minWidth: 0, height: heightPx, position: 'relative',
+    opacity: isDragging ? 0 : 1,
+    outline: isOver && isDragActive && !isDragging ? '2px solid #3b82f6' : undefined,
+    borderRadius: 8,
+  };
+
+  const onMouseDownResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeStartY.current = e.clientY;
+    resizeStartH.current = heightPx;
+    document.body.style.overflow = 'hidden';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      if (resizeStartY.current === null) return;
+      onResize(Math.max(160, resizeStartH.current + ev.clientY - resizeStartY.current));
+    };
+    const onUp = () => {
+      resizeStartY.current = null;
+      document.body.style.overflow = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <div ref={setRef} style={style}>
+      <div style={{ position: 'absolute', top: 8, right: 40, zIndex: 10 }}>
+        <Tooltip label="Arrastar para reordenar">
+          <ActionIcon size="sm" variant="subtle" color="gray" style={{ cursor: 'grab' }} {...listeners} {...attributes}>
+            <GripVertical size={14} />
+          </ActionIcon>
+        </Tooltip>
+      </div>
+      <div style={{ height: '100%' }}>{children}</div>
+      <div
+        onMouseDown={onMouseDownResize}
+        style={{
+          position: 'absolute', bottom: 0, left: '10%', right: '10%', height: 6,
+          cursor: 'ns-resize', borderRadius: '0 0 4px 4px',
+          background: 'rgba(128,128,128,0.25)', zIndex: 10,
+        }}
+      />
+    </div>
+  );
+}
+
 type PeriodKey = '7d' | '30d' | '90d' | 'month';
+
+type GeneratedWidget = {
+  id: string;
+  type: 'metric' | 'text' | 'bar_chart' | 'area_chart' | 'pie_chart' | 'ranking';
+  title: string;
+  value?: string;
+  hint?: string;
+  color?: string;
+  content?: string;
+  data?: { label?: string; name?: string; value: number }[];
+  items?: { label: string; value: string; score?: number }[];
+};
+
+type WidgetLayoutItem = { i: string; x: number; y: number; w: number; h: number };
+type WidgetHeights = Record<string, number>; // widgetId → height in px
+
+type PanelCustomState = {
+  widgets: GeneratedWidget[];
+  layout: WidgetLayoutItem[]; // kept for backwards compat (ignored)
+  heights: WidgetHeights;
+  prompt: string;
+  loading: boolean;
+  error: string | null;
+  rowsLayout: string[][] | null; // explicit row grouping by widget id; null = sequential fallback
+};
+
+const MAX_PER_ROW = 3;
+const ROW_HEIGHT_PX = 280;
+
+const DEFAULT_HEIGHT_PX: Record<string, number> = {
+  metric: 220, text: 260, bar_chart: 300, area_chart: 300, pie_chart: 300, ranking: 280,
+};
+
+/** Computes row groups from ordered widgets array (sequential chunks of MAX_PER_ROW). */
+function computeRows(widgets: GeneratedWidget[]): GeneratedWidget[][] {
+  const rows: GeneratedWidget[][] = [];
+  for (let i = 0; i < widgets.length; i += MAX_PER_ROW) {
+    rows.push(widgets.slice(i, i + MAX_PER_ROW));
+  }
+  return rows;
+}
+
+/** Computes display rows using explicit rowsLayout when available, falling back to sequential chunking. */
+function computeDisplayRows(widgets: GeneratedWidget[], rowsLayout: string[][] | null): GeneratedWidget[][] {
+  if (!rowsLayout || rowsLayout.length === 0) return computeRows(widgets);
+  const widgetMap = new Map(widgets.map((w) => [w.id, w]));
+  const placed = new Set<string>();
+  const rows: GeneratedWidget[][] = [];
+  for (const rowIds of rowsLayout) {
+    const row = rowIds.map((id) => widgetMap.get(id)).filter(Boolean) as GeneratedWidget[];
+    if (row.length > 0) { rows.push(row); row.forEach((w) => placed.add(w.id)); }
+  }
+  const orphans = widgets.filter((w) => !placed.has(w.id));
+  for (let i = 0; i < orphans.length; i += MAX_PER_ROW) rows.push(orphans.slice(i, i + MAX_PER_ROW));
+  return rows;
+}
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -89,7 +242,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 const integerFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const percentFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
 
-const CHART_COLORS = ['#0A2568', '#0f766e', '#b45309', '#7c3aed', '#be123c', '#2563eb'];
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
 
 const normalizeText = (value?: unknown) => String(value || '').trim().toLowerCase();
 
@@ -298,6 +451,241 @@ type InsightsResult = {
   fromCache: boolean;
 };
 
+const WIDGET_CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
+
+function WidgetCardContent({
+  widget,
+  panelBg,
+  colorScheme,
+  chartGridColor,
+  onDelete,
+}: {
+  widget: GeneratedWidget;
+  panelBg: string;
+  colorScheme: 'light' | 'dark' | 'auto';
+  chartGridColor: string;
+  onDelete?: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const textColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-2)' : undefined;
+
+  return (
+    <Box style={{ position: 'relative', height: '100%' }}>
+      <Modal
+        opened={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={<Group gap="sm"><ThemeIcon color="red" variant="light" radius="md" size={32}><Trash2 size={16} /></ThemeIcon><Text fw={700}>Excluir widget</Text></Group>}
+        size="sm" centered
+      >
+        <Text size="sm" c="dimmed" mb="xl">
+          Tem certeza que deseja excluir o widget <Text span fw={700} c="dark">"{widget.title}"</Text>? Esta ação não pode ser desfeita.
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="subtle" color="gray" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+          <Button color="red" leftSection={<Trash2 size={14} />} onClick={() => { onDelete?.(); setConfirmOpen(false); }}>Excluir</Button>
+        </Group>
+      </Modal>
+
+      {/* Botão excluir */}
+      <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+        {onDelete && (
+          <Tooltip label="Remover widget">
+            <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setConfirmOpen(true)}>
+              <Trash2 size={14} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+
+      {widget.type === 'metric' && (
+        <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Text size="sm" c="dimmed" fw={600} pr={90} mb="sm">{widget.title}</Text>
+          <Text fw={750} style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', lineHeight: 1 }}>{widget.value}</Text>
+          {widget.hint && <Text size="xs" c="dimmed" mt={8}>{widget.hint}</Text>}
+        </Paper>
+      )}
+
+      {widget.type === 'text' && (
+        <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Text fw={700} mb="xs" pr={90}>{widget.title}</Text>
+          <ScrollArea style={{ flex: 1 }} offsetScrollbars>
+            <Text size="sm" lh={1.7} c={textColor}>{widget.content}</Text>
+          </ScrollArea>
+        </Paper>
+      )}
+
+      {widget.type === 'bar_chart' && (
+        <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+          {widget.data && widget.data.length > 0 ? (
+            <Box style={{ flex: 1, minHeight: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={widget.data.map((d) => ({ ...d, _key: d.name || d.label || '' }))}>
+                  <CartesianGrid stroke={chartGridColor} vertical={false} />
+                  <XAxis dataKey="_key" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+                  <ChartTooltip />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {widget.data.map((_, i) => <Cell key={i} fill={WIDGET_CHART_COLORS[i % WIDGET_CHART_COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          ) : <Text size="sm" c="dimmed">Dados insuficientes para gerar este gráfico.</Text>}
+        </Paper>
+      )}
+
+      {widget.type === 'area_chart' && (
+        <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+          {widget.data && widget.data.length > 0 ? (
+            <Box style={{ flex: 1, minHeight: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={widget.data.map((d) => ({ ...d, _key: d.name || d.label || '' }))}>
+                  <CartesianGrid stroke={chartGridColor} vertical={false} />
+                  <XAxis dataKey="_key" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+                  <ChartTooltip />
+                  <Area type="monotone" dataKey="value" stroke={widget.color || '#3b82f6'} fill={widget.color || '#3b82f6'} fillOpacity={0.15} strokeWidth={2.5} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
+          ) : <Text size="sm" c="dimmed">Dados insuficientes para gerar este gráfico.</Text>}
+        </Paper>
+      )}
+
+      {widget.type === 'pie_chart' && (() => {
+        const MAX_SLICES = 8;
+        const raw = (widget.data || [])
+          .map((d) => ({ name: d.name || d.label || 'Sem nome', value: Number(d.value) || 0 }))
+          .filter((d) => d.value > 0)
+          .sort((a, b) => b.value - a.value);
+        const pieData = raw.length > MAX_SLICES
+          ? [...raw.slice(0, MAX_SLICES - 1), { name: 'Outros', value: raw.slice(MAX_SLICES - 1).reduce((s, d) => s + d.value, 0) }]
+          : raw;
+        return (
+          <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+            {pieData.length > 0 ? (
+              <Box style={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="30%" outerRadius="55%" paddingAngle={3}>
+                      {pieData.map((_, i) => <Cell key={i} fill={WIDGET_CHART_COLORS[i % WIDGET_CHART_COLORS.length]} />)}
+                    </Pie>
+                    <ChartTooltip formatter={(v: any, n: any) => [v, n]} />
+                    <ChartLegend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            ) : <Text size="sm" c="dimmed">Dados insuficientes para gerar este gráfico.</Text>}
+          </Paper>
+        );
+      })()}
+
+      {widget.type === 'ranking' && widget.items && (
+        <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Text fw={700} mb="sm" pr={90} style={{ fontSize: 14 }}>{widget.title}</Text>
+          <ScrollArea style={{ flex: 1 }} offsetScrollbars>
+            <Stack gap="xs">
+              {widget.items.map((item, i) => (
+                <Box key={i}>
+                  <Group justify="space-between" mb={3}>
+                    <Text size="sm" fw={600}>{item.label}</Text>
+                    <Text size="sm" fw={700}>{item.value}</Text>
+                  </Group>
+                  {item.score !== undefined && (
+                    <Progress value={Math.min(100, item.score)} color={WIDGET_CHART_COLORS[i % WIDGET_CHART_COLORS.length]} radius="xl" size="sm" />
+                  )}
+                </Box>
+              ))}
+            </Stack>
+          </ScrollArea>
+        </Paper>
+      )}
+    </Box>
+  );
+}
+
+function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartGridColor, isDragActive, onDelete, onResize }: {
+  widgets: GeneratedWidget[];
+  rowsLayout: string[][] | null;
+  heights: WidgetHeights;
+  panelBg: string;
+  colorScheme: 'light' | 'dark' | 'auto';
+  chartGridColor: string;
+  isDragActive: boolean;
+  onDelete: (id: string) => void;
+  onResize: (id: string, h: number) => void;
+}) {
+  const { active } = useDndContext();
+  const dragging = active !== null;
+
+  const baseRows = computeDisplayRows(widgets, rowsLayout).map((row) => {
+    const padded: (GeneratedWidget | null)[] = [...row];
+    while (padded.length < MAX_PER_ROW) padded.push(null);
+    return padded;
+  });
+  const extraRow: (GeneratedWidget | null)[] = [null, null, null];
+  const allRows: (GeneratedWidget | null)[][] = dragging
+    ? [...baseRows, extraRow]
+    : baseRows;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {allRows.map((row, rowIdx) => {
+        const rowMaxH = Math.max(...row.map((w) =>
+          w ? (heights[w.id] ?? DEFAULT_HEIGHT_PX[w.type] ?? ROW_HEIGHT_PX) : ROW_HEIGHT_PX,
+        ));
+        return (
+          <div key={rowIdx} style={{ display: 'flex', gap: 12 }}>
+            {row.map((widget, colIdx) => {
+              if (widget) {
+                const heightPx = heights[widget.id] ?? DEFAULT_HEIGHT_PX[widget.type] ?? ROW_HEIGHT_PX;
+                return (
+                  <DraggableWidgetShell
+                    key={widget.id}
+                    widget={widget}
+                    heightPx={heightPx}
+                    flex={1}
+                    isDragActive={isDragActive}
+                    onResize={(h) => onResize(widget.id, h)}
+                  >
+                    <WidgetCardContent
+                      widget={widget}
+                      panelBg={panelBg}
+                      colorScheme={colorScheme}
+                      chartGridColor={chartGridColor}
+                      onDelete={() => onDelete(widget.id)}
+                    />
+                  </DraggableWidgetShell>
+                );
+              }
+              if (!dragging) return null;
+              return (
+                <EmptyCell
+                  key={`grid-cell-${rowIdx}-col-${colIdx}`}
+                  id={`grid-cell-${rowIdx}-col-${colIdx}`}
+                  minHeight={rowMaxH} 
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Usa somente a posição do ponteiro como referência (não o rect do overlay)
+const gridCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  const emptyCellHit = hits.find((c) => String(c.id).startsWith('grid-cell-'));
+  if (emptyCellHit) return [emptyCellHit];
+  const first = getFirstCollision(hits);
+  return first ? [first] : [];
+};
+
 export function BIGestao() {
   const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
@@ -312,6 +700,253 @@ export function BIGestao() {
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const [insightsResult, setInsightsResult] = useState<InsightsResult | null>(null);
   const [showNewDataAnimation, setShowNewDataAnimation] = useState(false);
+
+  // ── Painel Personalizável ──────────────────────────────────────────────────
+
+  const [panelCustom, setPanelCustom] = useState<Record<string, PanelCustomState>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('bi_panel_custom') || '{}');
+      return Object.fromEntries(
+        Object.entries(stored).map(([k, v]: [string, any]) => {
+          const seen = new Set<string>();
+          const widgets: GeneratedWidget[] = (v.widgets || []).map((w: any, i: number) => {
+            const baseId = String(w.id || `w${i}`);
+            const uid = seen.has(baseId) ? `${baseId}_${i}_${Date.now()}` : baseId;
+            seen.add(uid);
+            return { ...w, id: uid };
+          });
+          const heights: WidgetHeights = v.heights || {};
+          return [k, { widgets, layout: [], heights, prompt: v.prompt || '', loading: false, error: null, rowsLayout: v.rowsLayout || null }];
+        }),
+      );
+    } catch { return {}; }
+  });
+
+  const [customPromptDraft, setCustomPromptDraft] = useState<Record<string, string>>({});
+
+  const persistCustom = (next: Record<string, PanelCustomState>) => {
+    localStorage.setItem('bi_panel_custom', JSON.stringify(
+      Object.fromEntries(Object.entries(next).map(([k, v]) => [k, { widgets: v.widgets, heights: v.heights, prompt: v.prompt, rowsLayout: v.rowsLayout }])),
+    ));
+  };
+
+  const getBIData = () => {
+    // Dados brutos com nomes reais — extraídos das queries locais
+    const appts = (appointmentsQuery.data || []) as any[];
+    const inPeriod = appts.filter((a: any) => inRange(itemDate(a, ['date', 'data', 'scheduledAt', 'appointmentDate']), startDate, endDate));
+
+    // Médicos: nome + contagem de atendimentos
+    const doctorMap = new Map<string, number>();
+    inPeriod.forEach((a: any) => {
+      const name = String(firstValue(a, ['doctorName', 'doctor', 'medico']) || '').trim();
+      if (name) doctorMap.set(name, (doctorMap.get(name) || 0) + 1);
+    });
+    const doctors = Array.from(doctorMap.entries())
+      .map(([name, appointments]) => ({ name, appointments }))
+      .sort((a, b) => b.appointments - a.appointments);
+
+    // Convênios: nome + contagem
+    const convenioMap = new Map<string, number>();
+    inPeriod.forEach((a: any) => {
+      const name = String(firstValue(a, ['convenio', 'insurance', 'healthInsuranceName']) || 'Particular').trim();
+      convenioMap.set(name, (convenioMap.get(name) || 0) + 1);
+    });
+    const convenios = Array.from(convenioMap.entries())
+      .map(([name, appointments]) => ({ name, appointments }))
+      .sort((a, b) => b.appointments - a.appointments);
+
+    // Especialidades/procedimentos
+    const specialtyMap = new Map<string, number>();
+    inPeriod.forEach((a: any) => {
+      const name = String(firstValue(a, ['specialty', 'procedureName', 'type', 'examType']) || 'Não informado').trim();
+      if (name && name !== 'Não informado') specialtyMap.set(name, (specialtyMap.get(name) || 0) + 1);
+    });
+    const specialties = Array.from(specialtyMap.entries())
+      .map(([name, appointments]) => ({ name, appointments }))
+      .sort((a, b) => b.appointments - a.appointments);
+
+    // Itens de estoque com nomes reais
+    const inventory = ((inventoryQuery.data || []) as any[]).slice(0, 20).map((i: any) => ({
+      name: String(firstValue(i, ['name', 'nome']) || ''),
+      quantity: asNumber(firstValue(i, ['quantity', 'quantidade'])),
+      minQuantity: asNumber(firstValue(i, ['minQuantity', 'minimo'])),
+      unitPrice: asNumber(firstValue(i, ['unitPrice', 'preco'])),
+      status: firstValue(i, ['status']),
+    })).filter((i) => i.name);
+
+    // Perfis TEA
+    const teaProfiles = ((teaProfilesQuery.data || []) as any[]).slice(0, 20).map((p: any) => ({
+      name: String(firstValue(p, ['patientName', 'name', 'nome', 'patient']) || ''),
+      isActive: p?.isActive !== false,
+    })).filter((p) => p.name);
+
+    return {
+      overview: biOverviewQuery.data,
+      financial: biFinancialQuery.data,
+      clinical: biClinicalQuery.data,
+      occupancy: biOccupancyQuery.data,
+      reports: biReportsQuery.data,
+      authorizations: biAuthorizationsQuery.data,
+      tea: biTeaQuery.data,
+      resources: biResourcesQuery.data,
+      communication: biCommunicationQuery.data,
+      // Dados reais com nomes da clínica
+      rawData: { doctors, convenios, specialties, inventory, teaProfiles },
+    };
+  };
+
+  const handleGenerateWidgets = async (panelId: string, panelLabel: string, prompt: string) => {
+    if (!prompt.trim()) return;
+    setPanelCustom((prev) => {
+      const cur = prev[panelId];
+      const next: Record<string, PanelCustomState> = {
+        ...prev,
+        [panelId]: { widgets: cur?.widgets || [], layout: [], heights: cur?.heights || {}, prompt: prompt.trim(), loading: true, error: null, rowsLayout: cur?.rowsLayout || null },
+      };
+      persistCustom(next);
+      return next;
+    });
+    try {
+      const result = await biService.generateWidgets(
+        getBIData() as any,
+        { startDate: startDate.format('YYYY-MM-DD'), endDate: endDate.format('YYYY-MM-DD') },
+        { doctorId: doctorFilter, insuranceId: insuranceFilter, procedureId: procedureFilter, sectorId: sectorFilter } as any,
+        panelLabel,
+        prompt.trim(),
+      );
+      setPanelCustom((prev) => {
+        const cur = prev[panelId];
+        const prefix = Date.now();
+        const newWidgets = result.widgets.map((w, i) => ({ ...w, id: `${prefix}_${i}` }));
+        const next: Record<string, PanelCustomState> = {
+          ...prev,
+          [panelId]: { widgets: [...(cur?.widgets || []), ...newWidgets], layout: [], heights: cur?.heights || {}, prompt: prompt.trim(), loading: false, error: null, rowsLayout: cur?.rowsLayout || null },
+        };
+        persistCustom(next);
+        return next;
+      });
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.originalError || err?.response?.data?.error || err?.message || 'Erro ao gerar widgets.';
+      setPanelCustom((prev) => ({
+        ...prev,
+        [panelId]: { ...(prev[panelId] || { widgets: [], layout: [], heights: {}, prompt: '', rowsLayout: null }), loading: false, error: errorMsg },
+      }));
+    }
+  };
+
+  const handleDeleteWidget = (panelId: string, widgetId: string) => {
+    setPanelCustom((prev) => {
+      const cur = prev[panelId];
+      const heights = { ...cur.heights };
+      delete heights[widgetId];
+      const newRowsLayout = cur.rowsLayout
+        ? cur.rowsLayout.map((row) => row.filter((id) => id !== widgetId)).filter((row) => row.length > 0)
+        : null;
+      const next: Record<string, PanelCustomState> = {
+        ...prev,
+        [panelId]: { ...cur, widgets: cur.widgets.filter((w) => w.id !== widgetId), layout: [], heights, rowsLayout: newRowsLayout },
+      };
+      persistCustom(next);
+      return next;
+    });
+  };
+
+  const handleReorderWidgets = (panelId: string, newWidgets: GeneratedWidget[], newRowsLayout: string[][] | null = null) => {
+    setPanelCustom((prev) => {
+      const cur = prev[panelId];
+      if (!cur) return prev;
+      const next: Record<string, PanelCustomState> = { ...prev, [panelId]: { ...cur, widgets: newWidgets, layout: [], rowsLayout: newRowsLayout } };
+      persistCustom(next);
+      return next;
+    });
+  };
+
+  const handleResizeWidget = (panelId: string, widgetId: string, heightPx: number) => {
+    setPanelCustom((prev) => {
+      const cur = prev[panelId];
+      if (!cur) return prev;
+      const heights = { ...cur.heights, [widgetId]: heightPx };
+      const next: Record<string, PanelCustomState> = { ...prev, [panelId]: { ...cur, heights, layout: [] } };
+      persistCustom(next);
+      return next;
+    });
+  };
+
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDndStart = (e: DragStartEvent) => setActiveDragId(String(e.active.id));
+  const handleDndEnd = (e: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = e;
+    if (!over) return;
+    const cur = panelCustom['personalizavel'];
+    if (!cur) return;
+    const widgets = cur.widgets;
+    const draggedWidget = widgets.find((w) => w.id === active.id);
+    if (!draggedWidget) return;
+
+    const displayRows = computeDisplayRows(widgets, cur.rowsLayout);
+    const overId = String(over.id);
+
+    if (overId.startsWith('grid-cell-')) {
+      // Drop numa célula vazia: mover para aquela linha/coluna
+      const parts = overId.split('-'); // ["grid","cell",rowIdx,"col",colIdx]
+      const targetRowIdx = parseInt(parts[2]);
+      const targetColIdx = parseInt(parts[4]);
+
+      // Remove o widget e conta quantas linhas ANTES do alvo foram eliminadas
+      const newRows: GeneratedWidget[][] = [];
+      let removedBeforeTarget = 0;
+      for (let i = 0; i < displayRows.length; i++) {
+        const filtered = displayRows[i].filter((w) => w.id !== draggedWidget.id);
+        if (filtered.length > 0) {
+          newRows.push(filtered);
+        } else if (i < targetRowIdx) {
+          removedBeforeTarget++;
+        }
+      }
+      const adjustedTarget = targetRowIdx - removedBeforeTarget;
+
+      if (adjustedTarget >= newRows.length) {
+        // Soltar após a última linha → nova linha com o widget
+        newRows.push([draggedWidget]);
+      } else {
+        // Soltar numa linha existente com espaço vazio
+        const targetRow = [...newRows[adjustedTarget]];
+        targetRow.splice(Math.min(targetColIdx, targetRow.length), 0, draggedWidget);
+        if (targetRow.length > MAX_PER_ROW) {
+          // Linha ficou cheia: overflow vai para nova linha após
+          const overflow = targetRow.splice(MAX_PER_ROW);
+          newRows[adjustedTarget] = targetRow;
+          newRows.splice(adjustedTarget + 1, 0, overflow);
+        } else {
+          newRows[adjustedTarget] = targetRow;
+        }
+      }
+
+      const newRowsLayout = newRows.map((row) => row.map((w) => w.id));
+      handleReorderWidgets('personalizavel', newRows.flat(), newRowsLayout);
+    } else {
+      // Drop em outro card: trocar posições dentro das linhas
+      const newRows = displayRows.map((row) => [...row]);
+      let fromR = -1, fromC = -1, toR = -1, toC = -1;
+      for (let r = 0; r < newRows.length; r++) {
+        for (let c = 0; c < newRows[r].length; c++) {
+          if (newRows[r][c].id === active.id) { fromR = r; fromC = c; }
+          if (newRows[r][c].id === overId) { toR = r; toC = c; }
+        }
+      }
+      if (fromR < 0 || toR < 0 || (fromR === toR && fromC === toC)) return;
+      const tmp = newRows[fromR][fromC];
+      newRows[fromR][fromC] = newRows[toR][toC];
+      newRows[toR][toC] = tmp;
+      const newRowsLayout = newRows.map((row) => row.map((w) => w.id));
+      handleReorderWidgets('personalizavel', newRows.flat(), newRowsLayout);
+    }
+  };
+
+
 
   const buildInsightsPayload = () => ({
     data: {
@@ -1020,27 +1655,159 @@ export function BIGestao() {
           />
         </SimpleGrid>
 
-        <SegmentedControl
-          mb="lg"
-          value={activePanel}
-          onChange={setActivePanel}
-          data={[
-            { value: 'executivo', label: 'Executivo' },
-            { value: 'operacao', label: 'Operação' },
-            { value: 'financeiro', label: 'Financeiro' },
-            { value: 'clinico', label: 'Clínico' },
-            { value: 'recursos', label: 'Recursos' },
-            { value: 'convenios', label: 'Convênios' },
-            { value: 'tea', label: 'TEA' },
-            { value: 'laudos', label: 'Laudos' },
-            { value: 'comunicacao', label: 'Comunicação' },
-          ]}
-          styles={{
-            root: { maxWidth: '100%', overflowX: 'auto' },
-            indicator: { background: 'linear-gradient(135deg, #93c5fd 0%, #86efac 100%)', boxShadow: '0 0 0 1px rgba(59,130,246,0.35) inset' },
-            label: { fontWeight: 650, color: '#4b5563' },
-          }}
-        />
+        {/* Navbar colorida */}
+        <ScrollArea mb="lg" scrollbarSize={4} type="hover">
+          <Group gap={6} wrap="nowrap" pb={4}>
+            {([
+              { value: 'executivo',      label: 'Executivo'},
+              { value: 'operacao',       label: 'Operação'},
+              { value: 'financeiro',     label: 'Financeiro'},
+              { value: 'clinico',        label: 'Clínico'},
+              { value: 'recursos',       label: 'Recursos'},
+              { value: 'convenios',      label: 'Convênios'},
+              { value: 'tea',            label: 'TEA'},
+              { value: 'laudos',         label: 'Laudos'},
+              { value: 'comunicacao',    label: 'Comunicação'},
+              { value: 'personalizavel', label: '✦ Personalizável'},
+            ] as { value: string; label: string; color: string }[]).map((tab) => {
+              const isActive = activePanel === tab.value;
+              const isPersonalizavel = tab.value === 'personalizavel';
+              return (
+                <Box
+                  key={tab.value}
+                  onClick={() => setActivePanel(tab.value)}
+                  style={{
+                    background: isActive ? (isPersonalizavel ? 'linear-gradient(135deg,#0A2568,#0f766e)' : tab.color) : 'transparent',
+                    border: `1.5px solid ${tab.color}`,
+                    borderRadius: 8,
+                    padding: '6px 14px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 650,
+                    fontSize: 13,
+                    color: isActive ? '#fff' : tab.color,
+                    boxShadow: isActive ? `0 2px 8px ${tab.color}55` : undefined,
+                    transition: 'all 0.15s ease',
+                    userSelect: 'none',
+                  }}
+                >
+                  {tab.label}
+                </Box>
+              );
+            })}
+          </Group>
+        </ScrollArea>
+
+        {/* ── Painel Personalizável ─────────────────────────────────────────── */}
+        {activePanel === 'personalizavel' && (() => {
+          const ps = panelCustom['personalizavel'] || { widgets: [], prompt: '', loading: false, error: null };
+          const draft = customPromptDraft['personalizavel'] ?? ps.prompt;
+          return (
+            <Stack gap="lg">
+              {/* Campo de prompt */}
+              <Paper p="md" withBorder style={{ background: panelBg, borderColor: 'rgba(10,37,104,0.18)' }}>
+                <Group gap="xs" mb="xs">
+                  <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={30}>
+                    <Sparkles size={15} />
+                  </ThemeIcon>
+                  <Text fw={700} size="sm">Descreva o que quer ver neste painel</Text>
+                </Group>
+                <Text size="xs" c="dimmed" mb="sm">
+                  A IA vai gerar cards, gráficos e análises com base nos dados reais do BI.
+                </Text>
+                <Group gap="xs" align="flex-end">
+                  <Textarea
+                    style={{ flex: 1 }}
+                    placeholder={`Ex: Quero ver a receita por convênio em gráfico de pizza, os 5 médicos com mais atendimentos e o ticket médio.`}
+                    value={draft}
+                    onChange={(e) => { const val = e.currentTarget.value; setCustomPromptDraft((p) => ({ ...p, personalizavel: val })); }}
+                    minRows={2}
+                    autosize
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleGenerateWidgets('personalizavel', 'Personalizável', draft);
+                    }}
+                  />
+                  <Tooltip label="Gerar (Ctrl+Enter)">
+                    <ActionIcon
+                      size="xl"
+                      variant="gradient"
+                      gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
+                      radius="md"
+                      loading={ps.loading}
+                      disabled={!draft.trim()}
+                      onClick={() => handleGenerateWidgets('personalizavel', 'Personalizável', draft)}
+                    >
+                      <Send size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
+              </Paper>
+
+              {/* Erro */}
+              {ps.error && (
+                <Alert color="red" title="Erro ao gerar widgets" icon={<XCircle size={16} />}>
+                  {ps.error}
+                </Alert>
+              )}
+
+              {/* Loading */}
+              {ps.loading && (
+                <Paper p="xl" withBorder style={{ background: panelBg }}>
+                  <Stack align="center" gap="md" py="lg">
+                    <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} size={56} radius="xl"
+                      style={{ animation: 'bi-pulse 1.6s ease-in-out infinite' }}>
+                      <Sparkles size={26} />
+                    </ThemeIcon>
+                    <Text fw={600}>Gerando widgets com IA...</Text>
+                    <Loader size="sm" color="darkBlue" />
+                    <style>{`@keyframes bi-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.1);opacity:.85}}`}</style>
+                  </Stack>
+                </Paper>
+              )}
+
+              {/* Widgets gerados */}
+              {!ps.loading && ps.widgets.length > 0 && (
+                <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={handleDndStart} onDragEnd={handleDndEnd}>
+                  <WidgetGrid
+                    widgets={ps.widgets}
+                    rowsLayout={ps.rowsLayout}
+                    heights={ps.heights}
+                    panelBg={panelBg}
+                    colorScheme={colorScheme}
+                    chartGridColor={chartGridColor}
+                    isDragActive={!!activeDragId}
+                    onDelete={(id) => handleDeleteWidget('personalizavel', id)}
+                    onResize={(id, h) => handleResizeWidget('personalizavel', id, h)}
+                  />
+                  <DragOverlay dropAnimation={null}>
+                    {activeDragId ? (() => {
+                      const w = ps.widgets.find((x) => x.id === activeDragId);
+                      const h = w ? (ps.heights[w.id] ?? DEFAULT_HEIGHT_PX[w.type] ?? ROW_HEIGHT_PX) : ROW_HEIGHT_PX;
+                      return w ? (
+                        <div style={{ height: h, opacity: 0.9, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', borderRadius: 8 }}>
+                          <WidgetCardContent widget={w} panelBg={panelBg} colorScheme={colorScheme} chartGridColor={chartGridColor} />
+                        </div>
+                      ) : null;
+                    })() : null}
+                  </DragOverlay>
+                </DndContext>
+              )}
+
+              {/* Empty state */}
+              {!ps.loading && !ps.error && ps.widgets.length === 0 && (
+                <Paper p="xl" withBorder style={{ background: panelBg }}>
+                  <Stack align="center" gap="sm" py="xl">
+                    <ThemeIcon size={52} radius="xl" variant="light" color="gray"><Sparkles size={24} /></ThemeIcon>
+                    <Text fw={600} ta="center">Nenhum widget gerado ainda</Text>
+                    <Text size="sm" c="dimmed" ta="center" maw={400}>
+                      Descreva o que você quer ver neste painel e clique em enviar. A IA vai criar cards, gráficos e análises com base nos dados reais.
+                    </Text>
+                  </Stack>
+                </Paper>
+              )}
+            </Stack>
+          );
+        })()}
 
         {activePanel === 'executivo' ? (
           <SimpleGrid cols={{ base: 1, lg: 3 }} spacing="lg">

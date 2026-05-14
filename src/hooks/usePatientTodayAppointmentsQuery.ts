@@ -2,13 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchPatientAppointments } from './usePatientAppointmentsQuery';
 import { queryKeys } from '../lib/queryKeys';
 
-const formatLocalDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 export interface PatientTodayAppointment {
   id: string;
   doctorName: string;
@@ -20,7 +13,7 @@ export interface PatientTodayAppointment {
 
 export const fetchPatientTodayAppointments = async (patientId?: string | null): Promise<PatientTodayAppointment[]> => {
   const appointments = await fetchPatientAppointments(patientId);
-  const today = formatLocalDate(new Date());
+  const today = new Date().toISOString().slice(0, 10);
 
   return appointments
     .filter((appointment: any) => String(appointment.date || '').slice(0, 10) === today)
