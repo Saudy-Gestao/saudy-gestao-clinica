@@ -26,6 +26,7 @@ import {
   Skeleton,
   Stack,
   Text,
+  TextInput,
   Textarea,
   ThemeIcon,
   Title,
@@ -60,6 +61,7 @@ import {
   Users,
   XCircle,
   PlusCircle,
+  Pencil,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import {
@@ -320,13 +322,14 @@ function buildDisplayMatrix(ids: string[], rowsLayout: (string | null)[][] | nul
   return dedupeEmptyRows(raw);
 }
 
-function StaticDraggableCardShell({ id, heightPx, flex, onResize, isDragActive, onDelete, children }: {
+function StaticDraggableCardShell({ id, heightPx, flex, onResize, isDragActive, onDelete, onEdit, children }: {
   id: string;
   heightPx: number;
   flex: number;
   onResize: (h: number) => void;
   isDragActive: boolean;
   onDelete?: () => void;
+  onEdit?: () => void;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id });
@@ -359,13 +362,22 @@ function StaticDraggableCardShell({ id, heightPx, flex, onResize, isDragActive, 
           <Button color="red" leftSection={<Trash2 size={14} />} onClick={() => { onDelete?.(); setConfirmOpen(false); }}>Ocultar</Button>
         </Group>
       </Modal>
-      <div style={{ position: 'absolute', top: 8, right: onDelete ? 48 : 40, zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: 8, right: (onDelete || onEdit) ? 56 : 40, zIndex: 10 }}>
         <Tooltip label="Arrastar para reordenar">
           <ActionIcon size="sm" variant="subtle" color="gray" style={{ cursor: 'grab' }} {...listeners} {...attributes}>
             <GripVertical size={14} />
           </ActionIcon>
         </Tooltip>
       </div>
+      {onEdit && (
+        <div style={{ position: 'absolute', top: 8, right: onDelete ? 32 : 8, zIndex: 10 }}>
+          <Tooltip label="Editar título e subtítulo">
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={onEdit}>
+              <Pencil size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </div>
+      )}
       {onDelete && (
         <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
           <Tooltip label="Ocultar card">
@@ -380,12 +392,13 @@ function StaticDraggableCardShell({ id, heightPx, flex, onResize, isDragActive, 
   );
 }
 
-function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize }: {
+function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize, onEdit }: {
   cards: { id: string; node: React.ReactNode }[];
   rowsLayout: (string | null)[][] | null;
   isDragActive: boolean;
   onDelete: (id: string) => void;
   onResize: (id: string, h: number) => void;
+  onEdit: (id: string) => void;
 }) {
   const cardMap = new Map(cards.map((c) => [c.id, c.node]));
   const visibleIds = cards.map((c) => c.id);
@@ -419,6 +432,7 @@ function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onResize 
                     flex={1}
                     isDragActive={isDragActive}
                     onDelete={() => onDelete(id)}
+                    onEdit={() => onEdit(id)}
                     onResize={(h) => onResize(id, h)}
                   >
                     {cardMap.get(id)}
@@ -746,15 +760,15 @@ type InsightsResult = {
 const WIDGET_CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
 const AI_WIDGET_CARD_PREFIX = 'ai_widget::';
 
-function AIWidgetHeader({ title }: { title: string }) {
+function AIWidgetHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <Group gap="xs" align="flex-start" mb="sm" wrap="nowrap">
-      <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={22} mt={2}>
-        <Sparkles size={12} />
+      <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={32} mt={1}>
+        <Sparkles size={16} />
       </ThemeIcon>
       <Box style={{ minWidth: 0 }}>
         <Text fw={700} style={{ fontSize: 14, lineHeight: 1.25 }}>{title}</Text>
-        <Text size="xs" c="dimmed" style={{ lineHeight: 1.25 }}>Informação gerada por IA</Text>
+        <Text size="xs" c="dimmed" style={{ lineHeight: 1.25 }}>{subtitle}</Text>
       </Box>
     </Group>
   );
@@ -762,16 +776,20 @@ function AIWidgetHeader({ title }: { title: string }) {
 
 function WidgetCardContent({
   widget,
+  subtitle,
   panelBg,
   colorScheme,
   chartGridColor,
   onDelete,
+  onEditTitle,
 }: {
   widget: GeneratedWidget;
+  subtitle: string;
   panelBg: string;
   colorScheme: 'light' | 'dark' | 'auto';
   chartGridColor: string;
   onDelete?: () => void;
+  onEditTitle?: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const textColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-2)' : undefined;
@@ -795,6 +813,13 @@ function WidgetCardContent({
 
       {/* Botão excluir */}
       <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+        {onEditTitle && (
+          <Tooltip label="Editar título e subtítulo">
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={onEditTitle}>
+              <Pencil size={14} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         {onDelete && (
           <Tooltip label="Remover widget">
             <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setConfirmOpen(true)}>
@@ -806,7 +831,7 @@ function WidgetCardContent({
 
       {widget.type === 'metric' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <AIWidgetHeader title={widget.title} />
+          <AIWidgetHeader title={widget.title} subtitle={subtitle} />
           <Text fw={750} style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', lineHeight: 1 }}>{widget.value}</Text>
           {widget.hint && <Text size="xs" c="dimmed" mt={8}>{widget.hint}</Text>}
         </Paper>
@@ -814,7 +839,7 @@ function WidgetCardContent({
 
       {widget.type === 'text' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <AIWidgetHeader title={widget.title} />
+          <AIWidgetHeader title={widget.title} subtitle={subtitle} />
           <ScrollArea style={{ flex: 1 }} offsetScrollbars>
             <Text size="sm" lh={1.7} c={textColor}>{widget.content}</Text>
           </ScrollArea>
@@ -823,7 +848,7 @@ function WidgetCardContent({
 
       {widget.type === 'bar_chart' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <AIWidgetHeader title={widget.title} />
+          <AIWidgetHeader title={widget.title} subtitle={subtitle} />
           {widget.data && widget.data.length > 0 ? (
             <Box style={{ flex: 1, minHeight: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -844,7 +869,7 @@ function WidgetCardContent({
 
       {widget.type === 'area_chart' && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <AIWidgetHeader title={widget.title} />
+          <AIWidgetHeader title={widget.title} subtitle={subtitle} />
           {widget.data && widget.data.length > 0 ? (
             <Box style={{ flex: 1, minHeight: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -872,7 +897,7 @@ function WidgetCardContent({
           : raw;
         return (
           <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <AIWidgetHeader title={widget.title} />
+            <AIWidgetHeader title={widget.title} subtitle={subtitle} />
             {pieData.length > 0 ? (
               <Box style={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -892,7 +917,7 @@ function WidgetCardContent({
 
       {widget.type === 'ranking' && widget.items && (
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <AIWidgetHeader title={widget.title} />
+          <AIWidgetHeader title={widget.title} subtitle={subtitle} />
           <ScrollArea style={{ flex: 1 }} offsetScrollbars>
             <Stack gap="xs">
               {widget.items.map((item, i) => (
@@ -914,7 +939,7 @@ function WidgetCardContent({
   );
 }
 
-function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartGridColor, isDragActive, onDelete, onResize }: {
+function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartGridColor, isDragActive, onDelete, onResize, getWidgetSubtitle, onEditWidgetTitle }: {
   widgets: GeneratedWidget[];
   rowsLayout: (string | null)[][] | null;
   heights: WidgetHeights;
@@ -924,6 +949,8 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
   isDragActive: boolean;
   onDelete: (id: string) => void;
   onResize: (id: string, h: number) => void;
+  getWidgetSubtitle: (widget: GeneratedWidget) => string;
+  onEditWidgetTitle: (widget: GeneratedWidget) => void;
 }) {
   const baseMatrix = buildWidgetMatrix(widgets, rowsLayout);
   const allRows = [...baseMatrix, Array(MAX_PER_ROW).fill(null)];
@@ -960,10 +987,12 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
                     >
                       <WidgetCardContent
                         widget={widget}
+                        subtitle={getWidgetSubtitle(widget)}
                         panelBg={panelBg}
                         colorScheme={colorScheme}
                         chartGridColor={chartGridColor}
                         onDelete={() => onDelete(widget.id)}
+                        onEditTitle={() => onEditWidgetTitle(widget)}
                       />
                     </DraggableWidgetShell>
                   </div>
@@ -1016,6 +1045,43 @@ export function BIGestao() {
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const [insightsResult, setInsightsResult] = useState<InsightsResult | null>(null);
   const [showNewDataAnimation, setShowNewDataAnimation] = useState(false);
+  const [titleOverrides, setTitleOverrides] = useState<Record<string, { title: string; subtitle: string }>>({});
+  const [titleEditorOpen, setTitleEditorOpen] = useState(false);
+  const [titleEditorTarget, setTitleEditorTarget] = useState<{ mode: 'static' | 'ai'; tabId: string; cardId: string } | null>(null);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [subtitleDraft, setSubtitleDraft] = useState('');
+
+  const titleKey = (mode: 'static' | 'ai', tabId: string, cardId: string) => `${mode}::${tabId}::${cardId}`;
+  const getEditedTitle = (mode: 'static' | 'ai', tabId: string, cardId: string, fallbackTitle: string, fallbackSubtitle: string) => {
+    const o = titleOverrides[titleKey(mode, tabId, cardId)];
+    return { title: o?.title || fallbackTitle, subtitle: o?.subtitle || fallbackSubtitle };
+  };
+  const openTitleEditor = (mode: 'static' | 'ai', tabId: string, cardId: string, currentTitle: string, currentSubtitle: string) => {
+    setTitleEditorTarget({ mode, tabId, cardId });
+    setTitleDraft(currentTitle);
+    setSubtitleDraft(currentSubtitle);
+    setTitleEditorOpen(true);
+  };
+  const saveTitleEditor = () => {
+    if (!titleEditorTarget) return;
+    const nextTitle = titleDraft.trim();
+    const nextSubtitle = subtitleDraft.trim();
+    if (!nextTitle || !nextSubtitle) return;
+    const { mode, tabId, cardId } = titleEditorTarget;
+    setTitleOverrides((prev) => ({ ...prev, [titleKey(mode, tabId, cardId)]: { title: nextTitle, subtitle: nextSubtitle } }));
+    if (mode === 'ai') {
+      setPanelCustom((prev) => {
+        const cur = prev[tabId];
+        if (!cur) return prev;
+        const widgets = cur.widgets.map((w) => (w.id === cardId ? { ...w, title: nextTitle } : w));
+        const next = { ...prev, [tabId]: { ...cur, widgets } };
+        persistCustom(next);
+        return next;
+      });
+    }
+    setTitleEditorOpen(false);
+    setTitleEditorTarget(null);
+  };
 
   // Painel Personalizável
 
@@ -1458,7 +1524,7 @@ export function BIGestao() {
           <Text size="xs" c="dimmed" mb="sm">
             Gere cards e análises personalizados para complementar os dados desta aba.
           </Text>
-          <Group gap="xs" align="flex-end">
+          <Group gap="xs" align="stretch">
             <Textarea
               style={{ flex: 1 }}
               placeholder="Ex: Quero ver um ranking dos 5 médicos com mais atendimentos e a taxa de cancelamento..."
@@ -1474,6 +1540,7 @@ export function BIGestao() {
                 variant="gradient"
                 gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
                 radius="md"
+                style={{ alignSelf: 'stretch', height: 'auto' }}
                 loading={ps.loading}
                 disabled={!draft.trim()}
                 onClick={() => handleGenerateWidgets(tabId, tabLabel, draft)}
@@ -1512,10 +1579,13 @@ export function BIGestao() {
       node: (
         <WidgetCardContent
           widget={widget}
+          subtitle={getEditedTitle('ai', tabId, widget.id, widget.title, 'Informação gerada por IA').subtitle}
           panelBg={panelBg}
           colorScheme={colorScheme}
           chartGridColor={chartGridColor}
-          onDelete={() => handleDeleteWidget(tabId, widget.id)}
+          // Em abas padrão, os ícones de ação ficam no shell (drag/lápis/lixeira).
+          onDelete={undefined}
+          onEditTitle={undefined}
         />
       ),
     }));
@@ -1526,6 +1596,59 @@ export function BIGestao() {
       ...aiCards.map((card) => [card.id, card.node] as const),
     ]);
     return mergedOrder.map((id) => ({ id, node: mergedNodes.get(id) })).filter((c) => !!c.node);
+  };
+
+  const renderEditablePanelTitle = (tabId: string, cardId: string, title: string, subtitle: string, icon: ElementType) => {
+    const current = getEditedTitle('static', tabId, cardId, title, subtitle);
+    return (
+      <PanelTitle
+        title={current.title}
+        description={current.subtitle}
+        icon={icon}
+      />
+    );
+  };
+
+  const staticCardMeta: Record<string, { title: string; subtitle: string }> = {
+    exec_trend: { title: 'Atendimentos x receita', subtitle: 'Tendência diária.' },
+    exec_funnel: { title: 'Funil da jornada', subtitle: 'Do agendamento ao faturamento.' },
+    exec_alerts: { title: 'Alertas de gestão', subtitle: 'Prioridades imediatas.' },
+    op_metrics: { title: 'Operação — visão geral', subtitle: 'Ocupação e recursos.' },
+    op_rooms: { title: 'Ocupação por sala', subtitle: 'Ranking de uso.' },
+    op_demand: { title: 'Demanda por horário', subtitle: 'Picos por faixa.' },
+    op_equipments: { title: 'Equipamentos', subtitle: 'Uso por equipamento e modalidade.' },
+    op_professionals: { title: 'Profissionais', subtitle: 'Ocupação estimada por agenda profissional.' },
+    fin_metrics: { title: 'Financeiro do período', subtitle: 'Entradas, saídas e faturamento.' },
+    fin_mix: { title: 'Mix financeiro por convênio', subtitle: 'Participação no faturamento do período.' },
+    fin_cashflow: { title: 'Fluxo de caixa diário', subtitle: 'Entradas, saídas e faturado por dia.' },
+    cli_metrics: { title: 'Laudos e autorizações', subtitle: 'Backlog clínico e risco de atendimento.' },
+    cli_sla: { title: 'SLA e backlog clínico', subtitle: 'Assinatura e envelhecimento.' },
+    cli_modalities: { title: 'Modalidades com maior SLA', subtitle: 'Top exames/modalidades por volume assinado.' },
+    res_metrics: { title: 'Recursos e estoque', subtitle: 'Insumos e riscos operacionais.' },
+    res_coverage: { title: 'Cobertura e consumo', subtitle: 'Consumo e cobertura em dias.' },
+    conv_metrics: { title: 'Autorizações por status', subtitle: 'Panorama do período.' },
+    conv_mix: { title: 'Mix de status', subtitle: 'Distribuição das autorizações.' },
+    tea_metrics: { title: 'Visão TEA', subtitle: 'Planejamento e conversão de reservas.' },
+    tea_mix: { title: 'Mix das reservas TEA', subtitle: 'Pendentes, convertidas e canceladas.' },
+    laud_metrics: { title: 'Laudos e exames', subtitle: 'Backlog e TAT.' },
+    laud_volume: { title: 'Volume por modalidade', subtitle: 'Principais exames/modalidades do período.' },
+    com_metrics: { title: 'Comunicação e experiência', subtitle: 'WhatsApp e entregas.' },
+    com_flows: { title: 'Fluxos de conversa', subtitle: 'Fluxos mais acionados no WhatsApp.' },
+  };
+
+  const openStaticCardEditor = (tabId: string, cardId: string) => {
+    const meta = staticCardMeta[cardId];
+    if (!meta) return;
+    const current = getEditedTitle('static', tabId, meta.title, meta.title, meta.subtitle);
+    openTitleEditor('static', tabId, meta.title, current.title, current.subtitle);
+  };
+
+  const openAICardEditorFromCombinedId = (tabId: string, combinedId: string) => {
+    const widgetId = combinedId.split('::').slice(2).join('::');
+    const widget = (panelCustom[tabId]?.widgets || []).find((w) => w.id === widgetId);
+    if (!widget) return;
+    const current = getEditedTitle('ai', tabId, widgetId, widget.title, 'Informação gerada por IA');
+    openTitleEditor('ai', tabId, widgetId, current.title, current.subtitle);
   };
 
   const buildInsightsPayload = () => ({
@@ -2137,6 +2260,32 @@ export function BIGestao() {
 
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
+      <Modal
+        opened={titleEditorOpen}
+        onClose={() => setTitleEditorOpen(false)}
+        title="Editar card"
+        centered
+        size="md"
+      >
+        <Stack gap="sm">
+          <TextInput
+            label="Título"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.currentTarget.value)}
+            placeholder="Digite o título do card"
+          />
+          <TextInput
+            label="Subtítulo"
+            value={subtitleDraft}
+            onChange={(e) => setSubtitleDraft(e.currentTarget.value)}
+            placeholder="Digite o subtítulo do card"
+          />
+          <Group justify="flex-end" mt="sm">
+            <Button variant="subtle" color="gray" onClick={() => setTitleEditorOpen(false)}>Cancelar</Button>
+            <Button onClick={saveTitleEditor} disabled={!titleDraft.trim() || !subtitleDraft.trim()}>Salvar</Button>
+          </Group>
+        </Stack>
+      </Modal>
       <Box maw={1500} mx="auto" px={{ base: 'md', md: 'xl' }} py="xl">
         <Paper
           p={{ base: 'md', md: 'lg' }}
@@ -2454,7 +2603,7 @@ export function BIGestao() {
                 <Text size="xs" c="dimmed" mb="sm">
                   A IA vai gerar cards, gráficos e análises com base nos dados reais do BI.
                 </Text>
-                <Group gap="xs" align="flex-end">
+                <Group gap="xs" align="stretch">
                   <Textarea
                     style={{ flex: 1 }}
                     placeholder="Ex: Quero ver a receita por convênio em gráfico de pizza, os 5 médicos com mais atendimentos e o ticket médio."
@@ -2470,6 +2619,7 @@ export function BIGestao() {
                       variant="gradient"
                       gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
                       radius="md"
+                      style={{ alignSelf: 'stretch', height: 'auto' }}
                       loading={ps.loading}
                       disabled={!draft.trim()}
                       onClick={() => handleGenerateWidgets(panelId, panelLabel, draft)}
@@ -2510,6 +2660,11 @@ export function BIGestao() {
                     isDragActive={!!activeDragId}
                     onDelete={(id) => handleDeleteWidget(panelId, id)}
                     onResize={(id, h) => handleResizeWidget(panelId, id, h)}
+                    getWidgetSubtitle={(widget) => getEditedTitle('ai', panelId, widget.id, widget.title, 'Informação gerada por IA').subtitle}
+                    onEditWidgetTitle={(widget) => {
+                      const current = getEditedTitle('ai', panelId, widget.id, widget.title, 'Informação gerada por IA');
+                      openTitleEditor('ai', panelId, widget.id, current.title, current.subtitle);
+                    }}
                   />
                   <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                     {activeDragId ? (() => {
@@ -2517,7 +2672,13 @@ export function BIGestao() {
                       const h = w ? (ps.heights[w.id] ?? DEFAULT_HEIGHT_PX[w.type] ?? ROW_HEIGHT_PX) : ROW_HEIGHT_PX;
                       return w ? (
                         <div style={{ height: 80, width: 160, borderRadius: 10, background: 'rgba(128,128,128,0.25)', backdropFilter: 'blur(6px)', border: '1.5px solid rgba(255,255,255,0.12)' }}>
-                          <WidgetCardContent widget={w} panelBg={panelBg} colorScheme={colorScheme} chartGridColor={chartGridColor} />
+                          <WidgetCardContent
+                            widget={w}
+                            subtitle={getEditedTitle('ai', panelId, w.id, w.title, 'Informação gerada por IA').subtitle}
+                            panelBg={panelBg}
+                            colorScheme={colorScheme}
+                            chartGridColor={chartGridColor}
+                          />
                         </div>
                       ) : null;
                     })() : null}
@@ -2547,7 +2708,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             exec_trend: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Atendimentos x receita" description="Tendência diária." icon={LineChartIcon} />
+                {renderEditablePanelTitle(tabId, "Atendimentos x receita", "Atendimentos x receita", "Tendência diária.", LineChartIcon)}
                 <Box style={{ minWidth: 0 }}>
                   {hasExecutiveTrend ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['exec_trend'] ?? 460) - 120}>
@@ -2579,7 +2740,7 @@ export function BIGestao() {
             ),
             exec_funnel: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Funil da jornada" description="Do agendamento ao faturamento." icon={TrendingUp} />
+                {renderEditablePanelTitle(tabId, "Funil da jornada", "Funil da jornada", "Do agendamento ao faturamento.", TrendingUp)}
                 <Stack gap="md">
                   {hasFunnelValues ? data.funnel.map((step, index) => {
                     const maxValue = Math.max(...data.funnel.map((item) => item.value), 1);
@@ -2606,7 +2767,7 @@ export function BIGestao() {
             ),
             exec_alerts: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Alertas de gestão" description="Prioridades imediatas." icon={AlertTriangle} />
+                {renderEditablePanelTitle(tabId, "Alertas de gestão", "Alertas de gestão", "Prioridades imediatas.", AlertTriangle)}
                 <Stack gap="sm">
                   {data.alerts.map((alert: any) => (
                     <Box key={alert.title} p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
@@ -2641,6 +2802,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -2659,7 +2821,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             op_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Operação — visão geral" description="Ocupação e recursos." icon={BarChart3} />
+                {renderEditablePanelTitle(tabId, "Operação — visão geral", "Operação — visão geral", "Ocupação e recursos.", BarChart3)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                   <MetricTile label="Ocupação geral" value={`${percentFormatter.format(asNumber(occupancyKpis.occupancyRate))}%`} hint={`${formatHours(asNumber(occupancyKpis.bookedMinutes))} ocupadas`} icon={BarChart3} tone="darkBlue" />
                   <MetricTile label="Horas ociosas" value={formatHours(asNumber(occupancyKpis.idleMinutes))} hint="Capacidade estimada livre" icon={Clock3} tone="orange" />
@@ -2670,7 +2832,7 @@ export function BIGestao() {
             ),
             op_rooms: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Ocupação por sala" description="Ranking de uso." icon={CalendarCheck} />
+                {renderEditablePanelTitle(tabId, "Ocupação por sala", "Ocupação por sala", "Ranking de uso.", CalendarCheck)}
                 <Box style={{ minWidth: 0 }}>
                   {hasOperationalRooms ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['op_rooms'] ?? 460) - 120}>
@@ -2693,7 +2855,7 @@ export function BIGestao() {
             ),
             op_demand: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Demanda por horário" description="Picos por faixa." icon={Clock3} />
+                {renderEditablePanelTitle(tabId, "Demanda por horário", "Demanda por horário", "Picos por faixa.", Clock3)}
                 <Box style={{ minWidth: 0 }}>
                   {hasOperationalHourlyDemand ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['op_demand'] ?? 460) - 120}>
@@ -2716,7 +2878,7 @@ export function BIGestao() {
             ),
             op_equipments: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Equipamentos" description="Uso por equipamento e modalidade." icon={PackageCheck} />
+                {renderEditablePanelTitle(tabId, "Equipamentos", "Equipamentos", "Uso por equipamento e modalidade.", PackageCheck)}
                 <Stack gap="sm">
                   {hasOperationalEquipments ? (occupancyRankings.equipments || []).slice(0, 6).map((item: any) => (
                     <Box key={item.id}>
@@ -2734,7 +2896,7 @@ export function BIGestao() {
             ),
             op_professionals: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Profissionais" description="Ocupação estimada por agenda profissional." icon={Users} />
+                {renderEditablePanelTitle(tabId, "Profissionais", "Profissionais", "Ocupação estimada por agenda profissional.", Users)}
                 <Stack gap="sm">
                   {hasOperationalProfessionals ? (occupancyRankings.professionals || []).slice(0, 6).map((item: any) => (
                     <Box key={item.id}>
@@ -2765,6 +2927,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -2783,7 +2946,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             fin_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Financeiro do período" description="Entradas, saídas e faturamento." icon={DollarSign} />
+                {renderEditablePanelTitle(tabId, "Financeiro do período", "Financeiro do período", "Entradas, saídas e faturamento.", DollarSign)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Entradas" value={currencyFormatter.format(asNumber(financialKpis.revenue) || data.revenue)} hint="Lançamentos" icon={TrendingUp} tone="teal" />
                   <MetricTile label="Saídas" value={currencyFormatter.format(asNumber(financialKpis.expenses) || data.expenses)} hint="Despesas" icon={DollarSign} tone="red" />
@@ -2794,7 +2957,7 @@ export function BIGestao() {
             ),
             fin_mix: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Mix financeiro por convênio" description="Participação no faturamento do período." icon={ShieldCheck} />
+                {renderEditablePanelTitle(tabId, "Mix financeiro por convênio", "Mix financeiro por convênio", "Participação no faturamento do período.", ShieldCheck)}
                 <Box style={{ minWidth: 0 }}>
                   {financialMixData.length > 0 && hasFinancialMixValues ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['fin_mix'] ?? 460) - 120}>
@@ -2817,7 +2980,7 @@ export function BIGestao() {
             ),
             fin_cashflow: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Fluxo de caixa diário" description="Entradas, saídas e faturado por dia." icon={LineChartIcon} />
+                {renderEditablePanelTitle(tabId, "Fluxo de caixa diário", "Fluxo de caixa diário", "Entradas, saídas e faturado por dia.", LineChartIcon)}
                 <Box style={{ minWidth: 0 }}>
                   {financialCashflowData.length > 0 && hasFinancialCashflowValues ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['fin_cashflow'] ?? 460) - 120}>
@@ -2856,6 +3019,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -2874,7 +3038,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             cli_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Laudos e autorizações" description="Backlog clínico e risco de atendimento." icon={FileClock} />
+                {renderEditablePanelTitle(tabId, "Laudos e autorizações", "Laudos e autorizações", "Backlog clínico e risco de atendimento.", FileClock)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Autoriz. pendentes" value={integerFormatter.format(asNumber(clinicalKpis.pendingAuthorizations) || data.pendingAuthorizations)} hint="Convênios em análise" icon={ShieldCheck} tone="grape" />
                   <MetricTile label="Negativas" value={integerFormatter.format(asNumber(clinicalKpis.deniedAuthorizations))} hint="Autorizações negadas" icon={AlertTriangle} tone="red" />
@@ -2885,7 +3049,7 @@ export function BIGestao() {
             ),
             cli_sla: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="SLA e backlog clínico" description="Assinatura e envelhecimento." icon={BarChart3} />
+                {renderEditablePanelTitle(tabId, "SLA e backlog clínico", "SLA e backlog clínico", "Assinatura e envelhecimento.", BarChart3)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }} mb="md">
                   <MetricTile label="SLA médio" value={`${percentFormatter.format(asNumber(clinicalKpis.slaAvgHours))}h`} hint="Da criação à assinatura" icon={Clock3} tone="teal" />
                   <MetricTile label="SLA p95" value={`${percentFormatter.format(asNumber(clinicalKpis.slaP95Hours))}h`} hint="Casos mais críticos" icon={AlertTriangle} tone="orange" />
@@ -2912,7 +3076,7 @@ export function BIGestao() {
             ),
             cli_modalities: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Modalidades com maior SLA" description="Top exames/modalidades por volume assinado." icon={Stethoscope} />
+                {renderEditablePanelTitle(tabId, "Modalidades com maior SLA", "Modalidades com maior SLA", "Top exames/modalidades por volume assinado.", Stethoscope)}
                 {hasClinicalModality ? (
                   <Stack gap="sm">
                     {clinicalModalityData.slice(0, 6).map((item: any) => (
@@ -2948,6 +3112,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -2967,7 +3132,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             res_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Recursos e estoque" description="Insumos e riscos operacionais." icon={PackageCheck} />
+                {renderEditablePanelTitle(tabId, "Recursos e estoque", "Recursos e estoque", "Insumos e riscos operacionais.", PackageCheck)}
                 {(asNumber(resourcesKpis.itemsCount) > 0 || hasResourceSignals) ? (
                   <SimpleGrid cols={{ base: 1, sm: 2 }}>
                     <MetricTile label="Itens monitorados" value={integerFormatter.format(asNumber(resourcesKpis.itemsCount))} hint="Base ativa de estoque" icon={PackageCheck} tone="teal" />
@@ -2985,7 +3150,7 @@ export function BIGestao() {
             ),
             res_coverage: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Cobertura e consumo" description="Consumo e cobertura em dias." icon={Sparkles} />
+                {renderEditablePanelTitle(tabId, "Cobertura e consumo", "Cobertura e consumo", "Consumo e cobertura em dias.", Sparkles)}
                 {resourcesCriticalItems.length > 0 ? (
                   <Stack gap="sm">
                     {resourcesCriticalItems.slice(0, 6).map((item: any) => (
@@ -3023,6 +3188,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -3042,7 +3208,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             conv_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Autorizações por status" description="Panorama do período." icon={ShieldCheck} />
+                {renderEditablePanelTitle(tabId, "Autorizações por status", "Autorizações por status", "Panorama do período.", ShieldCheck)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Pendentes" value={integerFormatter.format(asNumber(authorizationsKpis.pending))} hint={`${percentFormatter.format(asNumber(authorizationsKpis.pendingRate))}% do total`} icon={FileClock} tone="orange" />
                   <MetricTile label="Negadas" value={integerFormatter.format(asNumber(authorizationsKpis.denied))} hint={`${percentFormatter.format(asNumber(authorizationsKpis.deniedRate))}% do total`} icon={AlertTriangle} tone="red" />
@@ -3053,7 +3219,7 @@ export function BIGestao() {
             ),
             conv_mix: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Mix de status" description="Distribuição das autorizações." icon={BarChart3} />
+                {renderEditablePanelTitle(tabId, "Mix de status", "Mix de status", "Distribuição das autorizações.", BarChart3)}
                 <Box style={{ minWidth: 0 }}>
                   {(authorizationsCharts.statusMix || []).some((i: any) => asNumber(i?.value) > 0) ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['conv_mix'] ?? 460) - 120}>
@@ -3085,6 +3251,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -3104,7 +3271,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             tea_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Visão TEA" description="Planejamento e conversão de reservas." icon={HeartPulse} />
+                {renderEditablePanelTitle(tabId, "Visão TEA", "Visão TEA", "Planejamento e conversão de reservas.", HeartPulse)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Perfis ativos" value={integerFormatter.format(asNumber(teaKpis.activeProfiles) || data.activeTeaProfiles)} hint="Pacientes TEA ativos" icon={HeartPulse} tone="grape" />
                   <MetricTile label="Pendentes" value={integerFormatter.format(asNumber(teaKpis.pendingReservations))} hint="Reservas em aberto" icon={FileClock} tone="orange" />
@@ -3115,7 +3282,7 @@ export function BIGestao() {
             ),
             tea_mix: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Mix das reservas TEA" description="Pendentes, convertidas e canceladas." icon={BarChart3} />
+                {renderEditablePanelTitle(tabId, "Mix das reservas TEA", "Mix das reservas TEA", "Pendentes, convertidas e canceladas.", BarChart3)}
                 <Box style={{ minWidth: 0 }}>
                   {(teaCharts.reservationMix || []).some((item: any) => asNumber(item?.value) > 0) ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['tea_mix'] ?? 460) - 120}>
@@ -3147,6 +3314,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -3166,7 +3334,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             laud_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Laudos e exames" description="Backlog e TAT." icon={FileCheck2} />
+                {renderEditablePanelTitle(tabId, "Laudos e exames", "Laudos e exames", "Backlog e TAT.", FileCheck2)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Pendentes" value={integerFormatter.format(asNumber(reportsKpis.pendingReports) || data.pendingReports)} hint="Fila ativa de laudos" icon={FileClock} tone="orange" />
                   <MetricTile label="Assinados" value={integerFormatter.format(asNumber(reportsKpis.signedReports) || data.signedReports)} hint={periodLabel} icon={FileCheck2} tone="teal" />
@@ -3177,7 +3345,7 @@ export function BIGestao() {
             ),
             laud_volume: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Volume por modalidade" description="Principais exames/modalidades do período." icon={BarChart3} />
+                {renderEditablePanelTitle(tabId, "Volume por modalidade", "Volume por modalidade", "Principais exames/modalidades do período.", BarChart3)}
                 <Box style={{ minWidth: 0 }}>
                   {(reportsCharts.examVolume || []).length > 0 ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['laud_volume'] ?? 460) - 120}>
@@ -3210,6 +3378,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -3229,7 +3398,7 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             com_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                <PanelTitle title="Comunicação e experiência" description="WhatsApp e entregas." icon={Users} />
+                {renderEditablePanelTitle(tabId, "Comunicação e experiência", "Comunicação e experiência", "WhatsApp e entregas.", Users)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Conversas abertas" value={integerFormatter.format(asNumber(communicationKpis.conversationsOpen))} hint="Fila humana ativa" icon={Users} tone="orange" />
                   <MetricTile label="Conversas fechadas" value={integerFormatter.format(asNumber(communicationKpis.conversationsClosed))} hint={periodLabel} icon={ShieldCheck} tone="teal" />
@@ -3240,7 +3409,7 @@ export function BIGestao() {
             ),
             com_flows: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                <PanelTitle title="Fluxos de conversa" description="Fluxos mais acionados no WhatsApp." icon={BarChart3} />
+                {renderEditablePanelTitle(tabId, "Fluxos de conversa", "Fluxos de conversa", "Fluxos mais acionados no WhatsApp.", BarChart3)}
                 <Box style={{ minWidth: 0 }}>
                   {(communicationCharts.conversationFlows || []).length > 0 ? (
                     <ResponsiveContainer width="100%" height={getH('com_flows') - 120}>
@@ -3273,6 +3442,7 @@ export function BIGestao() {
                   isDragActive={!!activeDragId}
                   onDelete={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? handleDeleteWidget(tabId, id.split("::").slice(2).join("::")) : handleTabCardHide(tabId, id)}
                   onResize={(id, h) => handleTabCardResize(tabId, id, h)}
+                  onEdit={(id) => id.startsWith(AI_WIDGET_CARD_PREFIX) ? openAICardEditorFromCombinedId(tabId, id) : openStaticCardEditor(tabId, id)}
                 />
                 <DragOverlay dropAnimation={null} modifiers={[centerSilhouette]}>
                   {activeDragId ? (
@@ -3292,6 +3462,8 @@ export function BIGestao() {
     </>
   );
 }
+
+
 
 
 
