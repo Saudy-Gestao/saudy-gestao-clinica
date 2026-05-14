@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '../api';
 import insuranceService from '../insuranceService';
+import patientPortalService from '../patientPortalService';
 import medicalEquipmentService from '../medicalEquipmentService';
 import reportConfigService from '../reportConfigService';
 import reportService from '../reportService';
@@ -17,6 +18,9 @@ import consultationService from '../consultationService';
 const mockPublicApi = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
+  interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
 }));
 
 vi.mock('axios', () => ({
@@ -50,6 +54,7 @@ beforeEach(() => {
   (mockedApi as any).request.mockResolvedValue({ data });
   mockPublicApi.get.mockResolvedValue({ data });
   mockPublicApi.post.mockResolvedValue({ data });
+  mockPublicApi.put.mockResolvedValue({ data });
 });
 
 // ─── insuranceService ─────────────────────────────────────────────────────────
@@ -82,9 +87,17 @@ describe('insuranceService', () => {
     await insuranceService.addInsuranceProcedure('i1', { procedureId: 'p1', price: 100 });
     expect(mockedApi.post).toHaveBeenCalledWith('/procedures/insurances/i1/procedures', { procedureId: 'p1', price: 100 });
   });
+  it('addInsuranceProcedure with authorizationDays', async () => {
+    await insuranceService.addInsuranceProcedure('i1', { procedureId: 'p1', price: 100, authorizationDays: 10 });
+    expect(mockedApi.post).toHaveBeenCalledWith('/procedures/insurances/i1/procedures', { procedureId: 'p1', price: 100, authorizationDays: 10 });
+  });
   it('updateInsuranceProcedure', async () => {
     await insuranceService.updateInsuranceProcedure('i1', 'ip1', { price: 200 });
     expect(mockedApi.put).toHaveBeenCalledWith('/procedures/insurances/i1/procedures/ip1', { price: 200 });
+  });
+  it('updateInsuranceProcedure with authorizationDays', async () => {
+    await insuranceService.updateInsuranceProcedure('i1', 'ip1', { authorizationDays: 5 });
+    expect(mockedApi.put).toHaveBeenCalledWith('/procedures/insurances/i1/procedures/ip1', { authorizationDays: 5 });
   });
   it('removeInsuranceProcedure', async () => {
     await insuranceService.removeInsuranceProcedure('i1', 'ip1');
@@ -479,5 +492,29 @@ describe('consultationService - remaining', () => {
   it('remove', async () => {
     await consultationService.remove('c1');
     expect(mockedApi.delete).toHaveBeenCalledWith(expect.stringContaining('c1'));
+  });
+});
+
+// ─── patientPortalService (scheduling insurance endpoints) ────────────────────
+describe('patientPortalService – insurance scheduling', () => {
+  it('listSchedulingInsurances calls correct endpoint', async () => {
+    await patientPortalService.listSchedulingInsurances();
+    expect(mockPublicApi.get).toHaveBeenCalledWith('/auth/patient-portal/scheduling/insurances');
+  });
+
+  it('checkInsuranceCoverage passes procedureId and insuranceName as params', async () => {
+    await patientPortalService.checkInsuranceCoverage({ procedureId: 'p1', insuranceName: 'Unimed' });
+    expect(mockPublicApi.get).toHaveBeenCalledWith(
+      '/auth/patient-portal/scheduling/insurance-check',
+      expect.objectContaining({ params: { procedureId: 'p1', insuranceName: 'Unimed' } }),
+    );
+  });
+
+  it('updatePatientInsurance sends PUT to /me/insurance', async () => {
+    await patientPortalService.updatePatientInsurance({ insuranceName: 'Amil', insuranceNumber: '123' });
+    expect(mockPublicApi.put).toHaveBeenCalledWith(
+      '/auth/patient-portal/me/insurance',
+      { insuranceName: 'Amil', insuranceNumber: '123' },
+    );
   });
 });

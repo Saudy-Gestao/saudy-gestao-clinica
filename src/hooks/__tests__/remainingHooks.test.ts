@@ -473,7 +473,8 @@ describe('fetchPatientTodayAppointments', () => {
     await expect(fetchPatientTodayAppointments(null)).resolves.toEqual([]);
   });
   it('filters by today and maps fields', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     vi.mocked(appointmentService.list).mockResolvedValue([
       { id: 'a1', date: today, doctorName: 'Dr. X', specialty: 'Ortopedia', time: '10:00', status: 'SCHEDULED', room: '1' },
       { id: 'a2', date: '2000-01-01', doctorName: 'Dr. Y', specialty: 'Clínica', time: '09:00', status: 'DONE' },
@@ -483,7 +484,8 @@ describe('fetchPatientTodayAppointments', () => {
     expect(result[0].id).toBe('a1');
   });
   it('uses fallback field names when primary fields missing', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     vi.mocked(appointmentService.list).mockResolvedValue([
       { id: 'a1', date: today, doctor: { name: 'Dr. Z', specialty: 'Cardiologia' }, roomNumber: '2' },
     ] as any);
