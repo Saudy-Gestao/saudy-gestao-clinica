@@ -67,6 +67,48 @@ export interface ConsultationExamOrderPayload {
   scheduleMedicalEquipmentId?: string;
 }
 
+export interface HistoricoItem {
+  id: string;
+  status: string;
+  type: string;
+  patientName: string;
+  doctorName: string;
+  specialty: string;
+  appointment: {
+    id: string;
+    date: string;
+    time: string;
+    type: string;
+    specialty: string;
+    convenio?: string;
+    durationMinutes?: number;
+    status: string;
+  };
+  medicalRecord?: {
+    id: string;
+    chiefComplaint?: string;
+    historyOfPresentIllness?: string;
+    physicalExamination?: string;
+    diagnosis?: string;
+    treatment?: string;
+    prescriptions?: string;
+    examRequests?: string;
+    notes?: string;
+    bloodPressureSystolic?: number;
+    bloodPressureDiastolic?: number;
+    heartRate?: number;
+    respiratoryRate?: number;
+    temperature?: number;
+    oxygenSaturation?: number;
+    weight?: number;
+    height?: number;
+    bmi?: number;
+    riskClassification?: string;
+    recordDate?: string;
+  };
+  createdAt: string;
+}
+
 export default {
   async list(params?: { search?: string; convenioStatus?: string; queueType?: string; includeCompleted?: boolean; limit?: number; offset?: number }) {
     const url = '/care/consultations/';
@@ -126,5 +168,17 @@ export default {
     const url = `/care/consultations/${id}`;
     const res = await api.delete(url);
     return res.data;
+  },
+
+  async listHistorico(params?: {
+    search?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const res = await api.get('/care/consultations/historico', { params });
+    return res.data as { items: HistoricoItem[]; total: number };
   },
 };

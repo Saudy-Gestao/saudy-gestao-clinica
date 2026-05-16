@@ -48,6 +48,7 @@ import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
 import { CadastroEquipamento } from './components/Equipamentos/CadastroEquipamento';
 import { CadastroAnamnese } from './components/Anamnese/CadastroAnamnese';
+import { HistoricoAtendimentos } from './components/Historico/HistoricoAtendimentos';
 import { CadastroEnfermagem } from './components/Enfermagem/CadastroEnfermagem';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
@@ -270,9 +271,13 @@ function App() {
             path="/agendamento" 
             element={<ProtectedRoute><Agendamento /></ProtectedRoute>} 
           />
-          <Route 
-            path="/consulta" 
-            element={<ProtectedRoute><Consulta /></ProtectedRoute>} 
+          <Route
+            path="/historico"
+            element={<ProtectedRoute><HistoricoAtendimentos /></ProtectedRoute>}
+          />
+          <Route
+            path="/consulta"
+            element={<ProtectedRoute><Consulta /></ProtectedRoute>}
           />
           <Route
             path="/consulta/atendimento/:consultationId"

@@ -217,6 +217,11 @@ describe('consultationService', () => {
     await consultationService.remove('c1');
     expect(mockedApi.delete).toHaveBeenCalledWith('/care/consultations/c1');
   });
+  it('listHistorico', async () => {
+    const params = { search: 'ana', type: 'PRESENCIAL', startDate: '2026-01-01', endDate: '2026-01-31', limit: 20, offset: 0 };
+    await consultationService.listHistorico(params);
+    expect(mockedApi.get).toHaveBeenCalledWith('/care/consultations/historico', { params });
+  });
 });
 
 // ─── deliveryService ─────────────────────────────────────────────────────────
