@@ -8,9 +8,48 @@
 ## Variáveis de ambiente
 
 - Desenvolvimento: `.env.development` usa `VITE_API_URL=http://localhost:3000`
-- Produção (Render): `.env.production` usa `VITE_API_URL=https://saudy-backend.onrender.com`
+- Produção (Cloud Run): defina `VITE_API_URL` com a URL pública do backend em Cloud Run
 
-No Render, você também pode (e é recomendado) configurar a variável de ambiente `VITE_API_URL` diretamente no serviço de frontend.
+Para build em produção via CI/CD, configure:
+
+- `VITE_API_URL` (GitHub Variables)
+- `VITE_FACE_API_URL` (GitHub Variables, se aplicável)
+- `VITE_TINYMCE_API_KEY` (GitHub Secret)
+
+## Deploy no Google Cloud Run
+
+Este repositório já está preparado para deploy automático no Cloud Run com GitHub Actions em `.github/workflows/deploy-cloud-run.yml`.
+
+### 1. Pré-requisitos no GCP
+
+1. Crie/provisione um projeto GCP.
+2. Ative APIs:
+   `Artifact Registry`, `Cloud Run`, `Cloud Build`, `IAM`, `Secret Manager`.
+3. Crie um repositório Docker no Artifact Registry:
+   `gcloud artifacts repositories create saudy --repository-format=docker --location=us-central1`
+4. Configure Workload Identity Federation para GitHub Actions e vincule uma service account com permissões de deploy (`roles/run.admin`, `roles/artifactregistry.writer`, `roles/iam.serviceAccountUser`).
+
+### 2. Configuração no GitHub
+
+Adicione os secrets:
+
+- `GCP_PROJECT_ID`
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_SERVICE_ACCOUNT`
+- `VITE_TINYMCE_API_KEY`
+
+Adicione as variables:
+
+- `VITE_API_URL`
+- `VITE_FACE_API_URL`
+
+### 3. Deploy
+
+1. Faça push na branch `main` (ou rode manualmente em **Actions > Deploy to Cloud Run**).
+2. O workflow irá:
+   - buildar a imagem Docker
+   - publicar no Artifact Registry
+   - fazer deploy no serviço `saudy-gestao-clinica` no Cloud Run
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

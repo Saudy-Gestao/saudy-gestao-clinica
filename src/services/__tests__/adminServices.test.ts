@@ -93,6 +93,15 @@ describe('admin services', () => {
       filters: { branchId: 'b1' },
       force: true,
     });
+
+    await biService.generateWidgets({ total: 1 }, params, { branchId: 'b1' }, 'overview', 'Mostre métricas');
+    expect(mockedApi.post).toHaveBeenLastCalledWith('/admin/bi/widgets', {
+      data: { total: 1 },
+      period: params,
+      filters: { branchId: 'b1' },
+      panelName: 'overview',
+      userPrompt: 'Mostre métricas',
+    });
   });
 
   it('maps medical record endpoints', async () => {
