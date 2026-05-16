@@ -37,8 +37,7 @@ const MODULES: ModuleDefinition[] = [
   { key: 'pre-atendimento', label: 'Autorização e Recepção', route: '/autorizacao-e-recepcao', prefixes: ['/autorizacao-e-recepcao'] },
   { key: 'agendamento', label: 'Agendamento', route: '/agendamento', prefixes: ['/agendamento'] },
   { key: 'pre-agendamento', label: 'Pré-atendimento', route: '/pre-atendimento', prefixes: ['/pre-atendimento', '/pre-agendamento'] },
-  { key: 'historico', label: 'Histórico', route: '/historico', prefixes: ['/historico'] },
-  { key: 'consulta', label: 'Consulta', route: '/consulta', prefixes: ['/consulta'] },
+  { key: 'consulta', label: 'Consulta', route: '/consulta', prefixes: ['/consulta', '/historico'] },
   { key: 'teleconsulta-preparacao', label: 'Teleconsulta', route: '/teleconsulta/preparacao', prefixes: ['/teleconsulta'] },
   { key: 'execucao-exames', label: 'Execução de Exames', route: '/execucao-exames', prefixes: ['/execucao-exames'] },
   { key: 'laudo', label: 'Laudo', route: '/laudo-exames', prefixes: ['/laudo'] },
@@ -162,7 +161,7 @@ export function Header() {
 
   const doctorView = isDoctorUser(userProfile || currentUser);
   const doctorBlockedModules = new Set(['agendamento', 'pre-agendamento', 'pre-atendimento']);
-  const doctorDefaultModules = ['consulta', 'laudo', 'historico'];
+  const doctorDefaultModules = ['consulta', 'laudo'];
 
   const allowedModules = useMemo(() => extractAllowedModules(userProfile || currentUser), [userProfile, currentUser]);
   const companyModuleType = useMemo(

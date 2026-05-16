@@ -17,7 +17,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { AlertTriangle, ChevronLeft, Clock3, Copy, FileText, Grid2x2, List, MoreVertical, Play, Search, Video } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Clock3, Copy, Grid2x2, History, List, MoreVertical, Play, Search, Video } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
@@ -345,6 +345,15 @@ export function Consulta() {
               </Text>
             </Box>
           </Group>
+          <Button
+            variant="light"
+            color="darkBlue"
+            leftSection={<History size={16} />}
+            onClick={() => navigate('/historico')}
+            size={isMobile ? 'xs' : 'sm'}
+          >
+            Histórico
+          </Button>
         </Group>
 
         <Paper
@@ -504,15 +513,7 @@ export function Consulta() {
                                     Copiar link
                                   </Menu.Item>
                                 )}
-                                {isFinalized ? (
-                                  <Menu.Item
-                                    leftSection={<FileText size={14} />}
-                                    disabled={loadingId === row.id}
-                                    onClick={() => openClinicalCare(row)}
-                                  >
-                                    Prontuário
-                                  </Menu.Item>
-                                ) : (
+                                {!isFinalized && (
                                   <Menu.Item
                                     leftSection={row.isTeleconsultation ? <Video size={14} /> : <Play size={14} />}
                                     disabled={loadingId === row.id}
@@ -616,55 +617,44 @@ export function Consulta() {
 
                         <Divider my="sm" />
 
-                        {isFinalized ? (
-                          <Group gap={8} wrap="nowrap">
-                            <Button
-                              size="sm"
-                              color="darkBlue"
-                              leftSection={<FileText size={14} />}
-                              onClick={() => openClinicalCare(row)}
-                              loading={loadingId === row.id}
-                              style={{ flex: 1 }}
-                            >
-                              Prontuário
-                            </Button>
-                          </Group>
-                        ) : row.isTeleconsultation ? (
-                          <Group gap={8} wrap="nowrap">
-                            <Button
-                              size="sm"
-                              variant="default"
-                              leftSection={<Copy size={14} />}
-                              onClick={() => { void copyTeleconsultationLink(row); }}
-                              loading={loadingId === row.id}
-                              style={{ flex: 1 }}
-                            >
-                              Copiar Link
-                            </Button>
-                            <Button
-                              size="sm"
-                              color="darkBlue"
-                              leftSection={<Video size={14} />}
-                              onClick={() => { void startTeleconsultation(row); }}
-                              loading={loadingId === row.id}
-                              style={{ flex: 1 }}
-                            >
-                              Iniciar teleconsulta
-                            </Button>
-                          </Group>
-                        ) : (
-                          <Group gap={8} wrap="nowrap">
-                            <Button
-                              size="sm"
-                              color="darkBlue"
-                              leftSection={<Play size={14} />}
-                              onClick={() => { void startInPersonConsultation(row); }}
-                              loading={loadingId === row.id}
-                              style={{ flex: 1 }}
-                            >
-                              Iniciar consulta
-                            </Button>
-                          </Group>
+                        {!isFinalized && (
+                          row.isTeleconsultation ? (
+                            <Group gap={8} wrap="nowrap">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                leftSection={<Copy size={14} />}
+                                onClick={() => { void copyTeleconsultationLink(row); }}
+                                loading={loadingId === row.id}
+                                style={{ flex: 1 }}
+                              >
+                                Copiar Link
+                              </Button>
+                              <Button
+                                size="sm"
+                                color="darkBlue"
+                                leftSection={<Video size={14} />}
+                                onClick={() => { void startTeleconsultation(row); }}
+                                loading={loadingId === row.id}
+                                style={{ flex: 1 }}
+                              >
+                                Iniciar teleconsulta
+                              </Button>
+                            </Group>
+                          ) : (
+                            <Group gap={8} wrap="nowrap">
+                              <Button
+                                size="sm"
+                                color="darkBlue"
+                                leftSection={<Play size={14} />}
+                                onClick={() => { void startInPersonConsultation(row); }}
+                                loading={loadingId === row.id}
+                                style={{ flex: 1 }}
+                              >
+                                Iniciar consulta
+                              </Button>
+                            </Group>
+                          )
                         )}
                       </Paper>
                     );
