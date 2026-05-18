@@ -85,7 +85,7 @@ export function TermsOfService() {
 
       <h2 style={{ fontSize: 18, marginTop: 32 }}>11. Contato</h2>
       <p>
-        Dúvidas sobre estes Termos: <a href="mailto:contato@saudygestao.com.br">contato@saudygestao.com.br</a>
+        Dúvidas sobre estes Termos: <a href="mailto:saudygestao@gmail.com">saudygestao@gmail.com</a>
       </p>
 
       <hr style={{ marginTop: 48, borderColor: '#eee' }} />

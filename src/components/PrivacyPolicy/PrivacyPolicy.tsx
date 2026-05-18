@@ -66,7 +66,7 @@ export function PrivacyPolicy() {
         <li>Solicitar a portabilidade dos seus dados.</li>
       </ul>
       <p>
-        Para exercer seus direitos, entre em contato pelo e-mail: <a href="mailto:privacidade@saudygestao.com.br">privacidade@saudygestao.com.br</a>
+        Para exercer seus direitos, entre em contato pelo e-mail: <a href="mailto:saudygestao@gmail.com">saudygestao@gmail.com</a>
       </p>
 
       <h2 style={{ fontSize: 18, marginTop: 32 }}>8. Segurança</h2>
@@ -87,7 +87,7 @@ export function PrivacyPolicy() {
         Encarregado de Proteção de Dados (DPO):
       </p>
       <p>
-        E-mail: <a href="mailto:privacidade@saudygestao.com.br">privacidade@saudygestao.com.br</a><br />
+        E-mail: <a href="mailto:saudygestao@gmail.com">saudygestao@gmail.com</a><br />
         Site: <a href="https://saudygestao.com.br" target="_blank" rel="noreferrer">saudygestao.com.br</a>
       </p>
 
