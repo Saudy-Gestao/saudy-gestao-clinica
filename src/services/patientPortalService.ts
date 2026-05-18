@@ -299,6 +299,10 @@ class PatientPortalService {
     return api.put<{ ok: boolean }>('/auth/patient-portal/me/insurance', payload).then((r) => r.data);
   }
 
+  deleteMyAccount() {
+    return api.delete<{ message: string }>('/auth/patient-portal/me/account').then((r) => r.data);
+  }
+
   getReportDicomSeries(reportId: string) {
     return api.get<PatientPortalDicomSeriesResponse>(`/auth/patient-portal/me/reports/${reportId}/dicom/series`)
       .then((r) => r.data);

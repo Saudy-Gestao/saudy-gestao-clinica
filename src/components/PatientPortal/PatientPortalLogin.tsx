@@ -4,6 +4,7 @@ import { ActionIcon, Anchor, Badge, Box, Button, Group, MantineProvider, Paper, 
 import { notifications } from '@mantine/notifications';
 import { Building2, CheckCircle2, LockKeyhole, MailCheck, Moon, ShieldCheck, Sun } from 'lucide-react';
 import patientPortalAuthService, { type CompanyOption } from '../../services/patientPortalAuthService';
+import { LGPDConsentBanner } from '../common/LGPDConsentBanner';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF, isValidCPF, onlyDigits } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
@@ -119,6 +120,7 @@ export function PatientPortalLogin() {
 
   return (
     <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+      <LGPDConsentBanner />
       <Box className="patient-portal-login-page">
         <a href="#patient-portal-login-card" className="patient-portal-skip-link">Ir para formulário de acesso</a>
         <Box className="patient-portal-login-bg" />
@@ -265,6 +267,13 @@ export function PatientPortalLogin() {
 
               <Text ta="center" size="sm" c="dimmed">
                 Área administrativa? <Anchor href="/login">Acesse aqui</Anchor>
+              </Text>
+
+              <Text ta="center" size="xs" c="dimmed">
+                Ao acessar, você concorda com os{' '}
+                <Anchor size="xs" href="/termos" target="_blank" rel="noopener noreferrer">Termos de Serviço</Anchor>
+                {' '}e a{' '}
+                <Anchor size="xs" href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</Anchor>.
               </Text>
             </Stack>
           </Paper>

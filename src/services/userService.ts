@@ -26,6 +26,11 @@ const userService = {
     return response.data;
   },
 
+  deleteMyAccount: async (password: string) => {
+    const response = await api.delete('/auth/users/me', { data: { password } });
+    return response.data;
+  },
+
   addAccessToUser: async (userId: string, accessId: string) => {
     const user = await userService.getUser(userId);
     const currentAccessIds = user.accesses?.map((a: any) => a.id) || [];

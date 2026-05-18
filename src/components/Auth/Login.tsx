@@ -197,6 +197,13 @@ export function Login() {
               >
                 Acessar conta
               </Button>
+
+              <Text ta="center" size="xs" c="dimmed" mt="xs">
+                Ao acessar, você concorda com os{' '}
+                <Anchor size="xs" href="/termos" target="_blank" rel="noopener noreferrer">Termos de Serviço</Anchor>
+                {' '}e a{' '}
+                <Anchor size="xs" href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</Anchor>.
+              </Text>
             </Stack>
           </Box>
         </Box>

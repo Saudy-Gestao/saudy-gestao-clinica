@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
@@ -23,7 +24,7 @@ import {
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { CalendarDays, CalendarPlus, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ScanLine, Stethoscope, Sun, X } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ScanLine, Stethoscope, Sun, Trash2, AlertTriangle, X } from 'lucide-react';
 import PatientSelfScheduling from './PatientSelfScheduling';
 import patientPortalService, {
   type PatientPortalAppointmentItem,
@@ -314,6 +315,8 @@ export function PatientPortalDashboard() {
   const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
   const [sharedLinkUrl, setSharedLinkUrl] = useState('');
   const [sharedLinkExpiresAt, setSharedLinkExpiresAt] = useState<string | null>(null);
+  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const patientName = useMemo(() => summary?.patient?.name || 'Paciente', [summary?.patient?.name]);
   const activeProfile = useMemo(
@@ -626,6 +629,20 @@ export function PatientPortalDashboard() {
     window.location.replace('/portal/login');
   };
 
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      await patientPortalService.deleteMyAccount();
+      patientPortalAuthService.logout();
+      notifications.show({ title: 'Conta excluída', message: 'Sua conta foi excluída permanentemente.', color: 'green' });
+      window.location.replace('/portal/login');
+    } catch {
+      notifications.show({ title: 'Erro', message: 'Não foi possível excluir a conta. Tente novamente.', color: 'red' });
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   if (loading && !summary) {
     return (
       <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
@@ -636,6 +653,46 @@ export function PatientPortalDashboard() {
 
   return (
     <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+      <Modal
+        opened={deleteAccountModalOpen}
+        onClose={() => setDeleteAccountModalOpen(false)}
+        title={
+          <Group gap="xs">
+            <AlertTriangle size={18} color="var(--mantine-color-red-6)" />
+            <Text fw={700} c="red">Excluir minha conta permanentemente</Text>
+          </Group>
+        }
+        centered
+        size="md"
+      >
+        <Stack gap="md">
+          <Alert color="red" variant="filled" icon={<AlertTriangle size={16} />}>
+            <Text fw={700} size="sm">Esta ação não pode ser desfeita.</Text>
+            <Text size="sm" mt={4}>
+              Ao confirmar, seu acesso ao portal será encerrado e seus dados pessoais serão excluídos permanentemente. Não há como recuperar a conta após a exclusão.
+            </Text>
+          </Alert>
+          <Box style={{ background: 'var(--mantine-color-red-0)', borderRadius: 8, padding: '12px 14px' }}>
+            <Text size="sm" fw={600} c="red.8" mb={4}>O que será excluído:</Text>
+            <Stack gap={2}>
+              <Text size="sm">• Seu acesso ao portal do paciente</Text>
+              <Text size="sm">• Seus dados de cadastro e contato</Text>
+              <Text size="sm">• Seu histórico de agendamentos no portal</Text>
+            </Stack>
+            <Text size="xs" c="dimmed" mt={8}>
+              Prontuários e laudos podem ser mantidos pela clínica conforme obrigações legais (CFM/LGPD).
+            </Text>
+          </Box>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteAccountModalOpen(false)} disabled={deletingAccount}>
+              Cancelar
+            </Button>
+            <Button color="red" leftSection={<Trash2 size={14} />} onClick={handleDeleteAccount} loading={deletingAccount}>
+              Sim, excluir permanentemente
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
       <Box className="patient-portal-dashboard-page">
       <a href="#patient-portal-main-content" className="patient-portal-skip-link">Ir para conteúdo principal</a>
       <Box className="patient-portal-dashboard-bg" />
@@ -664,6 +721,15 @@ export function PatientPortalDashboard() {
                 </ActionIcon>
                 <Button leftSection={<LogOut size={16} />} variant="light" color="red" onClick={handleLogout}>
                   Sair
+                </Button>
+                <Button
+                  leftSection={<Trash2 size={14} />}
+                  variant="subtle"
+                  color="red"
+                  size="xs"
+                  onClick={() => setDeleteAccountModalOpen(true)}
+                >
+                  Excluir conta
                 </Button>
               </Group>
               <Box className="patient-portal-profile-switch">

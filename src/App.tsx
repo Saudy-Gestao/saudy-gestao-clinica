@@ -64,6 +64,7 @@ import { TeaEvolucaoTemplates } from './components/TEA/TeaEvolucaoTemplates';
 import { PublicCheckIn } from './components/PublicCheckIn/PublicCheckIn';
 import { PrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicy';
 import { TermsOfService } from './components/PrivacyPolicy/TermsOfService';
+import { LGPDConsentBanner } from './components/common/LGPDConsentBanner';
 import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
 import { TicketFab } from './components/common/TicketFab';
 import { MyTicketsPage } from './components/Tickets/MyTicketsPage';
@@ -173,6 +174,7 @@ function App() {
             notification: 'saudy-toast',
           }}
         />
+        <LGPDConsentBanner />
         <BrowserRouter>
           <Routes>
           <Route 
