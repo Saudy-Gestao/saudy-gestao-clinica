@@ -247,6 +247,7 @@ vi.mock('lucide-react', () => {
     'FolderOpen',
     'GitBranch',
     'Glasses',
+    'Globe',
     'Grid2x2',
     'History',
     'Images',

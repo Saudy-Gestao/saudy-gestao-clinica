@@ -75,4 +75,29 @@ export default {
     const res = await api.post(url);
     return res.data;
   },
+
+  async listOnline() {
+    const res = await api.get<{ appointments: OnlineAppointment[] }>('/care/appointments/online');
+    return res.data.appointments;
+  },
+
+  async resolveOnline(id: string, action: 'confirm' | 'reject', reason?: string) {
+    const res = await api.patch(`/care/appointments/online/${id}`, { action, reason });
+    return res.data;
+  },
+};
+
+export type OnlineAppointment = {
+  id: string;
+  patientName: string | null;
+  patientCpf: string | null;
+  doctorName: string | null;
+  specialty: string | null;
+  date: string | null;
+  time: string | null;
+  type: string | null;
+  convenio: string | null;
+  observations: string | null;
+  durationMinutes: number | null;
+  createdAt: string;
 };

@@ -64,6 +64,19 @@ describe('appointmentService', () => {
     await expect(appointmentService.createWorklist('a1')).resolves.toEqual(data);
     expect(mockedApi.post).toHaveBeenCalledWith('/care/appointments/a1/create-worklist');
   });
+  it('listOnline', async () => {
+    mockedApi.get.mockResolvedValueOnce({ data: { appointments: [] } });
+    await expect(appointmentService.listOnline()).resolves.toEqual([]);
+    expect(mockedApi.get).toHaveBeenCalledWith('/care/appointments/online');
+  });
+  it('resolveOnline confirm', async () => {
+    await expect(appointmentService.resolveOnline('a1', 'confirm')).resolves.toEqual(data);
+    expect(mockedApi.patch).toHaveBeenCalledWith('/care/appointments/online/a1', { action: 'confirm', reason: undefined });
+  });
+  it('resolveOnline reject with reason', async () => {
+    await expect(appointmentService.resolveOnline('a1', 'reject', 'horário indisponível')).resolves.toEqual(data);
+    expect(mockedApi.patch).toHaveBeenCalledWith('/care/appointments/online/a1', { action: 'reject', reason: 'horário indisponível' });
+  });
 });
 
 // ─── authService ──────────────────────────────────────────────────────────────

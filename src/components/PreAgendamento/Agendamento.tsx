@@ -18,10 +18,13 @@ import {
   Badge,
   Tabs,
   useComputedColorScheme,
+  Loader,
+  Textarea,
+  Divider,
 } from '@mantine/core';
 import { Calendar as MantineCalendar } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
-import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User, Globe, Check, X } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { showNotification } from '@mantine/notifications';
@@ -33,7 +36,7 @@ import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { FloatingDateInput } from '../common/FloatingDateInput';
 import { FloatingTextarea } from '../common/FloatingTextarea';
-import appointmentService from '../../services/appointmentService';
+import appointmentService, { type OnlineAppointment } from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import appointmentAttachmentService from '../../services/appointmentAttachmentService';
 import type { AppointmentAttachment } from '../../services/appointmentAttachmentService';
@@ -508,6 +511,12 @@ export function Agendamento() {
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [activeTab, setActiveTab] = useState<string>('hub');
+  const [onlineAppointments, setOnlineAppointments] = useState<OnlineAppointment[]>([]);
+  const [loadingOnline, setLoadingOnline] = useState(false);
+  const [resolvingOnlineId, setResolvingOnlineId] = useState<string | null>(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [, setSchedulingStep] = useState<number>(0);
   const [activeSchedulePeriod, setActiveSchedulePeriod] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
@@ -857,6 +866,11 @@ export function Agendamento() {
     });
   }, [patientsQuery.error]);
   useEffect(() => {
+    if (activeTab === 'online') void loadOnlineAppointments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!insurancesQuery.error) return;
     const err: any = insurancesQuery.error;
     showNotification({
@@ -1092,6 +1106,48 @@ export function Agendamento() {
       color: 'red',
     });
   };
+  const loadOnlineAppointments = async () => {
+    setLoadingOnline(true);
+    try {
+      const data = await appointmentService.listOnline();
+      setOnlineAppointments(data);
+    } catch {
+      showNotification({ title: 'Erro', message: 'Não foi possível carregar agendamentos online.', color: 'red' });
+    } finally {
+      setLoadingOnline(false);
+    }
+  };
+
+  const handleConfirmOnline = async (id: string) => {
+    setResolvingOnlineId(id);
+    try {
+      await appointmentService.resolveOnline(id, 'confirm');
+      setOnlineAppointments((prev) => prev.filter((a) => a.id !== id));
+      showNotification({ title: 'Agendamento confirmado', message: 'O agendamento foi aceito e está agendado.', color: 'green' });
+    } catch {
+      showNotification({ title: 'Erro', message: 'Não foi possível confirmar o agendamento.', color: 'red' });
+    } finally {
+      setResolvingOnlineId(null);
+    }
+  };
+
+  const handleRejectOnline = async () => {
+    if (!rejectTargetId) return;
+    setResolvingOnlineId(rejectTargetId);
+    try {
+      await appointmentService.resolveOnline(rejectTargetId, 'reject', rejectReason || undefined);
+      setOnlineAppointments((prev) => prev.filter((a) => a.id !== rejectTargetId));
+      showNotification({ title: 'Agendamento recusado', message: 'O agendamento foi recusado.', color: 'orange' });
+    } catch {
+      showNotification({ title: 'Erro', message: 'Não foi possível recusar o agendamento.', color: 'red' });
+    } finally {
+      setResolvingOnlineId(null);
+      setRejectModalOpen(false);
+      setRejectTargetId(null);
+      setRejectReason('');
+    }
+  };
+
   const handleEditAgendamento = (agendamento: Agendamento) => {
     const appointmentDate = agendamento.data ?new Date(`${agendamento.data}T00:00:00`) : null;
     setNovoAgendamento({
@@ -2887,7 +2943,7 @@ export function Agendamento() {
                   Voltar
                 </Button>
                 <Text fw={600}>
-                  {activeTab === 'marcacao' ? 'Realizar marcação' : 'Visualizar agenda'}
+                  {activeTab === 'marcacao' ? 'Realizar marcação' : activeTab === 'online' ? 'Agendamentos Online' : 'Visualizar agenda'}
                 </Text>
               </Group>
             </Group>
@@ -2977,6 +3033,46 @@ export function Agendamento() {
                   </Group>
                   <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
                     Consultar agenda, filtrar atendimentos e acompanhar horários já marcados.
+                  </Text>
+                </Stack>
+              </UnstyledButton>
+
+              <UnstyledButton
+                onClick={() => setActiveTab('online')}
+                style={{
+                  border: `1px solid ${isDarkMode ? 'rgba(130, 170, 255, 0.3)' : 'rgba(13, 46, 108, 0.2)'}`,
+                  borderRadius: 16,
+                  padding: isMobile ? '18px' : '24px',
+                  background: isDarkMode ? 'rgba(30, 60, 110, 0.78)' : 'rgba(235, 242, 255, 0.7)',
+                  textAlign: 'left',
+                  transition: 'all 120ms ease',
+                  minHeight: isMobile ? 170 : 260,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Stack gap={8}>
+                  <Group gap="xs">
+                    <Box
+                      w={34}
+                      h={34}
+                      style={{
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Globe size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    </Box>
+                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Agendamentos Online</Text>
+                    {onlineAppointments.length > 0 && (
+                      <Badge color="orange" size="sm">{onlineAppointments.length}</Badge>
+                    )}
+                  </Group>
+                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
+                    Revisar e confirmar solicitações de agendamento feitas pelos pacientes pelo portal.
                   </Text>
                 </Stack>
               </UnstyledButton>
@@ -4408,7 +4504,99 @@ export function Agendamento() {
             </Box>
           )}
           </Tabs.Panel>
+
+          <Tabs.Panel value="online">
+            <Stack gap="md">
+              {loadingOnline ? (
+                <Group justify="center" py="xl"><Loader /></Group>
+              ) : onlineAppointments.length === 0 ? (
+                <Paper p="xl" withBorder radius="md">
+                  <Stack align="center" gap="xs">
+                    <Globe size={32} color="var(--mantine-color-dimmed)" />
+                    <Text c="dimmed" ta="center">Nenhum agendamento online pendente de revisão.</Text>
+                  </Stack>
+                </Paper>
+              ) : (
+                onlineAppointments.map((a) => (
+                  <Paper key={a.id} p="md" withBorder radius="md">
+                    <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
+                      <Stack gap={4} style={{ flex: 1 }}>
+                        <Group gap="xs">
+                          <Text fw={700}>{a.patientName || '—'}</Text>
+                          {a.patientCpf && <Text size="sm" c="dimmed">CPF: {formatCPF(a.patientCpf)}</Text>}
+                        </Group>
+                        <Group gap="xs" wrap="wrap">
+                          <Badge variant="light" color="blue">{a.specialty || '—'}</Badge>
+                          {a.convenio && <Badge variant="light" color="teal">{a.convenio}</Badge>}
+                          {a.type && <Badge variant="outline">{a.type}</Badge>}
+                        </Group>
+                        <Group gap="xs">
+                          <Clock3 size={14} />
+                          <Text size="sm">{a.date ? a.date.split('-').reverse().join('/') : '—'} às {a.time || '—'}</Text>
+                          <User size={14} />
+                          <Text size="sm">{a.doctorName || '—'}</Text>
+                        </Group>
+                        {a.observations && (
+                          <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>{a.observations}</Text>
+                        )}
+                        <Text size="xs" c="dimmed">Solicitado em: {new Date(a.createdAt).toLocaleString('pt-BR')}</Text>
+                      </Stack>
+                      <Group gap="xs" align="flex-start">
+                        <Button
+                          size="xs"
+                          color="green"
+                          leftSection={<Check size={13} />}
+                          loading={resolvingOnlineId === a.id}
+                          onClick={() => handleConfirmOnline(a.id)}
+                        >
+                          Aceitar
+                        </Button>
+                        <Button
+                          size="xs"
+                          color="red"
+                          variant="light"
+                          leftSection={<X size={13} />}
+                          disabled={resolvingOnlineId === a.id}
+                          onClick={() => { setRejectTargetId(a.id); setRejectModalOpen(true); }}
+                        >
+                          Recusar
+                        </Button>
+                      </Group>
+                    </Group>
+                  </Paper>
+                ))
+              )}
+            </Stack>
+          </Tabs.Panel>
         </Tabs>
+
+        <Modal
+          opened={rejectModalOpen}
+          onClose={() => { setRejectModalOpen(false); setRejectTargetId(null); setRejectReason(''); }}
+          title="Recusar agendamento"
+          centered
+        >
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">Informe o motivo da recusa (opcional). O paciente não será notificado automaticamente.</Text>
+            <Textarea
+              label="Motivo"
+              placeholder="Ex: horário indisponível, profissional de folga..."
+              value={rejectReason}
+              onChange={(e) => { const v = e.currentTarget.value; setRejectReason(v); }}
+              rows={3}
+            />
+            <Divider />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => { setRejectModalOpen(false); setRejectTargetId(null); setRejectReason(''); }}>
+                Cancelar
+              </Button>
+              <Button color="red" loading={resolvingOnlineId === rejectTargetId} onClick={handleRejectOnline}>
+                Confirmar recusa
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
       </Box>
       <Modal
         opened={detailOpen}
