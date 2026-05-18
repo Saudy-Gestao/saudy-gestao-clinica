@@ -38,6 +38,7 @@ import facialRecognitionService from '../../services/facialRecognitionService';
 import consultationService from '../../services/consultationService';
 import convenioAuthorizationService, { type ConvenioAuthorizationAttachment } from '../../services/convenioAuthorizationService';
 import teleconsultationLinkService, { type TeleconsultationEligibility } from '../../services/teleconsultationLinkService';
+import branchSettingsService from '../../services/branchSettingsService';
 import { formatCPF, formatDateInput, formatPhone, normalizeEmail, onlyDigits } from '../../utils/formatters';
 import { fetchReceptionQueue, useReceptionQueueQuery } from '../../hooks/useReceptionQueueQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
@@ -167,6 +168,7 @@ export function PreAtendimento() {
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistPatient, setChecklistPatient] = useState<Patient | null>(null);
   const [checklistPreAttendanceId, setChecklistPreAttendanceId] = useState<string | null>(null);
+  const [requireFacialForPatientRegistration, setRequireFacialForPatientRegistration] = useState(true);
   const [facialValidationOpen, setFacialValidationOpen] = useState(false);
   const [facialValidationLoading, setFacialValidationLoading] = useState(false);
   const [facialValidationVerified, setFacialValidationVerified] = useState(false);
@@ -314,7 +316,8 @@ export function PreAtendimento() {
       ? checklistData.pagamentoRealizado && checklistData.valorPagamento > 0 && checklistData.formaPagamento.trim().length > 0
       : checklistData.guiaNumero.trim().length > 0;
 
-    return basicChecks && authorizationChecks && checklistData.agendaConferida && facialValidationVerified;
+    const facialCheck = requireFacialForPatientRegistration ? facialValidationVerified : true;
+    return basicChecks && authorizationChecks && checklistData.agendaConferida && facialCheck;
   };
 
   const fileToBase64 = async (file: File) => new Promise<string>((resolve, reject) => {
@@ -614,6 +617,21 @@ export function PreAtendimento() {
       return null;
     }
   };
+
+  useEffect(() => {
+    const loadBranchSettings = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const branchId = user?.branchId || user?.branch?.id || user?.sector?.branch?.id;
+        if (!branchId) return;
+        const settings = await branchSettingsService.getBranchSettings(branchId);
+        setRequireFacialForPatientRegistration(settings?.requireFacialForPatientRegistration ?? true);
+      } catch {
+        setRequireFacialForPatientRegistration(true);
+      }
+    };
+    loadBranchSettings();
+  }, []);
 
   useEffect(() => {
     const mapped = dedupeReceptionPatients(
@@ -2254,30 +2272,34 @@ export function PreAtendimento() {
                           setChecklistData((prev) => ({ ...prev, agendaConferida: checked }));
                         }}
                       />
-                      <Checkbox
-                        label="Validação de identidade realizada"
-                        checked={facialValidationVerified}
-                        readOnly
-                      />
-                    </Group>
-
-                    <Group gap="md" wrap="wrap">
-                      <Button
-                        bg={DARK_BLUE}
-                        leftSection={<Camera size={16} />}
-                        onClick={() => setFacialValidationOpen(true)}
-                        loading={facialValidationLoading}
-                      >
-                        Realizar validação facial
-                      </Button>
-
-                      {(facialValidationName || facialValidationTrust !== null) && (
-                        <Badge color={facialValidationVerified ? 'green' : 'red'} variant="light" size="lg">
-                          {facialValidationVerified ? 'Validado' : 'Divergente'}
-                          {facialValidationTrust !== null ? ` • ${(facialValidationTrust * 100).toFixed(1)}%` : ''}
-                        </Badge>
+                      {requireFacialForPatientRegistration && (
+                        <Checkbox
+                          label="Validação de identidade realizada"
+                          checked={facialValidationVerified}
+                          readOnly
+                        />
                       )}
                     </Group>
+
+                    {requireFacialForPatientRegistration && (
+                      <Group gap="md" wrap="wrap">
+                        <Button
+                          bg={DARK_BLUE}
+                          leftSection={<Camera size={16} />}
+                          onClick={() => setFacialValidationOpen(true)}
+                          loading={facialValidationLoading}
+                        >
+                          Realizar validação facial
+                        </Button>
+
+                        {(facialValidationName || facialValidationTrust !== null) && (
+                          <Badge color={facialValidationVerified ? 'green' : 'red'} variant="light" size="lg">
+                            {facialValidationVerified ? 'Validado' : 'Divergente'}
+                            {facialValidationTrust !== null ? ` • ${(facialValidationTrust * 100).toFixed(1)}%` : ''}
+                          </Badge>
+                        )}
+                      </Group>
+                    )}
 
                     {teleconsultationEligibilityLoading ? (
                       <Text size="sm" c="dimmed">Validando elegibilidade da teleconsulta...</Text>

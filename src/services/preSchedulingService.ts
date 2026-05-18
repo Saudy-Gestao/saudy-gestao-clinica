@@ -97,6 +97,8 @@ export interface PreSchedulingItem {
 export interface PublicPreSchedulingMeta {
   id: string;
   branchId?: string | null;
+  requireFacialForPatientRegistration?: boolean;
+  patientEmailMasked?: string | null;
   patientName: string;
   appointment?: {
     specialty?: string | null;
@@ -255,6 +257,20 @@ const preSchedulingService = {
     return response.data as {
       verified: boolean;
       trust?: number | null;
+      patientName?: string | null;
+      verificationExpiresAt?: string | null;
+    };
+  },
+
+  async requestEmailCode(token: string) {
+    const response = await publicApi.post(`/care/pre-scheduling/public/${token}/request-email-code`);
+    return response.data as { sent: boolean; emailMasked: string };
+  },
+
+  async verifyEmailCode(token: string, code: string) {
+    const response = await publicApi.post(`/care/pre-scheduling/public/${token}/verify-email-code`, { code });
+    return response.data as {
+      verified: boolean;
       patientName?: string | null;
       verificationExpiresAt?: string | null;
     };

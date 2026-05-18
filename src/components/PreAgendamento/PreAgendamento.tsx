@@ -652,10 +652,12 @@ export function PreAgendamento() {
                                   const canReviewDocs = Boolean(item.docsCount);
                                   const isCanceled = status === 'CANCELED';
                                   const isCompleted = status === 'COMPLETED';
+                                  const isParticular = !item.convenio;
                                   const canManualFinalize = Boolean(item.isTeleconsultation) && isPreAuthorized && !isCanceled && !item.isResolved;
 
                                   return (
                                     <>
+                                {!isParticular && (
                                 <Menu.Item
                                   leftSection={<ShieldCheck size={14} />}
                                   disabled={item.isResolved || viewMode === 'history' || isPreAuthorized || isCanceled}
@@ -663,6 +665,7 @@ export function PreAgendamento() {
                                 >
                                   Pré-autorizar
                                 </Menu.Item>
+                                )}
                                 <Menu.Item
                                   leftSection={<LinkIcon size={14} />}
                                   disabled={

@@ -28,6 +28,7 @@ export interface PublicBranchInfo {
   tradeName: string;
   phone?: string | null;
   publicCheckInEnabled: boolean;
+  requireFacialForPatientRegistration?: boolean;
 }
 
 export interface PublicCheckInAppointment {
@@ -67,6 +68,11 @@ const publicCheckInService = {
   },
 
   async facialCheckIn(payload: PublicCheckInPayload): Promise<PublicCheckInResponse> {
+    const response = await publicApi.post('/care/public-check-in/facial', payload);
+    return response.data;
+  },
+
+  async cpfCheckIn(payload: { branchId: string; patientCpf: string; totem?: number }): Promise<PublicCheckInResponse> {
     const response = await publicApi.post('/care/public-check-in/facial', payload);
     return response.data;
   },

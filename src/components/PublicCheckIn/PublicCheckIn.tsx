@@ -135,6 +135,9 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     statusMessageNoConfirmed: 'Paciente reconhecido, mas sem agendamento confirmado para hoje.',
     statusMessagePatientNotFound: 'Paciente não encontrado para esta filial.',
     statusMessageFaceNotRecognized: 'Não conseguimos reconhecer seu rosto com confiança suficiente.',
+    cpfOnlyTitle: 'Informe seu CPF',
+    cpfOnlyDescription: 'Digite seu CPF para localizar seu cadastro e entrar na fila de atendimento.',
+    cpfOnlyButton: 'Confirmar check-in',
   },
   'en-US': {
     languageLabel: 'Language',
@@ -148,7 +151,7 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     statusFaceNotRecognized: 'Face not recognized',
     titleCheckInArrival: 'Arrival check-in',
     titleEnterKiosk: 'Enter kiosk mode',
-    subtitleCheckInArrival: 'Position your face in front of the camera so we can identify you and find today’s appointment.',
+    subtitleCheckInArrival: "Position your face in front of the camera so we can identify you and find today's appointment.",
     subtitleEnterKiosk: 'Use the clinic login to enable this kiosk, keep operations auditable, and unlock branch check-in.',
     loginEmailLabel: 'User email',
     loginEmailPlaceholder: 'user@clinic.com',
@@ -182,7 +185,7 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     cpfPrefix: 'CPF',
     faceRetryHint: 'You can try again with better lighting or proceed to reception for manual identification.',
     trustPrefix: 'Recognition confidence',
-    appointmentsTodayTitle: 'Today’s appointments found',
+    appointmentsTodayTitle: "Today's appointments found",
     scheduledFallback: 'Scheduled',
     procedureFallback: 'Procedure',
     doctorFallback: 'Professional not informed',
@@ -190,7 +193,7 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     facialRegisterTitle: 'Patient facial registration',
     facialRecognitionTitle: 'Arrival facial recognition',
     facialRegisterDescription: 'Center your face in the camera to complete facial registration.',
-    facialRecognitionDescription: 'Center your face in the camera. We will validate your identity and locate today’s appointment.',
+    facialRecognitionDescription: "Center your face in the camera. We will validate your identity and locate today's appointment.",
     closeKioskModalTitle: 'Close kiosk',
     closeKioskModalText: 'To avoid accidental shutdown, confirm the authenticated user password before closing this kiosk.',
     userPasswordLabel: 'User password',
@@ -233,6 +236,9 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     statusMessageNoConfirmed: 'Patient recognized, but there is no confirmed appointment for today.',
     statusMessagePatientNotFound: 'Patient not found for this branch.',
     statusMessageFaceNotRecognized: 'We could not recognize your face with enough confidence.',
+    cpfOnlyTitle: 'Enter your CPF',
+    cpfOnlyDescription: 'Enter your CPF to find your record and join the queue.',
+    cpfOnlyButton: 'Confirm check-in',
   },
   'es-ES': {
     languageLabel: 'Idioma',
@@ -331,6 +337,9 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     statusMessageNoConfirmed: 'Paciente reconocido, pero sin cita confirmada para hoy.',
     statusMessagePatientNotFound: 'Paciente no encontrado para esta sucursal.',
     statusMessageFaceNotRecognized: 'No pudimos reconocer su rostro con confianza suficiente.',
+    cpfOnlyTitle: 'Ingrese su CPF',
+    cpfOnlyDescription: 'Ingrese su CPF para localizar su registro y unirse a la fila de atención.',
+    cpfOnlyButton: 'Confirmar check-in',
   },
   'fr-FR': {
     languageLabel: 'Langue',
@@ -338,14 +347,14 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     languageEn: 'Anglais',
     languageEs: 'Espagnol',
     languageFr: 'Français',
-    statusQueued: 'Dans la file d’accueil',
+    statusQueued: "Dans la file d'accueil",
     statusNoConfirmed: 'Aucun rendez-vous confirmé',
     statusPatientNotFound: 'Patient introuvable',
     statusFaceNotRecognized: 'Visage non reconnu',
-    titleCheckInArrival: 'Check-in d’arrivée',
+    titleCheckInArrival: "Check-in d'arrivée",
     titleEnterKiosk: 'Entrer en mode borne',
     subtitleCheckInArrival: 'Positionnez votre visage devant la caméra pour vous identifier et retrouver votre rendez-vous du jour.',
-    subtitleEnterKiosk: 'Utilisez le login de la clinique pour activer cette borne, garder l’opération traçable et libérer le check-in de l’unité.',
+    subtitleEnterKiosk: "Utilisez le login de la clinique pour activer cette borne, garder l'opération traçable et libérer le check-in de l'unité.",
     loginEmailLabel: 'Email utilisateur',
     loginEmailPlaceholder: 'utilisateur@clinique.com',
     passwordLabel: 'Mot de passe',
@@ -360,46 +369,46 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     cpfPlaceholder: '000.000.000-00',
     cancel: 'Annuler',
     findRecord: 'Rechercher le dossier',
-    manualFallbackHint: 'Si nous ne pouvons pas vous identifier, l’accueil pourra poursuivre manuellement.',
-    blockedHint: 'Sans connexion, la borne reste bloquée et le check-in n’est pas disponible.',
+    manualFallbackHint: "Si nous ne pouvons pas vous identifier, l'accueil pourra poursuivre manuellement.",
+    blockedHint: "Sans connexion, la borne reste bloquée et le check-in n'est pas disponible.",
     resultTitle: 'Résultat du check-in',
     branchConfigured: 'Unité configurée',
-    branchLoading: 'Chargement de l’unité...',
-    branchNotIdentified: 'Impossible d’identifier l’unité configurée.',
+    branchLoading: "Chargement de l'unité...",
+    branchNotIdentified: "Impossible d'identifier l'unité configurée.",
     resultNeedsLogin: 'Connectez-vous avec un utilisateur de la clinique pour activer le check-in de cette unité.',
     closeKiosk: 'Fermer la borne',
-    kioskLockedTitle: 'Borne bloquée jusqu’à authentification',
+    kioskLockedTitle: "Borne bloquée jusqu'à authentification",
     kioskLockedDescription: 'Le check-in de cette unité exige désormais un login utilisateur. Après connexion, le flux reste traçable et la borne peut être fermée via logout.',
     checkInOffTitle: 'Check-in désactivé pour cette unité',
-    checkInOffDescription: 'Cette URL est correcte, mais le check-in public doit encore être activé dans les paramètres de l’unité.',
-    waitingTitle: 'En attente d’identification',
-    waitingDescription: 'Dès la fin de la reconnaissance faciale, nous afficherons ici si vous avez été envoyé dans la file d’accueil.',
-    unknownPatient: 'Nous n’avons pas pu vous identifier',
+    checkInOffDescription: "Cette URL est correcte, mais le check-in public doit encore être activé dans les paramètres de l'unité.",
+    waitingTitle: "En attente d'identification",
+    waitingDescription: "Dès la fin de la reconnaissance faciale, nous afficherons ici si vous avez été envoyé dans la file d'accueil.",
+    unknownPatient: "Nous n'avons pas pu vous identifier",
     cpfPrefix: 'CPF',
-    faceRetryHint: 'Vous pouvez réessayer avec un meilleur éclairage ou aller à l’accueil pour une identification manuelle.',
+    faceRetryHint: "Vous pouvez réessayer avec un meilleur éclairage ou aller à l'accueil pour une identification manuelle.",
     trustPrefix: 'Confiance de reconnaissance',
-    appointmentsTodayTitle: 'Rendez-vous trouvés aujourd’hui',
+    appointmentsTodayTitle: "Rendez-vous trouvés aujourd'hui",
     scheduledFallback: 'Planifié',
     procedureFallback: 'Procédure',
     doctorFallback: 'Professionnel non renseigné',
     insurancePrefix: 'Assurance',
     facialRegisterTitle: 'Enregistrement facial du patient',
-    facialRecognitionTitle: 'Reconnaissance faciale d’arrivée',
-    facialRegisterDescription: 'Positionnez votre visage au centre de la caméra pour terminer l’enregistrement facial.',
+    facialRecognitionTitle: "Reconnaissance faciale d'arrivée",
+    facialRegisterDescription: "Positionnez votre visage au centre de la caméra pour terminer l'enregistrement facial.",
     facialRecognitionDescription: 'Positionnez votre visage au centre de la caméra. Nous allons valider votre identité et retrouver votre rendez-vous du jour.',
     closeKioskModalTitle: 'Fermer la borne',
-    closeKioskModalText: 'Pour éviter une fermeture accidentelle, confirmez le mot de passe de l’utilisateur authentifié.',
+    closeKioskModalText: "Pour éviter une fermeture accidentelle, confirmez le mot de passe de l'utilisateur authentifié.",
     userPasswordLabel: 'Mot de passe utilisateur',
     userPasswordPlaceholder: 'Saisissez le mot de passe',
     confirmClose: 'Confirmer la fermeture',
     loginRequiredTitle: 'Connexion requise',
     loginRequiredMessage: 'Saisissez email et mot de passe pour activer le mode borne.',
     kioskReleasedTitle: 'Borne activée',
-    kioskReleasedMessage: 'Connexion réussie. Le check-in est prêt à l’usage.',
+    kioskReleasedMessage: "Connexion réussie. Le check-in est prêt à l'usage.",
     loginErrorTitle: 'Erreur de connexion',
-    loginErrorMessage: 'Impossible d’authentifier cet utilisateur.',
+    loginErrorMessage: "Impossible d'authentifier cet utilisateur.",
     confirmNeededTitle: 'Confirmation requise',
-    confirmNeededMessage: 'Saisissez le mot de passe de l’utilisateur authentifié pour fermer la borne.',
+    confirmNeededMessage: "Saisissez le mot de passe de l'utilisateur authentifié pour fermer la borne.",
     kioskClosedTitle: 'Borne fermée',
     kioskClosedMessage: 'Le check-in a été désactivé dans ce navigateur.',
     wrongPasswordTitle: 'Mot de passe incorrect',
@@ -413,22 +422,25 @@ const UI_COPY: Record<UiLanguage, Record<string, string>> = {
     branchMissingMessage: 'Cette borne doit être liée à une unité valide.',
     lookupErrorTitle: 'Erreur de recherche',
     lookupErrorMessage: 'Impossible de localiser votre dossier avec le CPF saisi.',
-    faceRegisterDoneMessageQueued: 'Enregistrement facial terminé. Vous avez déjà été envoyé dans la file d’accueil.',
+    faceRegisterDoneMessageQueued: "Enregistrement facial terminé. Vous avez déjà été envoyé dans la file d'accueil.",
     faceRegisterDoneMessageDefault: 'Enregistrement facial terminé avec succès.',
     faceRegisterDoneTitle: 'Enregistrement facial terminé',
     faceRegisterDoneToast: 'Votre visage a été enregistré avec succès.',
-    faceRegisterErrorTitle: 'Erreur d’enregistrement facial',
-    faceRegisterErrorMessage: 'Impossible de terminer l’enregistrement facial.',
+    faceRegisterErrorTitle: "Erreur d'enregistrement facial",
+    faceRegisterErrorMessage: "Impossible de terminer l'enregistrement facial.",
     kioskUrlMissing: 'URL de la borne sans unité configurée.',
-    branchLookupError: 'Impossible d’identifier l’unité configurée.',
-    kioskNeedsBranch: 'Cette borne doit être ouverte avec une unité configurée dans l’URL.',
+    branchLookupError: "Impossible d'identifier l'unité configurée.",
+    kioskNeedsBranch: "Cette borne doit être ouverte avec une unité configurée dans l'URL.",
     checkInDisabledError: 'Le check-in public de cette unité est désactivé pour le moment.',
-    faceNotRecognizedError: 'Nous n’avons pas pu reconnaître votre visage avec une confiance suffisante.',
-    checkInGenericError: 'Impossible de terminer le check-in. Réessayez ou contactez l’accueil.',
-    statusMessageQueued: 'Check-in effectué avec succès. Patient envoyé dans la file d’accueil.',
-    statusMessageNoConfirmed: 'Patient reconnu, mais aucun rendez-vous confirmé pour aujourd’hui.',
+    faceNotRecognizedError: "Nous n'avons pas pu reconnaître votre visage avec une confiance suffisante.",
+    checkInGenericError: "Impossible de terminer le check-in. Réessayez ou contactez l'accueil.",
+    statusMessageQueued: "Check-in effectué avec succès. Patient envoyé dans la file d'accueil.",
+    statusMessageNoConfirmed: "Patient reconnu, mais aucun rendez-vous confirmé pour aujourd'hui.",
     statusMessagePatientNotFound: 'Patient introuvable pour cette unité.',
-    statusMessageFaceNotRecognized: 'Nous n’avons pas pu reconnaître votre visage avec une confiance suffisante.',
+    statusMessageFaceNotRecognized: "Nous n'avons pas pu reconnaître votre visage avec une confiance suffisante.",
+    cpfOnlyTitle: "Entrez votre CPF",
+    cpfOnlyDescription: "Entrez votre CPF pour retrouver votre dossier et rejoindre la file d'attente.",
+    cpfOnlyButton: "Confirmer le check-in",
   },
 };
 
@@ -473,6 +485,8 @@ export function PublicCheckIn() {
   const [logoutLoading, setLogoutLoading] = useState(false);
 
   const [facialCaptureOpen, setFacialCaptureOpen] = useState(false);
+  const [cpfOnlyInput, setCpfOnlyInput] = useState('');
+  const [cpfOnlyLoading, setCpfOnlyLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [recognitionResult, setRecognitionResult] = useState<FacialScanResponse | null>(null);
   const [checkInResult, setCheckInResult] = useState<PublicCheckInResponse | null>(null);
@@ -515,6 +529,7 @@ export function PublicCheckIn() {
     setCheckInResult(null);
     setFirstTimeMode(false);
     setFirstTimeCpf('');
+    setCpfOnlyInput('');
     setPendingFirstTimeCheckIn(null);
   };
 
@@ -724,6 +739,41 @@ export function PublicCheckIn() {
     setPendingFirstTimeCheckIn(null);
   };
 
+  const handleCpfOnlyCheckIn = async () => {
+    const cpfDigits = onlyDigits(cpfOnlyInput);
+    if (cpfDigits.length !== 11) {
+      showNotification({ title: t.invalidCpfTitle, message: t.invalidCpfMessage, color: 'yellow' });
+      return;
+    }
+    if (!branchId) {
+      showNotification({ title: t.branchMissingTitle, message: t.branchMissingMessage, color: 'red' });
+      return;
+    }
+    setCpfOnlyLoading(true);
+    try {
+      const result = await publicCheckInService.cpfCheckIn({ branchId, patientCpf: cpfDigits, totem: 1 });
+      setCheckInResult(result);
+      setCpfOnlyInput('');
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicBranchInfo, branchId] });
+    } catch (error: any) {
+      const responseData = error?.response?.data;
+      if (error?.response?.status === 401) {
+        publicCheckInSessionService.logout();
+        setIsAuthenticated(false);
+        setCurrentUserName('');
+        showNotification({ title: t.sessionExpiredTitle, message: t.sessionExpiredMessageCheckIn, color: 'yellow' });
+        return;
+      }
+      if (responseData?.status) {
+        setCheckInResult(responseData);
+      } else {
+        setCheckInResult({ status: 'PATIENT_NOT_FOUND', message: responseData?.message || error?.message || t.checkInGenericError });
+      }
+    } finally {
+      setCpfOnlyLoading(false);
+    }
+  };
+
   const handleFirstTimeLookup = async () => {
     const cpfDigits = onlyDigits(firstTimeCpf);
     if (cpfDigits.length !== 11) {
@@ -828,6 +878,7 @@ export function PublicCheckIn() {
   };
 
   const checkInDisabled = isAuthenticated && branchInfo && !branchInfo.publicCheckInEnabled;
+  const requireFacial = branchInfo?.requireFacialForPatientRegistration !== false;
 
   return (
     <Box bg={DARK_SURFACE} style={{ minHeight: '100vh' }}>
@@ -949,35 +1000,81 @@ export function PublicCheckIn() {
                   {t.kioskAuthenticated}{currentUserName ? ` • ${currentUserName}` : ''}
                 </Badge>
 
-                <Button
-                  size="xl"
-                  radius="xl"
-                  leftSection={<Camera size={22} />}
-                  onClick={() => setFacialCaptureOpen(true)}
-                  loading={processing}
-                  fullWidth
-                  disabled={firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
-                >
-                  {t.startFacial}
-                </Button>
+                {requireFacial ? (
+                  <>
+                    <Button
+                      size="xl"
+                      radius="xl"
+                      leftSection={<Camera size={22} />}
+                      onClick={() => setFacialCaptureOpen(true)}
+                      loading={processing}
+                      fullWidth
+                      disabled={firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
+                    >
+                      {t.startFacial}
+                    </Button>
 
-                <Button
-                  size="md"
-                  radius="xl"
-                  variant="light"
-                  color="blue"
-                  leftSection={<Camera size={18} />}
-                  onClick={handleStartFirstTimeFlow}
-                  disabled={processing || firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
-                  fullWidth
-                  styles={{
-                    root: {
-                      border: '1px solid rgba(120, 148, 255, 0.42)',
-                    },
-                  }}
-                >
-                  {t.firstTimeButton}
-                </Button>
+                    <Button
+                      size="md"
+                      radius="xl"
+                      variant="light"
+                      color="blue"
+                      leftSection={<Camera size={18} />}
+                      onClick={handleStartFirstTimeFlow}
+                      disabled={processing || firstTimeLookupLoading || firstTimeRegistering || Boolean(checkInDisabled)}
+                      fullWidth
+                      styles={{
+                        root: {
+                          border: '1px solid rgba(120, 148, 255, 0.42)',
+                        },
+                      }}
+                    >
+                      {t.firstTimeButton}
+                    </Button>
+                  </>
+                ) : (
+                  <Paper
+                    radius="xl"
+                    p="lg"
+                    withBorder
+                    bg={CARD_SURFACE}
+                    style={{ borderColor: 'rgba(120, 148, 255, 0.24)', width: '100%' }}
+                  >
+                    <Stack gap="sm">
+                      <Box>
+                        <Text c="white" fw={700}>{t.cpfOnlyTitle}</Text>
+                        <Text c="dimmed" size="sm">{t.cpfOnlyDescription}</Text>
+                      </Box>
+                      <TextInput
+                        label={t.cpfLabel}
+                        labelProps={{ style: { color: 'white' } }}
+                        placeholder={t.cpfPlaceholder}
+                        value={cpfOnlyInput}
+                        onChange={(event) => setCpfOnlyInput(formatCpf(event.currentTarget.value))}
+                        maxLength={14}
+                        disabled={Boolean(checkInDisabled)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleCpfOnlyCheckIn(); }}
+                        styles={{
+                          input: {
+                            background: 'rgba(255,255,255,0.04)',
+                            color: 'white',
+                            borderColor: 'rgba(120, 148, 255, 0.24)',
+                          },
+                        }}
+                      />
+                      <Button
+                        size="lg"
+                        radius="xl"
+                        onClick={handleCpfOnlyCheckIn}
+                        loading={cpfOnlyLoading}
+                        disabled={Boolean(checkInDisabled)}
+                        fullWidth
+                      >
+                        {t.cpfOnlyButton}
+                      </Button>
+                    </Stack>
+                  </Paper>
+                )}
               </>
             )}
 

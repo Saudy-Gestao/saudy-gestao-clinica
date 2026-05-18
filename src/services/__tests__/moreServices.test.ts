@@ -417,6 +417,14 @@ describe('preSchedulingService', () => {
     await preSchedulingService.finalizePublicDocuments('token-1', { patientComplaints: 'none' });
     expect(mockPublicApi.post).toHaveBeenCalledWith(expect.stringContaining('finalize'), expect.anything());
   });
+  it('requestEmailCode', async () => {
+    await preSchedulingService.requestEmailCode('token-1');
+    expect(mockPublicApi.post).toHaveBeenCalledWith('/care/pre-scheduling/public/token-1/request-email-code');
+  });
+  it('verifyEmailCode', async () => {
+    await preSchedulingService.verifyEmailCode('token-1', '123456');
+    expect(mockPublicApi.post).toHaveBeenCalledWith('/care/pre-scheduling/public/token-1/verify-email-code', { code: '123456' });
+  });
 });
 
 // ─── inventoryService - remaining ────────────────────────────────────────────

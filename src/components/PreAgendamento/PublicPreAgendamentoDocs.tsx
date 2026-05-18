@@ -10,6 +10,7 @@ import {
   Loader,
   MultiSelect,
   Paper,
+  PinInput,
   Select,
   Stepper,
   Stack,
@@ -48,6 +49,12 @@ export function PublicPreAgendamentoDocs() {
   const [verified, setVerified] = useState(false);
   const [facialOpen, setFacialOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [emailCodeMasked, setEmailCodeMasked] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [requestingCode, setRequestingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const [docType, setDocType] = useState<string | null>('DOCUMENTO_IDENTIDADE');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -172,6 +179,65 @@ export function PublicPreAgendamentoDocs() {
       });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleRequestEmailCode = async () => {
+    if (!token) return;
+    setRequestingCode(true);
+    try {
+      const result = await preSchedulingService.requestEmailCode(token);
+      setEmailCodeSent(true);
+      setEmailCodeMasked(result.emailMasked);
+      setResendCooldown(60);
+      const interval = window.setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) { window.clearInterval(interval); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
+      showNotification({
+        title: 'Código enviado',
+        message: `Um código de 6 dígitos foi enviado para ${result.emailMasked}.`,
+        color: 'green',
+      });
+    } catch (err: any) {
+      if (err?.response?.status === 410) setExpired(true);
+      showNotification({
+        title: 'Erro ao enviar código',
+        message: resolveApiErrorMessage(err, 'Não foi possível enviar o código de verificação.'),
+        color: 'red',
+      });
+    } finally {
+      setRequestingCode(false);
+    }
+  };
+
+  const handleVerifyEmailCode = async () => {
+    if (!token || emailCode.length !== 6) return;
+    setVerifyingCode(true);
+    try {
+      const result = await preSchedulingService.verifyEmailCode(token, emailCode);
+      setVerified(true);
+      showNotification({
+        title: 'Identidade confirmada',
+        message: meta?.anamnesis ? 'Você já pode responder a anamnese e enviar os documentos.' : 'Você já pode enviar os documentos.',
+        color: 'green',
+      });
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.publicPreSchedulingMeta, token || ''] });
+      if (result.verificationExpiresAt) {
+        setExpired(false);
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 410) setExpired(true);
+      setEmailCode('');
+      showNotification({
+        title: 'Código inválido',
+        message: resolveApiErrorMessage(err, 'Código incorreto ou expirado. Tente novamente.'),
+        color: 'red',
+      });
+    } finally {
+      setVerifyingCode(false);
     }
   };
 
@@ -300,7 +366,7 @@ export function PublicPreAgendamentoDocs() {
           <Stack gap={4}>
             <Text size="xl" fw={700} c="white">Pré-atendimento • Documentos e anamnese</Text>
             <Text c="rgba(255,255,255,0.8)" size="sm">
-              Faça a validação facial para liberar os anexos e, quando houver, responder a anamnese do procedimento.
+              Confirme sua identidade para liberar os anexos e, quando houver, responder a anamnese do procedimento.
             </Text>
           </Stack>
         </Paper>
@@ -340,67 +406,129 @@ export function PublicPreAgendamentoDocs() {
           </Paper>
         ) : (
           <>
-            <Paper p="md" bg="#001F54" withBorder>
-              <Stepper
-                active={!verified ? 0 : (anamnesisAnswered || !meta.anamnesis ? 2 : 1)}
-                color="green"
-                size="sm"
-                styles={{
-                  stepLabel: { color: 'white' },
-                  stepDescription: { color: 'rgba(255,255,255,0.7)' },
-                }}
-              >
-                <Stepper.Step label="Validar identidade" description="Reconhecimento facial" />
-                <Stepper.Step label="Responder anamnese" description={meta.anamnesis ? 'Perguntas do procedimento' : 'Sem anamnese para este procedimento'} />
-                <Stepper.Step label="Enviar anexos" description="Documentos do atendimento" />
-              </Stepper>
-            </Paper>
-
-            <Paper p="lg" bg="#001F54" withBorder>
-              <Stack gap={8}>
-                <Group justify="space-between" align="start">
-                  <Stack gap={0}>
-                    <Text c="white" fw={700}>{meta.patientName}</Text>
-                    <Text c="rgba(255,255,255,0.8)" size="sm">{scheduleSummary}</Text>
-                  </Stack>
-                  <Badge color={verified ? 'green' : 'yellow'} variant="light">
-                    {verified ? 'Identidade validada' : 'Validação pendente'}
-                  </Badge>
-                </Group>
-
-                <Group justify="space-between">
-                  <Text size="sm" c="rgba(255,255,255,0.8)">
-                    {verified
-                      ? 'Reconhecimento facial já concluído para este link.'
-                      : 'Para seguir, confirme sua identidade por reconhecimento facial.'}
-                  </Text>
-                  {verified ? (
-                    <Badge color="green" variant="light">Etapa concluída</Badge>
-                  ) : (
-                    <Button
-                      color="darkBlue"
-                      onClick={() => setFacialOpen(true)}
-                      loading={verifying}
+            {(() => {
+              const requireFacial = meta.requireFacialForPatientRegistration !== false;
+              const identityStepDesc = requireFacial ? 'Reconhecimento facial' : 'Código por e-mail';
+              return (
+                <>
+                  <Paper p="md" bg="#001F54" withBorder>
+                    <Stepper
+                      active={!verified ? 0 : (anamnesisAnswered || !meta.anamnesis ? 2 : 1)}
+                      color="green"
+                      size="sm"
+                      styles={{
+                        stepLabel: { color: 'white' },
+                        stepDescription: { color: 'rgba(255,255,255,0.7)' },
+                      }}
                     >
-                      Validar identidade
-                    </Button>
-                  )}
-                </Group>
-              </Stack>
-            </Paper>
+                      <Stepper.Step label="Validar identidade" description={identityStepDesc} />
+                      <Stepper.Step label="Responder anamnese" description={meta.anamnesis ? 'Perguntas do procedimento' : 'Sem anamnese para este procedimento'} />
+                      <Stepper.Step label="Enviar anexos" description="Documentos do atendimento" />
+                    </Stepper>
+                  </Paper>
 
-            {verified && remainingSeconds !== null && (
-              <Paper p="md" bg="#12305f" withBorder>
-                <Group justify="space-between" align="center">
-                  <Text c="white" fw={600}>
-                    Sua sessão ficará disponível por 30 minutos após a validação facial
-                  </Text>
-                  <Badge color={remainingSeconds <= 300 ? 'red' : 'yellow'} variant="filled" size="lg">
-                    {countdownLabel}
-                  </Badge>
-                </Group>
-              </Paper>
-            )}
+                  <Paper p="lg" bg="#001F54" withBorder>
+                    <Stack gap="md">
+                      <Group justify="space-between" align="start">
+                        <Stack gap={0}>
+                          <Text c="white" fw={700}>{meta.patientName}</Text>
+                          <Text c="rgba(255,255,255,0.8)" size="sm">{scheduleSummary}</Text>
+                        </Stack>
+                        <Badge color={verified ? 'green' : 'yellow'} variant="light">
+                          {verified ? 'Identidade validada' : 'Validação pendente'}
+                        </Badge>
+                      </Group>
+
+                      {verified ? (
+                        <Text size="sm" c="rgba(255,255,255,0.8)">
+                          {requireFacial ? 'Reconhecimento facial concluído.' : 'Verificação por e-mail concluída.'} Você já pode prosseguir.
+                        </Text>
+                      ) : requireFacial ? (
+                        <Group justify="space-between">
+                          <Text size="sm" c="rgba(255,255,255,0.8)">
+                            Para seguir, confirme sua identidade por reconhecimento facial.
+                          </Text>
+                          <Button color="darkBlue" onClick={() => setFacialOpen(true)} loading={verifying}>
+                            Validar identidade
+                          </Button>
+                        </Group>
+                      ) : !meta.patientEmailMasked ? (
+                        <Paper p="md" bg="#0A1128" withBorder radius="md">
+                          <Text c="rgba(255,220,100,0.95)" size="sm" fw={500}>
+                            Não há e-mail cadastrado para este paciente. Por favor, procure a recepção para validar sua identidade presencialmente.
+                          </Text>
+                        </Paper>
+                      ) : (
+                        <Stack gap="sm">
+                          <Text size="sm" c="rgba(255,255,255,0.8)">
+                            {emailCodeSent
+                              ? `Um código de 6 dígitos foi enviado para ${emailCodeMasked}. Informe o código abaixo para confirmar sua identidade.`
+                              : `Enviaremos um código de verificação para o e-mail cadastrado (${meta.patientEmailMasked}).`}
+                          </Text>
+
+                          {!emailCodeSent ? (
+                            <Button
+                              color="darkBlue"
+                              onClick={handleRequestEmailCode}
+                              loading={requestingCode}
+                              style={{ alignSelf: 'flex-start' }}
+                            >
+                              Enviar código por e-mail
+                            </Button>
+                          ) : (
+                            <Stack gap="sm">
+                              <Text size="sm" c="white" fw={500}>Digite o código recebido:</Text>
+                              <PinInput
+                                length={6}
+                                type="number"
+                                value={emailCode}
+                                onChange={setEmailCode}
+                                size="lg"
+                                styles={{
+                                  input: { background: '#0A1128', color: 'white', borderColor: '#3559A8', fontSize: 20, fontWeight: 700 },
+                                }}
+                              />
+                              <Group gap="sm">
+                                <Button
+                                  color="green"
+                                  onClick={handleVerifyEmailCode}
+                                  loading={verifyingCode}
+                                  disabled={emailCode.length !== 6}
+                                >
+                                  Confirmar código
+                                </Button>
+                                <Button
+                                  variant="subtle"
+                                  color="gray"
+                                  onClick={handleRequestEmailCode}
+                                  loading={requestingCode}
+                                  disabled={resendCooldown > 0}
+                                >
+                                  {resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : 'Reenviar código'}
+                                </Button>
+                              </Group>
+                            </Stack>
+                          )}
+                        </Stack>
+                      )}
+                    </Stack>
+                  </Paper>
+
+                  {verified && remainingSeconds !== null && (
+                    <Paper p="md" bg="#12305f" withBorder>
+                      <Group justify="space-between" align="center">
+                        <Text c="white" fw={600}>
+                          Sessão disponível por mais
+                        </Text>
+                        <Badge color={remainingSeconds <= 300 ? 'red' : 'yellow'} variant="filled" size="lg">
+                          {countdownLabel}
+                        </Badge>
+                      </Group>
+                    </Paper>
+                  )}
+                </>
+              );
+            })()}
 
             {verified && meta.anamnesis && (
               <Paper p="lg" bg="#001F54" withBorder>
