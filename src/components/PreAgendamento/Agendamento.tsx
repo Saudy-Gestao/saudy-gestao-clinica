@@ -509,6 +509,7 @@ export function Agendamento() {
   const handledPrefillRef = useRef(false);
   const schedulerRef = useRef<HTMLDivElement | null>(null);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState('');
   const [activeTab, setActiveTab] = useState<string>('hub');
   const [onlineAppointments, setOnlineAppointments] = useState<OnlineAppointment[]>([]);
@@ -1682,15 +1683,20 @@ export function Agendamento() {
   const handleStatusChange = async (agendamentoId: string, newStatus: string) => {
     const current = agendamentos.find((a) => a.id === agendamentoId);
     if (!current) return;
+    setUpdatingStatusId(agendamentoId);
+    const previousStatus = current.status;
+    setAgendamentos((prev) => prev.map((a) => a.id === agendamentoId ? { ...a, status: newStatus } : a));
     try {
       await appointmentService.update(agendamentoId, { status: newStatus });
-      await loadAgendamentos();
     } catch (err: any) {
+      setAgendamentos((prev) => prev.map((a) => a.id === agendamentoId ? { ...a, status: previousStatus } : a));
       showNotification({
         title: 'Erro',
         message: err?.response?.data?.message || err?.message || 'Erro ao atualizar status',
         color: 'red',
       });
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -1732,6 +1738,8 @@ export function Agendamento() {
 	            size="xs"
 	            radius="md"
 		            w={isMobile ?170 : 190}
+            disabled={updatingStatusId === agendamento.id}
+            rightSection={updatingStatusId === agendamento.id ? <Loader size={14} /> : undefined}
 	          />
 	        </Box>
         {(agendamento.status === 'NAO_COMPARECEU' || agendamento.status === 'CANCELADO') && (
