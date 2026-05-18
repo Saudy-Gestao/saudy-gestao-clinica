@@ -88,14 +88,14 @@ function InfoTab({
         required
         placeholder="Ex: Unimed"
         value={form.name}
-        onChange={(e) => setForm((p: any) => ({ ...p, name: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, name: v })); }}
       />
 
       <FloatingInput
         label="Código"
         placeholder="Opcional"
         value={form.code}
-        onChange={(e) => setForm((p: any) => ({ ...p, code: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, code: v })); }}
       />
 
       <FloatingTextarea
@@ -103,7 +103,7 @@ function InfoTab({
         placeholder="Detalhes do convênio"
         minRows={3}
         value={form.description}
-        onChange={(e) => setForm((p: any) => ({ ...p, description: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, description: v })); }}
       />
 
       <Text fw={600} size="sm" mt="xs">Configuração TISS</Text>
@@ -115,43 +115,43 @@ function InfoTab({
         label="Registro ANS da operadora"
         placeholder="Ex: 123456"
         value={form.tissRegistroAns}
-        onChange={(e) => setForm((p: any) => ({ ...p, tissRegistroAns: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissRegistroAns: v })); }}
       />
       <FloatingInput
         label="CNPJ da operadora"
         placeholder="Somente números"
         value={form.tissOperadoraCnpj}
-        onChange={(e) => setForm((p: any) => ({ ...p, tissOperadoraCnpj: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissOperadoraCnpj: v })); }}
       />
       <FloatingInput
         label="Versão TISS"
         placeholder="Ex: 3.05.00"
         value={form.tissVersao}
-        onChange={(e) => setForm((p: any) => ({ ...p, tissVersao: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissVersao: v })); }}
       />
       <FloatingInput
         label="CNPJ do prestador executante"
         placeholder="Somente números"
         value={form.tissPrestadorCnpj}
-        onChange={(e) => setForm((p: any) => ({ ...p, tissPrestadorCnpj: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissPrestadorCnpj: v })); }}
       />
       <FloatingInput
         label="CNES do prestador executante"
         placeholder="Ex: 1234567"
         value={form.tissPrestadorCnes}
-        onChange={(e) => setForm((p: any) => ({ ...p, tissPrestadorCnes: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissPrestadorCnes: v })); }}
       />
       <FloatingInput
         label="Código do prestador na operadora"
         placeholder="Código contratado"
         value={form.tissCodigoPrestadorOperadora}
-        onChange={(e) => setForm((p: any) => ({ ...p, tissCodigoPrestadorOperadora: e.currentTarget.value }))}
+        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissCodigoPrestadorOperadora: v })); }}
       />
 
       <Switch
         label="Convênio ativo"
         checked={form.isActive}
-        onChange={(e) => setForm((p: any) => ({ ...p, isActive: e.currentTarget.checked }))}
+        onChange={(e) => { const checked = e.currentTarget.checked; setForm((p: any) => ({ ...p, isActive: checked })); }}
       />
 
       <Box>
