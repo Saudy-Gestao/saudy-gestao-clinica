@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ActionIcon, Anchor, Badge, Box, Button, Group, MantineProvider, Paper, PinInput, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Box, Button, Group, MantineProvider, Paper, PinInput, Stack, Text, Title, UnstyledButton } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { CheckCircle2, LockKeyhole, MailCheck, Moon, ShieldCheck, Sun } from 'lucide-react';
-import patientPortalAuthService from '../../services/patientPortalAuthService';
+import { Building2, CheckCircle2, LockKeyhole, MailCheck, Moon, ShieldCheck, Sun } from 'lucide-react';
+import patientPortalAuthService, { type CompanyOption } from '../../services/patientPortalAuthService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF, isValidCPF, onlyDigits } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
@@ -14,7 +14,7 @@ export function PatientPortalLogin() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = usePatientPortalTheme();
   const portalColorScheme = isDark ? 'dark' : 'light';
-  const [step, setStep] = useState<'identify' | 'verify'>('identify');
+  const [step, setStep] = useState<'identify' | 'select-company' | 'verify'>('identify');
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [challengeToken, setChallengeToken] = useState('');
@@ -22,6 +22,7 @@ export function PatientPortalLogin() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
 
   useEffect(() => {
     if (retryAfterSeconds <= 0) return;
@@ -31,7 +32,7 @@ export function PatientPortalLogin() {
     return () => window.clearInterval(timer);
   }, [retryAfterSeconds]);
 
-  const handleRequestCode = async () => {
+  const handleRequestCode = async (selectedPatientId?: string) => {
     const cpfDigits = onlyDigits(cpf);
     if (!isValidCPF(cpfDigits)) {
       notifications.show({
@@ -53,7 +54,12 @@ export function PatientPortalLogin() {
 
     setLoading(true);
     try {
-      const response = await patientPortalAuthService.requestCode(cpfDigits, birthDate);
+      const response = await patientPortalAuthService.requestCode(cpfDigits, birthDate, selectedPatientId);
+      if (response.requiresCompanySelection) {
+        setCompanies(response.companies);
+        setStep('select-company');
+        return;
+      }
       setChallengeToken(response.challengeToken);
       setDestination(response.destination);
       setStep('verify');
@@ -73,6 +79,10 @@ export function PatientPortalLogin() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectCompany = (patientId: string) => {
+    handleRequestCode(patientId);
   };
 
   const handleVerifyCode = async () => {
@@ -154,7 +164,10 @@ export function PatientPortalLogin() {
 
               <Group gap="xs" className="patient-portal-steps">
                 <Badge variant={step === 'identify' ? 'filled' : 'light'} color="blue">1. Identificação</Badge>
-                <Badge variant={step === 'verify' ? 'filled' : 'light'} color="blue">2. Validação</Badge>
+                {step === 'select-company' && (
+                  <Badge variant="filled" color="blue">2. Selecionar clínica</Badge>
+                )}
+                <Badge variant={step === 'verify' ? 'filled' : 'light'} color="blue">{step === 'select-company' ? '3' : '2'}. Validação</Badge>
               </Group>
 
               {step === 'identify' ? (
@@ -181,9 +194,41 @@ export function PatientPortalLogin() {
                     />
                   </Box>
 
-                  <Button className="patient-portal-primary-btn" onClick={handleRequestCode} loading={loading} disabled={retryAfterSeconds > 0}>
+                  <Button className="patient-portal-primary-btn" onClick={() => handleRequestCode()} loading={loading} disabled={retryAfterSeconds > 0}>
                     {retryAfterSeconds > 0 ? `Tente novamente em ${retryAfterSeconds}s` : 'Enviar código de acesso'}
                   </Button>
+                </Stack>
+              ) : step === 'select-company' ? (
+                <Stack gap="md">
+                  <Box>
+                    <Text fw={600} size="sm">Selecione a clínica</Text>
+                    <Text size="xs" c="dimmed">Seu CPF está vinculado a mais de uma clínica. Escolha para qual deseja acessar.</Text>
+                  </Box>
+                  <Stack gap="xs">
+                    {companies.map((company) => (
+                      <UnstyledButton
+                        key={company.patientId}
+                        onClick={() => handleSelectCompany(company.patientId)}
+                        disabled={loading}
+                        style={(t) => ({
+                          padding: '12px 16px',
+                          borderRadius: t.radius.md,
+                          border: `1px solid ${t.colors.blue[4]}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          opacity: loading ? 0.6 : 1,
+                          transition: 'background 0.15s',
+                        })}
+                      >
+                        <Building2 size={18} />
+                        <Text size="sm" fw={500}>{company.branchName}</Text>
+                      </UnstyledButton>
+                    ))}
+                  </Stack>
+                  <Anchor size="sm" onClick={() => { setStep('identify'); setCompanies([]); }} style={{ cursor: 'pointer' }}>
+                    Voltar
+                  </Anchor>
                 </Stack>
               ) : (
                 <Stack gap="md">
@@ -211,7 +256,7 @@ export function PatientPortalLogin() {
                     <Anchor size="sm" onClick={() => { setStep('identify'); setCode(''); }} style={{ cursor: 'pointer' }}>
                       Alterar dados
                     </Anchor>
-                    <Anchor size="sm" onClick={retryAfterSeconds > 0 ? undefined : handleRequestCode} style={{ cursor: retryAfterSeconds > 0 ? 'not-allowed' : 'pointer', opacity: retryAfterSeconds > 0 ? 0.55 : 1 }}>
+                    <Anchor size="sm" onClick={retryAfterSeconds > 0 ? undefined : () => handleRequestCode()} style={{ cursor: retryAfterSeconds > 0 ? 'not-allowed' : 'pointer', opacity: retryAfterSeconds > 0 ? 0.55 : 1 }}>
                       Reenviar código
                     </Anchor>
                   </Group>

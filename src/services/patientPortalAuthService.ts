@@ -13,12 +13,24 @@ export type PatientPortalUser = {
   profileType?: 'SELF' | 'DEPENDENT' | null;
 };
 
-type RequestCodeResponse = {
-  message: string;
-  challengeToken: string;
-  destination: string;
-  expiresInMinutes: number;
+export type CompanyOption = {
+  patientId: string;
+  branchId: string | null;
+  branchName: string;
 };
+
+type RequestCodeResponse =
+  | {
+      requiresCompanySelection: true;
+      companies: CompanyOption[];
+    }
+  | {
+      requiresCompanySelection?: false;
+      message: string;
+      challengeToken: string;
+      destination: string;
+      expiresInMinutes: number;
+    };
 
 type VerifyCodeResponse = {
   token: string;
@@ -35,10 +47,11 @@ const TOKEN_KEY = 'patient_portal_token';
 const USER_KEY = 'patient_portal_user';
 
 class PatientPortalAuthService {
-  requestCode(cpf: string, birthDate: string) {
+  requestCode(cpf: string, birthDate: string, selectedPatientId?: string) {
     return api.post<RequestCodeResponse>('/auth/patient-portal/request-code', {
       cpf: onlyDigits(cpf),
       birthDate,
+      ...(selectedPatientId ? { selectedPatientId } : {}),
     }).then((response) => response.data);
   }
 
