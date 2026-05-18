@@ -30,7 +30,6 @@ import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
 import { DatePicker } from '@mantine/dates';
 import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
-import { FloatingDateInput } from '../common/FloatingDateInput';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { FloatingSelect } from '../common/FloatingSelect';
@@ -112,6 +111,7 @@ const getApiList = (response: unknown): ApiRecord[] => {
 
 interface DoctorForm {
   nome: string;
+  crmType: string;
   crm: string;
   crmState: string;
   email: string;
@@ -166,6 +166,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 const INITIAL_DOCTOR_FORM: DoctorForm = {
   nome: '',
+  crmType: 'CRM',
   crm: '',
   crmState: '',
   email: '',
@@ -418,6 +419,7 @@ export function CadastroMedico() {
     const workingSchedules = getWorkingSchedulesFromRaw(raw);
     setForm({
       nome: getString(raw.name ?? raw.nome),
+      crmType: getString(raw.crmType) || 'CRM',
       crm: getString(raw.crm),
       crmState: getString(raw.crmState ?? raw.ufCrm),
       email: getString(raw.email),
@@ -477,6 +479,19 @@ export function CadastroMedico() {
     }).filter((item: DoctorListItem) => item.id);
     setDoctors(mapped);
   }, [doctorsQuery.data]);
+
+  const crmTypeOptions = [
+    { value: 'CRM', label: 'CRM – Medicina' },
+    { value: 'CRO', label: 'CRO – Odontologia' },
+    { value: 'CRP', label: 'CRP – Psicologia' },
+    { value: 'CRN', label: 'CRN – Nutrição' },
+    { value: 'CREFITO', label: 'CREFITO – Fisioterapia/T.O.' },
+    { value: 'COREN', label: 'COREN – Enfermagem' },
+    { value: 'CRF', label: 'CRF – Farmácia' },
+    { value: 'CFFa', label: 'CFFa – Fonoaudiologia' },
+    { value: 'CRMV', label: 'CRMV – Med. Veterinária' },
+    { value: 'Outro', label: 'Outro' },
+  ];
 
   const statesOptions = [
     'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
@@ -591,6 +606,7 @@ export function CadastroMedico() {
       });
 
       const payload = {
+        crmType: form.crmType || 'CRM',
         crm: form.crm.trim(),
         crmState: form.crmState.trim().toUpperCase(),
         name: form.nome.trim(),
@@ -879,11 +895,25 @@ export function CadastroMedico() {
 
                   <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
                     <Popover.Target>
-                      <FloatingDateInput
+                      <FloatingInput
                         label="Data de nascimento"
                         placeholder="dd/mm/aaaa"
-                        value={form.birthDate}
-                        valueFormat="DD/MM/YYYY"
+                        value={birthDateInput}
+                        maxLength={10}
+                        required
+                        error={fieldErrors.birthDate}
+                        rightSection={
+                          <ActionIcon size="sm" variant="subtle" onClick={() => setDatePopoverOpened((o) => !o)}>
+                            <CalendarIcon size={16} />
+                          </ActionIcon>
+                        }
+                        onChange={(e) => {
+                          const formatted = formatDateInput(e.currentTarget.value);
+                          setBirthDateInput(formatted);
+                          clearFieldError('birthDate');
+                          const d = parseDate(formatted);
+                          setForm({ ...form, birthDate: d });
+                        }}
                         onBlur={() => {
                           if (!birthDateInput) {
                             setForm({ ...form, birthDate: null });
@@ -896,31 +926,6 @@ export function CadastroMedico() {
                           } else {
                             clearFieldError('birthDate');
                             setForm({ ...form, birthDate: d });
-                          }
-                        }}
-                        required
-                        rightSection={
-                          <ActionIcon size="sm" variant="subtle" onClick={() => setDatePopoverOpened((o) => !o)}>
-                            <CalendarIcon size={16} />
-                          </ActionIcon>
-                        }
-                        onClick={() => setDatePopoverOpened(true)}
-                        style={{ cursor: 'text' }}
-                        error={fieldErrors.birthDate}
-                        onChange={(value) => {
-                          if (value instanceof Date && !Number.isNaN(value.getTime())) {
-                            setBirthDateInput(formatDate(value));
-                            setForm({ ...form, birthDate: value });
-                            clearFieldError('birthDate');
-                            return;
-                          }
-
-                          if (typeof value === 'string') {
-                            const formatted = formatDateInput(value);
-                            setBirthDateInput(formatted);
-                            if (!formatted) {
-                              setForm({ ...form, birthDate: null });
-                            }
                           }
                         }}
                       />
@@ -957,9 +962,16 @@ export function CadastroMedico() {
               <Paper p="md" withBorder radius="md">
                 <SectionTitle>Dados Profissionais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <FloatingInput label="CRM" value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
                   <FloatingSelect
-                    label="UF do CRM"
+                    label="Tipo de registro"
+                    data={crmTypeOptions}
+                    value={form.crmType}
+                    onChange={(v) => { setForm({ ...form, crmType: v || 'CRM' }); }}
+                    required
+                  />
+                  <FloatingInput label={`Número do ${form.crmType || 'registro'}`} value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
+                  <FloatingSelect
+                    label="UF do registro"
                     data={statesOptions}
                     value={form.crmState}
                     onChange={(v) => { setForm({ ...form, crmState: v || '' }); clearFieldError('crmState'); }}
@@ -1370,12 +1382,13 @@ export function CadastroMedico() {
               <Text size="sm"><Text fw={600} span>Gênero:</Text> {formatGenderValue(selectedDoctor?.raw?.gender)}</Text>
               <Text size="sm"><Text fw={600} span>RG:</Text> {formatDetailValue(selectedDoctor?.raw?.rg)}</Text>
               <Text size="sm">
-                <Text fw={600} span>CRM/UF:</Text>{' '}
+                <Text fw={600} span>Registro/UF:</Text>{' '}
                 {(() => {
+                  const type = selectedDoctor?.raw?.crmType ? String(selectedDoctor.raw.crmType) : 'CRM';
                   const crm = selectedDoctor?.raw?.crm ? String(selectedDoctor.raw.crm) : '';
                   const uf = selectedDoctor?.raw?.crmState || selectedDoctor?.raw?.ufCrm || '';
                   if (!crm && !uf) return '-';
-                  return `${crm}${uf ? `/${uf}` : ''}`;
+                  return `${type} ${crm}${uf ? `/${uf}` : ''}`;
                 })()}
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
