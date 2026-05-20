@@ -1,4 +1,5 @@
 import api from './patientPortalApi';
+import type { ReportLayoutConfig } from './reportConfigService';
 
 export type PatientPortalSummary = {
   patient: {
@@ -70,11 +71,14 @@ export type PatientPortalReportItem = {
   id: string;
   status: string | null;
   exam: string | null;
+  patientName?: string | null;
+  cpf?: string | null;
   requestingDoctor: string | null;
   reportingDoctor: string | null;
   reviewingDoctor: string | null;
   conclusion: string | null;
   description: string | null;
+  notes?: string | null;
   issuerSignedAt: string | null;
   reviewerSignedAt: string | null;
   createdAt: string;
@@ -94,6 +98,11 @@ export type PatientPortalReportItem = {
     dicomStudyUid: string | null;
     dicomReceivedAt: string | null;
   } | null;
+};
+
+export type PatientPortalReportLayoutResponse = {
+  branchId: string;
+  reportLayout: ReportLayoutConfig | null;
 };
 
 export type PatientPortalUpcomingConsultationItem = {
@@ -198,6 +207,11 @@ class PatientPortalService {
 
   listReports(params?: { limit?: number; offset?: number }) {
     return api.get<PaginatedResult<PatientPortalReportItem>>('/auth/patient-portal/me/reports', { params })
+      .then((response) => response.data);
+  }
+
+  getReportLayout() {
+    return api.get<PatientPortalReportLayoutResponse>('/auth/patient-portal/me/report-layout')
       .then((response) => response.data);
   }
 
