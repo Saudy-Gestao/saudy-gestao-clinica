@@ -7,6 +7,8 @@ export interface ReportPayload {
   requestingDoctor?: string;
   reportingDoctor?: string;
   reviewingDoctor?: string;
+  reportingDoctorId?: string;
+  reviewingDoctorId?: string;
   description?: string;
   conclusion?: string;
   notes?: string;
@@ -19,6 +21,8 @@ export interface ReportPayload {
   appointmentId?: string;
   issuerSignedAt?: string | null;
   reviewerSignedAt?: string | null;
+  signIssuer?: boolean;
+  signReviewer?: boolean;
 }
 
 export interface TemporaryPriorStudyUploadPayload {

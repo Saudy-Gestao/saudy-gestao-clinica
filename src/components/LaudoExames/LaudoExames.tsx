@@ -58,7 +58,9 @@ interface ExamItem {
   convenio: string;
   requestingDoctor: string;
   assignedTo: string;
+  reportingDoctorId?: string;
   reviewerName?: string;
+  reviewingDoctorId?: string;
   priority: ExamPriority;
   status: ExamStatus;
   reportText: string;
@@ -440,7 +442,7 @@ export function LaudoExames() {
   const [reportLayout, setReportLayout] = useState<ReportLayoutConfig>(() => normalizeReportLayout(null));
   const [signPasswordModalOpen, setSignPasswordModalOpen] = useState(false);
   const [signPassword, setSignPassword] = useState('');
-  const [signRolePending, setSignRolePending] = useState<'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer' | 'save-issuer' | 'save-reviewer' | 'save-addendum-issuer' | 'save-addendum-reviewer' | null>(null);
+  const [signRolePending, setSignRolePending] = useState<'issuer' | 'reviewer' | 'addendum-issuer' | null>(null);
   const [signLoading, setSignLoading] = useState(false);
   const [addendumModalOpen, setAddendumModalOpen] = useState(false);
   const [addendumId, setAddendumId] = useState<string | null>(null);
@@ -464,6 +466,8 @@ export function LaudoExames() {
   const [editorReadyToken, setEditorReadyToken] = useState(0);
   const [editorInitializing, setEditorInitializing] = useState(true);
   const localStatusOverridesRef = useRef<Record<string, ExamStatus>>({});
+  const pendingSignatureChangesRef = useRef<Record<string, boolean>>({});
+  const pendingSignatureIntentsRef = useRef<Record<string, { issuer?: boolean; reviewer?: boolean }>>({});
   const { data: reportPageData, error: reportPageError, isLoading: reportPageLoading } = useReportExamsPageDataQuery();
   const { data: previousReportsData = [] } = useReportPreviousReportsQuery(selectedExamId ? (examRows.find((exam) => exam.id === selectedExamId)?.cpf || null) : null);
   const selectedExamReportId = useMemo(() => {
@@ -482,6 +486,15 @@ export function LaudoExames() {
 
   const clearLocalStatusOverride = (examId: string) => {
     delete localStatusOverridesRef.current[examId];
+  };
+
+  const markPendingSignatureChange = (examId: string, pending: boolean) => {
+    if (pending) {
+      pendingSignatureChangesRef.current[examId] = true;
+      return;
+    }
+    delete pendingSignatureChangesRef.current[examId];
+    delete pendingSignatureIntentsRef.current[examId];
   };
 
   // ===== Ditado por voz =====
@@ -637,7 +650,7 @@ export function LaudoExames() {
   };
   // ===========================
 
-  const requestSignature = (role: 'issuer' | 'reviewer' | 'addendum-issuer' | 'addendum-reviewer') => {
+  const requestSignature = (role: 'issuer' | 'reviewer' | 'addendum-issuer') => {
     setSignRolePending(role);
     setSignPassword('');
     setSignPasswordModalOpen(true);
@@ -675,7 +688,9 @@ export function LaudoExames() {
       convenio: appt?.convenio || '',
       requestingDoctor: appt?.doctorName || it.requestingDoctor || '-',
       assignedTo: it.reportingDoctor || '-',
+      reportingDoctorId: it.reportingDoctorId || undefined,
       reviewerName: it.reviewingDoctor || undefined,
+      reviewingDoctorId: it.reviewingDoctorId || undefined,
       priority: 'normal' as ExamPriority,
       status: normalizeExamStatus(it.status),
       reportText: it.description || '',
@@ -790,12 +805,30 @@ export function LaudoExames() {
     [examRows, selectedExamId],
   );
 
+  const isReviewMode = useMemo(() => {
+    if (!selectedExam) return false;
+    if (selectedExam.status === 'finalizado') return false;
+    if (selectedExam.issuerSignedAt) return false;
+    const currentUserDoctorId = String(currentUser?.doctorId || '').trim();
+    const reportingDoctorId = String(selectedExam.reportingDoctorId || '').trim();
+    if (!currentUserDoctorId || !reportingDoctorId) return false;
+    return currentUserDoctorId !== reportingDoctorId;
+  }, [selectedExam, currentUser]);
+
 
 
   const isLaudoDirty = useMemo(() => {
     if (!selectedExam) return false;
+    const signatureDirty = Boolean(pendingSignatureChangesRef.current[selectedExam.id]);
+    return editorContent !== (selectedExam.reportText || '') || signatureDirty;
+  }, [selectedExam, editorContent]);
+
+  const isReviewerSignatureStaleByDraft = useMemo(() => {
+    if (!selectedExam?.reviewerSignedAt) return false;
     return editorContent !== (selectedExam.reportText || '');
   }, [selectedExam, editorContent]);
+
+  const effectiveReviewerSignedAt = isReviewerSignatureStaleByDraft ? undefined : selectedExam?.reviewerSignedAt;
 
   const isLaudoContentEmpty = useMemo(() => isRichTextEmpty(editorContent), [editorContent]);
 
@@ -978,17 +1011,6 @@ export function LaudoExames() {
     setSelectedExamId(examId);
     setModalOpen(true);
   };
-
-  // Quando um exame sem laudo é aberto, marca como em_andamento automaticamente
-  useEffect(() => {
-    if (!modalOpen || !selectedExam || selectedExam.status !== 'sem_laudo') return;
-    const reportId = selectedExam.reportId || selectedExam.id;
-    reportService.update(reportId, { status: 'em_andamento' }).then(() => {
-      setExamRows((prev) => prev.map((e) => e.id === selectedExam.id ? { ...e, status: 'em_andamento' } : e));
-    }).catch(() => {
-      // falha silenciosa — não crítico
-    });
-  }, [modalOpen, selectedExam?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1210,6 +1232,12 @@ export function LaudoExames() {
     setAddendumIssuerSignedAt(null);
     setAddendumReviewerSignedAt(null);
     setAddendumSavedAt(null);
+    if (selectedExamId) {
+      clearLocalStatusOverride(selectedExamId);
+      markPendingSignatureChange(selectedExamId, false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reportExamsPageData });
+      void queryClient.refetchQueries({ queryKey: queryKeys.reportExamsPageData });
+    }
 
     if (returnToPath) {
       navigate(returnToPath, { replace: true });
@@ -1367,7 +1395,7 @@ export function LaudoExames() {
         issuerName: professionalName,
         issuerSignedAt: selectedExam.issuerSignedAt || 'Pendente',
         reviewerName: reviewerProfessionalName,
-        reviewerSignedAt: selectedExam.reviewerSignedAt || (requiresReviewer ? 'Pendente' : 'Nao obrigatorio'),
+        reviewerSignedAt: effectiveReviewerSignedAt || (requiresReviewer ? 'Pendente' : 'Nao obrigatorio'),
       },
     });
   };
@@ -1395,22 +1423,23 @@ export function LaudoExames() {
       });
       return;
     }
-    if (role === 'reviewer' && !selectedExam.issuerSignedAt) {
-      showNotification({
-        title: 'Assinatura bloqueada',
-        message: 'A revisão só pode ser feita após assinatura do emissor.',
-        color: 'yellow',
-      });
-      return;
-    }
     if (role === 'issuer' && selectedExam.issuerSignedAt) return;
-    if (role === 'reviewer' && selectedExam.reviewerSignedAt) return;
+    if (role === 'reviewer' && effectiveReviewerSignedAt) return;
 
     const signatureDate = new Date().toLocaleString('pt-BR');
 
     const reportText = getAllLaudoContent();
-    const nextIssuer = role === 'issuer' ? signatureDate : selectedExam.issuerSignedAt;
-    const nextReviewer = role === 'reviewer' ? signatureDate : selectedExam.reviewerSignedAt;
+    const currentUserDoctorId = String(currentUser?.doctorId || '').trim();
+    const issuerDoctorId = String(selectedExam.reportingDoctorId || '').trim();
+    const sameAsIssuer = Boolean(currentUserDoctorId && issuerDoctorId && currentUserDoctorId === issuerDoctorId);
+    const shouldAutoSignIssuer = role === 'reviewer' && !selectedExam.issuerSignedAt && !sameAsIssuer;
+    const signIntent = {
+      issuer: role === 'issuer' || shouldAutoSignIssuer,
+      reviewer: role === 'reviewer',
+    };
+
+    const nextIssuer = (role === 'issuer' || shouldAutoSignIssuer) ? signatureDate : selectedExam.issuerSignedAt;
+    const nextReviewer = role === 'reviewer' ? signatureDate : effectiveReviewerSignedAt;
     const nextStatus: ExamStatus = nextReviewer ? 'revisado' : 'laudado';
 
     setLocalStatusOverride(selectedExam.id, nextStatus);
@@ -1426,33 +1455,16 @@ export function LaudoExames() {
           }
         : exam
     )));
-
-    try {
-      await reportService.update(selectedExam.reportId || selectedExam.id, {
-        description: reportText,
-        status: nextStatus,
-        issuerSignedAt: nextIssuer,
-        reviewerSignedAt: nextReviewer,
-      });
-    } catch (err: any) {
-      clearLocalStatusOverride(selectedExam.id);
-      showNotification({
-        title: 'Erro ao assinar',
-        message: resolveApiErrorMessage(err, 'Falha ao registrar assinatura'),
-        color: 'red',
-      });
-      return;
-    }
-
-    setLastSavedAt(signatureDate);
-    // showNotification({
-    //   title: role === 'issuer' ? 'Assinado como emissor' : 'Assinado como revisor',
-    //   message:
-    //     role === 'issuer'
-    //       ? `Assinatura de emissor registrada para o exame ${selectedExam.id}.`
-    //       : `Assinatura de revisor registrada para o exame ${selectedExam.id}.`,
-    //   color: 'green',
-    // });
+    pendingSignatureIntentsRef.current[selectedExam.id] = {
+      issuer: Boolean(signIntent.issuer || pendingSignatureIntentsRef.current[selectedExam.id]?.issuer),
+      reviewer: Boolean(signIntent.reviewer || pendingSignatureIntentsRef.current[selectedExam.id]?.reviewer),
+    };
+    markPendingSignatureChange(selectedExam.id, true);
+    showNotification({
+      title: role === 'issuer' ? 'Assinatura de emissor pendente' : 'Assinatura de revisor pendente',
+      message: 'Clique em Salvar laudo ou Finalizar laudo para confirmar.',
+      color: 'blue',
+    });
   };
 
   const confirmSignature = async () => {
@@ -1475,16 +1487,6 @@ export function LaudoExames() {
     setSignPasswordModalOpen(false);
     setSignPassword('');
     setSignRolePending(null);
-
-    if (role === 'save-issuer' || role === 'save-reviewer') {
-      await saveLaudo();
-      return;
-    }
-
-    if (role === 'save-addendum-issuer' || role === 'save-addendum-reviewer') {
-      await saveAddendum();
-      return;
-    }
 
     if (role === 'addendum-issuer') {
       if (isAddendumContentEmpty) {
@@ -1512,36 +1514,6 @@ export function LaudoExames() {
       return;
     }
 
-    if (role === 'addendum-reviewer') {
-      if (isAddendumContentEmpty) {
-        showNotification({ title: 'Assinatura bloqueada', message: 'Não é permitido assinar adendo sem conteúdo.', color: 'yellow' });
-        return;
-      }
-      if (!addendumIssuerSignedAt) {
-        showNotification({ title: 'Assinatura bloqueada', message: 'O revisor do adendo só pode assinar após o emissor.', color: 'yellow' });
-        return;
-      }
-      const now = new Date().toLocaleString('pt-BR');
-      try {
-        const draftId = await ensureAddendumDraft();
-        if (!draftId) throw new Error('Draft not found');
-        await reportAddendumService.update(draftId, {
-          content: addendumText,
-          reviewerSignedAt: now,
-        });
-        setAddendumReviewerSignedAt(now);
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro ao assinar adendo',
-          message: resolveApiErrorMessage(err, 'Não foi possível assinar o adendo'),
-          color: 'red',
-        });
-        return;
-      }
-      showNotification({ title: 'Adendo assinado', message: 'Assinatura do revisor registrada no adendo.', color: 'green' });
-      return;
-    }
-
     await signExam(role as 'issuer' | 'reviewer');
   };
 
@@ -1557,9 +1529,9 @@ export function LaudoExames() {
     }
 
     const reportText = getAllLaudoContent();
-    const nextStatus: ExamStatus = selectedExam.reviewerSignedAt
+    const nextStatus: ExamStatus = selectedExam.status === 'revisado'
       ? 'revisado'
-      : (selectedExam.issuerSignedAt ? 'laudado' : 'em_andamento');
+      : (effectiveReviewerSignedAt ? 'revisado' : (isReviewMode ? 'revisado' : 'laudado'));
 
     setSavingLaudo(true);
     setLocalStatusOverride(selectedExam.id, nextStatus);
@@ -1571,14 +1543,19 @@ export function LaudoExames() {
     )));
 
     try {
+      const pendingIntent = pendingSignatureIntentsRef.current[selectedExam.id] || {};
       await reportService.update(selectedExam.reportId || selectedExam.id, {
         status: nextStatus,
         description: reportText,
+        signIssuer: Boolean(pendingIntent.issuer),
+        signReviewer: Boolean(pendingIntent.reviewer),
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportExamsPageData });
       await queryClient.refetchQueries({ queryKey: queryKeys.reportExamsPageData });
       setLastSavedAt(new Date().toLocaleString('pt-BR'));
+      markPendingSignatureChange(selectedExam.id, false);
       showNotification({ title: 'Laudo salvo', message: `Laudo salvo com status ${statusLabel[nextStatus]}.`, color: 'green' });
+      closeModal();
     } catch (err: any) {
       clearLocalStatusOverride(selectedExam.id);
       showNotification({
@@ -1589,26 +1566,6 @@ export function LaudoExames() {
     } finally {
       setSavingLaudo(false);
     }
-  };
-
-  const requestSaveLaudo = () => {
-    if (!selectedExam) return;
-    if (selectedExam.status === 'finalizado') {
-      showNotification({ title: 'Laudo finalizado', message: 'Não é permitido editar um laudo finalizado.', color: 'yellow' });
-      return;
-    }
-    if (!isLaudoDirty) {
-      showNotification({ title: 'Sem alterações', message: 'Não há mudanças para salvar.', color: 'gray' });
-      return;
-    }
-
-    const saveRole = selectedExam.reviewerSignedAt || selectedExam.status === 'revisado'
-      ? 'save-reviewer'
-      : 'save-issuer';
-
-    setSignRolePending(saveRole);
-    setSignPassword('');
-    setSignPasswordModalOpen(true);
   };
 
   const unfinalizeExam = async (examId: string) => {
@@ -1722,19 +1679,6 @@ export function LaudoExames() {
     }
   };
 
-  const requestSaveAddendum = () => {
-    if (!selectedExam) return;
-    if (!isAddendumDirty) {
-      showNotification({ title: 'Sem alterações', message: 'Não há mudanças para salvar no adendo.', color: 'gray' });
-      return;
-    }
-
-    const saveRole = addendumReviewerSignedAt ? 'save-addendum-reviewer' : 'save-addendum-issuer';
-    setSignRolePending(saveRole);
-    setSignPassword('');
-    setSignPasswordModalOpen(true);
-  };
-
   const finalizeAddendum = async () => {
     if (!selectedExam) return;
     if (isRichTextEmpty(addendumText)) {
@@ -1745,18 +1689,13 @@ export function LaudoExames() {
       showNotification({ title: 'Finalização bloqueada', message: 'Assine como emissor para finalizar o adendo.', color: 'yellow' });
       return;
     }
-    if (requiresReviewer && !addendumReviewerSignedAt) {
-      showNotification({ title: 'Finalização bloqueada', message: 'Este adendo exige assinatura do revisor para finalizar.', color: 'yellow' });
-      return;
-    }
-
     const now = new Date().toLocaleString('pt-BR');
     setAddendumFinalizing(true);
     const addendumBlock = `
       <hr />
       <h3>Adendo (${now})</h3>
       ${addendumText}
-      <p><strong>Assinaturas do adendo:</strong> Emissor: ${addendumIssuerSignedAt} ${requiresReviewer ? `| Revisor: ${addendumReviewerSignedAt || 'Pendente'}` : ''}</p>
+      <p><strong>Assinaturas do adendo:</strong> Emissor: ${addendumIssuerSignedAt}</p>
     `;
     const nextText = `${selectedExam.reportText || ''}${addendumBlock}`;
 
@@ -1828,7 +1767,7 @@ export function LaudoExames() {
       return;
     }
 
-    if (requiresReviewer && !selectedExam.reviewerSignedAt) {
+    if (requiresReviewer && !effectiveReviewerSignedAt) {
       showNotification({
         title: 'Finalização bloqueada',
         message: 'Este laudo exige assinatura do revisor para finalizar.',
@@ -1854,9 +1793,12 @@ export function LaudoExames() {
     );
 
     try {
+      const pendingIntent = pendingSignatureIntentsRef.current[selectedExam.id] || {};
       await reportService.update(selectedExam.reportId || selectedExam.id, {
         status: nextStatus,
         description: reportText,
+        signIssuer: Boolean(pendingIntent.issuer),
+        signReviewer: Boolean(pendingIntent.reviewer),
       });
     } catch (err: any) {
       clearLocalStatusOverride(selectedExam.id);
@@ -1870,6 +1812,7 @@ export function LaudoExames() {
 
     const now = new Date();
     setLastSavedAt(now.toLocaleString('pt-BR'));
+    markPendingSignatureChange(selectedExam.id, false);
     showNotification({
       title: nextStatus === 'finalizado' ? 'Laudo finalizado' : 'Laudo salvo',
       message:
@@ -2237,8 +2180,8 @@ export function LaudoExames() {
                       <Badge variant="dot" color={selectedExam.issuerSignedAt ? 'green' : 'gray'} size="sm">
                         Emissor: {selectedExam.issuerSignedAt ? 'Assinado' : 'Pendente'}
                       </Badge>
-                      <Badge variant="dot" color={selectedExam.reviewerSignedAt ? 'green' : 'gray'} size="sm">
-                        Revisor: {selectedExam.reviewerSignedAt ? 'Assinado' : 'Pendente'}
+                      <Badge variant="dot" color={effectiveReviewerSignedAt ? 'green' : 'gray'} size="sm">
+                        Revisor: {effectiveReviewerSignedAt ? 'Assinado' : 'Pendente'}
                       </Badge>
 
                     </Group>
@@ -2518,24 +2461,24 @@ export function LaudoExames() {
                   <Button variant="default" onClick={openExamImages} leftSection={<Images size={16} />}>
                     Imagens
                   </Button>
+                  <Button variant="default" onClick={closeModal}>
+                    Fechar
+                  </Button>
+                  <Button variant="light" color="darkBlue" onClick={openExamImages} leftSection={<Images size={16} />}>
+                    Imagens
+                  </Button>
                   <Button variant="light" color="cyan" onClick={openPriorStudyUploadModal} leftSection={<Upload size={16} />}>
                     Exame anterior
                   </Button>
                   <Button variant="default" onClick={() => setPdfPreviewModalOpen(true)} leftSection={<FileText size={16} />}>
                     Prévia
                   </Button>
-                  <Button variant="default" onClick={closeModal}>
-                    Fechar
-                  </Button>
-                  <Button variant="light" color="darkBlue" onClick={requestSaveLaudo} loading={savingLaudo} leftSection={<Save size={16} />} disabled={selectedExam.status === 'finalizado' || savingLaudo || !isLaudoDirty}>
-                    {savingLaudo ? 'Salvando...' : 'Salvar laudo'}
-                  </Button>
                   <Button
                     variant="light"
                     color="green"
                     onClick={() => requestSignature('issuer')}
                     leftSection={<PenTool size={16} />}
-                    disabled={selectedExam.status === 'finalizado' || Boolean(selectedExam.issuerSignedAt) || isLaudoContentEmpty}
+                    disabled={selectedExam.status === 'finalizado' || Boolean(selectedExam.issuerSignedAt) || isLaudoContentEmpty || isReviewMode}
                   >
                     {selectedExam.issuerSignedAt ? 'Emissor assinado' : 'Assinar emissor'}
                   </Button>
@@ -2544,21 +2487,24 @@ export function LaudoExames() {
                     color="blue"
                     onClick={() => requestSignature('reviewer')}
                     leftSection={<PenTool size={16} />}
-                    disabled={selectedExam.status === 'finalizado' || !selectedExam.issuerSignedAt || Boolean(selectedExam.reviewerSignedAt) || isLaudoContentEmpty}
+                    disabled={selectedExam.status === 'finalizado' || (!selectedExam.issuerSignedAt && !isReviewMode) || Boolean(effectiveReviewerSignedAt) || isLaudoContentEmpty}
                   >
-                    {selectedExam.reviewerSignedAt ? 'Revisor assinado' : 'Assinar revisor'}
+                    {effectiveReviewerSignedAt ? 'Revisor assinado' : 'Assinar revisor'}
                   </Button>
-                  <Button variant="light" color="orange" onClick={openAddendumModal} leftSection={<Plus size={16} />} disabled={selectedExam.status !== 'finalizado' || Boolean(selectedExam.hasFinalizedAddendum)}>
-                    {selectedExam.hasFinalizedAddendum ? 'Adendo finalizado' : 'Adendo'}
+                  <Button variant="light" color="darkBlue" onClick={saveLaudo} loading={savingLaudo} leftSection={<Save size={16} />} disabled={selectedExam.status === 'finalizado' || savingLaudo || !isLaudoDirty}>
+                    {savingLaudo ? 'Salvando...' : 'Salvar laudo'}
                   </Button>
                   <Button
                     bg={DARK_BLUE}
                     c="white"
                     onClick={() => requestFinalize('laudo')}
                     leftSection={<CheckCircle size={16} />}
-                    disabled={selectedExam.status === 'finalizado' || !selectedExam.issuerSignedAt || (requiresReviewer && !selectedExam.reviewerSignedAt)}
+                    disabled={selectedExam.status === 'finalizado' || !selectedExam.issuerSignedAt || (requiresReviewer && !effectiveReviewerSignedAt)}
                   >
                     Finalizar laudo
+                  </Button>
+                  <Button variant="light" color="orange" onClick={openAddendumModal} leftSection={<Plus size={16} />} disabled={selectedExam.status !== 'finalizado' || Boolean(selectedExam.hasFinalizedAddendum)}>
+                    {selectedExam.hasFinalizedAddendum ? 'Adendo finalizado' : 'Adendo'}
                   </Button>
                 </Group>
               </Group>
@@ -2972,32 +2918,18 @@ export function LaudoExames() {
             setSignRolePending(null);
           }}
           title={
-            signRolePending === 'save-issuer'
-              ? 'Confirmar salvamento (emissor)'
-              : signRolePending === 'save-reviewer'
-                ? 'Confirmar salvamento (revisor)'
-                : signRolePending === 'save-addendum-issuer'
-                  ? 'Confirmar salvamento do adendo (emissor)'
-                  : signRolePending === 'save-addendum-reviewer'
-                    ? 'Confirmar salvamento do adendo (revisor)'
-                : signRolePending === 'issuer'
+            signRolePending === 'issuer'
               ? 'Confirmar assinatura do emissor'
               : signRolePending === 'reviewer'
                 ? 'Confirmar assinatura do revisor'
-                : signRolePending === 'addendum-issuer'
-                  ? 'Confirmar assinatura do emissor do adendo'
-                  : 'Confirmar assinatura do revisor do adendo'
+                : 'Confirmar assinatura do emissor do adendo'
           }
           centered
           zIndex={450}
         >
           <Stack>
             <Text size="sm" c="dimmed">
-              {signRolePending === 'save-issuer' || signRolePending === 'save-reviewer'
-                ? 'Digite sua senha para confirmar o salvamento do laudo.'
-                : signRolePending === 'save-addendum-issuer' || signRolePending === 'save-addendum-reviewer'
-                  ? 'Digite sua senha para confirmar o salvamento do adendo.'
-                : 'Digite sua senha para confirmar a assinatura.'}
+              Digite sua senha para confirmar a assinatura.
             </Text>
             <TextInput
               label="Senha"
@@ -3021,7 +2953,7 @@ export function LaudoExames() {
                 Cancelar
               </Button>
               <Button bg={DARK_BLUE} c="white" onClick={confirmSignature} loading={signLoading} leftSection={<ShieldCheck size={16} />}>
-                {signRolePending === 'save-issuer' || signRolePending === 'save-reviewer' || signRolePending === 'save-addendum-issuer' || signRolePending === 'save-addendum-reviewer' ? 'Confirmar salvamento' : 'Confirmar assinatura'}
+                Confirmar assinatura
               </Button>
             </Group>
           </Stack>
@@ -3052,9 +2984,6 @@ export function LaudoExames() {
               <Badge variant="dot" color={addendumIssuerSignedAt ? 'green' : 'gray'}>
                 Emissor: {addendumIssuerSignedAt ? 'Assinado' : 'Pendente'}
               </Badge>
-              <Badge variant="dot" color={addendumReviewerSignedAt ? 'green' : 'gray'}>
-                Revisor: {addendumReviewerSignedAt ? 'Assinado' : 'Pendente'}
-              </Badge>
             </Group>
             <Group gap="sm">
               <Button
@@ -3065,15 +2994,6 @@ export function LaudoExames() {
                 disabled={Boolean(addendumIssuerSignedAt) || addendumLoading || addendumSaving || addendumFinalizing || isAddendumContentEmpty}
               >
                 {addendumIssuerSignedAt ? 'Emissor assinado' : 'Assinar emissor'}
-              </Button>
-              <Button
-                variant="light"
-                color="blue"
-                leftSection={<PenTool size={16} />}
-                onClick={() => requestSignature('addendum-reviewer')}
-                disabled={!addendumIssuerSignedAt || Boolean(addendumReviewerSignedAt) || addendumLoading || addendumSaving || addendumFinalizing || isAddendumContentEmpty}
-              >
-                {addendumReviewerSignedAt ? 'Revisor assinado' : 'Assinar revisor'}
               </Button>
             </Group>
             <Box>
@@ -3106,10 +3026,10 @@ export function LaudoExames() {
               }} disabled={addendumSaving || addendumFinalizing}>
                 Cancelar
               </Button>
-              <Button variant="light" color="darkBlue" onClick={requestSaveAddendum} loading={addendumSaving} disabled={addendumLoading || addendumFinalizing || addendumSaving || !isAddendumDirty}>
+              <Button variant="light" color="darkBlue" onClick={saveAddendum} loading={addendumSaving} disabled={addendumLoading || addendumFinalizing || addendumSaving || !isAddendumDirty}>
                 Salvar adendo
               </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={() => requestFinalize('adendo')} loading={addendumFinalizing} disabled={!addendumIssuerSignedAt || (requiresReviewer && !addendumReviewerSignedAt) || addendumLoading || addendumSaving}>
+              <Button bg={DARK_BLUE} c="white" onClick={() => requestFinalize('adendo')} loading={addendumFinalizing} disabled={!addendumIssuerSignedAt || addendumLoading || addendumSaving}>
                 Finalizar adendo
               </Button>
             </Group>
