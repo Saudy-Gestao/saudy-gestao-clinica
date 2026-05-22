@@ -40,9 +40,6 @@ import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQ
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { queryKeys } from '../../lib/queryKeys';
 import { FloatingInput } from '../common/FloatingInput';
-import { normalizeReportLayout } from '../../lib/reportLayout';
-import { buildReportDocumentHtml } from '../../lib/reportDocumentRenderer';
-import type { ReportLayoutConfig } from '../../services/reportConfigService';
 
 type ExamStatus = 'sem_laudo' | 'em_andamento' | 'laudado' | 'revisado' | 'finalizado';
 type ExamPriority = 'normal' | 'urgente';
@@ -421,6 +418,8 @@ export function LaudoExames() {
   const [templatePickerModalOpen, setTemplatePickerModalOpen] = useState(false);
   const location = useLocation();
   const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
   const [editorContent, setEditorContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -439,7 +438,6 @@ export function LaudoExames() {
   const [priorStudyCompareWithCurrent, setPriorStudyCompareWithCurrent] = useState(false);
   const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Record<string, boolean>>({});
   const [requiresReviewer, setRequiresReviewer] = useState(true);
-  const [reportLayout, setReportLayout] = useState<ReportLayoutConfig>(() => normalizeReportLayout(null));
   const [signPasswordModalOpen, setSignPasswordModalOpen] = useState(false);
   const [signPassword, setSignPassword] = useState('');
   const [signRolePending, setSignRolePending] = useState<'issuer' | 'reviewer' | 'addendum-issuer' | null>(null);
@@ -782,7 +780,6 @@ export function LaudoExames() {
       })).filter((item: ReportPhrase) => item.id);
       setPhrases(mappedPhrases.length > 0 ? mappedPhrases : MOCK_REPORT_PHRASES);
       setRequiresReviewer(Boolean(configData?.requiresReviewer ?? true));
-      setReportLayout(normalizeReportLayout(configData?.reportLayout));
       return;
     }
 
@@ -791,7 +788,6 @@ export function LaudoExames() {
       setTemplates(MOCK_REPORT_TEMPLATES);
       setPhrases(MOCK_REPORT_PHRASES);
       setRequiresReviewer(true);
-      setReportLayout(normalizeReportLayout(null));
       showNotification({
         title: 'Erro',
         message: resolveApiErrorMessage(reportPageError, 'Erro ao carregar dados de laudo. Exibindo dados locais de fallback.'),
@@ -969,23 +965,6 @@ export function LaudoExames() {
     setSelectedPhraseId(firstPhrase?.id || null);
     setPhraseQuery('');
   }, [selectedExam, filteredTemplates, phrases]);
-
-  const resolvePlaceholders = (content: string, exam: ExamItem) => {
-    const replacements: Record<string, string> = {
-      '{{paciente_nome}}': exam.patientName,
-      '{{cpf}}': exam.cpf,
-      '{{tipo_exame}}': exam.examType,
-      '{{data_exame}}': exam.scheduledAt,
-      '{{medico_solicitante}}': exam.requestingDoctor,
-      '{{laudante}}': exam.assignedTo,
-      '{{data_atual}}': new Date().toLocaleDateString('pt-BR'),
-    };
-
-    return Object.entries(replacements).reduce(
-      (current, [placeholder, value]) => current.split(placeholder).join(value),
-      content,
-    );
-  };
 
   const insertPlaceholder = (placeholderKey: string) => {
     if (selectedExam?.status === 'finalizado') {
@@ -1365,45 +1344,53 @@ export function LaudoExames() {
     return () => editorDoc.removeEventListener('keydown', handleEditorShortcut);
   }, [modalOpen, filteredPhrases, insertPhrase, editorReadyToken]);
 
-  const buildPreviewHtml = () => {
-    if (!selectedExam) return '';
-
-    const resolvedContent = resolvePlaceholders(getAllLaudoContent(), selectedExam);
-    const professionalName = (
-      (selectedExam.assignedTo && selectedExam.assignedTo !== '-' ? selectedExam.assignedTo : '')
-      || 'Emissor não identificado'
-    );
-    const reviewerProfessionalName = (
-      (selectedExam.reviewerName && selectedExam.reviewerName !== '-' ? selectedExam.reviewerName : '')
-      || (requiresReviewer ? 'Revisor não identificado' : 'Revisor não obrigatório')
-    );
-    return buildReportDocumentHtml({
-      mode: 'preview',
-      isDark,
-      layout: reportLayout,
-      reportId: selectedExam.id,
-      contentHtml: resolvedContent,
-      patient: {
-        name: selectedExam.patientName,
-        exam: selectedExam.examType,
-        cpf: selectedExam.cpf || 'Nao informado',
-        insurance: selectedExam.convenio || 'Nao informado',
-      },
-      signatures: {
-        show: true,
-        requiresReviewer,
-        issuerName: professionalName,
-        issuerSignedAt: selectedExam.issuerSignedAt || 'Pendente',
-        reviewerName: reviewerProfessionalName,
-        reviewerSignedAt: effectiveReviewerSignedAt || (requiresReviewer ? 'Pendente' : 'Nao obrigatorio'),
-      },
-    });
-  };
-
   const printPreview = () => {
     previewFrameRef.current?.contentWindow?.focus();
     previewFrameRef.current?.contentWindow?.print();
   };
+
+  useEffect(() => {
+    if (!pdfPreviewModalOpen || !selectedExamReportId || !selectedExam) return;
+    let cancelled = false;
+    let currentUrl: string | null = null;
+
+    const loadPdfPreview = async () => {
+      try {
+        setPdfPreviewLoading(true);
+        const contentHtml = editorRef.current ? editorRef.current.getContent() : editorContent;
+        const blob = await reportService.getPatientFacingPreviewPdf(selectedExamReportId, {
+          contentHtml,
+          issuerSignedAt: selectedExam.issuerSignedAt || null,
+          reviewerSignedAt: effectiveReviewerSignedAt || null,
+        });
+        if (cancelled) return;
+        currentUrl = window.URL.createObjectURL(blob);
+        setPdfPreviewUrl(currentUrl);
+      } catch {
+        if (!cancelled) {
+          showNotification({
+            title: 'Prévia indisponível',
+            message: 'Não foi possível carregar o PDF oficial deste laudo.',
+            color: 'red',
+          });
+          setPdfPreviewUrl(null);
+        }
+      } finally {
+        if (!cancelled) setPdfPreviewLoading(false);
+      }
+    };
+
+    void loadPdfPreview();
+
+    return () => {
+      cancelled = true;
+      if (currentUrl) window.URL.revokeObjectURL(currentUrl);
+      setPdfPreviewUrl((prev) => {
+        if (prev && prev !== currentUrl) window.URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [pdfPreviewModalOpen, selectedExamReportId, selectedExam, editorContent, effectiveReviewerSignedAt]);
 
   const signExam = async (role: 'issuer' | 'reviewer') => {
     if (!selectedExam) return;
@@ -2891,18 +2878,24 @@ export function LaudoExames() {
         >
           <Stack>
             <Box style={{ border: `1px solid ${borderColor}`, borderRadius: 8, overflow: 'hidden' }}>
-              <iframe
-                ref={previewFrameRef}
-                title="Prévia"
-                srcDoc={buildPreviewHtml()}
-                style={{ width: '100%', height: isMobile ? '58vh' : '64vh', border: 0 }}
-              />
+              {pdfPreviewLoading ? (
+                <Box style={{ width: '100%', height: isMobile ? '58vh' : '64vh', display: 'grid', placeItems: 'center' }}>
+                  <Text size="sm" c="dimmed">Carregando PDF oficial...</Text>
+                </Box>
+              ) : (
+                <iframe
+                  ref={previewFrameRef}
+                  title="Prévia"
+                  src={pdfPreviewUrl || undefined}
+                  style={{ width: '100%', height: isMobile ? '58vh' : '64vh', border: 0 }}
+                />
+              )}
             </Box>
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setPdfPreviewModalOpen(false)}>
                 Fechar
               </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={printPreview}>
+              <Button bg={DARK_BLUE} c="white" onClick={printPreview} disabled={!pdfPreviewUrl}>
                 Imprimir / Salvar PDF
               </Button>
             </Group>

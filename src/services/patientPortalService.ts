@@ -70,6 +70,9 @@ export type PatientPortalAppointmentItem = {
 export type PatientPortalReportItem = {
   id: string;
   status: string | null;
+  isUnderReview?: boolean;
+  patientWarning?: string | null;
+  publishedVersion?: number | null;
   exam: string | null;
   patientName?: string | null;
   cpf?: string | null;

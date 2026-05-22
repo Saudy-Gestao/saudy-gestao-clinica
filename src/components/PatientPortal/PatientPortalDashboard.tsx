@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+﻿import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -39,8 +39,6 @@ import patientPortalAuthService from '../../services/patientPortalAuthService';
 import { formatCPF } from '../../utils/formatters';
 import { usePatientPortalTheme } from './usePatientPortalTheme';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
-import { normalizeReportLayout } from '../../lib/reportLayout';
-import { buildReportDocumentHtml } from '../../lib/reportDocumentRenderer';
 import { theme } from '../../themes/theme';
 import './patient-portal.css';
 
@@ -463,69 +461,21 @@ export function PatientPortalDashboard() {
   };
 
   const downloadReportPdf = async (report: PatientPortalReportItem) => {
-    const win = window.open('', '_blank');
-    if (!win) {
-      showErrorToast({
-        title: 'Falha no download',
-        error: new Error('popup_blocked'),
-        fallback: 'O navegador bloqueou a nova aba. Permita pop-ups para continuar.',
-      });
-      return;
-    }
-
-    win.document.open();
-    win.document.write('<!doctype html><html><head><meta charset="utf-8" /><title>Gerando PDF...</title></head><body style="font-family:Arial,sans-serif;padding:24px">Gerando PDF do laudo...</body></html>');
-    win.document.close();
-
     try {
-      const layoutResponse = await patientPortalService.getReportLayout();
-      const layout = normalizeReportLayout(layoutResponse?.reportLayout || null);
-      const patientDisplayName = summary?.patient?.name || report.patientName || 'Paciente';
-      const patientCpf = summary?.patient?.cpf || report.cpf || '-';
-      const examName = report.exam || report.appointment?.specialty || 'Laudo';
-      const examDate = dayjs(report.updatedAt).isValid() ? dayjs(report.updatedAt).format('DD/MM/YYYY HH:mm') : '-';
-      const content = String(report.description || '').trim() || `<p>${String(report.conclusion || '-')}</p>`;
-      const html = buildReportDocumentHtml({
-        mode: 'print',
-        layout,
-        reportId: report.id,
-        contentHtml: content,
-        patient: {
-          name: patientDisplayName,
-          exam: examName,
-          cpf: formatCPF(patientCpf),
-          dateLabel: examDate,
-        },
-        signatures: {
-          show: true,
-          issuerName: report.reportingDoctor || '-',
-          issuerSignedAt: report.issuerSignedAt || 'Pendente',
-          reviewerName: report.reviewingDoctor || '-',
-          reviewerSignedAt: report.reviewerSignedAt || 'Pendente',
-        },
-      });
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
-      win.focus();
-      const waitForImages = async () => {
-        const maxWaitMs = 4000;
-        const start = Date.now();
-        while (Date.now() - start < maxWaitMs) {
-          const images = Array.from(win.document.images || []);
-          const allDone = images.every((img) => img.complete);
-          if (allDone) break;
-          await new Promise((resolve) => setTimeout(resolve, 60));
-        }
-      };
-      await waitForImages();
-      win.print();
+      const blob = await patientPortalService.downloadReportPdf(report.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `laudo-${report.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (error: unknown) {
-      try { win.close(); } catch { /* no-op */ }
       showErrorToast({
         title: 'Falha no download',
         error,
-        fallback: 'Não foi possível gerar o PDF do laudo com layout.',
+        fallback: 'Não foi possível baixar o PDF do laudo.',
       });
     }
   };
@@ -1058,6 +1008,11 @@ export function PatientPortalDashboard() {
                         <Badge variant="light" color={statusTone(item.status)}>{item.status || 'Sem status'}</Badge>
                       </Group>
                       {item.reportingDoctor ? <Text size="sm">{`Laudado por: ${item.reportingDoctor}`}</Text> : null}
+                      {item.isUnderReview ? (
+                        <Text size="xs" c="orange.6">
+                          {item.patientWarning || 'Este laudo esta em revisao. Voce visualiza a ultima versao publicada.'}
+                        </Text>
+                      ) : null}
                       <Group justify="flex-end" wrap="wrap">
                         {item.worklistItem && (
                           <Button
@@ -1169,3 +1124,6 @@ export function PatientPortalDashboard() {
     </MantineProvider>
   );
 }
+
+
+

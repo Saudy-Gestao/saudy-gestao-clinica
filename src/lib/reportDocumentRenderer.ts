@@ -24,6 +24,12 @@ type ReportDocumentParams = {
     reviewerName?: string | null;
     reviewerSignedAt?: string | null;
   };
+  notice?: {
+    show: boolean;
+    title?: string | null;
+    text?: string | null;
+    versionLabel?: string | null;
+  };
 };
 
 export function buildReportDocumentHtml(params: ReportDocumentParams): string {
@@ -41,6 +47,7 @@ export function buildReportDocumentHtml(params: ReportDocumentParams): string {
   const logoSrc = layout.logoImageDataUrl || layout.logoUrl;
   const footer = String(layout.footerText || '').trim();
   const sig = params.signatures;
+  const notice = params.notice;
   const issuerSigned = Boolean(sig?.issuerSignedAt);
   const reviewerSigned = Boolean(sig?.reviewerSignedAt);
   const requiresReviewer = sig?.requiresReviewer !== false;
@@ -69,6 +76,10 @@ export function buildReportDocumentHtml(params: ReportDocumentParams): string {
     .content p { margin: 0 0 8px; }
     .content ul, .content ol { margin: 4px 0 10px 22px; }
     .content li { margin: 2px 0; }
+    .notice { margin-bottom: 14px; border: 1px solid #f59e0b; background: #fffbeb; color: #7c2d12; border-radius: 8px; padding: 10px 12px; }
+    .notice-title { font-weight: 800; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .notice-text { font-size: 12px; line-height: 1.35; }
+    .notice-version { margin-top: 4px; font-size: 11px; color: #92400e; font-weight: 700; }
     .signatures { margin-top: 26px; border-top: 1px solid #cbd5e1; padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; color: #475569; }
     .sign-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; background: #fafcff; }
     .sign-title { font-weight: 700; color: #334155; margin-bottom: 2px; }
@@ -84,6 +95,7 @@ export function buildReportDocumentHtml(params: ReportDocumentParams): string {
   </style></head><body><div class="sheet">
     <div class="header"><div class="logo-wrap">${layout.showLogo && logoSrc ? `<img class="logo" src="${escapeHtml(logoSrc)}" alt="Logo" />` : ''}</div><div><div class="clinic">${escapeHtml(layout.clinicName)}</div><h1>${escapeHtml(layout.title || 'Laudo Medico')}</h1>${layout.subtitle ? `<div class="subtitle">${escapeHtml(layout.subtitle)}</div>` : ''}${layout.headerText ? `<div class="header-text">${escapeHtml(layout.headerText)}</div>` : ''}</div></div>
     ${layout.showPatientInfo ? `<div class="meta"><div class="meta-item"><b>Paciente:</b> ${escapeHtml(params.patient.name)}</div><div class="meta-item"><b>Exame:</b> ${escapeHtml(params.patient.exam)}</div><div class="meta-item"><b>CPF:</b> ${escapeHtml(params.patient.cpf || 'Nao informado')}</div><div class="meta-item"><b>Convenio/Data:</b> ${escapeHtml(params.patient.insurance || params.patient.dateLabel || 'Nao informado')}</div></div>` : ''}
+    ${notice?.show ? `<div class="notice"><div class="notice-title">${escapeHtml(notice.title || 'Laudo em revisao pela clinica')}</div><div class="notice-text">${escapeHtml(notice.text || 'Voce esta visualizando a ultima versao publicada enquanto uma atualizacao esta em andamento.')}</div>${notice.versionLabel ? `<div class="notice-version">${escapeHtml(notice.versionLabel)}</div>` : ''}</div>` : ''}
     <div class="content">${params.contentHtml}</div>
     ${sig?.show ? `<div class="signatures"><div class="sign-card"><div class="sign-title">Emissor</div><div class="sign-person">${escapeHtml(sig.issuerName || 'Emissor nao identificado')}</div><div class="sign-status"><span class="sign-dot ${issuerSigned ? 'sign-dot-ok' : 'sign-dot-pending'}">${issuerSigned ? '&#10003;' : '...'}</span><span>${issuerSigned ? 'Assinado' : 'Pendente'}</span></div><div class="sign-time">${escapeHtml(sig.issuerSignedAt || 'Pendente')}</div></div><div class="sign-card"><div class="sign-title">Revisor</div><div class="sign-person">${escapeHtml(sig.reviewerName || (requiresReviewer ? 'Revisor nao identificado' : 'Revisor nao obrigatorio'))}</div><div class="sign-status"><span class="sign-dot ${reviewerSigned ? 'sign-dot-ok' : 'sign-dot-pending'}">${reviewerSigned ? '&#10003;' : '...'}</span><span>${requiresReviewer ? (reviewerSigned ? 'Assinado' : 'Pendente') : 'Nao obrigatorio'}</span></div><div class="sign-time">${escapeHtml(sig.reviewerSignedAt || (requiresReviewer ? 'Pendente' : 'Nao obrigatorio'))}</div></div></div>` : ''}
     <div class="footer">${footer ? `<div class="footer-extra">${escapeHtml(footer)}</div>` : ''}</div>

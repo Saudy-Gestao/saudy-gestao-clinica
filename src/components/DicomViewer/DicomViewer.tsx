@@ -39,7 +39,8 @@ cornerstoneTools.init();
 cornerstoneWADOImageLoader.configure({
   useWebWorkers: false,
   beforeSend: (xhr: XMLHttpRequest) => {
-    const token = localStorage.getItem('token') || localStorage.getItem('patient_portal_token');
+    const token = sessionStorage.getItem('patient_portal_token')
+      || localStorage.getItem('token');
     if (token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }

@@ -78,4 +78,22 @@ export default {
     const res = await api.delete(`/care/reports/${reportId}/temporary-prior-studies/${temporaryStudyId}`);
     return res.data;
   },
+
+  async getPatientFacingPdf(reportId: string): Promise<Blob> {
+    const res = await api.get(`/care/reports/${reportId}/patient-facing-pdf`, {
+      responseType: 'blob',
+    });
+    return res.data as Blob;
+  },
+
+  async getPatientFacingPreviewPdf(reportId: string, payload: {
+    contentHtml?: string;
+    issuerSignedAt?: string | null;
+    reviewerSignedAt?: string | null;
+  }): Promise<Blob> {
+    const res = await api.post(`/care/reports/${reportId}/patient-facing-pdf-preview`, payload || {}, {
+      responseType: 'blob',
+    });
+    return res.data as Blob;
+  },
 };
