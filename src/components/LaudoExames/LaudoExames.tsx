@@ -694,7 +694,7 @@ export function LaudoExames() {
       reportText: it.description || '',
       issuerSignedAt: it.issuerSignedAt || undefined,
       reviewerSignedAt: it.reviewerSignedAt || undefined,
-      hasFinalizedAddendum: Boolean(it.hasFinalizedAddendum || (it.addendums && it.addendums.length > 0)),
+      hasFinalizedAddendum: Boolean(it.hasFinalizedAddendum),
       dicomUrl: wl?.dicomUrl || undefined,
       dicomPath: undefined,
     };
@@ -1137,8 +1137,9 @@ export function LaudoExames() {
       setAddendumReviewerSignedAt(addendumDraft.reviewerSignedAt || null);
       setAddendumSavedAt(addendumDraft.savedAt || null);
       if (selectedExamId) {
+        const hasFinalized = String(addendumDraft.status || '').trim().toLowerCase() === 'finalizado';
         setExamRows((prev) => prev.map((item) => (
-          item.id === selectedExamId ? { ...item, hasFinalizedAddendum: true } : item
+          item.id === selectedExamId ? { ...item, hasFinalizedAddendum: hasFinalized } : item
         )));
       }
       return;
@@ -1177,9 +1178,6 @@ export function LaudoExames() {
     const createdId = String(created?.id || '');
     if (!createdId) return null;
     setAddendumId(createdId);
-    setExamRows((prev) => prev.map((item) => (
-      item.id === selectedExam.id ? { ...item, hasFinalizedAddendum: true } : item
-    )));
     return createdId;
   };
 
@@ -1480,7 +1478,7 @@ export function LaudoExames() {
         showNotification({ title: 'Assinatura bloqueada', message: 'Não é permitido assinar adendo sem conteúdo.', color: 'yellow' });
         return;
       }
-      const now = new Date().toLocaleString('pt-BR');
+      const now = new Date().toISOString();
       try {
         const draftId = await ensureAddendumDraft();
         if (!draftId) throw new Error('Draft not found');
@@ -1588,7 +1586,7 @@ export function LaudoExames() {
 
   const removeAdendo = async (examId: string) => {
     const exam = examRows.find((item) => item.id === examId);
-    if (!exam || exam.status !== 'finalizado' || !exam.hasFinalizedAddendum) return;
+    if (!exam || !exam.hasFinalizedAddendum) return;
 
     setRemovingAdendo(true);
     try {
@@ -1639,7 +1637,7 @@ export function LaudoExames() {
       return;
     }
 
-    const now = new Date().toLocaleString('pt-BR');
+    const now = new Date().toISOString();
     setAddendumSaving(true);
 
     try {
@@ -1676,15 +1674,8 @@ export function LaudoExames() {
       showNotification({ title: 'Finalização bloqueada', message: 'Assine como emissor para finalizar o adendo.', color: 'yellow' });
       return;
     }
-    const now = new Date().toLocaleString('pt-BR');
+    const now = new Date().toISOString();
     setAddendumFinalizing(true);
-    const addendumBlock = `
-      <hr />
-      <h3>Adendo (${now})</h3>
-      ${addendumText}
-      <p><strong>Assinaturas do adendo:</strong> Emissor: ${addendumIssuerSignedAt}</p>
-    `;
-    const nextText = `${selectedExam.reportText || ''}${addendumBlock}`;
 
     try {
       const draftId = await ensureAddendumDraft();
@@ -1699,22 +1690,16 @@ export function LaudoExames() {
         finalizedAt: now,
       });
 
-      await reportService.update(selectedExam.reportId || selectedExam.id, {
-        description: nextText,
-        status: 'finalizado',
-      });
-
       setExamRows((prev) => prev.map((item) => (
-        item.id === selectedExam.id ? { ...item, reportText: nextText, status: 'finalizado', hasFinalizedAddendum: true } : item
+        item.id === selectedExam.id ? { ...item, hasFinalizedAddendum: true } : item
       )));
-      setEditorContent(nextText);
       setAddendumId(null);
       setAddendumText('');
       setAddendumIssuerSignedAt(null);
       setAddendumReviewerSignedAt(null);
       setAddendumSavedAt(null);
       setAddendumModalOpen(false);
-      showNotification({ title: 'Adendo salvo', message: 'Adendo adicionado ao laudo finalizado.', color: 'green' });
+      showNotification({ title: 'Adendo finalizado', message: 'Adendo salvo e finalizado com sucesso.', color: 'green' });
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -2048,7 +2033,7 @@ export function LaudoExames() {
                             <ActionIcon
                               variant="subtle"
                               color="red"
-                              disabled={exam.status !== 'finalizado' || !exam.hasFinalizedAddendum || removingAdendo}
+                              disabled={!exam.hasFinalizedAddendum || removingAdendo}
                               onClick={() => removeAdendo(exam.id)}
                             >
                               <Trash2 size={16} />
@@ -3000,6 +2985,8 @@ export function LaudoExames() {
                   height: 260,
                   menubar: false,
                   plugins: ['lists', 'link', 'table', 'wordcount'],
+                  skin: isDark ? 'oxide-dark' : 'oxide',
+                  content_css: isDark ? 'dark' : 'default',
                   toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
                   content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
                 }}

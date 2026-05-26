@@ -308,6 +308,11 @@ export function PatientPortalDashboard() {
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null);
   const [reportDeliveryModalOpen, setReportDeliveryModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<PatientPortalReportItem | null>(null);
+  const [addendumHistoryModalOpen, setAddendumHistoryModalOpen] = useState(false);
+  const [selectedReportHistory, setSelectedReportHistory] = useState<{
+    title: string;
+    events: Array<{ type: 'published' | 'removed'; createdAt: string }>;
+  } | null>(null);
   const [preferredDeliveryDate, setPreferredDeliveryDate] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [requestingDeliveryFor, setRequestingDeliveryFor] = useState<string | null>(null);
@@ -998,6 +1003,18 @@ export function PatientPortalDashboard() {
                   </Stack>
                 </Card>
                 {reports.map((item) => (
+                  (() => {
+                    const addendumEvents = (
+                      Array.isArray(item.addendumEvents) && item.addendumEvents.length > 0
+                        ? item.addendumEvents
+                        : [
+                          item.latestAddendumPublishedAt ? { type: 'published' as const, createdAt: item.latestAddendumPublishedAt } : null,
+                          item.latestAddendumRemovedAt ? { type: 'removed' as const, createdAt: item.latestAddendumRemovedAt } : null,
+                        ].filter((event): event is { type: 'published' | 'removed'; createdAt: string } => Boolean(event))
+                    ).sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf());
+                    const [latestEvent, ...olderEvents] = addendumEvents;
+
+                    return (
                   <Card key={item.id} className="patient-portal-record-card" withBorder radius="md">
                     <Stack gap={8}>
                       <Group justify="space-between" align="flex-start">
@@ -1008,6 +1025,49 @@ export function PatientPortalDashboard() {
                         <Badge variant="light" color={statusTone(item.status)}>{item.status || 'Sem status'}</Badge>
                       </Group>
                       {item.reportingDoctor ? <Text size="sm">{`Laudado por: ${item.reportingDoctor}`}</Text> : null}
+                      {latestEvent ? (
+                        <Box
+                          style={{
+                            border: '1px solid rgba(148, 163, 184, 0.25)',
+                            borderRadius: 10,
+                            padding: '8px 10px',
+                            background: 'rgba(15, 23, 42, 0.35)',
+                          }}
+                        >
+                          <Group justify="space-between" align="center" mb={4}>
+                            <Text size="xs" fw={700}>Atualizações do laudo</Text>
+                            <Badge
+                              size="xs"
+                              variant="light"
+                              color={latestEvent.type === 'removed' ? 'yellow' : 'teal'}
+                            >
+                              {latestEvent.type === 'removed' ? 'Atenção' : 'Novo adendo'}
+                            </Badge>
+                          </Group>
+                          <Text size="xs" c={latestEvent.type === 'removed' ? 'yellow.4' : 'teal.3'}>
+                            {latestEvent.type === 'removed'
+                              ? `- Adendo removido em ${dayjs(latestEvent.createdAt).isValid() ? dayjs(latestEvent.createdAt).format('DD/MM/YYYY HH:mm') : '-'}`
+                              : `+ Adendo adicionado em ${dayjs(latestEvent.createdAt).isValid() ? dayjs(latestEvent.createdAt).format('DD/MM/YYYY HH:mm') : '-'}`}
+                          </Text>
+                          {olderEvents.length > 0 ? (
+                            <Button
+                              size="compact-xs"
+                              variant="subtle"
+                              color="gray"
+                              mt={4}
+                              onClick={() => {
+                                setSelectedReportHistory({
+                                  title: item.exam || item.appointment?.specialty || 'Laudo',
+                                  events: addendumEvents,
+                                });
+                                setAddendumHistoryModalOpen(true);
+                              }}
+                            >
+                              {`Ver histórico (${addendumEvents.length})`}
+                            </Button>
+                          ) : null}
+                        </Box>
+                      ) : null}
                       {item.isUnderReview ? (
                         <Text size="xs" c="orange.6">
                           {item.patientWarning || 'Este laudo esta em revisao. Voce visualiza a ultima versao publicada.'}
@@ -1045,6 +1105,8 @@ export function PatientPortalDashboard() {
                       </Group>
                     </Stack>
                   </Card>
+                    );
+                  })()
                 ))}
                 {reports.length === 0 ? <EmptyState message="Nenhum laudo liberado disponível." /> : null}
                 </Stack>
@@ -1053,6 +1115,33 @@ export function PatientPortalDashboard() {
           </Tabs>
         </Paper>
       </Stack>
+
+      <Modal
+        opened={addendumHistoryModalOpen}
+        onClose={() => {
+          setAddendumHistoryModalOpen(false);
+          setSelectedReportHistory(null);
+        }}
+        title="Histórico de adendos"
+        centered
+      >
+        <Stack gap="xs">
+          <Text size="sm" fw={600}>{selectedReportHistory?.title || 'Laudo'}</Text>
+          {(selectedReportHistory?.events || []).map((event, index) => (
+            <Group key={`${event.type}-${event.createdAt}-${index}`} justify="space-between" align="center">
+              <Badge variant="light" color={event.type === 'removed' ? 'yellow' : 'teal'}>
+                {event.type === 'removed' ? 'Adendo removido' : 'Adendo adicionado'}
+              </Badge>
+              <Text size="sm">
+                {dayjs(event.createdAt).isValid() ? dayjs(event.createdAt).format('DD/MM/YYYY HH:mm') : '-'}
+              </Text>
+            </Group>
+          ))}
+          {(selectedReportHistory?.events || []).length === 0 ? (
+            <Text size="sm" c="dimmed">Sem eventos de adendo para este laudo.</Text>
+          ) : null}
+        </Stack>
+      </Modal>
 
       <Modal
         opened={reportDeliveryModalOpen}

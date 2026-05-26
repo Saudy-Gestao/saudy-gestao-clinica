@@ -73,6 +73,12 @@ export type PatientPortalReportItem = {
   isUnderReview?: boolean;
   patientWarning?: string | null;
   publishedVersion?: number | null;
+  latestAddendumPublishedAt?: string | null;
+  latestAddendumRemovedAt?: string | null;
+  addendumEvents?: Array<{
+    type: 'published' | 'removed';
+    createdAt: string;
+  }>;
   exam: string | null;
   patientName?: string | null;
   cpf?: string | null;
