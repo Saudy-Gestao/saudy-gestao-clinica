@@ -15,7 +15,7 @@ export interface CreateDoctorPayload {
   specialties?: string[];
   consultationFee?: number;
   biography?: string;
-  signatureImageBase64?: string;
+  signatureImageBase64?: string | null;
   address?: string;
   addressNumber?: string;
   addressComplement?: string;
