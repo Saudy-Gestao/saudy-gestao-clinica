@@ -1,192 +1,153 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Stack, Text, Button, Progress, Group } from '@mantine/core';
-import { ArrowLeft, FileDown, ScanLine } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ActionIcon, Box, Button, Group, Loader, Stack, Text } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { jsPDF } from 'jspdf';
+import { ArrowLeft } from 'lucide-react';
 import patientPortalService from '../../services/patientPortalService';
-import { parseDicomFile, buildDisplayPixels } from '../DicomViewer/dicomUtils';
+import { DicomViewer } from '../DicomViewer/DicomViewer';
+import { SeriesThumbnail } from '../DicomViewer/SeriesThumbnail';
 
-type Phase = 'idle' | 'fetching-series' | 'downloading' | 'rendering' | 'done' | 'error';
+type SeriesItem = {
+  seriesUid: string | null;
+  instancesCount: number;
+};
 
-function dicomBufferToDataUrl(buffer: ArrayBuffer): string | null {
-  try {
-    const image = parseDicomFile(buffer);
-    const { rows, columns } = image.metadata;
-    if (!rows || !columns) return null;
-
-    const ww = image.maxPixelValue - image.minPixelValue || 1;
-    const wc = image.minPixelValue + ww / 2;
-    const pixels = buildDisplayPixels(image, wc, ww, false);
-    // Ensure an ArrayBuffer-backed view to satisfy ImageData typing across runtimes.
-    const imageBuffer = pixels.buffer.slice(pixels.byteOffset, pixels.byteOffset + pixels.byteLength) as ArrayBuffer;
-    const imagePixels = new Uint8ClampedArray(imageBuffer);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = columns;
-    canvas.height = rows;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.putImageData(new ImageData(imagePixels, columns, rows), 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.92);
-  } catch {
-    return null;
-  }
-}
+const apiBase = String((import.meta.env.VITE_API_URL as string) || '').replace(/\/$/, '');
 
 export function PatientPortalDicomViewer() {
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
+  const [loadingSeries, setLoadingSeries] = useState(true);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [series, setSeries] = useState<SeriesItem[]>([]);
+  const [seriesPreviewByUid, setSeriesPreviewByUid] = useState<Record<string, string>>({});
+  const [activeSeriesUid, setActiveSeriesUid] = useState<string | null>(null);
+  const [imageIds, setImageIds] = useState<string[]>([]);
 
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [progress, setProgress] = useState(0);
-  const [progressLabel, setProgressLabel] = useState('');
+  const title = useMemo(() => {
+    if (!series.length) return 'Visualizador de imagens';
+    const index = series.findIndex((item) => item.seriesUid === activeSeriesUid);
+    return `Série ${index >= 0 ? index + 1 : 1} de ${series.length}`;
+  }, [series, activeSeriesUid]);
+
+  const loadSeriesFiles = async (nextSeriesUid: string | null) => {
+    if (!reportId) return;
+    setLoadingFiles(true);
+    try {
+      const response = await patientPortalService.getReportDicomFiles(reportId, nextSeriesUid ?? undefined);
+      const ids = (response.files || []).map((file) => `wadouri:${apiBase}/auth/patient-portal/me/reports/${reportId}/dicom/images/${file.id}`);
+      setImageIds(ids);
+      setActiveSeriesUid(nextSeriesUid);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
 
   useEffect(() => {
     if (!reportId) return;
-    void generatePdf(reportId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const load = async () => {
+      setLoadingSeries(true);
+      try {
+        const data = await patientPortalService.getReportDicomSeries(reportId);
+        const list = data.series || [];
+        setSeries(list);
+        const previews: Record<string, string> = {};
+        for (const item of list) {
+          const filesRes = await patientPortalService.getReportDicomFiles(reportId, item.seriesUid ?? undefined);
+          const firstId = filesRes?.files?.[0]?.id;
+          const key = item.seriesUid ?? '__NO_SERIES__';
+          if (firstId) previews[key] = `wadouri:${apiBase}/auth/patient-portal/me/reports/${reportId}/dicom/images/${firstId}`;
+        }
+        setSeriesPreviewByUid(previews);
+        if (!list.length) {
+          showNotification({ title: 'Sem imagens', message: 'Nenhuma imagem DICOM disponível para este laudo.', color: 'yellow' });
+          navigate('/portal');
+          return;
+        }
+        await loadSeriesFiles(list[0].seriesUid ?? null);
+      } catch (err: any) {
+        showNotification({
+          title: 'Erro ao abrir imagens',
+          message: err?.response?.data?.error || err?.message || 'Não foi possível abrir as imagens deste laudo.',
+          color: 'red',
+        });
+        navigate('/portal');
+      } finally {
+        setLoadingSeries(false);
+      }
+    };
+    void load();
   }, [reportId]);
 
-  async function generatePdf(id: string) {
-    try {
-      setPhase('fetching-series');
-      setProgressLabel('Buscando séries de imagens...');
-      setProgress(5);
-
-      const seriesData = await patientPortalService.getReportDicomSeries(id);
-      if (!seriesData.series.length) {
-        showNotification({ title: 'Sem imagens', message: 'Nenhuma imagem DICOM disponível para este laudo.', color: 'yellow' });
-        navigate('/portal');
-        return;
-      }
-
-      // collect all file IDs across series
-      setPhase('downloading');
-      setProgressLabel('Carregando lista de arquivos...');
-      setProgress(10);
-
-      const allFileIds: string[] = [];
-      for (const serie of seriesData.series) {
-        const { files } = await patientPortalService.getReportDicomFiles(id, serie.seriesUid ?? undefined);
-        allFileIds.push(...files.map((f) => f.id));
-      }
-
-      if (!allFileIds.length) {
-        showNotification({ title: 'Sem arquivos', message: 'Não foram encontrados arquivos de imagem.', color: 'yellow' });
-        navigate('/portal');
-        return;
-      }
-
-      // download buffers
-      const buffers: ArrayBuffer[] = [];
-      for (let i = 0; i < allFileIds.length; i++) {
-        setProgressLabel(`Baixando imagem ${i + 1} de ${allFileIds.length}...`);
-        setProgress(10 + Math.round(((i + 1) / allFileIds.length) * 50));
-        const buf = await patientPortalService.downloadDicomFile(id, allFileIds[i]);
-        buffers.push(buf);
-      }
-
-      // render to data URLs
-      setPhase('rendering');
-      setProgressLabel('Gerando PDF...');
-      setProgress(62);
-
-      const dataUrls: string[] = [];
-      for (let i = 0; i < buffers.length; i++) {
-        setProgress(62 + Math.round(((i + 1) / buffers.length) * 33));
-        const url = dicomBufferToDataUrl(buffers[i]);
-        if (url) dataUrls.push(url);
-      }
-
-      if (!dataUrls.length) {
-        showNotification({ title: 'Erro', message: 'Não foi possível processar as imagens DICOM.', color: 'red' });
-        setPhase('error');
-        return;
-      }
-
-      // build PDF
-      setProgressLabel('Finalizando PDF...');
-      setProgress(96);
-
-      // detect dimensions from first image
-      const firstImg = new Image();
-      await new Promise<void>((res) => { firstImg.onload = () => res(); firstImg.src = dataUrls[0]; });
-      const imgW = firstImg.naturalWidth;
-      const imgH = firstImg.naturalHeight;
-      const orientation = imgW >= imgH ? 'landscape' : 'portrait';
-
-      const pdf = new jsPDF({ orientation, unit: 'px', format: [imgW, imgH] });
-
-      for (let i = 0; i < dataUrls.length; i++) {
-        if (i > 0) pdf.addPage([imgW, imgH], orientation);
-        pdf.addImage(dataUrls[i], 'JPEG', 0, 0, imgW, imgH);
-      }
-
-      setProgress(100);
-      setPhase('done');
-
-      pdf.save(`imagens-laudo-${id.slice(0, 8)}.pdf`);
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro ao gerar PDF',
-        message: err?.response?.data?.error || err?.message || 'Não foi possível gerar o PDF das imagens.',
-        color: 'red',
-      });
-      setPhase('error');
-    }
-  }
-
-  const isDone = phase === 'done';
-  const isError = phase === 'error';
-
   return (
-    <Box
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--mantine-color-body)',
-        padding: 24,
-      }}
-    >
-      <Stack align="center" gap="lg" style={{ maxWidth: 400, width: '100%' }}>
-        <ScanLine size={48} color={isError ? '#fa5252' : 'var(--mantine-color-blue-6)'} />
-
-        <Text fw={600} size="lg" ta="center">
-          {isDone ? 'PDF gerado com sucesso!' : isError ? 'Erro ao gerar PDF' : 'Preparando imagens do exame...'}
-        </Text>
-
-        {!isDone && !isError && (
-          <>
-            <Progress value={progress} w="100%" size="md" radius="xl" animated />
-            <Text size="sm" c="dimmed" ta="center">{progressLabel}</Text>
-          </>
-        )}
-
-        {isDone && (
-          <Text size="sm" c="dimmed" ta="center">
-            O download do PDF foi iniciado automaticamente.
-          </Text>
-        )}
-
-        {isError && (
-          <Button
-            variant="light"
-            leftSection={<FileDown size={14} />}
-            onClick={() => { setPhase('idle'); setProgress(0); void generatePdf(reportId!); }}
-          >
-            Tentar novamente
-          </Button>
-        )}
-
-        <Group>
-          <Button variant="subtle" leftSection={<ArrowLeft size={14} />} onClick={() => navigate('/portal')}>
-            Voltar ao portal
-          </Button>
+    <Box style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', backgroundColor: '#000' }}>
+      <Box
+        style={{
+          padding: '12px 20px',
+          backgroundColor: '#121826',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Group gap="sm">
+          <ActionIcon variant="light" color="gray" size="lg" onClick={() => navigate('/portal')}>
+            <ArrowLeft size={18} />
+          </ActionIcon>
+          <Stack gap={0}>
+            <Text c="white" fw={700}>Visualizador de imagens</Text>
+            <Text size="xs" c="dimmed">{title}</Text>
+          </Stack>
         </Group>
-      </Stack>
+        <Button variant="light" onClick={() => navigate('/portal')}>
+          Voltar ao portal
+        </Button>
+      </Box>
+
+      <Box style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <Box
+          style={{
+            width: 210,
+            flexShrink: 0,
+            borderRight: '1px solid rgba(148, 163, 184, 0.2)',
+            padding: 12,
+            overflowY: 'auto',
+            background: '#0b1220',
+          }}
+        >
+          <Stack gap={8}>
+            {series.map((item, index) => {
+              const active = item.seriesUid === activeSeriesUid;
+              const previewImage = seriesPreviewByUid[item.seriesUid ?? '__NO_SERIES__'] || '';
+              return (
+                <SeriesThumbnail
+                  key={item.seriesUid || `series-${index}`}
+                  imageUrl={previewImage}
+                  onClick={() => void loadSeriesFiles(item.seriesUid ?? null)}
+                  disabled={loadingSeries || loadingFiles}
+                  active={active}
+                  label={`Série ${index + 1}`}
+                  count={item.instancesCount}
+                />
+              );
+            })}
+          </Stack>
+        </Box>
+
+        <Box style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}>
+          {loadingSeries || loadingFiles ? (
+            <Box style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Stack align="center" gap="xs">
+                <Loader color="blue" />
+                <Text size="sm" c="dimmed">Carregando imagens...</Text>
+              </Stack>
+            </Box>
+          ) : (
+            <DicomViewer initialImageIds={imageIds} style={{ width: '100%', height: '100%' }} />
+          )}
+        </Box>
+      </Box>
     </Box>
   );
 }

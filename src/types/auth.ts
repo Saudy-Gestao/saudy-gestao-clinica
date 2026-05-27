@@ -4,6 +4,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  doctorId?: string | null;
   cpf?: string;
   isAdmHubOnly?: boolean;
   role: 'patient' | 'doctor' | 'admin' | 'staff';
