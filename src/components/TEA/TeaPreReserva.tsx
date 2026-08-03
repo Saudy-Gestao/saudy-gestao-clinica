@@ -12,6 +12,7 @@ import {
   Stack,
   Badge,
   Loader,
+  Progress,
   ActionIcon,
   Divider,
   Modal,
@@ -444,6 +445,7 @@ export function TeaPreReserva() {
   const [search, setSearch] = useState('');
   const [badgeFilter, setBadgeFilter] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [conversionProgress, setConversionProgress] = useState<{ done: number; total: number } | null>(null);
   const [suggestionsByTherapyId, setSuggestionsByTherapyId] = useState<Record<string, SuggestedSlot[]>>({});
   const [suggestionFallbackByTherapyId, setSuggestionFallbackByTherapyId] = useState<Record<string, SuggestionFallbackLevel>>({});
   const [loadingSuggestionsId, setLoadingSuggestionsId] = useState<string | null>(null);
@@ -3101,19 +3103,24 @@ export function TeaPreReserva() {
     if (!Array.isArray(reservationIds) || reservationIds.length === 0) return;
 
     setUpdatingId(checklistGroupKey || reservationIds[0]);
+    setConversionProgress({ done: 0, total: reservationIds.length });
     try {
       const results = await Promise.allSettled(
-        reservationIds.map((reservationId) => {
+        reservationIds.map(async (reservationId) => {
           const reservation = checklistGroupReservations.find(
             (item) => String(item?.preReservationId || '') === String(reservationId),
           );
           const pitTherapyId = String(reservation?.pitTherapyId || reservation?.preReservationId || '').trim();
           const seriesStartDate = pitTherapyId ? String(acceptDateByTherapy[pitTherapyId] || '').trim() : '';
 
-          return teaPreReservationService.convertToAppointment(reservationId, {
-            convertSeries: true,
-            seriesStartDate: seriesStartDate || undefined,
-          });
+          try {
+            return await teaPreReservationService.convertToAppointment(reservationId, {
+              convertSeries: true,
+              seriesStartDate: seriesStartDate || undefined,
+            });
+          } finally {
+            setConversionProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev));
+          }
         }),
       );
 
@@ -3152,6 +3159,7 @@ export function TeaPreReserva() {
       setAcceptModalOpened(false);
     } finally {
       setUpdatingId(null);
+      setConversionProgress(null);
     }
   };
 
@@ -3574,13 +3582,26 @@ export function TeaPreReserva() {
           </Paper>
 
           {!!updatingId && acceptModalMode === 'conversion' && (
-            <Paper p="sm" withBorder className="tea-pre-reserva-accept-hero">
-              <Group gap="sm" align="center">
-                <Loader size="sm" />
-                <Text size="sm">
-                  Convertendo {acceptTherapies.length} terapia(s) em agendamento — isso pode levar alguns segundos, não feche esta janela.
+            <Paper p="md" withBorder className="tea-pre-reserva-accept-hero">
+              <Stack gap={8}>
+                <Group gap="sm" align="center">
+                  <Loader size="sm" />
+                  <Text size="sm" fw={700}>Convertendo terapias em agendamento</Text>
+                </Group>
+                <Progress
+                  value={conversionProgress ? (conversionProgress.done / Math.max(1, conversionProgress.total)) * 100 : 0}
+                  size="md"
+                  radius="xl"
+                  striped
+                  animated
+                />
+                <Text size="xs" className="tea-pre-reserva-muted">
+                  {conversionProgress
+                    ? `${conversionProgress.done} de ${conversionProgress.total} terapia(s) processadas`
+                    : 'Iniciando conversão...'}
+                  {' '}— isso pode levar alguns segundos, não feche esta janela.
                 </Text>
-              </Group>
+              </Stack>
             </Paper>
           )}
 
