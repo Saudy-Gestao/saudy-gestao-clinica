@@ -79,6 +79,9 @@ import {
   YAxis,
 } from 'recharts';
 import { Header } from '../Header/Header';
+import authService from '../../services/authService';
+import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
+import { normalizeCompanyModuleType } from '../../utils/moduleTypeAccess';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { useConvenioAuthorizationsQuery } from '../../hooks/useConvenioAuthorizationsQuery';
@@ -934,6 +937,15 @@ const gridCollision: CollisionDetection = (args) => {
 export function BIGestao() {
   const navigate = useNavigate();
   const { colorScheme } = useMantineColorScheme();
+  const currentUser = authService.getCurrentUser() as any;
+  const { data: userProfile } = useCurrentUserProfileQuery();
+  const companyModuleType = useMemo(
+    () => normalizeCompanyModuleType(
+      (userProfile as any)?.sector?.branch?.company?.module_type ?? currentUser?.sector?.branch?.company?.module_type,
+    ),
+    [userProfile, currentUser],
+  );
+  const isTeaOnly = companyModuleType === 'apenas-tea';
   const [period, setPeriod] = useState<PeriodKey>('30d');
   const [activePanel, setActivePanel] = useState('executivo');
   const [doctorFilter, setDoctorFilter] = useState<string | null>(null);
@@ -2317,7 +2329,9 @@ export function BIGestao() {
             { value: 'comunicacao', label: 'Comunicação' },
             { value: 'personalizavel', label: '✦ Personalizável' },
           ];
-          const hiddenTabsInfo = ALL_TABS.filter((t) => hiddenTabs.includes(t.value));
+          const hiddenTabsInfo = ALL_TABS
+            .filter((t) => !isTeaOnly || t.value !== 'laudos')
+            .filter((t) => hiddenTabs.includes(t.value));
           return (
             <Modal
               opened={restoreModalOpen}
@@ -2365,6 +2379,7 @@ export function BIGestao() {
               { value: 'laudos',      label: 'Laudos' },
               { value: 'comunicacao', label: 'Comunicação' },
             ] as { value: string; label: string }[])
+              .filter((tab) => !isTeaOnly || tab.value !== 'laudos')
               .filter((tab) => !hiddenTabs.includes(tab.value))
               .concat(customTabs.map((ct) => ({ value: ct.id, label: ct.label })))
               .map((tab) => {
@@ -2818,7 +2833,9 @@ export function BIGestao() {
                   <MetricTile label="Entradas" value={currencyFormatter.format(asNumber(financialKpis.revenue) || data.revenue)} hint="Lançamentos" icon={TrendingUp} tone="teal" />
                   <MetricTile label="Saídas" value={currencyFormatter.format(asNumber(financialKpis.expenses) || data.expenses)} hint="Despesas" icon={DollarSign} tone="red" />
                   <MetricTile label="Faturado" value={currencyFormatter.format(asNumber(financialKpis.invoiced) || data.invoiced)} hint="Notas/guias no período" icon={FileCheck2} tone="darkBlue" />
-                  <MetricTile label="Glosas" value={currencyFormatter.format(asNumber(financialKpis.glosaValue) || data.glosaValue)} hint="Retornos TISS" icon={ShieldCheck} tone="orange" />
+                  {!isTeaOnly && (
+                    <MetricTile label="Glosas" value={currencyFormatter.format(asNumber(financialKpis.glosaValue) || data.glosaValue)} hint="Retornos TISS" icon={ShieldCheck} tone="orange" />
+                  )}
                 </SimpleGrid>
               </Paper>
             ),
@@ -2904,16 +2921,20 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             cli_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                {renderEditablePanelTitle(tabId, "Laudos e autorizações", "Laudos e autorizações", "Backlog clínico e risco de atendimento.", FileClock)}
+                {isTeaOnly
+                  ? renderEditablePanelTitle(tabId, "Laudos e autorizações", "Autorizações e TEA", "Convênios e perfis TEA em acompanhamento.", FileClock)
+                  : renderEditablePanelTitle(tabId, "Laudos e autorizações", "Laudos e autorizações", "Backlog clínico e risco de atendimento.", FileClock)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Autoriz. pendentes" value={integerFormatter.format(asNumber(clinicalKpis.pendingAuthorizations) || data.pendingAuthorizations)} hint="Convênios em análise" icon={ShieldCheck} tone="grape" />
                   <MetricTile label="Negativas" value={integerFormatter.format(asNumber(clinicalKpis.deniedAuthorizations))} hint="Autorizações negadas" icon={AlertTriangle} tone="red" />
-                  <MetricTile label="SLA médio" value={`${percentFormatter.format(asNumber(clinicalKpis.slaAvgHours))}h`} hint="Assinatura de laudos" icon={Clock3} tone="teal" />
+                  {!isTeaOnly && (
+                    <MetricTile label="SLA médio" value={`${percentFormatter.format(asNumber(clinicalKpis.slaAvgHours))}h`} hint="Assinatura de laudos" icon={Clock3} tone="teal" />
+                  )}
                   <MetricTile label="TEA ativos" value={integerFormatter.format(data.activeTeaProfiles)} hint="Perfis ativos carregados" icon={HeartPulse} tone="red" />
                 </SimpleGrid>
               </Paper>
             ),
-            cli_sla: (
+            ...(!isTeaOnly && { cli_sla: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
                 {renderEditablePanelTitle(tabId, "SLA e backlog clínico", "SLA e backlog clínico", "Assinatura e envelhecimento.", BarChart3)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }} mb="md">
@@ -2962,7 +2983,7 @@ export function BIGestao() {
                   </Stack>
                 )}
               </Paper>
-            ),
+            ) }),
           };
           return (
             <Stack gap="lg">
