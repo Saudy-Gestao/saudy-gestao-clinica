@@ -20,6 +20,7 @@ import {
   Skeleton,
   Badge,
   Switch,
+  FileInput,
   UnstyledButton,
   useComputedColorScheme,
 } from '@mantine/core';
@@ -125,6 +126,7 @@ interface DoctorForm {
   specialties: string[];
   teleconsultationEnabled: boolean;
   biography: string;
+  signatureImageBase64: string;
   address: string;
   addressNumber: string;
   addressComplement: string;
@@ -180,6 +182,7 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   specialties: [],
   teleconsultationEnabled: false,
   biography: '',
+  signatureImageBase64: '',
   address: '',
   addressNumber: '',
   addressComplement: '',
@@ -270,6 +273,32 @@ export function CadastroMedico() {
     const date = new Date(year, month, day);
     if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
     return date;
+  };
+
+  const handleSignatureFileChange = (file: File | null) => {
+    if (!file) {
+      setForm((prev) => ({ ...prev, signatureImageBase64: '' }));
+      return;
+    }
+
+    const isValidType = ['image/png', 'image/jpeg', 'image/jpg'].includes(file.type);
+    if (!isValidType) {
+      showNotification({ title: 'Arquivo inválido', message: 'Envie PNG ou JPG para assinatura.', color: 'red' });
+      return;
+    }
+
+    const maxBytes = 300 * 1024;
+    if (file.size > maxBytes) {
+      showNotification({ title: 'Arquivo grande', message: 'A assinatura deve ter no máximo 300 KB.', color: 'red' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      setForm((prev) => ({ ...prev, signatureImageBase64: result }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const [form, setForm] = useState<DoctorForm>({ ...INITIAL_DOCTOR_FORM });
@@ -433,6 +462,7 @@ export function CadastroMedico() {
       specialties,
       teleconsultationEnabled,
       biography: getString(raw.biography),
+      signatureImageBase64: getString(raw.signatureImageBase64),
       address: getString(raw.address),
       addressNumber: getString(raw.addressNumber),
       addressComplement: getString(raw.addressComplement),
@@ -623,6 +653,7 @@ export function CadastroMedico() {
           ...(form.teleconsultationEnabled ? [TELECONSULTATION_SPECIALTY_FLAG] : []),
         ],
         biography: form.biography || undefined,
+        signatureImageBase64: form.signatureImageBase64?.trim() || null,
         address: form.address || undefined,
         addressNumber: form.addressNumber || undefined,
         addressComplement: form.addressComplement || undefined,
@@ -1003,6 +1034,55 @@ export function CadastroMedico() {
                   minRows={3}
                   mt="md"
                 />
+                <Stack gap={6} mt="md">
+                  <Text size="sm" fw={500}>Assinatura do médico</Text>
+                  <FileInput
+                    placeholder="Selecionar assinatura"
+                    accept="image/png,image/jpeg,image/jpg"
+                    onChange={(file) => handleSignatureFileChange(file)}
+                    clearable
+                  />
+                  <Text size="xs" c="dimmed">Formatos aceitos: PNG/JPG. Tamanho máximo: 300 KB.</Text>
+                  {form.signatureImageBase64 ? (
+                    <Text size="xs" c="green">Assinatura carregada.</Text>
+                  ) : null}
+                  {form.signatureImageBase64 ? (
+                    <Group justify="flex-start">
+                      <Button
+                        size="xs"
+                        variant="light"
+                        color="red"
+                        onClick={() => setForm((prev) => ({ ...prev, signatureImageBase64: '' }))}
+                      >
+                        Remover assinatura
+                      </Button>
+                    </Group>
+                  ) : null}
+                  {form.signatureImageBase64 ? (
+                    <Paper withBorder radius="sm" p="xs" bg={isDarkMode ? 'dark.6' : 'gray.0'}>
+                      <Text size="xs" c="dimmed" mb={6}>Pré-visualização da assinatura</Text>
+                      <Box
+                        style={{
+                          minHeight: 64,
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'flex-start',
+                        }}
+                      >
+                        <img
+                          src={form.signatureImageBase64}
+                          alt="Assinatura do médico"
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: 72,
+                            objectFit: 'contain',
+                            objectPosition: 'left bottom',
+                          }}
+                        />
+                      </Box>
+                    </Paper>
+                  ) : null}
+                </Stack>
               </Paper>
 
               {/* Endereço */}
@@ -1393,6 +1473,7 @@ export function CadastroMedico() {
               </Text>
               <Text size="sm"><Text fw={600} span>Especialidade:</Text> {formatDetailValue(selectedDoctor?.raw?.specialty)}</Text>
               <Text size="sm"><Text fw={600} span>Teleconsulta:</Text> {Array.isArray(selectedDoctor?.raw?.specialties) && (selectedDoctor?.raw?.specialties as unknown[]).some((item) => String(item) === TELECONSULTATION_SPECIALTY_FLAG) ? 'Habilitado' : 'Desabilitado'}</Text>
+              <Text size="sm"><Text fw={600} span>Assinatura:</Text> {selectedDoctor?.raw?.signatureImageBase64 ? 'Cadastrada' : '-'}</Text>
             </SimpleGrid>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
@@ -1454,3 +1535,6 @@ export function CadastroMedico() {
     </Box>
   );
 }
+
+
+

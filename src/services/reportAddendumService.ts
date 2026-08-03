@@ -5,10 +5,10 @@ export interface ReportAddendumPayload {
   reportId?: string;
   content?: string;
   status?: string;
-  issuerSignedAt?: string | null;
-  reviewerSignedAt?: string | null;
+  issuerSignedAt?: string | Date | null;
+  reviewerSignedAt?: string | Date | null;
   savedAt?: string | null;
-  finalizedAt?: string | null;
+  finalizedAt?: string | Date | null;
 }
 
 export default {
