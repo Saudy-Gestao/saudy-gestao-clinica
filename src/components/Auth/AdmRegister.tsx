@@ -7,10 +7,6 @@ import authService from '../../services/authService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 
-function isEtechdevDomain(email: string) {
-  return /@etechdev(?:\.[a-z0-9-]+)*$/i.test(email.trim());
-}
-
 export function AdmRegister() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
@@ -49,11 +45,6 @@ export function AdmRegister() {
 
     if (!name.trim() || !normalizedEmail || !password || !confirmPassword) {
       notifications.show({ title: 'Erro', message: 'Preencha todos os campos', color: 'red' });
-      return;
-    }
-
-    if (!isEtechdevDomain(normalizedEmail)) {
-      notifications.show({ title: 'Erro', message: 'Use um e-mail do domínio @etechdev', color: 'red' });
       return;
     }
 
@@ -141,7 +132,6 @@ export function AdmRegister() {
           <Stack gap="lg">
             <Box ta="center">
               <Text size="xl" fw={600}>Cadastrar ADM Hub</Text>
-              <Text c="dimmed" size="sm">Acesso restrito ao domínio @etechdev</Text>
             </Box>
 
             {step === 'form' ? (
