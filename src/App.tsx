@@ -73,7 +73,7 @@ import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogi
 import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
 import { PatientPortalDicomViewer } from './components/PatientPortal/PatientPortalDicomViewer';
 import patientPortalAuthService from './services/patientPortalAuthService';
-import { isAdminUser, isDoctorUser } from './utils/userRole';
+import { hasModuleAccess, isAdminUser, isDoctorUser } from './utils/userRole';
 import { useCurrentUserProfileQuery } from './hooks/useCurrentUserProfileQuery';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -87,7 +87,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const effectiveUser = (profileUser || currentUser) as any;
   const isAdmOnly = Boolean(effectiveUser?.isAdmHubOnly);
   const doctorView = isDoctorUser(effectiveUser);
-  const adminView = isAdminUser(effectiveUser);
+  const adminView = isAdminUser(effectiveUser) || hasModuleAccess(effectiveUser, 'configuracoes');
   const admAllowedPaths = ['/adm-hub', '/cadastro-cliente', '/possiveis-clientes', '/adm-clientes', '/adm-tickets', '/adm-knowledge'];
 
   if (!isAdmOnly && location.pathname === '/adm-hub') {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDoctorUser, isAdminUser } from '../userRole';
+import { isDoctorUser, isAdminUser, hasModuleAccess } from '../userRole';
 
 describe('isDoctorUser', () => {
   it('returns false for null', () => expect(isDoctorUser(null)).toBe(false));
@@ -34,5 +34,39 @@ describe('isAdminUser', () => {
   });
   it('returns false for regular user', () => {
     expect(isAdminUser({ role: 'user', name: 'João Silva' })).toBe(false);
+  });
+});
+
+describe('hasModuleAccess', () => {
+  it('returns false for null', () => expect(hasModuleAccess(null, 'configuracoes')).toBe(false));
+
+  it('fails open when the user has no access records at all', () => {
+    expect(hasModuleAccess({ accesses: [] }, 'configuracoes')).toBe(true);
+    expect(hasModuleAccess({}, 'configuracoes')).toBe(true);
+  });
+
+  it('returns true when a module with that name is granted', () => {
+    const user = { accesses: [{ modules: [{ name: 'cadastro-paciente' }, { name: 'configuracoes' }] }] };
+    expect(hasModuleAccess(user, 'configuracoes')).toBe(true);
+  });
+
+  it('returns false when accesses exist but the module is not granted', () => {
+    const user = { accesses: [{ modules: [{ name: 'cadastro-paciente' }] }] };
+    expect(hasModuleAccess(user, 'configuracoes')).toBe(false);
+  });
+
+  it('is case/accent-insensitive and checks across multiple accesses', () => {
+    const user = {
+      accesses: [
+        { modules: [{ name: 'cadastro-paciente' }] },
+        { modules: [{ name: 'Configuracoes' }] },
+      ],
+    };
+    expect(hasModuleAccess(user, 'CONFIGURAÇÕES')).toBe(true);
+  });
+
+  it('supports the singular `access` field shape', () => {
+    const user = { access: { modules: [{ name: 'configuracoes' }] } };
+    expect(hasModuleAccess(user, 'configuracoes')).toBe(true);
   });
 });

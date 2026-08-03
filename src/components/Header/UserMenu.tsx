@@ -7,7 +7,7 @@ import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 import authService from '../../services/authService';
 import userService from '../../services/userService';
-import { isAdminUser } from '../../utils/userRole';
+import { hasModuleAccess, isAdminUser } from '../../utils/userRole';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { APP_COLOR_SCHEME_EVENT, applyAppColorScheme, getAppColorScheme, type AppColorScheme } from '../../utils/appColorScheme';
 
@@ -26,7 +26,8 @@ export function UserMenu() {
   const { data: profileUser } = useCurrentUserProfileQuery();
   const unreadCount = Number(myTicketsData?.unreadCount || 0);
   const currentUser = authService.getCurrentUser() as any;
-  const adminView = isAdminUser(profileUser || currentUser);
+  const effectiveUser = profileUser || currentUser;
+  const adminView = isAdminUser(effectiveUser) || hasModuleAccess(effectiveUser, 'configuracoes');
 
   useEffect(() => {
     const syncColorScheme = () => {

@@ -14,6 +14,31 @@ const normalizeRoleToken = (value: unknown) => String(value || '')
   .trim()
   .toLowerCase();
 
+/**
+ * Checks whether the user's assigned accesses grant a given module (by name),
+ * e.g. 'configuracoes' for the Settings menu. Fails open (returns true) when
+ * the user has no access records at all, matching how every other
+ * module-gated menu entry in the app behaves for unrestricted users.
+ */
+export const hasModuleAccess = (user: any, moduleName: string): boolean => {
+  if (!user || typeof user !== 'object') return false;
+
+  const accesses = Array.isArray(user?.accesses)
+    ? user.accesses
+    : Array.isArray(user?.access)
+      ? user.access
+      : (user?.access ? [user.access] : []);
+
+  const allModuleNames = accesses.flatMap((access: any) =>
+    (Array.isArray(access?.modules) ? access.modules : []).map((module: any) => normalizeRoleToken(module?.name)),
+  );
+
+  if (allModuleNames.length === 0) return true;
+
+  const target = normalizeRoleToken(moduleName);
+  return allModuleNames.includes(target);
+};
+
 export const isAdminUser = (user: any): boolean => {
   if (!user || typeof user !== 'object') return false;
   if (Boolean(user?.isAdmHubOnly)) return true;
