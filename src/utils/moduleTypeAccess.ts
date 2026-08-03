@@ -13,6 +13,7 @@ const TEA_DEPENDENCY_MODULE_NAMES = new Set([
   'autorizacao-convenio',
   'agendamento',
   'bi-gestao',
+  'faturamento',
 ]);
 
 export const normalizeCompanyModuleType = (value: unknown): CompanyModuleType => {
