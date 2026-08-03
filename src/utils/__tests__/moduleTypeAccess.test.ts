@@ -27,6 +27,10 @@ describe('isModuleAllowedForCompanyType', () => {
   it('apenas-tea blocks non-tea modules', () => {
     expect(isModuleAllowedForCompanyType('some-other-module', 'apenas-tea')).toBe(false);
   });
+  it('apenas-tea allows agendamento and bi-gestao', () => {
+    expect(isModuleAllowedForCompanyType('agendamento', 'apenas-tea')).toBe(true);
+    expect(isModuleAllowedForCompanyType('bi-gestao', 'apenas-tea')).toBe(true);
+  });
   it('padrao blocks modulo-tea', () => {
     expect(isModuleAllowedForCompanyType('modulo-tea', 'padrao')).toBe(false);
   });
