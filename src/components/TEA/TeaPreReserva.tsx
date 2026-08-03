@@ -3141,6 +3141,7 @@ export function TeaPreReserva() {
       }
 
       setChecklistModalOpened(false);
+      setAcceptModalOpened(false);
       setConversionReservationIds([]);
     } catch (err: any) {
       showNotification({
@@ -3148,6 +3149,7 @@ export function TeaPreReserva() {
         message: resolveApiErrorMessage(err, 'Falha ao converter PIT em lote'),
         color: 'red',
       });
+      setAcceptModalOpened(false);
     } finally {
       setUpdatingId(null);
     }
@@ -3526,7 +3528,10 @@ export function TeaPreReserva() {
 
       <Modal
         opened={acceptModalOpened}
-        onClose={() => setAcceptModalOpened(false)}
+        onClose={() => { if (!updatingId) setAcceptModalOpened(false); }}
+        closeOnClickOutside={!updatingId}
+        closeOnEscape={!updatingId}
+        withCloseButton={!updatingId}
         title={acceptModalMode === 'suggestion' ? 'Confirmação de aceitação' : 'Selecione data para agendamento'}
         centered
         size="xl"
@@ -3567,6 +3572,17 @@ export function TeaPreReserva() {
               </Box>
             </Group>
           </Paper>
+
+          {!!updatingId && acceptModalMode === 'conversion' && (
+            <Paper p="sm" withBorder className="tea-pre-reserva-accept-hero">
+              <Group gap="sm" align="center">
+                <Loader size="sm" />
+                <Text size="sm">
+                  Convertendo {acceptTherapies.length} terapia(s) em agendamento — isso pode levar alguns segundos, não feche esta janela.
+                </Text>
+              </Group>
+            </Paper>
+          )}
 
           <Stack gap="sm">
             {acceptTherapies.map((entry) => {
@@ -3687,15 +3703,19 @@ export function TeaPreReserva() {
 
           <Paper p="md" withBorder className="tea-pre-reserva-accept-footer">
             <Group justify="flex-end" gap="sm">
-              <Button className={getTeaActionButtonClass('secondary')} onClick={() => setAcceptModalOpened(false)}>
+              <Button
+                className={getTeaActionButtonClass('secondary')}
+                disabled={!!updatingId}
+                onClick={() => setAcceptModalOpened(false)}
+              >
                 Cancelar
               </Button>
               <Button
                 className={getTeaActionButtonClass('primary')}
                 disabled={acceptConversionHasMissingStartDate}
                 onClick={async () => {
-                  setAcceptModalOpened(false);
                   if (acceptModalMode === 'suggestion') {
+                    setAcceptModalOpened(false);
                     if (!suggestionModalContext) return;
                     setAcceptSuggestionDecisionOpened(true);
                   } else if (acceptModalMode === 'conversion') {
@@ -3707,6 +3727,9 @@ export function TeaPreReserva() {
                       });
                       return;
                     }
+                    // Keep the modal open (with a loading button) until the batch conversion
+                    // actually finishes — closing it immediately left the user staring at
+                    // nothing for the ~15s a full PIT (many sessions) takes to convert.
                     setUpdatingId(checklistGroupKey || conversionReservationIds[0]);
                     await handleConvertGroupToAppointment();
                   }
