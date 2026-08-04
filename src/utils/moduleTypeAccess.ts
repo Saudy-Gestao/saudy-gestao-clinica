@@ -15,6 +15,8 @@ const TEA_DEPENDENCY_MODULE_NAMES = new Set([
   'bi-gestao',
   'faturamento',
   'cadastro-sala',
+  'whatsapp-config',
+  'conversas',
 ]);
 
 export const normalizeCompanyModuleType = (value: unknown): CompanyModuleType => {
