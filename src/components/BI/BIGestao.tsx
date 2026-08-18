@@ -2185,7 +2185,7 @@ export function BIGestao() {
           <Stack gap="sm">
             <Group gap="md" align="center" justify="space-between" wrap="wrap">
               <Group gap="md" align="center">
-              <ActionIcon variant="white" color="dark" size="xl" onClick={() => navigate('/dashboard')}>
+              <ActionIcon variant="white" color="dark" size="xl" onClick={() => navigate(-1)}>
                 <ArrowLeft size={20} />
               </ActionIcon>
               <Box>

@@ -1835,7 +1835,7 @@ export function LaudoExames() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group mb={isMobile ? 16 : 24} justify="space-between" align="center">
           <Group align="center">
-            <ActionIcon variant="default" color={isDark ? 'gray' : 'black'} size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color={isDark ? 'gray' : 'black'} size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>

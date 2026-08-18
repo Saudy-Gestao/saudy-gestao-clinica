@@ -32,7 +32,7 @@ export function WhatsAppPage() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
         <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>

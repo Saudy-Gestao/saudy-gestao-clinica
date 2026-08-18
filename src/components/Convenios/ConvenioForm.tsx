@@ -37,7 +37,6 @@ const formatCurrency = (value: number) =>
 interface ProcedureOption {
   id: string;
   name: string;
-  tussCode?: string | null;
   appointmentType?: string;
 }
 
@@ -48,7 +47,7 @@ interface LinkedProcedure {
   price?: number | null;
   authorizationDays?: number | null;
   isActive: boolean;
-  procedure: { id: string; name: string; tussCode?: string | null; appointmentType?: string };
+  procedure: { id: string; name: string; appointmentType?: string };
   subInsurance?: { id: string; name: string } | null;
 }
 
@@ -247,7 +246,7 @@ function ProceduresTab({
       try {
         const data = await procedureService.listProcedures({ search: searchAdd, limit: 30 });
         const list = Array.isArray(data) ? data : (data?.items ?? []);
-        setProcedureOptions(list.map((p: any) => ({ id: p.id, name: p.name, tussCode: p.tussCode, appointmentType: p.appointmentType })));
+        setProcedureOptions(list.map((p: any) => ({ id: p.id, name: p.name, appointmentType: p.appointmentType })));
       } catch {
         setProcedureOptions([]);
       } finally {
@@ -353,15 +352,13 @@ function ProceduresTab({
               data={(() => {
                 const opts = procedureOptions.map((opt) => ({
                   value: opt.id,
-                  label: opt.tussCode ? `${opt.name} (${opt.tussCode})` : opt.name,
+                  label: opt.name,
                   disabled: linkedProcedureIds.has(opt.id),
                 }));
                 if (selectedProcedureOption && !opts.find((o) => o.value === selectedProcedureOption.id)) {
                   opts.unshift({
                     value: selectedProcedureOption.id,
-                    label: selectedProcedureOption.tussCode
-                      ? `${selectedProcedureOption.name} (${selectedProcedureOption.tussCode})`
-                      : selectedProcedureOption.name,
+                    label: selectedProcedureOption.name,
                     disabled: false,
                   });
                 }
@@ -448,7 +445,6 @@ function ProceduresTab({
                 <Stack gap={2} style={{ flex: 1 }}>
                   <Text size="sm" fw={600}>{item.procedure.name}</Text>
                   {item.subInsurance && <Text size="xs" c="dimmed">{item.subInsurance.name}</Text>}
-                  {item.procedure.tussCode && <Text size="xs" c="dimmed">TUSS: {item.procedure.tussCode}</Text>}
                   {editingId === item.id ? (
                     <Group gap="xs" mt={4} wrap="wrap">
                       <NumberInput
@@ -511,7 +507,6 @@ function ProceduresTab({
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Procedimento</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>TUSS</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Sub-convênio</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valor / Prazo autorização</Table.Th>
                 <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 90 }}>Ações</Table.Th>
@@ -522,9 +517,6 @@ function ProceduresTab({
                 <Table.Tr key={item.id} style={{ borderBottom: '1px solid #f1f3f5' }}>
                   <Table.Td>
                     <Text size="sm" fw={500}>{item.procedure.name}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c="dimmed">{item.procedure.tussCode ?? '—'}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm" c="dimmed">{item.subInsurance?.name ?? 'Principal'}</Text>

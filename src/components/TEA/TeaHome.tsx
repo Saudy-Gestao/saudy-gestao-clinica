@@ -301,7 +301,7 @@ export function TeaHome() {
 
       <Box p={isMobile ? 'sm' : 'md'} maw={1400} mx="auto" w="100%">
         <Group mb={isMobile ? 12 : 14} gap="xs" align="center" wrap="nowrap">
-          <ActionIcon variant="default" color="dark" size={isMobile ? 'lg' : 48} onClick={() => navigate('/dashboard')}>
+          <ActionIcon variant="default" color="dark" size={isMobile ? 'lg' : 48} onClick={() => navigate(-1)}>
             <ChevronLeft size={isMobile ? 18 : 18} />
           </ActionIcon>
           <Box>

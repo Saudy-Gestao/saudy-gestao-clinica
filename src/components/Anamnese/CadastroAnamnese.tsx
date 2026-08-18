@@ -353,7 +353,7 @@ export function CadastroAnamnese() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group justify="space-between" align="center" mb={isMobile ? 20 : 30}>
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')} aria-label="Voltar">
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)} aria-label="Voltar">
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>

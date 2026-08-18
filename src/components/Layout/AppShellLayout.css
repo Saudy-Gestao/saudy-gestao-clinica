@@ -1,0 +1,179 @@
+.saudy-sidebar {
+  width: 232px;
+  min-width: 232px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #0a2568 0%, #071640 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 12px 16px;
+  z-index: 120;
+  transition: width 160ms ease, min-width 160ms ease;
+}
+
+.saudy-sidebar[data-collapsed] {
+  width: 68px;
+  min-width: 68px;
+  padding: 0 10px 16px;
+}
+
+.saudy-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  padding: 0 10px;
+  margin: 0 -12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.saudy-sidebar[data-collapsed] .saudy-sidebar__brand {
+  justify-content: center;
+  margin: 0 -10px 16px;
+  padding: 0;
+}
+
+.saudy-sidebar__brand .saudy-sidebar__collapse-toggle {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  margin-left: auto;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.saudy-sidebar[data-collapsed] .saudy-sidebar__brand .saudy-sidebar__collapse-toggle {
+  margin-left: 0;
+}
+
+.saudy-sidebar__brand-name {
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.saudy-sidebar__brand-name span {
+  color: #4674ff;
+}
+
+.saudy-sidebar__label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 0 10px;
+  margin-bottom: 8px;
+}
+
+.saudy-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.saudy-sidebar[data-collapsed] .saudy-sidebar__item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.saudy-sidebar__item + .saudy-sidebar__item {
+  margin-top: 3px;
+}
+
+.saudy-sidebar__item:hover {
+  background: rgba(70, 116, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.saudy-sidebar__item[data-active='true'] {
+  background: rgba(70, 116, 255, 0.18);
+  border-color: rgba(70, 116, 255, 0.35);
+  color: #fff;
+  font-weight: 600;
+}
+
+.saudy-sidebar__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.saudy-sidebar__item:hover .saudy-sidebar__item-icon {
+  transform: scale(1.18) translateY(-1px);
+}
+
+.saudy-sidebar__item[data-active='true'] .saudy-sidebar__item-icon {
+  transform: scale(1.08);
+}
+
+.saudy-sidebar__footer {
+  margin-top: auto;
+  padding: 12px 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.saudy-sidebar__collapse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, transform 160ms ease;
+}
+
+.saudy-sidebar__collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.saudy-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.saudy-shell__content {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 799px) {
+  .saudy-sidebar {
+    display: none;
+  }
+}
+
+[data-mantine-color-scheme='dark'] .saudy-sidebar {
+  background: linear-gradient(180deg, #05070f 0%, #0a1128 100%);
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Dentro do shell (desktop) a marca já aparece na sidebar — esconde a do Header */
+@media (min-width: 800px) {
+  .saudy-shell__content .saudy-header-brand {
+    display: none;
+  }
+}

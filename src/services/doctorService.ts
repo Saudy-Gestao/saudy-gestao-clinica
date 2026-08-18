@@ -33,6 +33,12 @@ export interface CreateDoctorPayload {
     hoursStart: string;
     hoursEnd: string;
   }>;
+  especialidadeIds?: string[];
+  modalidadeIds?: string[];
+  metodos?: string[];
+  cbo?: string;
+  branchIds?: string[];
+  appointmentDurations?: number[];
 }
 
 export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;

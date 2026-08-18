@@ -1317,7 +1317,7 @@ export function SettingsPage() {
     <PageContainer>
       <Group justify="space-between" align="center" mb="lg">
         <Group gap="sm" align="center">
-          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
             <ChevronLeft size={28} />
           </ActionIcon>
           <Title order={1} fw={600} style={{ fontSize: '1.8rem' }}>Configurações</Title>

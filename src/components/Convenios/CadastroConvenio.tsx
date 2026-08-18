@@ -16,11 +16,10 @@ import {
   Skeleton,
   Menu,
   SimpleGrid,
-  UnstyledButton,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useComputedColorScheme } from '@mantine/core';
-import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical, FilePlus, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, MoreVertical, FilePlus, List } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -285,7 +284,7 @@ export function CadastroConvenio() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => activeTab === 'hub' ? navigate('/dashboard') : setActiveTab('hub')}>
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => activeTab === 'hub' ? navigate(-1) : setActiveTab('hub')}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
@@ -306,63 +305,56 @@ export function CadastroConvenio() {
         </Group>
 
         {activeTab === 'hub' ? (
-          <Box style={{ minHeight: isMobile ? 'auto' : '58vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
-              <UnstyledButton
-                onClick={() => navigate('/convenios/novo')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+            {[
+              {
+                key: 'novo',
+                icon: FilePlus,
+                title: 'Cadastrar convênio',
+                desc: 'Registre um novo convênio com procedimentos aceitos, valores e prazos de autorização.',
+                onClick: () => navigate('/convenios/novo'),
+              },
+              {
+                key: 'lista',
+                icon: List,
+                title: 'Convênios cadastrados',
+                desc: 'Consulte, edite e gerencie os convênios já cadastrados.',
+                onClick: () => setActiveTab('lista'),
+              },
+            ].map((card) => (
+              <Paper
+                key={card.key}
+                p="lg"
+                withBorder
+                onClick={card.onClick}
+                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
               >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <FilePlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                <Group justify="space-between" align="center" wrap="nowrap">
+                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                    <Box
+                      w={44}
+                      h={44}
+                      style={{
+                        borderRadius: 10,
+                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
                     </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar convênio</Text>
-                  </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Registre um novo convênio com procedimentos aceitos, valores e prazos de autorização.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('lista')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <List size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    <Box style={{ minWidth: 0 }}>
+                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                     </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Convênios cadastrados</Text>
                   </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Consulte, edite e gerencie os convênios já cadastrados.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-            </SimpleGrid>
-          </Box>
+                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                </Group>
+              </Paper>
+            ))}
+          </SimpleGrid>
         ) : (
           <>
         <Box mb={isMobile ? 20 : 30}>

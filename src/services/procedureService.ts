@@ -6,9 +6,9 @@ export interface CreateProcedurePayload {
   appointmentType?: 'CONSULTA' | 'EXAME';
   price?: number | null;
   durationMinutes?: number | null;
-  tussCode?: string | null;
-  tussTableCode?: string | null;
   modalities?: string[];
+  modalidadeId?: string | null;
+  branchIds?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
   procedureKitBindings?: Array<{
@@ -24,9 +24,9 @@ export interface UpdateProcedurePayload {
   appointmentType?: 'CONSULTA' | 'EXAME';
   price?: number | null;
   durationMinutes?: number | null;
-  tussCode?: string | null;
-  tussTableCode?: string | null;
   modalities?: string[];
+  modalidadeId?: string | null;
+  branchIds?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
   procedureKitBindings?: Array<{

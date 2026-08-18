@@ -2926,7 +2926,7 @@ export function Agendamento() {
       <Box p={isMobile ?'sm' : isTablet ?'md' : 'xl'} maw={isMobile ?'100%' : 1400} mx="auto">
         {/* Breadcrumb/Back Button */}
         <Group mb={isMobile ?20 : 30}>
-          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
             <ChevronLeft size={28} />
           </ActionIcon>
           <Box>
@@ -2958,134 +2958,71 @@ export function Agendamento() {
           )}
 
           <Tabs.Panel value="hub">
-            <Box
-              style={{
-                minHeight: isMobile ? 'auto' : '58vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <SimpleGrid
-                cols={{ base: 1, md: 2 }}
-                spacing="xl"
-                style={{ width: '100%', maxWidth: 900 }}
-              >
-              <UnstyledButton
-                onClick={() => setActiveTab('marcacao')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box
-                      w={34}
-                      h={34}
-                      style={{
-                        borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Plus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Realizar marcação</Text>
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+              {[
+                {
+                  key: 'marcacao',
+                  icon: Plus,
+                  title: 'Realizar marcação',
+                  desc: 'Cadastrar novo agendamento com paciente, procedimento, profissional e horário.',
+                  onClick: () => setActiveTab('marcacao'),
+                },
+                {
+                  key: 'agendados',
+                  icon: Calendar,
+                  title: 'Visualizar agenda',
+                  desc: 'Consultar agenda, filtrar atendimentos e acompanhar horários já marcados.',
+                  onClick: () => setActiveTab('agendados'),
+                },
+                {
+                  key: 'online',
+                  icon: Globe,
+                  title: 'Agendamentos Online',
+                  desc: 'Revisar e confirmar solicitações de agendamento feitas pelos pacientes pelo portal.',
+                  badge: onlineAppointments.length > 0 ? onlineAppointments.length : null,
+                  onClick: () => setActiveTab('online'),
+                },
+              ].map((card) => (
+                <Paper
+                  key={card.key}
+                  p="lg"
+                  withBorder
+                  onClick={card.onClick}
+                  style={{
+                    cursor: 'pointer',
+                    borderColor: 'var(--mantine-color-default-border)',
+                    minHeight: 96,
+                  }}
+                >
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box
+                        w={44}
+                        h={44}
+                        style={{
+                          borderRadius: 10,
+                          border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Group gap={6} wrap="nowrap">
+                          <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                          {card.badge ? <Badge color="orange" size="xs">{card.badge}</Badge> : null}
+                        </Group>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
                   </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Cadastrar novo agendamento com paciente, procedimento, profissional e horário.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('agendados')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box
-                      w={34}
-                      h={34}
-                      style={{
-                        borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Calendar size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Visualizar agenda</Text>
-                  </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Consultar agenda, filtrar atendimentos e acompanhar horários já marcados.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('online')}
-                style={{
-                  border: `1px solid ${isDarkMode ? 'rgba(130, 170, 255, 0.3)' : 'rgba(13, 46, 108, 0.2)'}`,
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(30, 60, 110, 0.78)' : 'rgba(235, 242, 255, 0.7)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box
-                      w={34}
-                      h={34}
-                      style={{
-                        borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Globe size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Agendamentos Online</Text>
-                    {onlineAppointments.length > 0 && (
-                      <Badge color="orange" size="sm">{onlineAppointments.length}</Badge>
-                    )}
-                  </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Revisar e confirmar solicitações de agendamento feitas pelos pacientes pelo portal.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-              </SimpleGrid>
-            </Box>
+                </Paper>
+              ))}
+            </SimpleGrid>
           </Tabs.Panel>
 
           <Tabs.Panel value="marcacao">

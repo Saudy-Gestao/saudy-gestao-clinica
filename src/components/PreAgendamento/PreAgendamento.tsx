@@ -15,12 +15,11 @@ import {
   Text,
   TextInput,
   Textarea,
-  UnstyledButton,
   SimpleGrid,
   useComputedColorScheme,
 } from '@mantine/core';
 import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, FileSearch, History, Link as LinkIcon, MoreVertical, ShieldCheck, BriefcaseBusiness } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, FileSearch, History, Link as LinkIcon, MoreVertical, ShieldCheck, BriefcaseBusiness } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
@@ -423,7 +422,7 @@ export function PreAgendamento() {
       <Box p="xl" maw={1400} mx="auto">
         <Group justify="space-between" align="center" mb="md" wrap="wrap">
           <Group>
-            <ActionIcon variant="default" size="lg" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" size="lg" onClick={() => navigate(-1)}>
               <ChevronLeft size={18} />
             </ActionIcon>
             <Box>
@@ -447,88 +446,56 @@ export function PreAgendamento() {
         >
           <Stack gap="md">
             {viewMode === 'hub' ? (
-              <Box
-                style={{
-                  minHeight: '52vh',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
-                  <UnstyledButton
-                    onClick={() => setViewMode('queue')}
-                    style={{
-                      border: '1px solid var(--mantine-color-default-border)',
-                      borderRadius: 16,
-                      padding: '24px',
-                      background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                      textAlign: 'left',
-                      minHeight: 220,
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                {[
+                  {
+                    key: 'queue',
+                    icon: BriefcaseBusiness,
+                    title: 'Fila de trabalho',
+                    desc: 'Itens pendentes para pré-autorização, envio de links e revisão de documentos.',
+                    onClick: () => setViewMode('queue'),
+                  },
+                  {
+                    key: 'history',
+                    icon: History,
+                    title: 'Histórico',
+                    desc: 'Auditoria dos fluxos concluídos, links enviados e revisões finalizadas.',
+                    onClick: () => setViewMode('history'),
+                  },
+                ].map((card) => (
+                  <Paper
+                    key={card.key}
+                    p="lg"
+                    withBorder
+                    onClick={card.onClick}
+                    style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
                   >
-                    <Stack gap={8}>
-                      <Group gap="xs">
+                    <Group justify="space-between" align="center" wrap="nowrap">
+                      <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
                         <Box
-                          w={34}
-                          h={34}
+                          w={44}
+                          h={44}
                           style={{
                             borderRadius: 10,
-                            background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                            border: `1px solid ${isDarkMode ? '#dbe7ff' : '#0D2E6C'}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            flexShrink: 0,
                           }}
                         >
-                          <BriefcaseBusiness size={16} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                          <card.icon size={22} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
                         </Box>
-                        <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Fila de trabalho</Text>
-                      </Group>
-                      <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                        Itens pendentes para pré-autorização, envio de links e revisão de documentos.
-                      </Text>
-                    </Stack>
-                  </UnstyledButton>
-
-                  <UnstyledButton
-                    onClick={() => setViewMode('history')}
-                    style={{
-                      border: '1px solid var(--mantine-color-default-border)',
-                      borderRadius: 16,
-                      padding: '24px',
-                      background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                      textAlign: 'left',
-                      minHeight: 220,
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Stack gap={8}>
-                      <Group gap="xs">
-                        <Box
-                          w={34}
-                          h={34}
-                          style={{
-                            borderRadius: 10,
-                            background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <History size={16} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                        <Box style={{ minWidth: 0 }}>
+                          <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                          <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                         </Box>
-                        <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Histórico</Text>
                       </Group>
-                      <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                        Auditoria dos fluxos concluídos, links enviados e revisões finalizadas.
-                      </Text>
-                    </Stack>
-                  </UnstyledButton>
-                </SimpleGrid>
-              </Box>
+                      <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                    </Group>
+                  </Paper>
+                ))}
+              </SimpleGrid>
             ) : (
               <Group justify="space-between" wrap="wrap">
                 <Group gap="xs">

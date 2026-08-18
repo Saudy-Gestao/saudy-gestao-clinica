@@ -16,11 +16,10 @@ import {
   Badge,
   Skeleton,
   Menu,
-  UnstyledButton,
   useComputedColorScheme,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Power, Pencil, X, UserPlus, Users, MoreVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Power, Pencil, X, UserPlus, Users, MoreVertical } from 'lucide-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -36,6 +35,8 @@ import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
+import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
+import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { PaginatedGrid } from '../common/PaginatedGrid';
@@ -44,11 +45,11 @@ interface ProcedureForm {
   name: string;
   description: string;
   appointmentType: 'CONSULTA' | 'EXAME';
-  tussCode: string;
-  tussTableCode: string;
   durationMinutes?: number | null;
   supportsTeleconsultation: boolean;
   modalities: string[];
+  modalidadeId: string | null;
+  branchIds: string[];
   doctorIds: string[];
   procedureMaterials: { inventoryItemId: string; quantity: number }[];
   procedureKitBindings: ProcedureKitBindingForm[];
@@ -66,10 +67,11 @@ interface ProcedureItem {
   id: string;
   name: string;
   appointmentType: 'CONSULTA' | 'EXAME';
-  tussCode?: string;
-  tussTableCode?: string;
   supportsTeleconsultation: boolean;
   modalities: string[];
+  modalidadeId: string | null;
+  modalidadeName: string | null;
+  branchIds: string[];
   doctorIds: string[];
   doctorsCount: number;
   materialsCount: number;
@@ -80,11 +82,11 @@ const INITIAL_FORM: ProcedureForm = {
   name: '',
   description: '',
   appointmentType: 'CONSULTA',
-  tussCode: '',
-  tussTableCode: '',
   durationMinutes: null,
   supportsTeleconsultation: false,
   modalities: [],
+  modalidadeId: null,
+  branchIds: [],
   doctorIds: [],
   procedureMaterials: [],
   procedureKitBindings: [],
@@ -136,6 +138,33 @@ export function CadastroProcedimento() {
   const proceduresQuery = useProceduresAdminQuery();
   const doctorsQuery = useDoctorsAdminQuery();
   const inventoryItemsQuery = useInventoryItemsQuery();
+  const modalidadesQuery = useModalidadesAdminQuery();
+  const branchesQuery = useSettingsBranchesQuery();
+
+  const modalidadeOptions = useMemo(() => {
+    const data: any = modalidadesQuery.data;
+    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    return list
+      .filter((m: any) => m?.id && m.isActive)
+      .map((m: any) => ({ value: m.id, label: m.name }));
+  }, [modalidadesQuery.data]);
+
+  const branchOptions = useMemo(() => {
+    const data: any = branchesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.data) ? data.data : []));
+    return list
+      .filter((b: any) => b?.id)
+      .map((b: any) => ({ value: String(b.id), label: b.tradeName || b.socialName || 'Filial sem nome' }));
+  }, [branchesQuery.data]);
+
+  const branchLabelById = useMemo(() => {
+    return branchOptions.reduce<Record<string, string>>((acc, option) => {
+      acc[option.value] = option.label;
+      return acc;
+    }, {});
+  }, [branchOptions]);
 
   const doctorLabelById = useMemo(() => {
     return doctorOptions.reduce<Record<string, string>>((acc, option) => {
@@ -197,12 +226,13 @@ export function CadastroProcedimento() {
       id: String(it.id ?? it.procedureId ?? ''),
       name: it.name || 'Procedimento',
       appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
-      tussCode: String(it.tussCode || '').trim() || undefined,
-      tussTableCode: String(it.tussTableCode || '').trim() || undefined,
       supportsTeleconsultation: Array.isArray(it.modalities) ? it.modalities.includes(TELECONSULT_MODALITY) : false,
       modalities: Array.isArray(it.modalities)
         ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
         : [],
+      modalidadeId: it.modalidadeId || it.modalidade?.id || null,
+      modalidadeName: it.modalidade?.name || null,
+      branchIds: Array.isArray(it.branchIds) ? it.branchIds.map((id: any) => String(id)) : [],
       doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
       materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
       isActive: Boolean(it.isActive ?? true),
@@ -355,12 +385,12 @@ export function CadastroProcedimento() {
         description: form.description.trim() || undefined,
         appointmentType: form.appointmentType,
         durationMinutes: form.durationMinutes ?? null,
-        tussCode: form.tussCode.trim() || null,
-        tussTableCode: form.tussTableCode.trim() || null,
         modalities: [
           ...form.modalities.filter((modality) => modality !== TELECONSULT_MODALITY),
           ...(form.appointmentType === 'CONSULTA' && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
         ],
+        modalidadeId: form.modalidadeId || null,
+        branchIds: form.branchIds,
         doctors,
         procedureMaterials: form.procedureMaterials,
         procedureKitBindings: form.procedureKitBindings.map((binding) => ({
@@ -555,12 +585,12 @@ export function CadastroProcedimento() {
         durationMinutes: data.durationMinutes !== undefined && data.durationMinutes !== null
           ? Number(data.durationMinutes)
           : null,
-        tussCode: String(data.tussCode || '').trim(),
-        tussTableCode: String(data.tussTableCode || '').trim(),
         supportsTeleconsultation: Array.isArray(data.modalities) ? data.modalities.includes(TELECONSULT_MODALITY) : false,
         modalities: Array.isArray(data.modalities)
           ? data.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
           : [],
+        modalidadeId: data.modalidadeId || data.modalidade?.id || null,
+        branchIds: Array.isArray(data.branchIds) ? data.branchIds.map((id: any) => String(id)) : [],
         doctorIds,
         procedureMaterials: Array.isArray(data?.materials)
           ? data.materials
@@ -606,7 +636,7 @@ export function CadastroProcedimento() {
         <Stack gap="md">
           <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Group align="center">
-              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
                 <ChevronLeft size={28} />
               </ActionIcon>
               <Box>
@@ -617,90 +647,56 @@ export function CadastroProcedimento() {
           </Group>
 
           {activeTab === 'hub' ? (
-            <Box
-              style={{
-                minHeight: isMobile ? 'auto' : '58vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
-                <UnstyledButton
-                  onClick={() => setActiveTab('cadastro')}
-                  style={{
-                    border: '1px solid var(--mantine-color-default-border)',
-                    borderRadius: 16,
-                    padding: isMobile ? '18px' : '24px',
-                    background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                    textAlign: 'left',
-                    transition: 'all 120ms ease',
-                    minHeight: isMobile ? 170 : 260,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+              {[
+                {
+                  key: 'cadastro',
+                  icon: UserPlus,
+                  title: 'Cadastrar procedimento',
+                  desc: 'Registre procedimentos com regras clínicas, convênios, médicos e materiais vinculados.',
+                  onClick: () => setActiveTab('cadastro'),
+                },
+                {
+                  key: 'lista',
+                  icon: Users,
+                  title: 'Procedimentos cadastrados',
+                  desc: 'Consulte, edite e ative/desative procedimentos já cadastrados.',
+                  onClick: () => setActiveTab('lista'),
+                },
+              ].map((card) => (
+                <Paper
+                  key={card.key}
+                  p="lg"
+                  withBorder
+                  onClick={card.onClick}
+                  style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
                 >
-                  <Stack gap={8}>
-                    <Group gap="xs">
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
                       <Box
-                        w={34}
-                        h={34}
+                        w={44}
+                        h={44}
                         style={{
                           borderRadius: 10,
-                          background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                          border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          flexShrink: 0,
                         }}
                       >
-                        <UserPlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                        <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
                       </Box>
-                      <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar procedimento</Text>
-                    </Group>
-                    <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                      Registre procedimentos com regras clínicas, convênios, médicos e materiais vinculados.
-                    </Text>
-                  </Stack>
-                </UnstyledButton>
-
-                <UnstyledButton
-                  onClick={() => setActiveTab('lista')}
-                  style={{
-                    border: '1px solid var(--mantine-color-default-border)',
-                    borderRadius: 16,
-                    padding: isMobile ? '18px' : '24px',
-                    background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                    textAlign: 'left',
-                    transition: 'all 120ms ease',
-                    minHeight: isMobile ? 170 : 260,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Stack gap={8}>
-                    <Group gap="xs">
-                      <Box
-                        w={34}
-                        h={34}
-                        style={{
-                          borderRadius: 10,
-                          background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Users size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                       </Box>
-                      <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Procedimentos cadastrados</Text>
                     </Group>
-                    <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                      Consulte, edite e ative/desative procedimentos já cadastrados.
-                    </Text>
-                  </Stack>
-                </UnstyledButton>
-              </SimpleGrid>
-            </Box>
+                    <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                  </Group>
+                </Paper>
+              ))}
+            </SimpleGrid>
           ) : (
             <>
               <Group justify="space-between" align="center" mb="lg" wrap="wrap">
@@ -762,17 +758,25 @@ export function CadastroProcedimento() {
                 </SimpleGrid>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingInput
-                    label="Código TUSS"
-                    placeholder="Ex: 40314618"
-                    value={form.tussCode}
-                    onChange={(e) => setForm((prev) => ({ ...prev, tussCode: e?.currentTarget?.value ?? '' }))}
+                  <FloatingSelect
+                    label="Modalidade"
+                    placeholder="Selecione a modalidade de exame"
+                    data={modalidadeOptions}
+                    value={form.modalidadeId}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhuma modalidade encontrada"
+                    onChange={(value) => setForm((prev) => ({ ...prev, modalidadeId: value }))}
                   />
-                  <FloatingInput
-                    label="Tabela de referência"
-                    placeholder="Ex: 22"
-                    value={form.tussTableCode}
-                    onChange={(e) => setForm((prev) => ({ ...prev, tussTableCode: e?.currentTarget?.value ?? '' }))}
+                  <FloatingMultiSelect
+                    label="Unidades atendidas"
+                    placeholder="Selecione as unidades"
+                    data={branchOptions}
+                    value={form.branchIds}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhuma unidade encontrada"
+                    onChange={(values) => setForm((prev) => ({ ...prev, branchIds: values }))}
                   />
                 </SimpleGrid>
 
@@ -785,7 +789,7 @@ export function CadastroProcedimento() {
                   onChange={(e) => handleDescriptionChange(e?.currentTarget?.value ?? '')}
                 />
 
-                <SectionTitle>Modalidades</SectionTitle>
+                <SectionTitle>Forma de Atendimento</SectionTitle>
                 <Group align="flex-end" gap="md" wrap="wrap">
                   <Switch
                     label="Suporta teleconsulta"
@@ -800,7 +804,7 @@ export function CadastroProcedimento() {
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <FloatingMultiSelect
-                    label="Modalidades"
+                    label="Forma de Atendimento"
                     data={modalityOptions}
                     value={form.modalities}
                     onChange={(values) => setForm((prev) => ({ ...prev, modalities: values }))}
@@ -1059,9 +1063,9 @@ export function CadastroProcedimento() {
                             <Group justify="space-between" align="flex-start" wrap="nowrap">
                               <Stack gap={4} style={{ flex: 1 }}>
                                 <Text fw={600} size="sm">{item.name}</Text>
-                                {(item.tussCode || item.tussTableCode) && (
+                                {item.modalidadeName && (
                                   <Text size="xs" c="dimmed">
-                                    TUSS: {item.tussCode || '-'} • Tabela: {item.tussTableCode || '-'}
+                                    Modalidade: {item.modalidadeName}
                                   </Text>
                                 )}
                                 <Group gap="xs">
@@ -1075,7 +1079,10 @@ export function CadastroProcedimento() {
                                   )}
                                 </Group>
                                 <Text size="xs" c="dimmed">
-                                  {item.modalities.length ? item.modalities.join(', ') : 'Sem modalidades'} • {item.doctorsCount} médico(s) • {item.materialsCount} material(is)
+                                  {item.modalities.length ? item.modalities.join(', ') : 'Sem forma de atendimento'} • {item.doctorsCount} médico(s) • {item.materialsCount} material(is)
+                                </Text>
+                                <Text size="xs" c="dimmed">
+                                  Unidades: {item.branchIds.length ? item.branchIds.map((id) => branchLabelById[id] || id).join(', ') : 'Todas'}
                                 </Text>
                               </Stack>
                               <Badge color={item.isActive ? 'green' : 'red'} variant="light" size="sm">
@@ -1123,7 +1130,7 @@ export function CadastroProcedimento() {
                             <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidades</Table.Th>}
+                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Forma de Atendimento</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Materiais</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
@@ -1155,13 +1162,13 @@ export function CadastroProcedimento() {
                                 <Table.Td>
                                   <Stack gap={2}>
                                     <Text fw={600} size="sm">{item.name}</Text>
-                                    {(item.tussCode || item.tussTableCode) && (
+                                    {item.modalidadeName && (
                                       <Text size="xs" c="dimmed">
-                                        TUSS: {item.tussCode || '-'} • Tabela: {item.tussTableCode || '-'}
+                                        Modalidade: {item.modalidadeName}
                                       </Text>
                                     )}
                                     <Text size="xs" c="dimmed">
-                                      {item.modalities.length ? item.modalities.join(', ') : 'Sem modalidades'}
+                                      Unidades: {item.branchIds.length ? item.branchIds.map((id) => branchLabelById[id] || id).join(', ') : 'Todas'}
                                     </Text>
                                   </Stack>
                                 </Table.Td>

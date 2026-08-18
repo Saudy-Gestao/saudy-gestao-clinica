@@ -18,10 +18,9 @@ import {
   Menu,
   Skeleton,
   SimpleGrid,
-  UnstyledButton,
   useMantineColorScheme,
 } from '@mantine/core';
-import { Calendar as CalendarIcon, MoreVertical, ChevronLeft, CircleDollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calendar as CalendarIcon, MoreVertical, ChevronLeft, ChevronRight, CircleDollarSign, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatDateInput } from '../utils/formatters';
 import { DatePicker } from '@mantine/dates';
 import { useNavigate } from 'react-router-dom';
@@ -362,7 +361,7 @@ export function Financeiro() {
       >
         <Container size="xl" px={isMobile ? 0 : 'md'}>
           <Group mb={isMobile ? 16 : 24} wrap="nowrap">
-            <ActionIcon variant="default" color="black" size={isMobile ? 'lg' : 'xl'} onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color="black" size={isMobile ? 'lg' : 'xl'} onClick={() => navigate(-1)}>
               <ChevronLeft size={isMobile ? 22 : 28} />
             </ActionIcon>
             <Box>
@@ -381,90 +380,63 @@ export function Financeiro() {
       {/* Content */}
       <Container size="xl" py={isMobile ? 'md' : 'xl'}>
         {activeSubModule === 'hub' ? (
-          <Box py={isMobile ? 'xs' : 'md'}>
-            <SimpleGrid cols={{ base: 1, md: 3 }} spacing="xl" style={{ width: '100%' }}>
-              <UnstyledButton
-                onClick={() => setActiveSubModule('todos')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 140 : 200,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+            {[
+              {
+                key: 'todos',
+                icon: CircleDollarSign,
+                title: 'Todos',
+                desc: 'Visualize todos os lançamentos financeiros em um único painel.',
+                onClick: () => setActiveSubModule('todos'),
+              },
+              {
+                key: 'receita',
+                icon: TrendingUp,
+                title: 'Receita',
+                desc: 'Acompanhe apenas entradas financeiras e recebimentos.',
+                onClick: () => setActiveSubModule('receita'),
+              },
+              {
+                key: 'despesas',
+                icon: TrendingDown,
+                title: 'Despesas',
+                desc: 'Filtre e gerencie pagamentos e saídas financeiras.',
+                onClick: () => setActiveSubModule('despesas'),
+              },
+            ].map((card) => (
+              <Paper
+                key={card.key}
+                p="lg"
+                withBorder
+                onClick={card.onClick}
+                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
               >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CircleDollarSign size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                <Group justify="space-between" align="center" wrap="nowrap">
+                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                    <Box
+                      w={44}
+                      h={44}
+                      style={{
+                        borderRadius: 10,
+                        border: `1px solid ${isDark ? '#dbe7ff' : DARK_BLUE}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <card.icon size={22} color={isDark ? '#dbe7ff' : DARK_BLUE} />
                     </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Todos</Text>
-                  </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>
-                    Visualize todos os lançamentos financeiros em um único painel.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveSubModule('receita')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 140 : 200,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <TrendingUp size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    <Box style={{ minWidth: 0 }}>
+                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                     </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Receita</Text>
                   </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>
-                    Acompanhe apenas entradas financeiras e recebimentos.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveSubModule('despesas')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 140 : 200,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <TrendingDown size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Despesas</Text>
-                  </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>
-                    Filtre e gerencie pagamentos e saídas financeiras.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-            </SimpleGrid>
-          </Box>
+                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                </Group>
+              </Paper>
+            ))}
+          </SimpleGrid>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">

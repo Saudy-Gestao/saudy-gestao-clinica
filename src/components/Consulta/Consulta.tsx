@@ -333,7 +333,7 @@ export function Consulta() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1500} mx="auto">
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>

@@ -1004,7 +1004,7 @@ export function Conversations() {
           <Stack gap="md" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <Group justify="space-between" align="center" wrap="wrap">
               <Group align="center" gap="sm">
-                <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+                <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
                   <ChevronLeft size={28} />
                 </ActionIcon>
                 <Box>

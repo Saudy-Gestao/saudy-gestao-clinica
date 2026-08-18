@@ -106,7 +106,7 @@ export function FacialRecognition() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1200} mx="auto">
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
-            <ActionIcon variant="default" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
 

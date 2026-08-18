@@ -21,11 +21,10 @@ import {
   Badge,
   Switch,
   FileInput,
-  UnstyledButton,
   useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Calendar as CalendarIcon, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -41,6 +40,9 @@ import cepService from '../../services/cepService';
 import ResultModal from '../common/ResultModal';
 import { findExistingCpf } from '../../utils/cpfRegistry';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
+import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
+import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
+import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 
@@ -140,6 +142,12 @@ interface DoctorForm {
     hoursStart: string;
     hoursEnd: string;
   }>;
+  especialidadeIds: string[];
+  modalidadeIds: string[];
+  metodos: string[];
+  cbo: string;
+  branchIds: string[];
+  appointmentDurations: number[];
 }
 
 interface DoctorListItem {
@@ -163,6 +171,62 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
       {children}
     </Title>
+  );
+}
+
+function DurationTagInput({
+  label,
+  placeholder,
+  values,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  placeholder?: string;
+  values: number[];
+  onAdd: (value: number) => void;
+  onRemove: (value: number) => void;
+}) {
+  const [input, setInput] = useState('');
+
+  const commit = () => {
+    const parsed = Number(input.trim());
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    onAdd(Math.round(parsed));
+    setInput('');
+  };
+
+  return (
+    <Box>
+      <FloatingInput
+        label={label}
+        placeholder={placeholder}
+        value={input}
+        onChange={(e) => setInput(e?.currentTarget?.value ?? '')}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          }
+        }}
+        onBlur={commit}
+      />
+      {values.length > 0 ? (
+        <Group mt={6} gap="xs">
+          {values.map((value) => (
+            <Button
+              key={value}
+              size="compact-xs"
+              variant="light"
+              color="blue"
+              onClick={() => onRemove(value)}
+            >
+              {value} min ×
+            </Button>
+          ))}
+        </Group>
+      ) : null}
+    </Box>
   );
 }
 
@@ -192,6 +256,12 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   zipCode: '',
   isActive: true,
   workingSchedules: [],
+  especialidadeIds: [],
+  modalidadeIds: [],
+  metodos: [],
+  cbo: '',
+  branchIds: [],
+  appointmentDurations: [],
 };
 
 const TELECONSULTATION_SPECIALTY_FLAG = '__TELECONSULTA__';
@@ -328,6 +398,67 @@ export function CadastroMedico() {
   const [lastZipLookup, setLastZipLookup] = useState('');
   const lastValidatedCpfRef = useRef<string>('');
   const doctorsQuery = useDoctorsAdminQuery();
+  const especialidadesQuery = useEspecialidadesAdminQuery();
+  const modalidadesQuery = useModalidadesAdminQuery();
+  const branchesQuery = useSettingsBranchesQuery();
+
+  const especialidadeList = useMemo(() => {
+    const data: any = especialidadesQuery.data;
+    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    return list.filter((e: any) => e?.id && e.isActive);
+  }, [especialidadesQuery.data]);
+
+  const modalidadeOptions = useMemo(() => {
+    const data: any = modalidadesQuery.data;
+    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    return list.filter((m: any) => m?.id && m.isActive).map((m: any) => ({ value: m.id, label: m.name }));
+  }, [modalidadesQuery.data]);
+
+  const especialidadeOptions = useMemo(() => {
+    const selectedModalidades = new Set(form.modalidadeIds);
+    return especialidadeList
+      .filter((e: any) => selectedModalidades.has(e.modalidadeId))
+      .map((e: any) => ({ value: e.id, label: e.name }));
+  }, [especialidadeList, form.modalidadeIds]);
+
+  useEffect(() => {
+    const allowed = new Set(especialidadeOptions.map((opt) => opt.value));
+    setForm((prev) => {
+      const filtered = prev.especialidadeIds.filter((id) => allowed.has(id));
+      if (filtered.length === prev.especialidadeIds.length) return prev;
+      return { ...prev, especialidadeIds: filtered };
+    });
+  }, [especialidadeOptions]);
+
+  const branchOptions = useMemo(() => {
+    const data: any = branchesQuery.data;
+    const list: any[] = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.data) ? data.data : []));
+    return list
+      .filter((b: any) => b?.id)
+      .map((b: any) => ({ value: String(b.id), label: b.tradeName || b.socialName || 'Filial sem nome' }));
+  }, [branchesQuery.data]);
+
+  const metodoOptions = useMemo(() => {
+    const selected = new Set(form.especialidadeIds);
+    const metodos = new Set<string>();
+    especialidadeList.forEach((e: any) => {
+      if (!selected.has(e.id)) return;
+      (Array.isArray(e.metodos) ? e.metodos : []).forEach((m: string) => metodos.add(m));
+    });
+    return Array.from(metodos).map((m) => ({ value: m, label: m }));
+  }, [especialidadeList, form.especialidadeIds]);
+
+  useEffect(() => {
+    const allowed = new Set(metodoOptions.map((opt) => opt.value));
+    setForm((prev) => {
+      const filtered = prev.metodos.filter((m) => allowed.has(m));
+      if (filtered.length === prev.metodos.length) return prev;
+      return { ...prev, metodos: filtered };
+    });
+  }, [metodoOptions]);
+
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
       if (!(field in prev)) return prev;
@@ -472,6 +603,14 @@ export function CadastroMedico() {
       zipCode: getString(raw.zipCode),
       isActive: getBoolean(raw.isActive, true),
       workingSchedules,
+      especialidadeIds: Array.isArray(raw.especialidadeIds) ? (raw.especialidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+      modalidadeIds: Array.isArray(raw.modalidadeIds) ? (raw.modalidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+      metodos: Array.isArray(raw.metodos) ? (raw.metodos as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+      cbo: getString(raw.cbo),
+      branchIds: Array.isArray(raw.branchIds) ? (raw.branchIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+      appointmentDurations: Array.isArray(raw.appointmentDurations)
+        ? (raw.appointmentDurations as unknown[]).map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0)
+        : [],
     });
   };
 
@@ -484,7 +623,7 @@ export function CadastroMedico() {
       const err = doctorsQuery.error as ApiError;
       showNotification({
         title: 'Erro',
-        message: resolveApiErrorMessage(err, 'Erro ao carregar médicos'),
+        message: resolveApiErrorMessage(err, 'Erro ao carregar profissionais'),
         color: 'red',
       });
     }
@@ -493,7 +632,7 @@ export function CadastroMedico() {
   useEffect(() => {
     const list = getApiList(doctorsQuery.data);
     const mapped: DoctorListItem[] = list.map((item: ApiRecord) => {
-      const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Médico');
+      const name = getString(item.name ?? item.nome ?? item.fullName ?? 'Profissional');
       const specialties = Array.isArray(item.specialties)
         ? (item.specialties as unknown[]).map((value) => String(value)).filter((value) => value !== TELECONSULTATION_SPECIALTY_FLAG)
         : [];
@@ -549,7 +688,6 @@ export function CadastroMedico() {
     if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
-    if (!data.specialty) errors.specialty = 'Especialidade é obrigatória';
     if (data.workingSchedules.length > 0) {
       data.workingSchedules.forEach((schedule, idx) => {
         if (!schedule.days.length) errors[`workingSchedules.${idx}.days`] = 'Selecione pelo menos um dia';
@@ -635,6 +773,13 @@ export function CadastroMedico() {
         schedule.days.forEach((day) => allDays.add(day));
       });
 
+      // Especialidade principal foi removida da tela; deriva um rótulo a partir
+      // das especialidades vinculadas pra manter os consumidores legados (busca, BI) funcionando.
+      const derivedSpecialty = form.especialidadeIds
+        .map((id) => especialidadeOptions.find((opt) => opt.value === id)?.label)
+        .filter(Boolean)
+        .join(', ') || form.specialty || '';
+
       const payload = {
         crmType: form.crmType || 'CRM',
         crm: form.crm.trim(),
@@ -647,7 +792,7 @@ export function CadastroMedico() {
         gender: form.gender ? form.gender.toUpperCase() : undefined,
         cpf: form.cpf,
         rg: form.rg?.trim() || undefined,
-        specialty: form.specialty || undefined,
+        specialty: derivedSpecialty,
         specialties: [
           ...(form.specialties || []),
           ...(form.teleconsultationEnabled ? [TELECONSULTATION_SPECIALTY_FLAG] : []),
@@ -666,6 +811,12 @@ export function CadastroMedico() {
         workingDays: Array.from(allDays),
         workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
+        especialidadeIds: form.especialidadeIds,
+        modalidadeIds: form.modalidadeIds,
+        metodos: form.metodos,
+        cbo: form.cbo.trim() || undefined,
+        branchIds: form.branchIds,
+        appointmentDurations: form.appointmentDurations,
       };
 
       if (editingDoctorId) {
@@ -674,7 +825,7 @@ export function CadastroMedico() {
         setForm({ ...INITIAL_DOCTOR_FORM });
         setFieldErrors({});
         setActiveTab('lista');
-        showNotification({ title: 'Médico atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
+        showNotification({ title: 'Profissional atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
       } else {
         await doctorService.createDoctor(payload);
 
@@ -697,7 +848,7 @@ export function CadastroMedico() {
         setFieldErrors(mapped);
         showNotification({ title: 'Erro', message: Object.values(mapped)[0], color: 'red' });
       } else {
-        const msg = resolveApiErrorMessage(err, 'Erro ao registrar médico');
+        const msg = resolveApiErrorMessage(err, 'Erro ao registrar profissional');
         setErrorMessage(msg);
         setShowErrorModal(true);
         showNotification({ title: 'Erro', message: msg, color: 'red' });
@@ -722,12 +873,12 @@ export function CadastroMedico() {
     try {
       await doctorService.deleteDoctor(item.id);
       await queryClient.invalidateQueries({ queryKey: queryKeys.doctorsAdmin });
-      showNotification({ title: 'Médico excluído', message: 'Registro removido com sucesso.', color: 'green' });
+      showNotification({ title: 'Profissional excluído', message: 'Registro removido com sucesso.', color: 'green' });
       setDeleteConfirmOpen(false);
       setDeleteTarget(null);
     } catch (e: unknown) {
       const err = e as ApiError;
-      const msg = resolveApiErrorMessage(err, 'Erro ao excluir médico');
+      const msg = resolveApiErrorMessage(err, 'Erro ao excluir profissional');
       showNotification({ title: 'Erro', message: msg, color: 'red' });
     }
   };
@@ -739,7 +890,7 @@ export function CadastroMedico() {
 
       showNotification({
         title: 'Status atualizado',
-        message: `Médico ${!item.isActive ? 'ativado' : 'desativado'} com sucesso.`,
+        message: `Profissional ${!item.isActive ? 'ativado' : 'desativado'} com sucesso.`,
         color: 'green',
       });
     } catch (e: unknown) {
@@ -769,106 +920,72 @@ export function CadastroMedico() {
         {/* Header da página */}
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
-            <ActionIcon variant="default" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
 
             <Box>
               <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Cadastro de Médico
+                Cadastro de Profissional
               </Text>
               <Text size="sm" c="dimmed">
-                Registro de médicos
+                Registro de profissionais
               </Text>
             </Box>
           </Group>
 
         </Group>
         {activeTab === 'hub' ? (
-          <Box
-            style={{
-              minHeight: isMobile ? 'auto' : '58vh',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 900 }}>
-              <UnstyledButton
-                onClick={() => setActiveTab('cadastro')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+            {[
+              {
+                key: 'cadastro',
+                icon: UserPlus,
+                title: 'Cadastrar profissional',
+                desc: 'Registrar profissional com dados profissionais, contatos e turnos de atendimento.',
+                onClick: () => setActiveTab('cadastro'),
+              },
+              {
+                key: 'lista',
+                icon: Users,
+                title: 'Profissionais',
+                desc: 'Visualize, edite e gerencie o status dos profissionais registrados no sistema.',
+                onClick: () => setActiveTab('lista'),
+              },
+            ].map((card) => (
+              <Paper
+                key={card.key}
+                p="lg"
+                withBorder
+                onClick={card.onClick}
+                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
               >
-                <Stack gap={8}>
-                  <Group gap="xs">
+                <Group justify="space-between" align="center" wrap="nowrap">
+                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
                     <Box
-                      w={34}
-                      h={34}
+                      w={44}
+                      h={44}
                       style={{
                         borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        flexShrink: 0,
                       }}
                     >
-                      <UserPlus size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
                     </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Cadastrar médico</Text>
-                  </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Registrar médico com dados profissionais, contatos e turnos de atendimento.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('lista')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box
-                      w={34}
-                      h={34}
-                      style={{
-                        borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Users size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    <Box style={{ minWidth: 0 }}>
+                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                     </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Médicos cadastrados</Text>
                   </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Visualize, edite e gerencie o status dos médicos registrados no sistema.
-                  </Text>
-                </Stack>
-              </UnstyledButton>
-            </SimpleGrid>
-          </Box>
+                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                </Group>
+              </Paper>
+            ))}
+          </SimpleGrid>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
@@ -881,7 +998,7 @@ export function CadastroMedico() {
                   Voltar
                 </Button>
                 <Text fw={600}>
-                  {activeTab === 'cadastro' ? 'Cadastrar médico' : 'Médicos cadastrados'}
+                  {activeTab === 'cadastro' ? 'Cadastrar profissional' : 'Profissionais cadastrados'}
                 </Text>
               </Group>
             </Group>
@@ -1009,17 +1126,77 @@ export function CadastroMedico() {
                     required
                     error={fieldErrors.crmState}
                   />
-                  <FloatingInput
-                    label="Especialidade principal"
-                    value={form.specialty}
-                    onChange={(e) => { setForm({ ...form, specialty: e.currentTarget.value }); clearFieldError('specialty'); }}
-                    error={fieldErrors.specialty}
-                    required
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <FloatingMultiSelect
+                    label="Modalidades"
+                    placeholder="Selecione as modalidades"
+                    data={modalidadeOptions}
+                    value={form.modalidadeIds}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhuma modalidade encontrada"
+                    onChange={(values) => setForm((prev) => ({ ...prev, modalidadeIds: values }))}
+                  />
+                  <FloatingMultiSelect
+                    label="Especialidades"
+                    placeholder={form.modalidadeIds.length === 0 ? 'Selecione uma modalidade primeiro' : 'Selecione as especialidades'}
+                    data={especialidadeOptions}
+                    value={form.especialidadeIds}
+                    disabled={form.modalidadeIds.length === 0}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhuma especialidade encontrada"
+                    onChange={(values) => setForm((prev) => ({ ...prev, especialidadeIds: values }))}
                   />
                 </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <FloatingMultiSelect
+                    label="Métodos"
+                    placeholder={form.especialidadeIds.length === 0 ? 'Selecione uma especialidade primeiro' : 'Selecione os métodos'}
+                    data={metodoOptions}
+                    value={form.metodos}
+                    disabled={form.especialidadeIds.length === 0}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhum método disponível"
+                    onChange={(values) => setForm((prev) => ({ ...prev, metodos: values }))}
+                  />
+                  <FloatingInput
+                    label="CBO"
+                    placeholder="Ex: 225124"
+                    value={form.cbo}
+                    onChange={(e) => setForm((prev) => ({ ...prev, cbo: e?.currentTarget?.value ?? '' }))}
+                  />
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                  <FloatingMultiSelect
+                    label="Unidades atendidas"
+                    placeholder="Selecione as unidades"
+                    data={branchOptions}
+                    value={form.branchIds}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhuma unidade encontrada"
+                    onChange={(values) => setForm((prev) => ({ ...prev, branchIds: values }))}
+                  />
+                  <DurationTagInput
+                    label="Tempo de atendimento (minutos)"
+                    placeholder="Digite e pressione Enter"
+                    values={form.appointmentDurations}
+                    onAdd={(value) => setForm((prev) => (prev.appointmentDurations.includes(value)
+                      ? prev
+                      : { ...prev, appointmentDurations: [...prev.appointmentDurations, value].sort((a, b) => a - b) }))}
+                    onRemove={(value) => setForm((prev) => ({ ...prev, appointmentDurations: prev.appointmentDurations.filter((v) => v !== value) }))}
+                  />
+                </SimpleGrid>
+
                 <Switch
                   mt="md"
-                  label="Médico habilitado para teleconsulta"
+                  label="Profissional habilitado para teleconsulta"
                   checked={form.teleconsultationEnabled}
                   onChange={(event) => {
                     const checked = event.currentTarget.checked;
@@ -1035,7 +1212,7 @@ export function CadastroMedico() {
                   mt="md"
                 />
                 <Stack gap={6} mt="md">
-                  <Text size="sm" fw={500}>Assinatura do médico</Text>
+                  <Text size="sm" fw={500}>Assinatura do profissional</Text>
                   <FileInput
                     placeholder="Selecionar assinatura"
                     accept="image/png,image/jpeg,image/jpg"
@@ -1071,7 +1248,7 @@ export function CadastroMedico() {
                       >
                         <img
                           src={form.signatureImageBase64}
-                          alt="Assinatura do médico"
+                          alt="Assinatura do profissional"
                           style={{
                             maxWidth: '100%',
                             maxHeight: 72,
@@ -1203,9 +1380,9 @@ export function CadastroMedico() {
           <Tabs.Panel value="lista" pt={0}>
             <Paper p="md" withBorder radius="md">
               <Group justify="space-between" mb="md" wrap="wrap">
-                <SectionTitle>Médicos cadastrados</SectionTitle>
+                <SectionTitle>Profissionais cadastrados</SectionTitle>
                 <FloatingInput
-                  label="Buscar médicos"
+                  label="Buscar profissionais"
                   value={doctorQuery}
                   onChange={(e) => setDoctorQuery(e.currentTarget.value)}
                   containerProps={{ w: isMobile ? '100%' : 320 }}
@@ -1273,7 +1450,7 @@ export function CadastroMedico() {
                   filteredDoctors.length === 0 ? (
                     <Paper withBorder radius="md" p="xl">
                       <Text size="sm" c="dimmed" ta="center">
-                        Nenhum médico encontrado. Ajuste a busca ou cadastre um novo médico.
+                        Nenhum profissional encontrado. Ajuste a busca ou cadastre um novo profissional.
                       </Text>
                     </Paper>
                   ) : (
@@ -1295,7 +1472,7 @@ export function CadastroMedico() {
                           <Group justify="flex-end" mt="md">
                             <Menu shadow="md" width={210} position="bottom-end" withArrow>
                               <Menu.Target>
-                                <ActionIcon variant="light" size="sm" aria-label="Ações do médico">
+                                <ActionIcon variant="light" size="sm" aria-label="Ações do profissional">
                                   <MoreVertical size={16} />
                                 </ActionIcon>
                               </Menu.Target>
@@ -1356,7 +1533,7 @@ export function CadastroMedico() {
                           <Table.Tr>
                             <Table.Td colSpan={isTablet ? 2 : 5}>
                               <Text size="sm" c="dimmed" ta="center">
-                                Nenhum médico encontrado. Ajuste a busca ou cadastre um novo médico.
+                                Nenhum profissional encontrado. Ajuste a busca ou cadastre um novo profissional.
                               </Text>
                             </Table.Td>
                           </Table.Tr>
@@ -1398,7 +1575,7 @@ export function CadastroMedico() {
                                 <Group justify="flex-end">
                                   <Menu shadow="md" width={220} position="bottom-end" withArrow>
                                     <Menu.Target>
-                                      <ActionIcon variant="light" size="sm" aria-label="Ações do médico">
+                                      <ActionIcon variant="light" size="sm" aria-label="Ações do profissional">
                                         <MoreVertical size={16} />
                                       </ActionIcon>
                                     </Menu.Target>
@@ -1447,7 +1624,7 @@ export function CadastroMedico() {
         <Modal
           opened={detailsOpen}
           onClose={() => setDetailsOpen(false)}
-          title="Detalhes do médico"
+          title="Detalhes do profissional"
           centered
           size="lg"
         >
@@ -1514,20 +1691,20 @@ export function CadastroMedico() {
           opened={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
           variant="success"
-          title="Médico cadastrado"
-          message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Médico cadastrado com sucesso.'}
+          title="Profissional cadastrado"
+          message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Profissional cadastrado com sucesso.'}
           primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ ...INITIAL_DOCTOR_FORM }); setShowSuccessModal(false); } }}
           secondary={{ label: 'Voltar para o dashboard', onClick: () => { setShowSuccessModal(false); navigate('/dashboard'); } }}
         />
 
-        <ResultModal opened={showErrorModal} onClose={() => setShowErrorModal(false)} variant="error" title="Erro ao cadastrar médico" message={errorMessage || 'Erro ao registrar médico'} secondary={{ label: 'Fechar', onClick: () => setShowErrorModal(false) }} />
+        <ResultModal opened={showErrorModal} onClose={() => setShowErrorModal(false)} variant="error" title="Erro ao cadastrar profissional" message={errorMessage || 'Erro ao registrar profissional'} secondary={{ label: 'Fechar', onClick: () => setShowErrorModal(false) }} />
 
         <ResultModal
           opened={deleteConfirmOpen}
           onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null); }}
           variant="error"
           title="Confirmar exclusão"
-          message={`Tem certeza que deseja excluir ${deleteTarget?.name || 'este médico'}?`}
+          message={`Tem certeza que deseja excluir ${deleteTarget?.name || 'este profissional'}?`}
           primary={{ label: 'Excluir', onClick: () => { if (deleteTarget) handleDeleteDoctor(deleteTarget); } }}
           secondary={{ label: 'Cancelar', onClick: () => { setDeleteConfirmOpen(false); setDeleteTarget(null); } }}
         />

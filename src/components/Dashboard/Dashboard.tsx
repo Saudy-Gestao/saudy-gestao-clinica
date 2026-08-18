@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Text, Stack, Group, Button } from '@mantine/core';
+import { Box, Title, Text, Stack, Group, Button, ThemeIcon, useMantineColorScheme } from '@mantine/core';
+import { useSearchParams } from 'react-router-dom';
+import { useMediaQuery } from '@mantine/hooks';
 import { Camera } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
@@ -13,6 +15,8 @@ import facialRecognitionService, { type FacialScanResponse } from '../../service
 import authService from '../../services/authService';
 import { isDoctorUser } from '../../utils/userRole';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
+import { MACRO_SECTIONS } from '../../lib/moduleCatalog';
+import { DARK_BLUE } from '../../themes/theme';
 
 export function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -28,6 +32,11 @@ export function Dashboard() {
   const { data: profileUser } = useCurrentUserProfileQuery();
   const currentUser = (profileUser || authService.getCurrentUser()) as any;
   const doctorView = isDoctorUser(currentUser);
+  const { colorScheme } = useMantineColorScheme();
+  const isMobile = useMediaQuery('(max-width: 799px)');
+  const [searchParams] = useSearchParams();
+  const activeSection = MACRO_SECTIONS.find((section) => section.key === searchParams.get('secao')) || null;
+  const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000); // Atualiza a cada minuto
@@ -93,38 +102,63 @@ export function Dashboard() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto">
-        {/* Welcome Section */}
-        <Group mb={30} justify="space-between" align="center">
-          <Stack gap="xs">
-            <Title order={1} fw={600} style={{ fontSize: '2rem' }}>{getGreeting()}</Title>
-            <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
-          </Stack>
+        {activeSection ? (
+          <>
+            {/* Blocos do macro selecionado na sidebar */}
+            <Group mb={30} gap="md" align="center">
+              <ThemeIcon
+                size={48}
+                variant="transparent"
+                color="darkBlue"
+                bg="transparent"
+                style={{ border: `1px solid ${accentColor}`, borderRadius: 12 }}
+              >
+                <activeSection.icon size={26} color={accentColor} />
+              </ThemeIcon>
+              <Stack gap={2}>
+                <Title order={1} fw={600} style={{ fontSize: '1.7rem' }}>{activeSection.title}</Title>
+                <Text c="dimmed">Escolha um módulo para começar</Text>
+              </Stack>
+            </Group>
+            <WorkflowSections sectionKey={activeSection.key} />
+          </>
+        ) : (
+          <>
+            {/* Visão Geral */}
+            <Group mb={30} justify="space-between" align="center">
+              <Stack gap="xs">
+                <Title order={1} fw={600} style={{ fontSize: '2rem' }}>{getGreeting()}</Title>
+                <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
+              </Stack>
 
-          {!doctorView ? (
-            <Button
-              size="lg"
-              leftSection={<Camera size={20} strokeWidth={2} />}
-              onClick={() => setFacialCaptureOpen(true)}
-              loading={recognizing}
-              variant="default"
-              radius="md"
-              styles={{
-                root: {
-                  fontWeight: 500,
-                  '&:hover': {
-                    backgroundColor: 'var(--mantine-color-default-hover)',
-                  },
-                },
-              }}
-            >
-              Identificar Paciente
-            </Button>
-          ) : null}
-        </Group>
+              {!doctorView ? (
+                <Button
+                  size="lg"
+                  leftSection={<Camera size={20} strokeWidth={2} />}
+                  onClick={() => setFacialCaptureOpen(true)}
+                  loading={recognizing}
+                  variant="default"
+                  radius="md"
+                  styles={{
+                    root: {
+                      fontWeight: 500,
+                      '&:hover': {
+                        backgroundColor: 'var(--mantine-color-default-hover)',
+                      },
+                    },
+                  }}
+                >
+                  Identificar Paciente
+                </Button>
+              ) : null}
+            </Group>
 
-        <StatsCards user={currentUser} />
-        {!doctorView ? <PatientQueue limit={3} /> : null}
-        <WorkflowSections />
+            <StatsCards user={currentUser} />
+            {!doctorView ? <PatientQueue limit={3} /> : null}
+            {/* Sem a sidebar (mobile), a Visão Geral segue listando todos os módulos */}
+            {isMobile ? <WorkflowSections /> : null}
+          </>
+        )}
       </Box>
 
       {/* Modal de Captura Facial */}

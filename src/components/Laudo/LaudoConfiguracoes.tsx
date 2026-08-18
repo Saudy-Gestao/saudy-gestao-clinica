@@ -17,7 +17,6 @@ import {
   Title,
   Menu,
   NumberInput,
-  UnstyledButton,
   Select,
   useMantineColorScheme,
   Textarea,
@@ -27,7 +26,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Pencil, Plus, Trash2, MoreVertical, FileText, TextQuote, ListTodo, Settings2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, MoreVertical, FileText, TextQuote, ListTodo, Settings2 } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
@@ -623,116 +622,70 @@ export function LaudoConfiguracoes() {
         </Group>
 
         {activeTab === 'hub' ? (
-          <Box
-            style={{
-              minHeight: isMobile ? 'auto' : '58vh',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl" style={{ width: '100%', maxWidth: 920 }}>
-              <UnstyledButton
-                onClick={() => setActiveTab('templates')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 150 : 220,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+            {[
+              {
+                key: 'templates',
+                icon: FileText,
+                title: 'Padrões',
+                desc: 'Cadastre e gerencie modelos de laudo por tipo de exame.',
+                onClick: () => setActiveTab('templates'),
+              },
+              {
+                key: 'phrases',
+                icon: TextQuote,
+                title: 'Frases',
+                desc: 'Organize frases frequentes para acelerar o preenchimento de laudos.',
+                onClick: () => setActiveTab('phrases'),
+              },
+              {
+                key: 'worklist',
+                icon: ListTodo,
+                title: 'Fila Manual',
+                desc: 'Gerencie itens da fila de laudo enquanto a integração completa não é usada.',
+                onClick: () => setActiveTab('worklist'),
+              },
+              {
+                key: 'settings',
+                icon: Settings2,
+                title: 'Configurações',
+                desc: 'Defina regras globais para finalização e revisão de laudos.',
+                onClick: () => setActiveTab('settings'),
+              },
+            ].map((card) => (
+              <Paper
+                key={card.key}
+                p="lg"
+                withBorder
+                onClick={card.onClick}
+                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
               >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <FileText size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                <Group justify="space-between" align="center" wrap="nowrap">
+                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                    <Box
+                      w={44}
+                      h={44}
+                      style={{
+                        borderRadius: 10,
+                        border: `1px solid ${isDark ? '#dbe7ff' : DARK_BLUE}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <card.icon size={22} color={isDark ? '#dbe7ff' : DARK_BLUE} />
                     </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Padrões</Text>
-                  </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Cadastre e gerencie modelos de laudo por tipo de exame.</Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('phrases')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 150 : 220,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <TextQuote size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
+                    <Box style={{ minWidth: 0 }}>
+                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                     </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Frases</Text>
                   </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Organize frases frequentes para acelerar o preenchimento de laudos.</Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('worklist')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 150 : 220,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ListTodo size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Fila Manual</Text>
-                  </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Gerencie itens da fila de laudo enquanto a integração completa não é usada.</Text>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setActiveTab('settings')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDark ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 150 : 220,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box w={34} h={34} style={{ borderRadius: 10, background: isDark ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Settings2 size={16} color={isDark ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Text fw={700} size="lg" c={isDark ? '#e9f1ff' : undefined}>Configurações</Text>
-                  </Group>
-                  <Text size="sm" c={isDark ? '#c2d4ff' : 'dimmed'}>Defina regras globais para finalização e revisão de laudos.</Text>
-                </Stack>
-              </UnstyledButton>
-            </SimpleGrid>
-          </Box>
+                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                </Group>
+              </Paper>
+            ))}
+          </SimpleGrid>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">

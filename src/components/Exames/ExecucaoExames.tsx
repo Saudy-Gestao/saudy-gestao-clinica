@@ -18,12 +18,11 @@ import {
   Text,
   TextInput,
   Textarea,
-  UnstyledButton,
   useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search, Image as ImageIcon } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import { FloatingInput } from '../common/FloatingInput';
@@ -554,7 +553,7 @@ export function ExecucaoExames() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
           <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/dashboard')}>
+            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
@@ -572,100 +571,63 @@ export function ExecucaoExames() {
         </Group>
 
         {viewMode === 'hub' ? (
-          <Box
-            style={{
-              minHeight: isMobile ? 'auto' : '58vh',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <SimpleGrid
-              cols={{ base: 1, md: 2 }}
-              spacing="xl"
-              style={{ width: '100%', maxWidth: 900 }}
-            >
-              <UnstyledButton
-                onClick={() => setViewMode('pending')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+            {[
+              {
+                key: 'pending',
+                icon: ClipboardCheck,
+                title: 'Fila de exames',
+                desc: 'Triagem, chamada e execução operacional dos exames em andamento.',
+                badgeColor: 'cyan',
+                badgeLabel: `${pendingCount} pendente(s)`,
+                onClick: () => setViewMode('pending'),
+              },
+              {
+                key: 'completed',
+                icon: CheckCircle2,
+                title: 'Exames concluídos',
+                desc: 'Consulte os exames já finalizados para acompanhamento operacional.',
+                badgeColor: 'green',
+                badgeLabel: `${completedCount} concluído(s)`,
+                onClick: () => setViewMode('completed'),
+              },
+            ].map((card) => (
+              <Paper
+                key={card.key}
+                p="lg"
+                withBorder
+                onClick={card.onClick}
+                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
               >
-                <Stack gap={8}>
-                  <Group gap="xs">
+                <Group justify="space-between" align="center" wrap="nowrap">
+                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
                     <Box
-                      w={34}
-                      h={34}
+                      w={44}
+                      h={44}
                       style={{
                         borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
+                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        flexShrink: 0,
                       }}
                     >
-                      <ClipboardCheck size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
                     </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Fila de exames</Text>
-                  </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Triagem, chamada e execução operacional dos exames em andamento.
-                  </Text>
-                  <Badge variant="light" radius="xl" color="cyan" w="fit-content">
-                    {pendingCount} pendente(s)
-                  </Badge>
-                </Stack>
-              </UnstyledButton>
-
-              <UnstyledButton
-                onClick={() => setViewMode('completed')}
-                style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 16,
-                  padding: isMobile ? '18px' : '24px',
-                  background: isDarkMode ? 'rgba(58, 83, 138, 0.78)' : 'var(--mantine-color-white)',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease',
-                  minHeight: isMobile ? 170 : 260,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Stack gap={8}>
-                  <Group gap="xs">
-                    <Box
-                      w={34}
-                      h={34}
-                      style={{
-                        borderRadius: 10,
-                        background: isDarkMode ? 'rgba(130, 170, 255, 0.22)' : 'rgba(13, 46, 108, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <CheckCircle2 size={16} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    <Box style={{ minWidth: 0 }}>
+                      <Group gap={6} wrap="nowrap">
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Badge variant="light" radius="xl" color={card.badgeColor} size="sm">{card.badgeLabel}</Badge>
+                      </Group>
+                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                     </Box>
-                    <Text fw={700} size="lg" c={isDarkMode ? '#e9f1ff' : undefined}>Exames concluídos</Text>
                   </Group>
-                  <Text size="sm" c={isDarkMode ? '#c2d4ff' : 'dimmed'}>
-                    Consulte os exames já finalizados para acompanhamento operacional.
-                  </Text>
-                  <Badge variant="light" radius="xl" color="green" w="fit-content">
-                    {completedCount} concluído(s)
-                  </Badge>
-                </Stack>
-              </UnstyledButton>
-            </SimpleGrid>
-          </Box>
+                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                </Group>
+              </Paper>
+            ))}
+          </SimpleGrid>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">

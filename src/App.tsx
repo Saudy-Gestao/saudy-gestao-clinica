@@ -8,6 +8,7 @@ import { theme } from './themes/theme';
 import authService from './services/authService';
 import { APP_COLOR_SCHEME_EVENT, getAppColorScheme, type AppColorScheme } from './utils/appColorScheme';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import { AppShellLayout } from './components/Layout/AppShellLayout';
 import { BIGestao } from './components/BI/BIGestao';
 import { Login } from './components/Auth/Login';
 import { Cadastro } from './components/Auth/Cadastro';
@@ -46,6 +47,8 @@ import { ConvenioForm } from './components/Convenios/ConvenioForm';
 import { AutorizacaoConvenio } from './components/Convenios/AutorizacaoConvenio';
 import { CadastroCliente } from './components/Company/CadastroCliente';
 import { CadastroSala } from './components/Salas/CadastroSala';
+import { CadastroModalidades } from './components/Modalidades/CadastroModalidades';
+import { CadastroEspecialidades } from './components/Especialidades/CadastroEspecialidades';
 import { CadastroEquipamento } from './components/Equipamentos/CadastroEquipamento';
 import { CadastroAnamnese } from './components/Anamnese/CadastroAnamnese';
 import { HistoricoAtendimentos } from './components/Historico/HistoricoAtendimentos';
@@ -233,9 +236,12 @@ function App() {
           <Route path="/check-in/:branchId" element={<PublicCheckIn />} />
           <Route path="/pre-atendimento/documentos/:token" element={<PublicPreAgendamentoDocs />} />
           <Route path="/pre-agendamento/documentos/:token" element={<LegacyPreSchedulingDocsRedirect />} />
-          <Route 
-            path="/dashboard" 
-            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+          {/* Shell interno: sidebar de macros + conteúdo. Telas full-screen
+              (teleconsulta, DICOM viewer) e o mundo ADM ficam fora do grupo. */}
+          <Route element={<AppShellLayout />}>
+          <Route
+            path="/dashboard"
+            element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
           />
           <Route
             path="/bi"
@@ -286,28 +292,12 @@ function App() {
             element={<ProtectedRoute><AtendimentoClinico /></ProtectedRoute>}
           />
           <Route
-            path="/teleconsulta/preparacao"
-            element={<TeleconsultaPreparation />}
-          />
-          <Route
-            path="/teleconsulta/paciente/espera"
-            element={<TeleconsultaPatientWaiting />}
-          />
-          <Route
-            path="/teleconsulta/finalizada"
-            element={<TeleconsultaFinished />}
-          />
-          <Route
             path="/execucao-exames"
             element={<ProtectedRoute><ExecucaoExames /></ProtectedRoute>}
           />
           <Route
             path="/laudo-exames"
             element={<ProtectedRoute><LaudoExames /></ProtectedRoute>}
-          />
-          <Route
-            path="/dicom-viewer/:key"
-            element={<ProtectedRoute><DicomViewerPage /></ProtectedRoute>}
           />
           <Route
             path="/laudo-configuracoes"
@@ -358,16 +348,20 @@ function App() {
             element={<ProtectedRoute><AutorizacaoConvenio /></ProtectedRoute>}
           />
           <Route
-            path="/cadastro-cliente"
-            element={<ProtectedRoute><CadastroCliente /></ProtectedRoute>}
-          />
-          <Route
             path="/cadastro-sala"
             element={<ProtectedRoute><CadastroSala /></ProtectedRoute>}
           />
           <Route
             path="/cadastro-equipamento"
             element={<ProtectedRoute><CadastroEquipamento /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-modalidade"
+            element={<ProtectedRoute><CadastroModalidades /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-especialidade"
+            element={<ProtectedRoute><CadastroEspecialidades /></ProtectedRoute>}
           />
           <Route
             path="/cadastro-anamnese"
@@ -428,6 +422,28 @@ function App() {
           <Route
             path="/tea/evolucao-templates"
             element={<ProtectedRoute><TeaEvolucaoTemplates /></ProtectedRoute>}
+          />
+          </Route>
+          {/* Fora do shell: telas full-screen e mundo ADM */}
+          <Route
+            path="/teleconsulta/preparacao"
+            element={<TeleconsultaPreparation />}
+          />
+          <Route
+            path="/teleconsulta/paciente/espera"
+            element={<TeleconsultaPatientWaiting />}
+          />
+          <Route
+            path="/teleconsulta/finalizada"
+            element={<TeleconsultaFinished />}
+          />
+          <Route
+            path="/dicom-viewer/:key"
+            element={<ProtectedRoute><DicomViewerPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-cliente"
+            element={<ProtectedRoute><CadastroCliente /></ProtectedRoute>}
           />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

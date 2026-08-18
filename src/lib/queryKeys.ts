@@ -21,6 +21,8 @@ export const queryKeys = {
   patientsAdmin: ['patients-admin'] as const,
   doctorsAdmin: ['doctors-admin'] as const,
   insurancesAdmin: ['insurances-admin'] as const,
+  modalidadesAdmin: ['modalidades-admin'] as const,
+  especialidadesAdmin: ['especialidades-admin'] as const,
   insuranceDetail: ['insurance-detail'] as const,
   insuranceProcedures: ['insurance-procedures'] as const,
   anamnesisTemplates: ['anamnesis-templates'] as const,
