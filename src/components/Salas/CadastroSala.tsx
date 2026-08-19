@@ -33,6 +33,8 @@ import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
+import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
+import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
@@ -54,6 +56,9 @@ interface SalaRow {
   workingHoursEnd?: string | null;
   doctorIds?: string[];
   doctorNames?: string[];
+  modalidadeId?: string | null;
+  especialidadeId?: string | null;
+  capacity?: number | null;
 }
 
 interface DoctorOption {
@@ -171,6 +176,8 @@ export function CadastroSala() {
   const doctorsQuery = useDoctorsAdminQuery();
   const appointmentsQuery = useAppointmentsQuery();
   const clinicalQueueQuery = useClinicalQueueQuery();
+  const modalidadesQuery = useModalidadesAdminQuery();
+  const especialidadesQuery = useEspecialidadesAdminQuery();
 
   const [form, setForm] = useState({
     name: '',
@@ -180,7 +187,28 @@ export function CadastroSala() {
     workingDays: [] as string[],
     workingHoursStart: '',
     workingHoursEnd: '',
+    modalidadeId: '' as string,
+    especialidadeId: '' as string,
+    capacity: '' as string,
   });
+
+  const modalidadeOptions = useMemo(() => {
+    const data: any = modalidadesQuery.data;
+    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    return list.filter((m: any) => m?.id && m.isActive).map((m: any) => ({ value: m.id, label: m.name }));
+  }, [modalidadesQuery.data]);
+
+  const especialidadeList = useMemo(() => {
+    const data: any = especialidadesQuery.data;
+    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    return list.filter((e: any) => e?.id && e.isActive);
+  }, [especialidadesQuery.data]);
+
+  const especialidadeByModalidadeId = useMemo(() => {
+    const map = new Map<string, any>();
+    especialidadeList.forEach((e: any) => map.set(e.modalidadeId, e));
+    return map;
+  }, [especialidadeList]);
 
   const branchLabelById = useMemo(() => {
     return branches.reduce<Record<string, string>>((acc, branch) => {
@@ -404,6 +432,9 @@ export function CadastroSala() {
         workingHoursEnd: sector.workingHoursEnd || null,
         doctorIds: [],
         doctorNames: [],
+        modalidadeId: sector.modalidadeId || null,
+        especialidadeId: sector.especialidadeId || null,
+        capacity: sector.capacity ?? null,
       }))
       .filter((sector: SalaRow) => sector.id && sector.branchId === selectedBranchId);
     setItems(mapped);
@@ -439,6 +470,9 @@ export function CadastroSala() {
         workingDays: Array.isArray(item.workingDays) ? item.workingDays : [],
         workingHoursStart: String(item.workingHoursStart || ''),
         workingHoursEnd: String(item.workingHoursEnd || ''),
+        modalidadeId: item.modalidadeId || '',
+        especialidadeId: item.especialidadeId || '',
+        capacity: item.capacity != null ? String(item.capacity) : '',
       });
     } else {
       setEditingId(null);
@@ -450,9 +484,17 @@ export function CadastroSala() {
         workingDays: [],
         workingHoursStart: '',
         workingHoursEnd: '',
+        modalidadeId: '',
+        especialidadeId: '',
+        capacity: '',
       });
     }
     setModalOpen(true);
+  };
+
+  const handleModalidadeChange = (modalidadeId: string | null) => {
+    const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
+    setForm((prev) => ({ ...prev, modalidadeId: modalidadeId || '', especialidadeId: especialidade?.id || '' }));
   };
 
   const syncRoomDoctors = async (roomId: string, nextDoctorIds: string[]) => {
@@ -519,6 +561,13 @@ export function CadastroSala() {
         return;
       }
 
+      const trimmedCapacity = form.capacity.trim();
+      if (trimmedCapacity && (!/^\d+$/.test(trimmedCapacity) || Number(trimmedCapacity) < 1)) {
+        showNotification({ title: 'Erro', message: 'Capacidade de slots deve ser um número inteiro maior que zero', color: 'red' });
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         name: form.name.trim(),
         description: markRoomDescription(form.description || ''),
@@ -526,6 +575,9 @@ export function CadastroSala() {
         workingDays: form.workingDays || [],
         workingHoursStart: form.workingHoursStart || null,
         workingHoursEnd: form.workingHoursEnd || null,
+        modalidadeId: form.modalidadeId || null,
+        especialidadeId: form.especialidadeId || null,
+        capacity: trimmedCapacity ? Number(trimmedCapacity) : null,
       };
 
       let roomId = editingId;
@@ -552,6 +604,9 @@ export function CadastroSala() {
             ...item,
             doctorIds: selectedDoctors.map((doctor) => doctor.value),
             doctorNames: selectedDoctors.map((doctor) => doctor.label),
+            modalidadeId: payload.modalidadeId,
+            especialidadeId: payload.especialidadeId,
+            capacity: payload.capacity,
           };
         }
 
@@ -568,6 +623,9 @@ export function CadastroSala() {
         workingDays: [],
         workingHoursStart: '',
         workingHoursEnd: '',
+        modalidadeId: '',
+        especialidadeId: '',
+        capacity: '',
       });
     } catch (err: any) {
       showNotification({
@@ -958,6 +1016,32 @@ export function CadastroSala() {
             searchable
             clearable
             nothingFoundMessage="Nenhum médico encontrado para esta filial"
+          />
+          <Group grow>
+            <FloatingSelect
+              label="Modalidade"
+              placeholder="Selecione a modalidade"
+              value={form.modalidadeId || null}
+              onChange={handleModalidadeChange}
+              data={modalidadeOptions}
+              searchable
+              clearable
+              nothingFoundMessage="Nenhuma modalidade encontrada"
+            />
+            <FloatingInput
+              label="Especialidade"
+              value={(form.modalidadeId ? especialidadeByModalidadeId.get(form.modalidadeId) : null)?.name || ''}
+              disabled
+              containerProps={{ opacity: 0.7 }}
+              placeholder={form.modalidadeId ? 'Modalidade sem especialidade cadastrada' : 'Selecione uma modalidade'}
+            />
+          </Group>
+          <FloatingInput
+            label="Capacidade de slots"
+            type="number"
+            placeholder="Ex.: 1"
+            value={form.capacity}
+            onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, capacity: value })); }}
           />
           <FloatingMultiSelect
             label="Dias de funcionamento"
