@@ -11,7 +11,6 @@ import {
   Button,
   Switch,
   SimpleGrid,
-  Loader,
   Table,
   Badge,
   Skeleton,
@@ -19,13 +18,12 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Power, Pencil, X, UserPlus, Users, MoreVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Power, Pencil, UserPlus, Users, MoreVertical } from 'lucide-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import procedureService from '../../services/procedureService';
-import inventoryService from '../../services/inventoryService';
 import ResultModal from '../common/ResultModal';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
@@ -33,8 +31,6 @@ import { FloatingNumberInput } from '../common/FloatingNumberInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
-import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
-import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -50,17 +46,6 @@ interface ProcedureForm {
   modalities: string[];
   modalidadeId: string | null;
   branchIds: string[];
-  doctorIds: string[];
-  procedureMaterials: { inventoryItemId: string; quantity: number }[];
-  procedureKitBindings: ProcedureKitBindingForm[];
-}
-
-interface ProcedureKitBindingForm {
-  id: string;
-  inventoryKitId: string;
-  inventoryKitName: string;
-  insuranceName?: string | null;
-  isActive: boolean;
 }
 
 interface ProcedureItem {
@@ -72,9 +57,6 @@ interface ProcedureItem {
   modalidadeId: string | null;
   modalidadeName: string | null;
   branchIds: string[];
-  doctorIds: string[];
-  doctorsCount: number;
-  materialsCount: number;
   isActive: boolean;
 }
 
@@ -87,9 +69,6 @@ const INITIAL_FORM: ProcedureForm = {
   modalities: [],
   modalidadeId: null,
   branchIds: [],
-  doctorIds: [],
-  procedureMaterials: [],
-  procedureKitBindings: [],
 };
 
 const TELECONSULT_MODALITY = 'Telemedicina';
@@ -114,9 +93,6 @@ export function CadastroProcedimento() {
   const [procedures, setProcedures] = useState<ProcedureItem[]>([]);
   const [proceduresLoading, setProceduresLoading] = useState(false);
   const [procedureQuery, setProcedureQuery] = useState('');
-  const [loadingDoctors, setLoadingDoctors] = useState(false);
-  const [doctorOptions, setDoctorOptions] = useState<{ value: string; label: string }[]>([]);
-  const [doctorDirectory, setDoctorDirectory] = useState<Record<string, { name?: string }>>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -124,20 +100,9 @@ export function CadastroProcedimento() {
   const [lastSaveAction, setLastSaveAction] = useState<'create' | 'update'>('create');
   const [editingProcedureId, setEditingProcedureId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'hub' | 'cadastro' | 'lista'>('hub');
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [procedurePage, setProcedurePage] = useState(1);
   const [procedurePageSize, setProcedurePageSize] = useState(10);
-  const [materialOptions, setMaterialOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [materialDirectory, setMaterialDirectory] = useState<Record<string, { name: string; code?: string; unit?: string }>>({});
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-  const [selectedMaterialQuantity, setSelectedMaterialQuantity] = useState<number | ''>(1);
-  const [inventoryKitOptions, setInventoryKitOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [inventoryKitLabelById, setInventoryKitLabelById] = useState<Record<string, string>>({});
-  const [selectedBindingKitId, setSelectedBindingKitId] = useState<string | null>(null);
-  const [loadingKits, setLoadingKits] = useState(false);
   const proceduresQuery = useProceduresAdminQuery();
-  const doctorsQuery = useDoctorsAdminQuery();
-  const inventoryItemsQuery = useInventoryItemsQuery();
   const modalidadesQuery = useModalidadesAdminQuery();
   const branchesQuery = useSettingsBranchesQuery();
 
@@ -165,13 +130,6 @@ export function CadastroProcedimento() {
       return acc;
     }, {});
   }, [branchOptions]);
-
-  const doctorLabelById = useMemo(() => {
-    return doctorOptions.reduce<Record<string, string>>((acc, option) => {
-      acc[option.value] = option.label;
-      return acc;
-    }, {});
-  }, [doctorOptions]);
 
   const filteredProcedures = useMemo(() => {
     const q = procedureQuery.trim().toLowerCase();
@@ -233,133 +191,10 @@ export function CadastroProcedimento() {
       modalidadeId: it.modalidadeId || it.modalidade?.id || null,
       modalidadeName: it.modalidade?.name || null,
       branchIds: Array.isArray(it.branchIds) ? it.branchIds.map((id: any) => String(id)) : [],
-      doctorsCount: Array.isArray(it.doctors) ? it.doctors.length : 0,
-      materialsCount: Array.isArray(it.materials) ? it.materials.length : 0,
       isActive: Boolean(it.isActive ?? true),
-      doctorIds: Array.isArray(it.doctors) ? it.doctors.map((doc: any) => String(doc.doctorId ?? doc.id ?? '')) : [],
     })).filter((item) => Boolean(item.id));
     setProcedures(mapped);
   }, [proceduresQuery.data]);
-
-  useEffect(() => {
-    setLoadingDoctors(doctorsQuery.isFetching);
-  }, [doctorsQuery.isFetching]);
-
-  useEffect(() => {
-    if (!doctorsQuery.error) return;
-    const err: any = doctorsQuery.error;
-    showNotification({
-      title: 'Erro',
-      message: resolveApiErrorMessage(err, 'Erro ao carregar medicos'),
-      color: 'red',
-    });
-  }, [doctorsQuery.error]);
-
-  useEffect(() => {
-    const data: any = doctorsQuery.data;
-    const list: any[] = Array.isArray(data)
-      ? data
-      : (Array.isArray(data?.items)
-        ? data.items
-        : (Array.isArray(data?.data?.items)
-          ? data.data.items
-          : (Array.isArray(data?.data)
-            ? data.data
-            : [])));
-
-    const options = list.map((doctor: any) => {
-      const id = String(doctor.id ?? doctor.doctorId ?? '');
-      const name = doctor.name || doctor.nome || doctor.fullName || 'Sem nome';
-      return { value: id, label: name };
-    }).filter((item: { value: string }) => item.value);
-
-    const directory = list.reduce<Record<string, { name?: string }>>((acc, doctor: any) => {
-      const id = String(doctor.id ?? doctor.doctorId ?? '');
-      if (!id) return acc;
-      acc[id] = { name: doctor.name || doctor.nome || doctor.fullName || undefined };
-      return acc;
-    }, {});
-
-    setDoctorOptions(options);
-    setDoctorDirectory(directory);
-  }, [doctorsQuery.data]);
-
-  useEffect(() => {
-    setLoadingMaterials(inventoryItemsQuery.isFetching);
-  }, [inventoryItemsQuery.isFetching]);
-
-  useEffect(() => {
-    if (!inventoryItemsQuery.error) return;
-    const err: any = inventoryItemsQuery.error;
-    showNotification({
-      title: 'Erro',
-      message: resolveApiErrorMessage(err, 'Erro ao carregar materiais do estoque'),
-      color: 'red',
-    });
-  }, [inventoryItemsQuery.error]);
-
-  useEffect(() => {
-    const list: any[] = Array.isArray(inventoryItemsQuery.data) ? inventoryItemsQuery.data : [];
-    const mapped = list
-      .filter((item: any) => item && item.id)
-      .map((item: any) => {
-        const id = String(item.id);
-        const name = String(item.name || '').trim();
-        const code = String(item.code || '').trim();
-        return {
-          id,
-          name: name || 'Material',
-          code: code || undefined,
-          unit: item.unit ? String(item.unit) : undefined,
-        };
-      });
-
-    setMaterialOptions(mapped.map((item: any) => ({
-      value: item.id,
-      label: item.code ? `${item.name} (${item.code})` : item.name,
-    })));
-    setMaterialDirectory(
-      mapped.reduce((acc: Record<string, { name: string; code?: string; unit?: string }>, item: any) => {
-        acc[item.id] = { name: item.name, code: item.code, unit: item.unit };
-        return acc;
-      }, {}),
-    );
-  }, [inventoryItemsQuery.data]);
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      setLoadingKits(true);
-      try {
-        const data: any = await inventoryService.getKits({ limit: 500, offset: 0 });
-        const list = Array.isArray(data?.items) ? data.items : [];
-        if (!mounted) return;
-        const options = list
-          .filter((item: any) => item?.id && item?.isActive !== false)
-          .map((item: any) => ({ value: String(item.id), label: String(item.name || 'Kit') }))
-          .sort((a: any, b: any) => a.label.localeCompare(b.label));
-        setInventoryKitOptions(options);
-        setInventoryKitLabelById(
-          options.reduce((acc: Record<string, string>, item: any) => {
-            acc[item.value] = item.label;
-            return acc;
-          }, {}),
-        );
-      } catch (err: any) {
-        showNotification({
-          title: 'Erro',
-          message: resolveApiErrorMessage(err, 'Erro ao carregar kits de insumos'),
-          color: 'red',
-        });
-      } finally {
-        if (mounted) setLoadingKits(false);
-      }
-    };
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -373,13 +208,6 @@ export function CadastroProcedimento() {
 
     setSaving(true);
     try {
-      const doctors = form.doctorIds
-        .filter(Boolean)
-        .map((doctorId) => ({
-          doctorId,
-          doctorName: doctorLabelById[doctorId] || doctorDirectory[doctorId]?.name || doctorId,
-        }));
-
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
@@ -391,13 +219,6 @@ export function CadastroProcedimento() {
         ],
         modalidadeId: form.modalidadeId || null,
         branchIds: form.branchIds,
-        doctors,
-        procedureMaterials: form.procedureMaterials,
-        procedureKitBindings: form.procedureKitBindings.map((binding) => ({
-          inventoryKitId: binding.inventoryKitId,
-          insuranceName: binding.insuranceName || null,
-          isActive: Boolean(binding.isActive),
-        })),
       };
 
       if (editingProcedureId) {
@@ -405,9 +226,6 @@ export function CadastroProcedimento() {
         setLastSaveAction('update');
         setEditingProcedureId(null);
         setForm(INITIAL_FORM);
-        setSelectedMaterialId(null);
-        setSelectedMaterialQuantity(1);
-        setSelectedBindingKitId(null);
 
         setActiveTab('lista');
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
@@ -417,9 +235,6 @@ export function CadastroProcedimento() {
         setLastCreatedName(form.name.trim());
         setShowSuccessModal(true);
         setForm(INITIAL_FORM);
-        setSelectedMaterialId(null);
-        setSelectedMaterialQuantity(1);
-        setSelectedBindingKitId(null);
 
         setProcedureQuery('');
       }
@@ -437,16 +252,10 @@ export function CadastroProcedimento() {
     if (editingProcedureId) {
       setEditingProcedureId(null);
       setForm(INITIAL_FORM);
-      setSelectedMaterialId(null);
-      setSelectedMaterialQuantity(1);
-      setSelectedBindingKitId(null);
       setActiveTab('lista');
       return;
     }
     setForm(INITIAL_FORM);
-    setSelectedMaterialId(null);
-    setSelectedMaterialQuantity(1);
-    setSelectedBindingKitId(null);
     navigate('/dashboard');
   };
 
@@ -456,98 +265,6 @@ export function CadastroProcedimento() {
 
   const handleDescriptionChange = (value: string) => {
     setForm((prev) => ({ ...prev, description: value }));
-  };
-
-  const handleAddMaterial = () => {
-    if (!selectedMaterialId) return;
-    const quantity = Number(selectedMaterialQuantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      showNotification({
-        title: 'Quantidade inválida',
-        message: 'Informe uma quantidade maior que zero.',
-        color: 'red',
-      });
-      return;
-    }
-
-    setForm((prev) => {
-      const existing = prev.procedureMaterials.find((item) => item.inventoryItemId === selectedMaterialId);
-      if (existing) {
-        return {
-          ...prev,
-          procedureMaterials: prev.procedureMaterials.map((item) =>
-            item.inventoryItemId === selectedMaterialId
-              ? { ...item, quantity: item.quantity + Math.floor(quantity) }
-              : item,
-          ),
-        };
-      }
-      return {
-        ...prev,
-        procedureMaterials: [
-          ...prev.procedureMaterials,
-          { inventoryItemId: selectedMaterialId, quantity: Math.floor(quantity) },
-        ],
-      };
-    });
-
-    setSelectedMaterialId(null);
-    setSelectedMaterialQuantity(1);
-  };
-
-  const handleRemoveMaterial = (inventoryItemId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      procedureMaterials: prev.procedureMaterials.filter((item) => item.inventoryItemId !== inventoryItemId),
-    }));
-  };
-
-  const createBindingId = () => `binding-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  const handleAddKitBinding = () => {
-    if (!selectedBindingKitId) {
-      showNotification({
-        title: 'Kit obrigatório',
-        message: 'Selecione um kit para vincular.',
-        color: 'red',
-      });
-      return;
-    }
-
-    const duplicate = form.procedureKitBindings.some((binding) =>
-      binding.inventoryKitId === selectedBindingKitId,
-    );
-    if (duplicate) {
-      showNotification({
-        title: 'Vínculo duplicado',
-        message: 'Esse kit já está vinculado para este convênio.',
-        color: 'red',
-      });
-      return;
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      procedureKitBindings: [
-        ...prev.procedureKitBindings,
-        {
-          id: createBindingId(),
-          inventoryKitId: selectedBindingKitId,
-          inventoryKitName: inventoryKitLabelById[selectedBindingKitId] || selectedBindingKitId,
-          insuranceName: null,
-          isActive: true,
-        },
-      ],
-    }));
-
-    setSelectedBindingKitId(null);
-  };
-
-  const handleRemoveKitBinding = (bindingId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      procedureKitBindings: prev.procedureKitBindings.filter((binding) => binding.id !== bindingId),
-    }));
   };
 
   const handleToggleActive = async (item: ProcedureItem) => {
@@ -571,12 +288,6 @@ export function CadastroProcedimento() {
   const handleEditProcedure = async (procedureId: string) => {
     try {
       const data: any = await procedureService.getProcedure(procedureId);
-      
-      const doctorIds = Array.isArray(data?.doctors)
-        ? data.doctors
-            .map((doctor: any) => String(doctor?.doctorId || doctor?.id || '').trim())
-            .filter(Boolean)
-        : [];
 
       setForm({
         name: data.name || '',
@@ -591,35 +302,10 @@ export function CadastroProcedimento() {
           : [],
         modalidadeId: data.modalidadeId || data.modalidade?.id || null,
         branchIds: Array.isArray(data.branchIds) ? data.branchIds.map((id: any) => String(id)) : [],
-        doctorIds,
-        procedureMaterials: Array.isArray(data?.materials)
-          ? data.materials
-              .map((item: any) => ({
-                inventoryItemId: String(item?.inventoryItemId || item?.inventoryItem?.id || '').trim(),
-                quantity: Number(item?.quantity || 0),
-              }))
-              .filter((item: { inventoryItemId: string; quantity: number }) => item.inventoryItemId && Number.isFinite(item.quantity) && item.quantity > 0)
-          : [],
-        procedureKitBindings: Array.isArray(data?.kitBindings)
-          ? data.kitBindings
-              .map((binding: any, index: number) => {
-                const inventoryKitId = String(binding?.inventoryKitId || binding?.inventoryKit?.id || '').trim();
-                if (!inventoryKitId) return null;
-                return {
-                  id: String(binding?.id || `binding-loaded-${index}`),
-                  inventoryKitId,
-                  inventoryKitName: String(binding?.inventoryKit?.name || inventoryKitLabelById[inventoryKitId] || inventoryKitId),
-                  insuranceName: String(binding?.insuranceName || '').trim() || null,
-                  isActive: binding?.isActive === undefined ? true : Boolean(binding.isActive),
-                };
-              })
-              .filter(Boolean) as ProcedureKitBindingForm[]
-          : [],
       });
 
       setEditingProcedureId(procedureId);
       setActiveTab('cadastro');
-      setSelectedBindingKitId(null);
     } catch (err: any) {
       showNotification({
         title: 'Erro',
@@ -653,7 +339,7 @@ export function CadastroProcedimento() {
                   key: 'cadastro',
                   icon: UserPlus,
                   title: 'Cadastrar procedimento',
-                  desc: 'Registre procedimentos com regras clínicas, convênios, médicos e materiais vinculados.',
+                  desc: 'Registre procedimentos com regras clínicas, modalidade, unidades e convênios aceitos.',
                   onClick: () => setActiveTab('cadastro'),
                 },
                 {
@@ -813,144 +499,6 @@ export function CadastroProcedimento() {
                   />
                 </SimpleGrid>
 
-                <SectionTitle>Medicos vinculados</SectionTitle>
-                <FloatingMultiSelect
-                  label="Selecione os médicos"
-                  data={doctorOptions}
-                  value={form.doctorIds}
-                  onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
-                  searchable
-                  nothingFoundMessage="Nenhum médico"
-                  rightSection={loadingDoctors ? <Loader size={16} /> : undefined}
-                  clearable
-                  maxDropdownHeight={220}
-                />
-
-                <SectionTitle>Materiais vinculados</SectionTitle>
-                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="md">
-                  <FloatingSelect
-                    label="Material"
-                    data={materialOptions}
-                    value={selectedMaterialId}
-                    onChange={setSelectedMaterialId}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhum material"
-                    rightSection={loadingMaterials ? <Loader size={16} /> : undefined}
-                  />
-                  <FloatingNumberInput
-                    label="Quantidade por sessão"
-                    placeholder="Ex: 1"
-                    min={1}
-                    value={selectedMaterialQuantity}
-                    onChange={(value) => setSelectedMaterialQuantity(typeof value === 'number' ? value : '')}
-                  />
-                  <Group align="end">
-                    <Button variant="default" onClick={handleAddMaterial} fullWidth>
-                      Adicionar material
-                    </Button>
-                  </Group>
-                </SimpleGrid>
-
-                <Box mt="md" style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                  <Table horizontalSpacing="sm" verticalSpacing="sm">
-                    <Table.Thead>
-                      <Table.Tr style={{ borderBottom: 'none' }}>
-                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Material</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Quantidade</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: 90 }}>Ações</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {form.procedureMaterials.length === 0 ? (
-                        <Table.Tr>
-                          <Table.Td colSpan={3}>
-                            <Text size="sm" c="dimmed" ta="center">Nenhum material vinculado</Text>
-                          </Table.Td>
-                        </Table.Tr>
-                      ) : (
-                        form.procedureMaterials.map((material) => {
-                          const meta = materialDirectory[material.inventoryItemId];
-                          const label = meta?.code ? `${meta.name} (${meta.code})` : (meta?.name || material.inventoryItemId);
-                          return (
-                            <Table.Tr key={material.inventoryItemId}>
-                              <Table.Td>
-                                <Text size="sm">{label}</Text>
-                              </Table.Td>
-                              <Table.Td>
-                                <Text size="sm">{material.quantity}</Text>
-                              </Table.Td>
-                              <Table.Td>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={() => handleRemoveMaterial(material.inventoryItemId)}
-                                  title="Remover material"
-                                >
-                                  <X size={16} />
-                                </ActionIcon>
-                              </Table.Td>
-                            </Table.Tr>
-                          );
-                        })
-                      )}
-                    </Table.Tbody>
-                  </Table>
-                </Box>
-
-                <SectionTitle>Kits de insumos</SectionTitle>
-                <Text size="sm" c="dimmed" mb="sm">
-                  O cadastro do kit é feito no módulo Estoque. Aqui você apenas vincula os kits ao procedimento.
-                </Text>
-
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingSelect
-                    label="Kit do estoque"
-                    placeholder="Selecione o kit"
-                    data={inventoryKitOptions}
-                    value={selectedBindingKitId}
-                    onChange={setSelectedBindingKitId}
-                    rightSection={loadingKits ? <Loader size={16} /> : undefined}
-                    searchable
-                  />
-                  <Group align="end">
-                    <Button variant="default" fullWidth onClick={handleAddKitBinding}>
-                      Vincular kit
-                    </Button>
-                  </Group>
-                </SimpleGrid>
-
-                <Stack gap="md" mt="md">
-                  {form.procedureKitBindings.length === 0 ? (
-                    <Paper withBorder radius="md" p="md">
-                      <Text size="sm" c="dimmed" ta="center">
-                        Nenhum kit vinculado ao procedimento.
-                      </Text>
-                    </Paper>
-                  ) : (
-                    form.procedureKitBindings.map((binding) => (
-                      <Paper key={binding.id} withBorder radius="md" p="md">
-                        <Group justify="space-between" align="center" mb="sm" wrap="wrap">
-                          <Group gap="xs">
-                            <Text fw={600}>{binding.inventoryKitName}</Text>
-                            <Badge color={binding.insuranceName ? 'teal' : 'blue'} variant="light">
-                              {binding.insuranceName ? `Convênio: ${binding.insuranceName}` : 'Vínculo padrão'}
-                            </Badge>
-                          </Group>
-                          <ActionIcon
-                            variant="subtle"
-                            color="red"
-                            onClick={() => handleRemoveKitBinding(binding.id)}
-                            title="Remover vínculo"
-                          >
-                            <X size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Paper>
-                    ))
-                  )}
-                </Stack>
-
                 <Group justify="space-between" mt="xl" wrap="wrap">
                   <Button variant="default" onClick={handleCancel} fullWidth={isMobile}>
                     Cancelar
@@ -1010,8 +558,6 @@ export function CadastroProcedimento() {
                             <Table.Th>Tipo</Table.Th>
                             <Table.Th>Convênio</Table.Th>
                             <Table.Th>Modalidades</Table.Th>
-                            <Table.Th>Médicos</Table.Th>
-                            <Table.Th>Materiais</Table.Th>
                             <Table.Th>Status</Table.Th>
                             <Table.Th>Ações</Table.Th>
                           </Table.Tr>
@@ -1023,8 +569,6 @@ export function CadastroProcedimento() {
                               <Table.Td><Skeleton height={24} width={82} radius="xl" /></Table.Td>
                               <Table.Td><Skeleton height={14} width="45%" radius="sm" /></Table.Td>
                               <Table.Td><Skeleton height={14} width="70%" radius="sm" /></Table.Td>
-                              <Table.Td><Skeleton height={14} width="24%" radius="sm" /></Table.Td>
-                              <Table.Td><Skeleton height={14} width="24%" radius="sm" /></Table.Td>
                               <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
                               <Table.Td>
                                 <Group gap={6} wrap="nowrap">
@@ -1079,7 +623,7 @@ export function CadastroProcedimento() {
                                   )}
                                 </Group>
                                 <Text size="xs" c="dimmed">
-                                  {item.modalities.length ? item.modalities.join(', ') : 'Sem forma de atendimento'} • {item.doctorsCount} médico(s) • {item.materialsCount} material(is)
+                                  {item.modalities.length ? item.modalities.join(', ') : 'Sem forma de atendimento'}
                                 </Text>
                                 <Text size="xs" c="dimmed">
                                   Unidades: {item.branchIds.length ? item.branchIds.map((id) => branchLabelById[id] || id).join(', ') : 'Todas'}
@@ -1131,8 +675,6 @@ export function CadastroProcedimento() {
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Forma de Atendimento</Table.Th>}
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos</Table.Th>}
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Materiais</Table.Th>}
                             {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
                             <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
                               Ações
@@ -1142,7 +684,7 @@ export function CadastroProcedimento() {
                         <Table.Tbody>
                           {filteredProcedures.length === 0 ? (
                             <Table.Tr>
-                              <Table.Td colSpan={isTablet ? 2 : 8}>
+                              <Table.Td colSpan={isTablet ? 2 : 6}>
                                 <Text size="sm" c="dimmed" ta="center">
                                   Nenhum procedimento encontrado. Ajuste a busca ou cadastre um novo procedimento.
                                 </Text>
@@ -1189,16 +731,6 @@ export function CadastroProcedimento() {
                                 {!isTablet && (
                                   <Table.Td>
                                     <Text size="sm">{item.modalities.length ? item.modalities.join(', ') : '-'}</Text>
-                                  </Table.Td>
-                                )}
-                                {!isTablet && (
-                                  <Table.Td>
-                                    <Text size="sm">{item.doctorsCount}</Text>
-                                  </Table.Td>
-                                )}
-                                {!isTablet && (
-                                  <Table.Td>
-                                    <Text size="sm">{item.materialsCount}</Text>
                                   </Table.Td>
                                 )}
                                 {!isTablet && (
