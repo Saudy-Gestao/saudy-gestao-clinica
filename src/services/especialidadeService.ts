@@ -7,6 +7,8 @@ export interface Especialidade {
   modalidade?: { id: string; name: string } | null;
   name: string;
   metodos: string[];
+  cboId?: string | null;
+  cbo?: { id: string; code: string; title: string } | null;
   isActive: boolean;
   createdByUserId?: string | null;
   createdByName?: string | null;
@@ -30,6 +32,7 @@ export interface CreateEspecialidadePayload {
   modalidadeId: string;
   name: string;
   metodos?: string[];
+  cboId?: string | null;
   force?: boolean;
 }
 

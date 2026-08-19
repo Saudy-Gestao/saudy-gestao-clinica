@@ -145,7 +145,6 @@ interface DoctorForm {
   especialidadeIds: string[];
   modalidadeIds: string[];
   metodos: string[];
-  cbo: string;
   branchIds: string[];
   appointmentDurations: number[];
 }
@@ -259,7 +258,6 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   especialidadeIds: [],
   modalidadeIds: [],
   metodos: [],
-  cbo: '',
   branchIds: [],
   appointmentDurations: [],
 };
@@ -606,7 +604,6 @@ export function CadastroMedico() {
       especialidadeIds: Array.isArray(raw.especialidadeIds) ? (raw.especialidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
       modalidadeIds: Array.isArray(raw.modalidadeIds) ? (raw.modalidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
       metodos: Array.isArray(raw.metodos) ? (raw.metodos as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
-      cbo: getString(raw.cbo),
       branchIds: Array.isArray(raw.branchIds) ? (raw.branchIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
       appointmentDurations: Array.isArray(raw.appointmentDurations)
         ? (raw.appointmentDurations as unknown[]).map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0)
@@ -814,7 +811,6 @@ export function CadastroMedico() {
         especialidadeIds: form.especialidadeIds,
         modalidadeIds: form.modalidadeIds,
         metodos: form.metodos,
-        cbo: form.cbo.trim() || undefined,
         branchIds: form.branchIds,
         appointmentDurations: form.appointmentDurations,
       };
@@ -1164,15 +1160,6 @@ export function CadastroMedico() {
                     nothingFoundMessage="Nenhum método disponível"
                     onChange={(values) => setForm((prev) => ({ ...prev, metodos: values }))}
                   />
-                  <FloatingInput
-                    label="CBO"
-                    placeholder="Ex: 225124"
-                    value={form.cbo}
-                    onChange={(e) => setForm((prev) => ({ ...prev, cbo: e?.currentTarget?.value ?? '' }))}
-                  />
-                </SimpleGrid>
-
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <FloatingMultiSelect
                     label="Unidades atendidas"
                     placeholder="Selecione as unidades"
@@ -1183,6 +1170,9 @@ export function CadastroMedico() {
                     nothingFoundMessage="Nenhuma unidade encontrada"
                     onChange={(values) => setForm((prev) => ({ ...prev, branchIds: values }))}
                   />
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <DurationTagInput
                     label="Tempo de atendimento (minutos)"
                     placeholder="Digite e pressione Enter"

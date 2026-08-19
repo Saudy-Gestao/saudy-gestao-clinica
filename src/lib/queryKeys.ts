@@ -23,6 +23,7 @@ export const queryKeys = {
   insurancesAdmin: ['insurances-admin'] as const,
   modalidadesAdmin: ['modalidades-admin'] as const,
   especialidadesAdmin: ['especialidades-admin'] as const,
+  cbosCatalog: ['cbos-catalog'] as const,
   insuranceDetail: ['insurance-detail'] as const,
   insuranceProcedures: ['insurance-procedures'] as const,
   anamnesisTemplates: ['anamnesis-templates'] as const,
