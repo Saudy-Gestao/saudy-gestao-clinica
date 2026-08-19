@@ -45,6 +45,7 @@ import {
   Power,
   PowerOff,
   RefreshCw,
+  Star,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { resolveApiErrorMessage } from '../../lib/apiError';
@@ -83,7 +84,9 @@ import {
   validateSectorForm,
   validateUserForm,
   validateAccessForm,
+  validateCNPJ,
 } from '../../utils/validations';
+import { formatCNPJ } from '../../utils/formatters';
 
 const PageContainer = ({ children }: { children: React.ReactNode }) => (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -225,14 +228,23 @@ export function SettingsPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<any | null>(null);
-  const [branchForm, setBranchForm] = useState<{ tradeName: string; address: string; phone: string; type: 'Filial' | 'Matriz' }>({
+  const [branchForm, setBranchForm] = useState<{
+    tradeName: string;
+    address: string;
+    phone: string;
+    type: 'Filial' | 'Matriz';
+    cnpjs: Array<{ cnpj: string; label: string; isPrimary: boolean }>;
+  }>({
     tradeName: '',
     address: '',
     phone: '',
     type: 'Filial',
+    cnpjs: [],
   });
   const [savingBranch, setSavingBranch] = useState(false);
   const [branchErrors, setBranchErrors] = useState<Record<string, string>>({});
+  const [branchCnpjDraft, setBranchCnpjDraft] = useState({ cnpj: '', label: '' });
+  const [branchCnpjError, setBranchCnpjError] = useState<string | null>(null);
   const [branchQuota, setBranchQuota] = useState<{ allowedCreates: number; initialBranchCount: number } | null>(null);
 
   const isBranchMatriz = (branch: any) => {
@@ -629,8 +641,10 @@ export function SettingsPage() {
     }
 
     setEditingBranch(null);
-    setBranchForm({ tradeName: '', address: '', phone: '', type: 'Filial' });
+    setBranchForm({ tradeName: '', address: '', phone: '', type: 'Filial', cnpjs: [] });
     setBranchErrors({});
+    setBranchCnpjDraft({ cnpj: '', label: '' });
+    setBranchCnpjError(null);
     setBranchModalOpen(true);
   };
 
@@ -641,9 +655,47 @@ export function SettingsPage() {
       address: branch.address || '',
       phone: branch.phone || '',
       type: isBranchMatriz(branch) ? 'Matriz' : 'Filial',
+      cnpjs: Array.isArray(branch.cnpjs) ? branch.cnpjs : [],
     });
     setBranchErrors({});
+    setBranchCnpjDraft({ cnpj: '', label: '' });
+    setBranchCnpjError(null);
     setBranchModalOpen(true);
+  };
+
+  const handleAddBranchCnpj = () => {
+    const digits = branchCnpjDraft.cnpj.replace(/\D/g, '');
+    if (!validateCNPJ(digits)) {
+      setBranchCnpjError('CNPJ inválido');
+      return;
+    }
+    if (branchForm.cnpjs.some((entry) => entry.cnpj === digits)) {
+      setBranchCnpjError('Esse CNPJ já foi adicionado');
+      return;
+    }
+    setBranchForm((prev) => ({
+      ...prev,
+      cnpjs: [...prev.cnpjs, { cnpj: digits, label: branchCnpjDraft.label.trim(), isPrimary: prev.cnpjs.length === 0 }],
+    }));
+    setBranchCnpjDraft({ cnpj: '', label: '' });
+    setBranchCnpjError(null);
+  };
+
+  const handleRemoveBranchCnpj = (cnpj: string) => {
+    setBranchForm((prev) => {
+      const remaining = prev.cnpjs.filter((entry) => entry.cnpj !== cnpj);
+      if (remaining.length > 0 && !remaining.some((entry) => entry.isPrimary)) {
+        remaining[0] = { ...remaining[0], isPrimary: true };
+      }
+      return { ...prev, cnpjs: remaining };
+    });
+  };
+
+  const handleSetPrimaryBranchCnpj = (cnpj: string) => {
+    setBranchForm((prev) => ({
+      ...prev,
+      cnpjs: prev.cnpjs.map((entry) => ({ ...entry, isPrimary: entry.cnpj === cnpj })),
+    }));
   };
 
   const [creatingDefaultSectors, setCreatingDefaultSectors] = useState(false);
@@ -694,6 +746,7 @@ export function SettingsPage() {
         phone: branchForm.phone,
         isMatriz: editingBranch ? branchForm.type === 'Matriz' : false,
         type: editingBranch ? branchForm.type : 'Filial',
+        cnpjs: branchForm.cnpjs,
       };
 
       if (editingBranch) {
@@ -1480,20 +1533,68 @@ export function SettingsPage() {
                                     />
                                 {(!editingBranch || (editingBranch && !isBranchMatriz(editingBranch))) && (
                                   <>
-                                    <FloatingInput 
-                                      label="Telefone" 
-                                      value={branchForm.phone} 
-                                      onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })} 
+                                    <FloatingInput
+                                      label="Telefone"
+                                      value={branchForm.phone}
+                                      onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })}
                                       error={branchErrors.phone}
                                     />
-                                    <FloatingInput 
-                                      label="Endereço" 
-                                      value={branchForm.address} 
-                                      onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })} 
+                                    <FloatingInput
+                                      label="Endereço"
+                                      value={branchForm.address}
+                                      onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })}
                                       error={branchErrors.address}
                                     />
                                   </>
                                 )}
+
+                                <Divider label="CNPJs da unidade" labelPosition="left" mt="sm" />
+                                {branchForm.cnpjs.length > 0 ? (
+                                  <Stack gap={6}>
+                                    {branchForm.cnpjs.map((entry) => (
+                                      <Group key={entry.cnpj} justify="space-between" wrap="nowrap" p={8} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                                        <Box style={{ minWidth: 0 }}>
+                                          <Text size="sm" fw={600}>{formatCNPJ(entry.cnpj)}</Text>
+                                          <Text size="xs" c="dimmed">{entry.label || 'Sem apelido'}</Text>
+                                        </Box>
+                                        <Group gap={4} wrap="nowrap">
+                                          {entry.isPrimary ? (
+                                            <Badge size="xs" color="yellow" variant="light" leftSection={<Star size={10} />}>Principal</Badge>
+                                          ) : (
+                                            <ActionIcon variant="light" color="yellow" size="sm" onClick={() => handleSetPrimaryBranchCnpj(entry.cnpj)} title="Tornar principal">
+                                              <Star size={14} />
+                                            </ActionIcon>
+                                          )}
+                                          <ActionIcon variant="light" color="red" size="sm" onClick={() => handleRemoveBranchCnpj(entry.cnpj)}>
+                                            <Trash size={14} />
+                                          </ActionIcon>
+                                        </Group>
+                                      </Group>
+                                    ))}
+                                  </Stack>
+                                ) : (
+                                  <Text size="sm" c="dimmed">Nenhum CNPJ cadastrado ainda.</Text>
+                                )}
+                                <Group align="flex-end" gap="xs" wrap="nowrap">
+                                  <Box style={{ flex: 1 }}>
+                                    <FloatingInput
+                                      label="CNPJ"
+                                      value={branchCnpjDraft.cnpj}
+                                      onChange={(e: any) => { setBranchCnpjDraft((prev) => ({ ...prev, cnpj: e.currentTarget.value })); setBranchCnpjError(null); }}
+                                      error={branchCnpjError || undefined}
+                                    />
+                                  </Box>
+                                  <Box style={{ flex: 1 }}>
+                                    <FloatingInput
+                                      label="Apelido (opcional)"
+                                      placeholder="Ex: Exames"
+                                      value={branchCnpjDraft.label}
+                                      onChange={(e: any) => setBranchCnpjDraft((prev) => ({ ...prev, label: e.currentTarget.value }))}
+                                    />
+                                  </Box>
+                                  <Button variant="light" onClick={handleAddBranchCnpj}>Adicionar</Button>
+                                </Group>
+
                                 <Button fullWidth mt="md" onClick={handleSaveBranch} loading={savingBranch} bg={DARK_BLUE}>{editingBranch ? 'Salvar' : 'Criar'}</Button>
                             </Stack>
                         </Modal>
