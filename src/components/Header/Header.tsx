@@ -16,7 +16,7 @@ import { DARK_BLUE } from '../../themes/theme';
 export function Header() {
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { colorScheme } = useMantineColorScheme();
-  const headerBg = colorScheme === 'dark' ? '#05070f' : DARK_BLUE;
+  const headerBg = colorScheme === 'dark' ? '#08090b' : DARK_BLUE;
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState<any>(() => authService.getCurrentUser());
