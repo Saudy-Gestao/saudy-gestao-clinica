@@ -450,28 +450,49 @@ export function CadastroMedico() {
       .map((p: any) => ({ value: p.id, label: p.name }))
   );
 
-  const updateEspecialidadeGroup = (index: number, patch: Partial<DoctorEspecialidadeGroup>) => {
-    setForm((prev) => ({
-      ...prev,
-      especialidadeGroups: prev.especialidadeGroups.map((group, i) => (i === index ? { ...group, ...patch } : group)),
-    }));
+  const EMPTY_GROUP_DRAFT: DoctorEspecialidadeGroup = { modalidadeId: null, especialidadeId: null, metodos: [], procedimentoIds: [] };
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
+  const [groupDraft, setGroupDraft] = useState<DoctorEspecialidadeGroup>(EMPTY_GROUP_DRAFT);
+  const [groupModalidadeError, setGroupModalidadeError] = useState<string | null>(null);
+
+  const openAddGroupModal = () => {
+    setEditingGroupIndex(null);
+    setGroupDraft(EMPTY_GROUP_DRAFT);
+    setGroupModalidadeError(null);
+    setGroupModalOpen(true);
   };
 
-  const handleGroupModalidadeChange = (index: number, modalidadeId: string | null) => {
+  const openEditGroupModal = (index: number) => {
+    setEditingGroupIndex(index);
+    setGroupDraft({ ...form.especialidadeGroups[index] });
+    setGroupModalidadeError(null);
+    setGroupModalOpen(true);
+  };
+
+  const handleGroupDraftModalidadeChange = (modalidadeId: string | null) => {
     const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
-    updateEspecialidadeGroup(index, {
+    setGroupDraft({
       modalidadeId,
       especialidadeId: especialidade?.id || null,
       metodos: [],
       procedimentoIds: [],
     });
+    setGroupModalidadeError(null);
   };
 
-  const addEspecialidadeGroup = () => {
-    setForm((prev) => ({
-      ...prev,
-      especialidadeGroups: [...prev.especialidadeGroups, { modalidadeId: null, especialidadeId: null, metodos: [], procedimentoIds: [] }],
-    }));
+  const handleSaveGroup = () => {
+    if (!groupDraft.modalidadeId) {
+      setGroupModalidadeError('Selecione uma modalidade');
+      return;
+    }
+    setForm((prev) => {
+      const especialidadeGroups = editingGroupIndex === null
+        ? [...prev.especialidadeGroups, groupDraft]
+        : prev.especialidadeGroups.map((group, i) => (i === editingGroupIndex ? groupDraft : group));
+      return { ...prev, especialidadeGroups };
+    });
+    setGroupModalOpen(false);
   };
 
   const removeEspecialidadeGroup = (index: number) => {
@@ -1154,71 +1175,119 @@ export function CadastroMedico() {
                   />
                 </SimpleGrid>
 
-                <Stack gap="md" mt="md">
-                  <Text size="sm" fw={600}>Modalidades, especialidades e procedimentos</Text>
+                <Stack gap="sm" mt="md">
+                  <Group justify="space-between" align="center">
+                    <Text size="sm" fw={600}>Modalidades, especialidades e procedimentos</Text>
+                    <Button variant="light" size="xs" onClick={openAddGroupModal}>
+                      + Adicionar conjunto
+                    </Button>
+                  </Group>
+
                   {form.especialidadeGroups.length === 0 ? (
-                    <Text size="sm" c="dimmed">Nenhum conjunto cadastrado ainda.</Text>
-                  ) : null}
-                  {form.especialidadeGroups.map((group, index) => {
-                    const especialidade = group.modalidadeId ? especialidadeByModalidadeId.get(group.modalidadeId) : null;
-                    return (
-                      <Paper key={index} withBorder radius="md" p="md">
-                        <Group justify="space-between" align="flex-start" mb="sm">
-                          <Text size="sm" fw={600}>Conjunto {index + 1}</Text>
-                          <ActionIcon variant="light" color="red" size="sm" onClick={() => removeEspecialidadeGroup(index)}>
-                            <Trash size={14} />
-                          </ActionIcon>
-                        </Group>
-                        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                          <FloatingSelect
-                            label="Modalidade"
-                            placeholder="Selecione a modalidade"
-                            data={modalidadeOptions}
-                            value={group.modalidadeId}
-                            searchable
-                            clearable
-                            nothingFoundMessage="Nenhuma modalidade encontrada"
-                            onChange={(value) => handleGroupModalidadeChange(index, value)}
-                          />
-                          <FloatingInput
-                            label="Especialidade"
-                            value={especialidade?.name || ''}
-                            disabled
-                            containerProps={{ opacity: 0.7 }}
-                            placeholder={group.modalidadeId ? 'Modalidade sem especialidade cadastrada' : 'Selecione uma modalidade'}
-                          />
-                        </SimpleGrid>
-                        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                          <FloatingMultiSelect
-                            label="Métodos"
-                            placeholder={!group.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os métodos'}
-                            data={metodoOptionsForModalidade(group.modalidadeId)}
-                            value={group.metodos}
-                            disabled={!group.modalidadeId}
-                            searchable
-                            clearable
-                            nothingFoundMessage="Nenhum método disponível"
-                            onChange={(values) => updateEspecialidadeGroup(index, { metodos: values })}
-                          />
-                          <FloatingMultiSelect
-                            label="Procedimentos"
-                            placeholder={!group.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os procedimentos'}
-                            data={procedureOptionsForModalidade(group.modalidadeId)}
-                            value={group.procedimentoIds}
-                            disabled={!group.modalidadeId}
-                            searchable
-                            clearable
-                            nothingFoundMessage="Nenhum procedimento disponível"
-                            onChange={(values) => updateEspecialidadeGroup(index, { procedimentoIds: values })}
-                          />
-                        </SimpleGrid>
-                      </Paper>
-                    );
-                  })}
-                  <Button variant="light" size="sm" onClick={addEspecialidadeGroup} style={{ alignSelf: 'flex-start' }}>
-                    + Adicionar conjunto
-                  </Button>
+                    <Paper withBorder radius="md" p="md">
+                      <Text size="sm" c="dimmed" ta="center">Nenhum conjunto cadastrado ainda.</Text>
+                    </Paper>
+                  ) : (
+                    <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                      <Table horizontalSpacing="sm" verticalSpacing="sm">
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Modalidade</Table.Th>
+                            <Table.Th>Especialidade</Table.Th>
+                            <Table.Th>Métodos</Table.Th>
+                            <Table.Th>Procedimentos</Table.Th>
+                            <Table.Th style={{ textAlign: 'center', width: 90 }}>Ações</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {form.especialidadeGroups.map((group, index) => {
+                            const especialidade = group.modalidadeId ? especialidadeByModalidadeId.get(group.modalidadeId) : null;
+                            const modalidadeName = modalidadeOptions.find((opt) => opt.value === group.modalidadeId)?.label || '—';
+                            return (
+                              <Table.Tr key={index}>
+                                <Table.Td><Text size="sm">{modalidadeName}</Text></Table.Td>
+                                <Table.Td><Text size="sm" c="dimmed">{especialidade?.name || '—'}</Text></Table.Td>
+                                <Table.Td><Text size="sm" c="dimmed">{group.metodos.length > 0 ? group.metodos.join(', ') : '—'}</Text></Table.Td>
+                                <Table.Td><Text size="sm" c="dimmed">{group.procedimentoIds.length} vinculado(s)</Text></Table.Td>
+                                <Table.Td style={{ textAlign: 'center' }}>
+                                  <Group gap={4} justify="center">
+                                    <ActionIcon variant="light" color="blue" size="sm" onClick={() => openEditGroupModal(index)}>
+                                      <Pencil size={14} />
+                                    </ActionIcon>
+                                    <ActionIcon variant="light" color="red" size="sm" onClick={() => removeEspecialidadeGroup(index)}>
+                                      <Trash size={14} />
+                                    </ActionIcon>
+                                  </Group>
+                                </Table.Td>
+                              </Table.Tr>
+                            );
+                          })}
+                        </Table.Tbody>
+                      </Table>
+                    </Box>
+                  )}
                 </Stack>
+
+                <Modal
+                  opened={groupModalOpen}
+                  onClose={() => setGroupModalOpen(false)}
+                  title={editingGroupIndex === null ? 'Adicionar conjunto' : 'Editar conjunto'}
+                  size={isMobile ? '100%' : 520}
+                  centered
+                  fullScreen={isMobile}
+                >
+                  <Stack gap={10}>
+                    <FloatingSelect
+                      label="Modalidade"
+                      required
+                      placeholder="Selecione a modalidade"
+                      data={modalidadeOptions}
+                      value={groupDraft.modalidadeId}
+                      error={groupModalidadeError || undefined}
+                      searchable
+                      clearable
+                      nothingFoundMessage="Nenhuma modalidade encontrada"
+                      onChange={handleGroupDraftModalidadeChange}
+                    />
+                    <FloatingInput
+                      label="Especialidade"
+                      value={(groupDraft.modalidadeId ? especialidadeByModalidadeId.get(groupDraft.modalidadeId) : null)?.name || ''}
+                      disabled
+                      containerProps={{ opacity: 0.7 }}
+                      placeholder={groupDraft.modalidadeId ? 'Modalidade sem especialidade cadastrada' : 'Selecione uma modalidade'}
+                    />
+                    <FloatingMultiSelect
+                      label="Métodos"
+                      placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os métodos'}
+                      data={metodoOptionsForModalidade(groupDraft.modalidadeId)}
+                      value={groupDraft.metodos}
+                      disabled={!groupDraft.modalidadeId}
+                      searchable
+                      clearable
+                      nothingFoundMessage="Nenhum método disponível"
+                      onChange={(values) => setGroupDraft((prev) => ({ ...prev, metodos: values }))}
+                    />
+                    <FloatingMultiSelect
+                      label="Procedimentos"
+                      placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os procedimentos'}
+                      data={procedureOptionsForModalidade(groupDraft.modalidadeId)}
+                      value={groupDraft.procedimentoIds}
+                      disabled={!groupDraft.modalidadeId}
+                      searchable
+                      clearable
+                      nothingFoundMessage="Nenhum procedimento disponível"
+                      onChange={(values) => setGroupDraft((prev) => ({ ...prev, procedimentoIds: values }))}
+                    />
+                    <Group justify="flex-end" mt={8}>
+                      <Button variant="default" onClick={() => setGroupModalOpen(false)} size="sm">
+                        Cancelar
+                      </Button>
+                      <Button bg={DARK_BLUE} onClick={handleSaveGroup} size="sm">
+                        {editingGroupIndex === null ? 'Cadastrar' : 'Salvar'}
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Modal>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <FloatingMultiSelect
