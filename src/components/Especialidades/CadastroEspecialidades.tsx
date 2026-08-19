@@ -43,8 +43,6 @@ const formatDateTime = (value?: string | null) => {
   return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-type SimilarPendingEntry = { name: string; similar: { id: string; name: string }[] };
-
 function TagInput({
   label,
   placeholder,
@@ -130,15 +128,25 @@ export function CadastroEspecialidades() {
       .map((m: any) => ({ value: m.id, label: m.name }));
   }, [modalidadesQuery.data]);
 
-  // Modal criar (lote)
+  const modalidadeIdsWithEspecialidade = useMemo(
+    () => new Set(items.filter((it) => it.isActive).map((it) => it.modalidadeId)),
+    [items],
+  );
+
+  const createModalidadeOptions = useMemo(
+    () => modalidadeOptions.filter((opt) => !modalidadeIdsWithEspecialidade.has(opt.value)),
+    [modalidadeOptions, modalidadeIdsWithEspecialidade],
+  );
+
+  // Modal criar (item único)
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createModalidadeId, setCreateModalidadeId] = useState<string | null>(null);
   const [modalidadeError, setModalidadeError] = useState<string | null>(null);
-  const [pendingNames, setPendingNames] = useState<string[]>([]);
+  const [createName, setCreateName] = useState('');
+  const [createNameError, setCreateNameError] = useState<string | null>(null);
   const [pendingMetodos, setPendingMetodos] = useState<string[]>([]);
-  const [blockedNames, setBlockedNames] = useState<string[]>([]);
-  const [similarPending, setSimilarPending] = useState<SimilarPendingEntry[]>([]);
+  const [createSimilarWarning, setCreateSimilarWarning] = useState<{ id: string; name: string }[] | null>(null);
 
   // Modal editar (item único)
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -207,10 +215,10 @@ export function CadastroEspecialidades() {
   const resetCreateState = () => {
     setCreateModalidadeId(null);
     setModalidadeError(null);
-    setPendingNames([]);
+    setCreateName('');
+    setCreateNameError(null);
     setPendingMetodos([]);
-    setBlockedNames([]);
-    setSimilarPending([]);
+    setCreateSimilarWarning(null);
   };
 
   const openCreateModal = () => {
@@ -226,80 +234,54 @@ export function CadastroEspecialidades() {
     setEditModalOpen(true);
   };
 
-  const runCreateBatch = async (namesToSubmit: string[], force: boolean) => {
+  const runCreate = async (force: boolean) => {
     if (!createModalidadeId) {
       setModalidadeError('Selecione uma modalidade');
       return;
     }
-    setModalidadeError(null);
-    setCreating(true);
-
-    let createdCount = 0;
-    const stillBlocked: string[] = [];
-    const stillSimilar: SimilarPendingEntry[] = [];
-
-    for (const name of namesToSubmit) {
-      try {
-        await especialidadeService.createEspecialidade({
-          modalidadeId: createModalidadeId,
-          name,
-          metodos: pendingMetodos,
-          force,
-        });
-        createdCount += 1;
-      } catch (err: any) {
-        const errorCode = err?.response?.data?.error;
-        if (errorCode === 'DUPLICATE_EXACT') {
-          stillBlocked.push(name);
-        } else if (errorCode === 'SIMILAR_EXISTS') {
-          stillSimilar.push({ name, similar: err.response.data.similar || [] });
-        } else {
-          showNotification({
-            title: 'Erro',
-            message: resolveApiErrorMessage(err, `Erro ao cadastrar "${name}"`),
-            color: 'red',
-          });
-        }
-      }
-    }
-
-    setCreating(false);
-
-    if (createdCount > 0) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.especialidadesAdmin });
-      showNotification({
-        title: 'Cadastrado',
-        message: `${createdCount} especialidade(s) cadastrada(s) com sucesso`,
-        color: 'green',
-      });
-    }
-
-    const nextBlocked = Array.from(new Set([...blockedNames.filter((n) => !namesToSubmit.includes(n)), ...stillBlocked]));
-    setBlockedNames(nextBlocked);
-    setSimilarPending(stillSimilar);
-    setPendingNames(stillSimilar.map((s) => s.name));
-
-    if (nextBlocked.length === 0 && stillSimilar.length === 0) {
-      setCreateModalOpen(false);
-      resetCreateState();
-    }
-  };
-
-  const handleCreateSubmit = () => {
-    if (pendingNames.length === 0) {
-      setModalidadeError(createModalidadeId ? null : 'Selecione uma modalidade');
-      if (!createModalidadeId) return;
-      showNotification({ title: 'Atenção', message: 'Adicione ao menos uma especialidade', color: 'yellow' });
+    const name = createName.trim();
+    if (!name) {
+      setCreateNameError('Nome é obrigatório');
       return;
     }
-    setBlockedNames([]);
-    runCreateBatch(pendingNames, false);
+    setModalidadeError(null);
+    setCreateNameError(null);
+    setCreateSimilarWarning(null);
+    setCreating(true);
+
+    try {
+      await especialidadeService.createEspecialidade({
+        modalidadeId: createModalidadeId,
+        name,
+        metodos: pendingMetodos,
+        force,
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.especialidadesAdmin });
+      showNotification({ title: 'Cadastrado', message: 'Especialidade cadastrada com sucesso', color: 'green' });
+      setCreateModalOpen(false);
+      resetCreateState();
+    } catch (err: any) {
+      const errorCode = err?.response?.data?.error;
+      if (errorCode === 'DUPLICATE_EXACT') {
+        setCreateNameError('Já existe uma especialidade com esse nome nessa modalidade');
+      } else if (errorCode === 'SIMILAR_EXISTS') {
+        setCreateSimilarWarning(err.response.data.similar || []);
+      } else if (errorCode === 'MODALIDADE_ALREADY_HAS_ESPECIALIDADE') {
+        setModalidadeError('Essa modalidade já tem uma especialidade cadastrada');
+      } else {
+        showNotification({
+          title: 'Erro',
+          message: resolveApiErrorMessage(err, 'Erro ao cadastrar especialidade'),
+          color: 'red',
+        });
+      }
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const handleForceSimilar = () => {
-    const names = similarPending.map((s) => s.name);
-    runCreateBatch(names, true);
-  };
+  const handleCreateSubmit = () => runCreate(false);
+  const handleForceSimilar = () => runCreate(true);
 
   const submitEdit = async (force: boolean) => {
     if (!editingItem) return;
@@ -611,7 +593,7 @@ export function CadastroEspecialidades() {
         )}
       </Box>
 
-      {/* Modal criar (lote) */}
+      {/* Modal criar (item único) */}
       <Modal
         opened={createModalOpen}
         onClose={() => { if (!creating) setCreateModalOpen(false); }}
@@ -625,23 +607,28 @@ export function CadastroEspecialidades() {
             label="Modalidade"
             required
             placeholder="Selecione a modalidade"
-            data={modalidadeOptions}
+            data={createModalidadeOptions}
             value={createModalidadeId}
             error={modalidadeError || undefined}
             searchable
-            nothingFoundMessage="Nenhuma modalidade encontrada"
+            nothingFoundMessage="Todas as modalidades já têm uma especialidade cadastrada"
             onChange={(value) => {
               setCreateModalidadeId(value);
               setModalidadeError(null);
             }}
           />
 
-          <TagInput
+          <FloatingInput
             label="Nome da especialidade"
-            placeholder="Digite e pressione Enter (pode adicionar várias)"
-            tags={pendingNames}
-            onAdd={(value) => setPendingNames((prev) => (prev.includes(value) ? prev : [...prev, value]))}
-            onRemove={(value) => setPendingNames((prev) => prev.filter((n) => n !== value))}
+            required
+            value={createName}
+            error={createNameError || undefined}
+            onChange={(e) => {
+              const value = e?.currentTarget?.value ?? '';
+              setCreateName(value);
+              setCreateNameError(null);
+              setCreateSimilarWarning(null);
+            }}
           />
 
           <TagInput
@@ -652,28 +639,15 @@ export function CadastroEspecialidades() {
             onRemove={(value) => setPendingMetodos((prev) => prev.filter((m) => m !== value))}
           />
 
-          {blockedNames.length > 0 ? (
-            <Paper withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-red-6)' }}>
-              <Text size="sm" fw={600} mb={4}>Já cadastradas nessa modalidade</Text>
-              <Text size="sm" c="dimmed">
-                {blockedNames.map((n) => `"${n}"`).join(', ')}
-              </Text>
-            </Paper>
-          ) : null}
-
-          {similarPending.length > 0 ? (
+          {createSimilarWarning && createSimilarWarning.length > 0 ? (
             <Paper withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-yellow-6)' }}>
-              <Text size="sm" fw={600} mb={4}>Especialidades parecidas encontradas</Text>
-              <Stack gap={4} mb="sm">
-                {similarPending.map((entry) => (
-                  <Text key={entry.name} size="sm" c="dimmed">
-                    {`"${entry.name}" parece com: ${entry.similar.map((s) => `"${s.name}"`).join(', ')}`}
-                  </Text>
-                ))}
-              </Stack>
+              <Text size="sm" fw={600} mb={4}>Especialidade parecida encontrada</Text>
+              <Text size="sm" c="dimmed" mb="sm">
+                {`Já existe: ${createSimilarWarning.map((s) => `"${s.name}"`).join(', ')}. Deseja cadastrar mesmo assim?`}
+              </Text>
               <Group justify="flex-end">
-                <Button variant="default" size="xs" onClick={() => { setSimilarPending([]); setPendingNames([]); }}>
-                  Descartar
+                <Button variant="default" size="xs" onClick={() => setCreateSimilarWarning(null)}>
+                  Revisar nome
                 </Button>
                 <Button color="yellow" size="xs" onClick={handleForceSimilar} loading={creating}>
                   Cadastrar mesmo assim
