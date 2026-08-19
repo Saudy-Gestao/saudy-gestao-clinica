@@ -43,6 +43,7 @@ import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
+import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 
@@ -112,6 +113,13 @@ const getApiList = (response: unknown): ApiRecord[] => {
   return [];
 };
 
+interface DoctorEspecialidadeGroup {
+  modalidadeId: string | null;
+  especialidadeId: string | null;
+  metodos: string[];
+  procedimentoIds: string[];
+}
+
 interface DoctorForm {
   nome: string;
   crmType: string;
@@ -142,9 +150,7 @@ interface DoctorForm {
     hoursStart: string;
     hoursEnd: string;
   }>;
-  especialidadeIds: string[];
-  modalidadeIds: string[];
-  metodos: string[];
+  especialidadeGroups: DoctorEspecialidadeGroup[];
   branchIds: string[];
   appointmentDurations: number[];
 }
@@ -255,9 +261,7 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   zipCode: '',
   isActive: true,
   workingSchedules: [],
-  especialidadeIds: [],
-  modalidadeIds: [],
-  metodos: [],
+  especialidadeGroups: [],
   branchIds: [],
   appointmentDurations: [],
 };
@@ -399,6 +403,7 @@ export function CadastroMedico() {
   const especialidadesQuery = useEspecialidadesAdminQuery();
   const modalidadesQuery = useModalidadesAdminQuery();
   const branchesQuery = useSettingsBranchesQuery();
+  const proceduresQuery = useProceduresAdminQuery();
 
   const especialidadeList = useMemo(() => {
     const data: any = especialidadesQuery.data;
@@ -412,21 +417,16 @@ export function CadastroMedico() {
     return list.filter((m: any) => m?.id && m.isActive).map((m: any) => ({ value: m.id, label: m.name }));
   }, [modalidadesQuery.data]);
 
-  const especialidadeOptions = useMemo(() => {
-    const selectedModalidades = new Set(form.modalidadeIds);
-    return especialidadeList
-      .filter((e: any) => selectedModalidades.has(e.modalidadeId))
-      .map((e: any) => ({ value: e.id, label: e.name }));
-  }, [especialidadeList, form.modalidadeIds]);
+  const procedureList = useMemo(() => {
+    const list: any[] = Array.isArray(proceduresQuery.data) ? proceduresQuery.data : [];
+    return list.filter((p: any) => p?.id && p.isActive !== false);
+  }, [proceduresQuery.data]);
 
-  useEffect(() => {
-    const allowed = new Set(especialidadeOptions.map((opt) => opt.value));
-    setForm((prev) => {
-      const filtered = prev.especialidadeIds.filter((id) => allowed.has(id));
-      if (filtered.length === prev.especialidadeIds.length) return prev;
-      return { ...prev, especialidadeIds: filtered };
-    });
-  }, [especialidadeOptions]);
+  const especialidadeByModalidadeId = useMemo(() => {
+    const map = new Map<string, any>();
+    especialidadeList.forEach((e: any) => map.set(e.modalidadeId, e));
+    return map;
+  }, [especialidadeList]);
 
   const branchOptions = useMemo(() => {
     const data: any = branchesQuery.data;
@@ -438,24 +438,48 @@ export function CadastroMedico() {
       .map((b: any) => ({ value: String(b.id), label: b.tradeName || b.socialName || 'Filial sem nome' }));
   }, [branchesQuery.data]);
 
-  const metodoOptions = useMemo(() => {
-    const selected = new Set(form.especialidadeIds);
-    const metodos = new Set<string>();
-    especialidadeList.forEach((e: any) => {
-      if (!selected.has(e.id)) return;
-      (Array.isArray(e.metodos) ? e.metodos : []).forEach((m: string) => metodos.add(m));
-    });
-    return Array.from(metodos).map((m) => ({ value: m, label: m }));
-  }, [especialidadeList, form.especialidadeIds]);
+  const metodoOptionsForModalidade = (modalidadeId: string | null) => {
+    const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
+    const metodos: string[] = Array.isArray(especialidade?.metodos) ? especialidade.metodos : [];
+    return metodos.map((m) => ({ value: m, label: m }));
+  };
 
-  useEffect(() => {
-    const allowed = new Set(metodoOptions.map((opt) => opt.value));
-    setForm((prev) => {
-      const filtered = prev.metodos.filter((m) => allowed.has(m));
-      if (filtered.length === prev.metodos.length) return prev;
-      return { ...prev, metodos: filtered };
+  const procedureOptionsForModalidade = (modalidadeId: string | null) => (
+    procedureList
+      .filter((p: any) => p.modalidadeId === modalidadeId)
+      .map((p: any) => ({ value: p.id, label: p.name }))
+  );
+
+  const updateEspecialidadeGroup = (index: number, patch: Partial<DoctorEspecialidadeGroup>) => {
+    setForm((prev) => ({
+      ...prev,
+      especialidadeGroups: prev.especialidadeGroups.map((group, i) => (i === index ? { ...group, ...patch } : group)),
+    }));
+  };
+
+  const handleGroupModalidadeChange = (index: number, modalidadeId: string | null) => {
+    const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
+    updateEspecialidadeGroup(index, {
+      modalidadeId,
+      especialidadeId: especialidade?.id || null,
+      metodos: [],
+      procedimentoIds: [],
     });
-  }, [metodoOptions]);
+  };
+
+  const addEspecialidadeGroup = () => {
+    setForm((prev) => ({
+      ...prev,
+      especialidadeGroups: [...prev.especialidadeGroups, { modalidadeId: null, especialidadeId: null, metodos: [], procedimentoIds: [] }],
+    }));
+  };
+
+  const removeEspecialidadeGroup = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      especialidadeGroups: prev.especialidadeGroups.filter((_, i) => i !== index),
+    }));
+  };
 
   const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
@@ -601,9 +625,17 @@ export function CadastroMedico() {
       zipCode: getString(raw.zipCode),
       isActive: getBoolean(raw.isActive, true),
       workingSchedules,
-      especialidadeIds: Array.isArray(raw.especialidadeIds) ? (raw.especialidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
-      modalidadeIds: Array.isArray(raw.modalidadeIds) ? (raw.modalidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
-      metodos: Array.isArray(raw.metodos) ? (raw.metodos as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+      especialidadeGroups: Array.isArray(raw.especialidadeGroups)
+        ? (raw.especialidadeGroups as unknown[]).map((item: unknown) => {
+          const groupRecord = isRecord(item) ? item : {};
+          return {
+            modalidadeId: getString(groupRecord.modalidadeId) || null,
+            especialidadeId: getString(groupRecord.especialidadeId) || null,
+            metodos: Array.isArray(groupRecord.metodos) ? (groupRecord.metodos as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+            procedimentoIds: Array.isArray(groupRecord.procedimentoIds) ? (groupRecord.procedimentoIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+          };
+        })
+        : [],
       branchIds: Array.isArray(raw.branchIds) ? (raw.branchIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
       appointmentDurations: Array.isArray(raw.appointmentDurations)
         ? (raw.appointmentDurations as unknown[]).map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0)
@@ -772,8 +804,8 @@ export function CadastroMedico() {
 
       // Especialidade principal foi removida da tela; deriva um rótulo a partir
       // das especialidades vinculadas pra manter os consumidores legados (busca, BI) funcionando.
-      const derivedSpecialty = form.especialidadeIds
-        .map((id) => especialidadeOptions.find((opt) => opt.value === id)?.label)
+      const derivedSpecialty = form.especialidadeGroups
+        .map((group) => especialidadeList.find((e: any) => e.id === group.especialidadeId)?.name)
         .filter(Boolean)
         .join(', ') || form.specialty || '';
 
@@ -808,9 +840,7 @@ export function CadastroMedico() {
         workingDays: Array.from(allDays),
         workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
-        especialidadeIds: form.especialidadeIds,
-        modalidadeIds: form.modalidadeIds,
-        metodos: form.metodos,
+        especialidadeGroups: form.especialidadeGroups.filter((group) => group.modalidadeId),
         branchIds: form.branchIds,
         appointmentDurations: form.appointmentDurations,
       };
@@ -1124,42 +1154,73 @@ export function CadastroMedico() {
                   />
                 </SimpleGrid>
 
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingMultiSelect
-                    label="Modalidades"
-                    placeholder="Selecione as modalidades"
-                    data={modalidadeOptions}
-                    value={form.modalidadeIds}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhuma modalidade encontrada"
-                    onChange={(values) => setForm((prev) => ({ ...prev, modalidadeIds: values }))}
-                  />
-                  <FloatingMultiSelect
-                    label="Especialidades"
-                    placeholder={form.modalidadeIds.length === 0 ? 'Selecione uma modalidade primeiro' : 'Selecione as especialidades'}
-                    data={especialidadeOptions}
-                    value={form.especialidadeIds}
-                    disabled={form.modalidadeIds.length === 0}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhuma especialidade encontrada"
-                    onChange={(values) => setForm((prev) => ({ ...prev, especialidadeIds: values }))}
-                  />
-                </SimpleGrid>
+                <Stack gap="md" mt="md">
+                  <Text size="sm" fw={600}>Modalidades, especialidades e procedimentos</Text>
+                  {form.especialidadeGroups.length === 0 ? (
+                    <Text size="sm" c="dimmed">Nenhum conjunto cadastrado ainda.</Text>
+                  ) : null}
+                  {form.especialidadeGroups.map((group, index) => {
+                    const especialidade = group.modalidadeId ? especialidadeByModalidadeId.get(group.modalidadeId) : null;
+                    return (
+                      <Paper key={index} withBorder radius="md" p="md">
+                        <Group justify="space-between" align="flex-start" mb="sm">
+                          <Text size="sm" fw={600}>Conjunto {index + 1}</Text>
+                          <ActionIcon variant="light" color="red" size="sm" onClick={() => removeEspecialidadeGroup(index)}>
+                            <Trash size={14} />
+                          </ActionIcon>
+                        </Group>
+                        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                          <FloatingSelect
+                            label="Modalidade"
+                            placeholder="Selecione a modalidade"
+                            data={modalidadeOptions}
+                            value={group.modalidadeId}
+                            searchable
+                            clearable
+                            nothingFoundMessage="Nenhuma modalidade encontrada"
+                            onChange={(value) => handleGroupModalidadeChange(index, value)}
+                          />
+                          <FloatingInput
+                            label="Especialidade"
+                            value={especialidade?.name || ''}
+                            disabled
+                            containerProps={{ opacity: 0.7 }}
+                            placeholder={group.modalidadeId ? 'Modalidade sem especialidade cadastrada' : 'Selecione uma modalidade'}
+                          />
+                        </SimpleGrid>
+                        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                          <FloatingMultiSelect
+                            label="Métodos"
+                            placeholder={!group.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os métodos'}
+                            data={metodoOptionsForModalidade(group.modalidadeId)}
+                            value={group.metodos}
+                            disabled={!group.modalidadeId}
+                            searchable
+                            clearable
+                            nothingFoundMessage="Nenhum método disponível"
+                            onChange={(values) => updateEspecialidadeGroup(index, { metodos: values })}
+                          />
+                          <FloatingMultiSelect
+                            label="Procedimentos"
+                            placeholder={!group.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os procedimentos'}
+                            data={procedureOptionsForModalidade(group.modalidadeId)}
+                            value={group.procedimentoIds}
+                            disabled={!group.modalidadeId}
+                            searchable
+                            clearable
+                            nothingFoundMessage="Nenhum procedimento disponível"
+                            onChange={(values) => updateEspecialidadeGroup(index, { procedimentoIds: values })}
+                          />
+                        </SimpleGrid>
+                      </Paper>
+                    );
+                  })}
+                  <Button variant="light" size="sm" onClick={addEspecialidadeGroup} style={{ alignSelf: 'flex-start' }}>
+                    + Adicionar conjunto
+                  </Button>
+                </Stack>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingMultiSelect
-                    label="Métodos"
-                    placeholder={form.especialidadeIds.length === 0 ? 'Selecione uma especialidade primeiro' : 'Selecione os métodos'}
-                    data={metodoOptions}
-                    value={form.metodos}
-                    disabled={form.especialidadeIds.length === 0}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhum método disponível"
-                    onChange={(values) => setForm((prev) => ({ ...prev, metodos: values }))}
-                  />
                   <FloatingMultiSelect
                     label="Unidades atendidas"
                     placeholder="Selecione as unidades"
@@ -1170,9 +1231,6 @@ export function CadastroMedico() {
                     nothingFoundMessage="Nenhuma unidade encontrada"
                     onChange={(values) => setForm((prev) => ({ ...prev, branchIds: values }))}
                   />
-                </SimpleGrid>
-
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <DurationTagInput
                     label="Tempo de atendimento (minutos)"
                     placeholder="Digite e pressione Enter"

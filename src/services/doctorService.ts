@@ -33,9 +33,12 @@ export interface CreateDoctorPayload {
     hoursStart: string;
     hoursEnd: string;
   }>;
-  especialidadeIds?: string[];
-  modalidadeIds?: string[];
-  metodos?: string[];
+  especialidadeGroups?: Array<{
+    modalidadeId: string | null;
+    especialidadeId: string | null;
+    metodos: string[];
+    procedimentoIds: string[];
+  }>;
   branchIds?: string[];
   appointmentDurations?: number[];
 }
