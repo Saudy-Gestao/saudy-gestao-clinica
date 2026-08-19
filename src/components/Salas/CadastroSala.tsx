@@ -25,7 +25,6 @@ import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import sectorService from '../../services/sectorService';
-import doctorService from '../../services/doctorService';
 import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
@@ -35,7 +34,6 @@ import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
-import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -54,18 +52,9 @@ interface SalaRow {
   workingDays: string[];
   workingHoursStart?: string | null;
   workingHoursEnd?: string | null;
-  doctorIds?: string[];
-  doctorNames?: string[];
   modalidadeId?: string | null;
   especialidadeId?: string | null;
   capacity?: number | null;
-}
-
-interface DoctorOption {
-  value: string;
-  label: string;
-  branchId: string;
-  roomIds: string[];
 }
 
 type RoomMapStatus = 'EM_USO' | 'ALTA_DEMANDA' | 'MODERADA' | 'LIVRE';
@@ -118,29 +107,6 @@ const getRoomMapStatusMeta = (status: RoomMapStatus) => {
   return { label: 'Livre', color: 'gray' as const };
 };
 
-const normalizeDoctorOptions = (data: any): DoctorOption[] => {
-  const list: any[] = Array.isArray(data)
-    ? data
-    : (Array.isArray(data?.items)
-      ? data.items
-      : (Array.isArray(data?.data?.items)
-        ? data.data.items
-        : (Array.isArray(data?.data)
-          ? data.data
-          : [])));
-
-  return list
-    .map((doctor: any) => ({
-      value: String(doctor?.id || ''),
-      label: doctor?.name || 'Médico sem nome',
-      branchId: String(doctor?.branchId || ''),
-      roomIds: Array.isArray(doctor?.roomIds)
-        ? doctor.roomIds.map((roomId: any) => String(roomId || '').trim()).filter(Boolean)
-        : (doctor?.roomId ? [String(doctor.roomId)] : []),
-    }))
-    .filter((doctor: DoctorOption) => Boolean(doctor.value));
-};
-
 const WEEKDAY_OPTIONS = [
   { value: 'segunda', label: 'Segunda' },
   { value: 'terca', label: 'Terça' },
@@ -162,7 +128,6 @@ export function CadastroSala() {
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [items, setItems] = useState<SalaRow[]>([]);
-  const [doctorOptions, setDoctorOptions] = useState<DoctorOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -173,7 +138,6 @@ export function CadastroSala() {
   const [deleting, setDeleting] = useState(false);
   const roomsQuery = useRoomsAdminQuery();
   const branchesQuery = useSettingsBranchesQuery();
-  const doctorsQuery = useDoctorsAdminQuery();
   const appointmentsQuery = useAppointmentsQuery();
   const clinicalQueueQuery = useClinicalQueueQuery();
   const modalidadesQuery = useModalidadesAdminQuery();
@@ -183,7 +147,6 @@ export function CadastroSala() {
     name: '',
     description: '',
     branchId: '',
-    doctorIds: [] as string[],
     workingDays: [] as string[],
     workingHoursStart: '',
     workingHoursEnd: '',
@@ -217,36 +180,14 @@ export function CadastroSala() {
     }, {});
   }, [branches]);
 
-  const linkedDoctorsByRoomId = useMemo(() => {
-    return doctorOptions.reduce<Record<string, DoctorOption[]>>((acc, doctor) => {
-      for (const roomId of doctor.roomIds) {
-        if (!acc[roomId]) acc[roomId] = [];
-        acc[roomId].push(doctor);
-      }
-      return acc;
-    }, {} as Record<string, DoctorOption[]>);
-  }, [doctorOptions]);
-
-  const displayItems = useMemo(() => {
-    return items.map((item) => {
-      const linkedDoctors = linkedDoctorsByRoomId[item.id] || [];
-      return {
-        ...item,
-        doctorIds: linkedDoctors.map((doctor) => doctor.value),
-        doctorNames: linkedDoctors.map((doctor) => doctor.label),
-      };
-    });
-  }, [items, linkedDoctorsByRoomId]);
-
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return displayItems;
-    return displayItems.filter((it) => (
+    if (!q) return items;
+    return items.filter((it) => (
       it.name.toLowerCase().includes(q)
       || (it.description || '').toLowerCase().includes(q)
-      || (it.doctorNames || []).some((doctorName) => doctorName.toLowerCase().includes(q))
     ));
-  }, [displayItems, query]);
+  }, [items, query]);
 
   const roomMapItems = useMemo<RoomMapItem[]>(() => {
     const todayKey = dayjs().format('YYYY-MM-DD');
@@ -307,7 +248,7 @@ export function CadastroSala() {
       return acc;
     }, {});
 
-    return displayItems
+    return items
       .map((room) => {
         const roomId = room.id;
         const stats = roomStatsById[roomId] || {
@@ -348,7 +289,7 @@ export function CadastroSala() {
         if (b.upcomingToday !== a.upcomingToday) return b.upcomingToday - a.upcomingToday;
         return a.roomName.localeCompare(b.roomName, 'pt-BR');
       });
-  }, [appointmentsQuery.data, clinicalQueueQuery.data, displayItems]);
+  }, [appointmentsQuery.data, clinicalQueueQuery.data, items]);
 
   const roomMapSummary = useMemo(() => {
     return roomMapItems.reduce((acc, item) => {
@@ -430,8 +371,6 @@ export function CadastroSala() {
           : [],
         workingHoursStart: sector.workingHoursStart || null,
         workingHoursEnd: sector.workingHoursEnd || null,
-        doctorIds: [],
-        doctorNames: [],
         modalidadeId: sector.modalidadeId || null,
         especialidadeId: sector.especialidadeId || null,
         capacity: sector.capacity ?? null,
@@ -440,33 +379,13 @@ export function CadastroSala() {
     setItems(mapped);
   }, [roomsQuery.data, selectedBranchId]);
 
-  useEffect(() => {
-    if (!doctorsQuery.error) return;
-    const err: any = doctorsQuery.error;
-    setDoctorOptions([]);
-    showNotification({
-      title: 'Erro ao carregar médicos',
-      message: resolveApiErrorMessage(err, 'A lista de médicos não pôde ser carregada.'),
-      color: 'red',
-    });
-  }, [doctorsQuery.error]);
-
-  useEffect(() => {
-    setDoctorOptions(normalizeDoctorOptions(doctorsQuery.data));
-  }, [doctorsQuery.data]);
-  const availableDoctorOptions = useMemo(() => {
-    return doctorOptions.map((doctor) => ({ value: doctor.value, label: doctor.label }));
-  }, [doctorOptions]);
-
   const openModal = (item?: SalaRow) => {
     if (item) {
-      const linkedDoctors = linkedDoctorsByRoomId[item.id] || [];
       setEditingId(item.id);
       setForm({
         name: item.name || '',
         description: item.description || '',
         branchId: item.branchId || selectedBranchId || '',
-        doctorIds: linkedDoctors.map((doctor) => doctor.value),
         workingDays: Array.isArray(item.workingDays) ? item.workingDays : [],
         workingHoursStart: String(item.workingHoursStart || ''),
         workingHoursEnd: String(item.workingHoursEnd || ''),
@@ -480,7 +399,6 @@ export function CadastroSala() {
         name: '',
         description: '',
         branchId: selectedBranchId || '',
-        doctorIds: [],
         workingDays: [],
         workingHoursStart: '',
         workingHoursEnd: '',
@@ -495,38 +413,6 @@ export function CadastroSala() {
   const handleModalidadeChange = (modalidadeId: string | null) => {
     const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
     setForm((prev) => ({ ...prev, modalidadeId: modalidadeId || '', especialidadeId: especialidade?.id || '' }));
-  };
-
-  const syncRoomDoctors = async (roomId: string, nextDoctorIds: string[]) => {
-    const selectedIds = Array.from(new Set(nextDoctorIds.filter(Boolean)));
-    const currentDoctors = doctorOptions.filter((doctor) => doctor.roomIds.includes(roomId));
-    const doctorsToSync = doctorOptions.filter((doctor) =>
-      currentDoctors.some((item) => item.value === doctor.value) || selectedIds.includes(doctor.value),
-    );
-
-    for (const doctor of doctorsToSync) {
-      const nextRoomIds = selectedIds.includes(doctor.value)
-        ? Array.from(new Set([...doctor.roomIds.filter(Boolean), roomId]))
-        : doctor.roomIds.filter((linkedRoomId) => linkedRoomId !== roomId);
-
-      await doctorService.updateDoctor(doctor.value, {
-        roomIds: nextRoomIds,
-        roomId: nextRoomIds[0] || null,
-      });
-    }
-
-    setDoctorOptions((prev) => prev.map((doctor) => {
-      if (!doctorsToSync.some((item) => item.value === doctor.value)) return doctor;
-
-      const nextRoomIds = selectedIds.includes(doctor.value)
-        ? Array.from(new Set([...doctor.roomIds.filter(Boolean), roomId]))
-        : doctor.roomIds.filter((linkedRoomId) => linkedRoomId !== roomId);
-
-      return {
-        ...doctor,
-        roomIds: nextRoomIds,
-      };
-    }));
   };
 
   const handleSave = async () => {
@@ -591,19 +477,15 @@ export function CadastroSala() {
       }
 
       if (!roomId) {
-        throw new Error('Não foi possível identificar a sala salva para vincular o médico.');
+        throw new Error('Não foi possível identificar a sala salva.');
       }
 
-      await syncRoomDoctors(roomId, form.doctorIds || []);
       await queryClient.invalidateQueries({ queryKey: queryKeys.roomsAdmin });
-      const selectedDoctors = doctorOptions.filter((doctor) => (form.doctorIds || []).includes(doctor.value));
 
       setItems((prev) => prev.map((item) => {
         if (item.id === roomId) {
           return {
             ...item,
-            doctorIds: selectedDoctors.map((doctor) => doctor.value),
-            doctorNames: selectedDoctors.map((doctor) => doctor.label),
             modalidadeId: payload.modalidadeId,
             especialidadeId: payload.especialidadeId,
             capacity: payload.capacity,
@@ -619,7 +501,6 @@ export function CadastroSala() {
         name: '',
         description: '',
         branchId: selectedBranchId || '',
-        doctorIds: [],
         workingDays: [],
         workingHoursStart: '',
         workingHoursEnd: '',
@@ -744,7 +625,6 @@ export function CadastroSala() {
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Nome da sala</Table.Th>
-                        <Table.Th>Médicos vinculados</Table.Th>
                         <Table.Th>Descrição</Table.Th>
                         <Table.Th>Filial</Table.Th>
                         <Table.Th>Ações</Table.Th>
@@ -785,9 +665,6 @@ export function CadastroSala() {
                           <Stack gap={4} style={{ flex: 1 }}>
                             <Text fw={600}>{item.name}</Text>
                             <Text size="sm" c="dimmed">{branchLabelById[item.branchId] || '-'}</Text>
-                            <Text size="sm" c="dimmed">
-                              {(item.doctorNames || []).length > 0 ? `${item.doctorNames?.length} médico(s) vinculados` : 'Sem médicos vinculados'}
-                            </Text>
                             {item.description ? (
                               <Text size="sm" c="dimmed" lineClamp={2}>{item.description}</Text>
                             ) : null}
@@ -819,7 +696,6 @@ export function CadastroSala() {
                     <Table.Thead>
                       <Table.Tr style={{ borderBottom: 'none' }}>
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
-                        {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Médicos vinculados</Table.Th>}
                         {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
                         {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
                         <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
@@ -831,24 +707,6 @@ export function CadastroSala() {
                           <Table.Td>
                             <Text fw={600}>{item.name}</Text>
                           </Table.Td>
-                          {!isMobile && (
-                            <Table.Td>
-                              {(item.doctorNames || []).length > 0 ? (
-                                <Group gap={6}>
-                                  {(item.doctorNames || []).slice(0, 2).map((doctorName) => (
-                                    <Badge key={doctorName} variant="light" color="blue" size="sm">
-                                      {doctorName}
-                                    </Badge>
-                                  ))}
-                                  {(item.doctorNames || []).length > 2 ? (
-                                    <Text size="xs" c="dimmed">+{(item.doctorNames || []).length - 2}</Text>
-                                  ) : null}
-                                </Group>
-                              ) : (
-                                <Text c="dimmed">-</Text>
-                              )}
-                            </Table.Td>
-                          )}
                           {!isMobile && <Table.Td><Text c="dimmed" lineClamp={2}>{item.description || '-'}</Text></Table.Td>}
                           {!isTablet && <Table.Td><Text c="dimmed">{branchLabelById[item.branchId] || '-'}</Text></Table.Td>}
                           <Table.Td>
@@ -1007,15 +865,6 @@ export function CadastroSala() {
               setForm((prev) => ({ ...prev, name: value }));
             }}
             required
-          />
-          <FloatingMultiSelect
-            label="Médicos vinculados"
-            value={form.doctorIds}
-            onChange={(values) => setForm((prev) => ({ ...prev, doctorIds: values }))}
-            data={availableDoctorOptions}
-            searchable
-            clearable
-            nothingFoundMessage="Nenhum médico encontrado para esta filial"
           />
           <Group grow>
             <FloatingSelect
