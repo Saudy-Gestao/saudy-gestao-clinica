@@ -14,6 +14,8 @@ import {
   Paper,
   Skeleton,
   Menu,
+  Stepper,
+  Divider,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical } from 'lucide-react';
@@ -75,6 +77,8 @@ const toDateInputValue = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
+const genKey = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
 interface AgendaFormState {
   branchId: string;
   doctorId: string;
@@ -96,6 +100,35 @@ const EMPTY_FORM: AgendaFormState = {
   shiftEnd: '',
   especialidadeId: '',
   roomId: '',
+  startDate: '',
+  endDate: '',
+  status: 'ATIVA',
+};
+
+interface ConjuntoDraft {
+  key: string;
+  roomId: string;
+  roomName: string;
+  especialidadeId: string | null;
+  especialidadeName: string | null;
+  weekday: string;
+  shiftStart: string;
+  shiftEnd: string;
+  startDate: string;
+  endDate: string;
+  status: AgendaFormState['status'];
+  error?: string;
+}
+
+const EMPTY_DRAFT: ConjuntoDraft = {
+  key: '',
+  roomId: '',
+  roomName: '',
+  especialidadeId: null,
+  especialidadeName: null,
+  weekday: '',
+  shiftStart: '',
+  shiftEnd: '',
   startDate: '',
   endDate: '',
   status: 'ATIVA',
@@ -144,18 +177,27 @@ export function CadastroAgendas() {
     return Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [];
   };
 
-  const especialidadeOptionsForDoctor = (doctorId: string) => especialidadeGroupsForDoctor(doctorId)
-    .map((g: any) => especialidadeById.get(g.especialidadeId))
-    .filter(Boolean)
-    .map((e: any) => ({ value: e.id, label: e.name }));
+  const doctorModalidadeIds = (doctorId: string) => {
+    const groups = especialidadeGroupsForDoctor(doctorId);
+    return new Set(groups.map((g: any) => g.modalidadeId).filter(Boolean));
+  };
 
-  const roomOptionsForBranch = (branchId: string, especialidadeId: string) => {
-    const especialidade = especialidadeId ? especialidadeById.get(especialidadeId) : null;
-    const modalidadeId = especialidade?.modalidadeId || null;
+  // Only rooms whose modalidade matches one of the professional's registered conjuntos.
+  const roomOptionsForDoctorInBranch = (branchId: string, doctorId: string) => {
+    const modalidadeIds = doctorModalidadeIds(doctorId);
     return roomList
       .filter((r: any) => r.branchId === branchId)
-      .filter((r: any) => !modalidadeId || !r.modalidadeId || r.modalidadeId === modalidadeId)
+      .filter((r: any) => r.modalidadeId && modalidadeIds.has(r.modalidadeId))
       .map((r: any) => ({ value: r.id, label: r.name }));
+  };
+
+  const deriveEspecialidadeForRoom = (doctorId: string, roomId: string): { especialidadeId: string | null; especialidadeName: string | null } => {
+    const room = roomList.find((r: any) => r.id === roomId);
+    if (!room?.modalidadeId) return { especialidadeId: null, especialidadeName: null };
+    const group = especialidadeGroupsForDoctor(doctorId).find((g: any) => g.modalidadeId === room.modalidadeId);
+    if (!group) return { especialidadeId: null, especialidadeName: null };
+    const esp = especialidadeById.get(group.especialidadeId);
+    return { especialidadeId: group.especialidadeId || null, especialidadeName: esp?.name || null };
   };
 
   const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
@@ -190,6 +232,7 @@ export function CadastroAgendas() {
     }
   }, [agendasQuery.error]);
 
+  // --- Single-record edit modal (existing agendas only; creation goes through the wizard below) ---
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AgendaFormState>(EMPTY_FORM);
@@ -199,13 +242,6 @@ export function CadastroAgendas() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Agenda | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  const openCreateModal = () => {
-    setEditingId(null);
-    setForm({ ...EMPTY_FORM, branchId: filterBranchId || '' });
-    setFormError(null);
-    setModalOpen(true);
-  };
 
   const openEditModal = (item: Agenda) => {
     setEditingId(item.id);
@@ -233,8 +269,9 @@ export function CadastroAgendas() {
     setForm((prev) => ({ ...prev, doctorId: doctorId || '', especialidadeId: '', roomId: '' }));
   };
 
-  const handleEspecialidadeChange = (especialidadeId: string | null) => {
-    setForm((prev) => ({ ...prev, especialidadeId: especialidadeId || '', roomId: '' }));
+  const handleFormRoomChange = (roomId: string | null) => {
+    const { especialidadeId } = deriveEspecialidadeForRoom(form.doctorId, roomId || '');
+    setForm((prev) => ({ ...prev, roomId: roomId || '', especialidadeId: especialidadeId || '' }));
   };
 
   const handleSave = async () => {
@@ -266,9 +303,6 @@ export function CadastroAgendas() {
       if (editingId) {
         await agendaService.updateAgenda(editingId, payload);
         showNotification({ title: 'Atualizada', message: 'Agenda atualizada com sucesso', color: 'green' });
-      } else {
-        await agendaService.createAgenda(payload);
-        showNotification({ title: 'Cadastrada', message: 'Agenda cadastrada com sucesso', color: 'green' });
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
       setModalOpen(false);
@@ -299,6 +333,196 @@ export function CadastroAgendas() {
     }
   };
 
+  // --- Creation wizard: Unidade/Profissional -> Sala -> Turno, with a staging mini-grid for multiple conjuntos ---
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
+  const [wizardBranchId, setWizardBranchId] = useState('');
+  const [wizardDoctorId, setWizardDoctorId] = useState('');
+  const [draft, setDraft] = useState<ConjuntoDraft>(EMPTY_DRAFT);
+  const [conjuntos, setConjuntos] = useState<ConjuntoDraft[]>([]);
+  const [wizardError, setWizardError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openWizard = () => {
+    setWizardStep(0);
+    setWizardBranchId(filterBranchId || '');
+    setWizardDoctorId('');
+    setDraft(EMPTY_DRAFT);
+    setConjuntos([]);
+    setWizardError(null);
+    setWizardOpen(true);
+  };
+
+  const closeWizard = () => { if (!submitting) setWizardOpen(false); };
+
+  const handleWizardBranchChange = (branchId: string | null) => {
+    setWizardBranchId(branchId || '');
+    setWizardDoctorId('');
+    setDraft(EMPTY_DRAFT);
+    setConjuntos([]);
+    setWizardError(null);
+  };
+
+  const handleWizardDoctorChange = (doctorId: string | null) => {
+    setWizardDoctorId(doctorId || '');
+    setDraft(EMPTY_DRAFT);
+    setConjuntos([]);
+    setWizardError(null);
+  };
+
+  const handleDraftRoomChange = (roomId: string | null) => {
+    const room = roomList.find((r: any) => r.id === roomId);
+    const { especialidadeId, especialidadeName } = deriveEspecialidadeForRoom(wizardDoctorId, roomId || '');
+    setDraft((prev) => ({ ...prev, roomId: roomId || '', roomName: room?.name || '', especialidadeId, especialidadeName }));
+  };
+
+  const goToStep0 = () => { setWizardError(null); setWizardStep(0); };
+  const goToStep1 = () => {
+    if (!wizardBranchId || !wizardDoctorId) { setWizardError('Selecione a unidade e o profissional'); return; }
+    setWizardError(null);
+    setWizardStep(1);
+  };
+  const goToStep2 = () => {
+    if (!draft.roomId) { setWizardError('Selecione a sala'); return; }
+    setWizardError(null);
+    setWizardStep(2);
+  };
+
+  const addConjunto = () => {
+    if (!draft.weekday || !draft.shiftStart || !draft.shiftEnd) {
+      setWizardError('Preencha o dia da semana e o turno');
+      return;
+    }
+    if (draft.shiftEnd <= draft.shiftStart) {
+      setWizardError('O fim do turno deve ser maior que o início');
+      return;
+    }
+    setWizardError(null);
+    setConjuntos((prev) => [...prev, { ...draft, key: genKey() }]);
+    setDraft(EMPTY_DRAFT);
+    setWizardStep(1);
+  };
+
+  const removeConjunto = (key: string) => setConjuntos((prev) => prev.filter((c) => c.key !== key));
+
+  const editConjunto = (item: ConjuntoDraft) => {
+    setDraft({ ...item, error: undefined });
+    setConjuntos((prev) => prev.filter((c) => c.key !== item.key));
+    setWizardStep(1);
+    setWizardError(null);
+  };
+
+  const goToSummary = () => {
+    if (conjuntos.length === 0) { setWizardError('Adicione pelo menos um conjunto antes de finalizar'); return; }
+    setWizardError(null);
+    setWizardStep(3);
+  };
+
+  const handleWizardSubmit = async () => {
+    if (conjuntos.length === 0) return;
+    setSubmitting(true);
+    let successCount = 0;
+    const remaining: ConjuntoDraft[] = [];
+    for (const item of conjuntos) {
+      try {
+        await agendaService.createAgenda({
+          branchId: wizardBranchId,
+          doctorId: wizardDoctorId,
+          weekday: item.weekday,
+          shiftStart: item.shiftStart,
+          shiftEnd: item.shiftEnd,
+          especialidadeId: item.especialidadeId,
+          roomId: item.roomId,
+          startDate: item.startDate || null,
+          endDate: item.endDate || null,
+          status: item.status,
+        });
+        successCount += 1;
+      } catch (err: any) {
+        const errorCode = err?.response?.data?.error;
+        const message = errorCode === 'AGENDA_OVERLAP'
+          ? 'Já existe uma agenda ativa nesse dia/turno para esse profissional'
+          : resolveApiErrorMessage(err, 'Erro ao cadastrar esse conjunto');
+        remaining.push({ ...item, error: message });
+      }
+    }
+    setConjuntos(remaining);
+    setSubmitting(false);
+
+    if (successCount > 0) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
+    }
+    if (remaining.length === 0) {
+      showNotification({ title: 'Cadastradas', message: `${successCount} conjunto(s) de agenda cadastrado(s) com sucesso`, color: 'green' });
+      setWizardOpen(false);
+    } else if (successCount > 0) {
+      showNotification({ title: 'Parcialmente cadastrado', message: `${successCount} cadastrado(s), ${remaining.length} com erro. Corrija e tente novamente.`, color: 'yellow' });
+    } else {
+      showNotification({ title: 'Erro', message: 'Não foi possível cadastrar os conjuntos. Verifique os erros na lista.', color: 'red' });
+    }
+  };
+
+  const roomOptionsForWizard = useMemo(
+    () => roomOptionsForDoctorInBranch(wizardBranchId, wizardDoctorId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wizardBranchId, wizardDoctorId, roomList, doctorList],
+  );
+
+  const wizardDoctorName = doctorList.find((d: any) => d.id === wizardDoctorId)?.name || '';
+  const wizardBranchName = branchOptions.find((b) => b.value === wizardBranchId)?.label || '';
+
+  const renderVigenciaText = (start?: string | null, end?: string | null) => {
+    const s = formatDate(start);
+    const e = formatDate(end);
+    if (!s && !e) return 'Sem prazo';
+    return `${s || '—'} até ${e || 'sem fim'}`;
+  };
+
+  const renderConjuntosGrid = (list: ConjuntoDraft[], showErrors: boolean) => (
+    <Table horizontalSpacing="sm" verticalSpacing="xs">
+      <Table.Thead>
+        <Table.Tr>
+          <Table.Th style={{ fontSize: '0.75rem' }}>Sala</Table.Th>
+          <Table.Th style={{ fontSize: '0.75rem' }}>Especialidade</Table.Th>
+          <Table.Th style={{ fontSize: '0.75rem' }}>Dia</Table.Th>
+          <Table.Th style={{ fontSize: '0.75rem' }}>Turno</Table.Th>
+          <Table.Th style={{ fontSize: '0.75rem' }}>Vigência</Table.Th>
+          <Table.Th style={{ fontSize: '0.75rem' }}>Status</Table.Th>
+          <Table.Th style={{ fontSize: '0.75rem', width: 76, textAlign: 'center' }}>Ações</Table.Th>
+        </Table.Tr>
+      </Table.Thead>
+      <Table.Tbody>
+        {list.map((item) => (
+          <Table.Tr key={item.key}>
+            <Table.Td>
+              <Text size="sm">{item.roomName}</Text>
+              {showErrors && item.error ? <Text size="xs" c="red">{item.error}</Text> : null}
+            </Table.Td>
+            <Table.Td><Text size="sm" c="dimmed">{item.especialidadeName || '—'}</Text></Table.Td>
+            <Table.Td><Text size="sm" c="dimmed">{WEEKDAY_LABEL[item.weekday] || item.weekday}</Text></Table.Td>
+            <Table.Td><Text size="sm" c="dimmed">{item.shiftStart} - {item.shiftEnd}</Text></Table.Td>
+            <Table.Td><Text size="xs" c="dimmed">{renderVigenciaText(item.startDate, item.endDate)}</Text></Table.Td>
+            <Table.Td>
+              <Badge color={STATUS_COLOR[item.status]} variant="light" size="sm">
+                {STATUS_OPTIONS.find((s) => s.value === item.status)?.label || item.status}
+              </Badge>
+            </Table.Td>
+            <Table.Td>
+              <Group gap={4} justify="center" wrap="nowrap">
+                <ActionIcon variant="light" size="sm" onClick={() => editConjunto(item)}>
+                  <Pencil size={14} />
+                </ActionIcon>
+                <ActionIcon variant="light" color="red" size="sm" onClick={() => removeConjunto(item.key)}>
+                  <Trash2 size={14} />
+                </ActionIcon>
+              </Group>
+            </Table.Td>
+          </Table.Tr>
+        ))}
+      </Table.Tbody>
+    </Table>
+  );
+
   const renderVigencia = (item: Agenda) => {
     const start = formatDate(item.startDate);
     const end = formatDate(item.endDate);
@@ -328,7 +552,7 @@ export function CadastroAgendas() {
             </Box>
           </Group>
 
-          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={openCreateModal} size={isMobile ? 'sm' : 'md'}>
+          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={openWizard} size={isMobile ? 'sm' : 'md'}>
             Nova agenda
           </Button>
         </Group>
@@ -488,10 +712,166 @@ export function CadastroAgendas() {
         )}
       </Box>
 
+      {/* Creation wizard */}
+      <Modal
+        opened={wizardOpen}
+        onClose={closeWizard}
+        title="Cadastrar agenda"
+        size={isMobile ? '100%' : 720}
+        centered
+        fullScreen={isMobile}
+      >
+        <Stack gap={16}>
+          <Stepper active={wizardStep} onStepClick={(step) => { if (step < wizardStep) setWizardStep(step); }} size="sm" iconSize={28}>
+            <Stepper.Step label="Profissional" description="Unidade e profissional" />
+            <Stepper.Step label="Sala" description="Onde vai atender" />
+            <Stepper.Step label="Turno" description="Dia e horário" />
+            <Stepper.Step label="Resumo" description="Confirmar cadastro" />
+          </Stepper>
+
+          {wizardStep === 0 && (
+            <Stack gap={10}>
+              <FloatingSelect
+                label="Unidade"
+                required
+                placeholder="Selecione a unidade"
+                data={branchOptions}
+                value={wizardBranchId || null}
+                searchable
+                nothingFoundMessage="Nenhuma unidade encontrada"
+                onChange={handleWizardBranchChange}
+              />
+              <FloatingSelect
+                label="Profissional"
+                required
+                placeholder={wizardBranchId ? 'Selecione o profissional' : 'Selecione uma unidade primeiro'}
+                data={doctorOptionsForBranch(wizardBranchId)}
+                value={wizardDoctorId || null}
+                disabled={!wizardBranchId}
+                searchable
+                nothingFoundMessage="Nenhum profissional encontrado para essa unidade"
+                onChange={handleWizardDoctorChange}
+              />
+            </Stack>
+          )}
+
+          {wizardStep === 1 && (
+            <Stack gap={10}>
+              <Text size="sm" c="dimmed">{wizardDoctorName} · {wizardBranchName}</Text>
+              <FloatingSelect
+                label="Sala"
+                required
+                placeholder={roomOptionsForWizard.length ? 'Selecione a sala' : 'Nenhuma sala compatível com as modalidades do profissional'}
+                data={roomOptionsForWizard}
+                value={draft.roomId || null}
+                searchable
+                nothingFoundMessage="Nenhuma sala encontrada"
+                onChange={handleDraftRoomChange}
+              />
+              {conjuntos.length > 0 && (
+                <>
+                  <Divider label={`${conjuntos.length} conjunto(s) já adicionado(s)`} labelPosition="left" mt={8} />
+                  {renderConjuntosGrid(conjuntos, false)}
+                </>
+              )}
+            </Stack>
+          )}
+
+          {wizardStep === 2 && (
+            <Stack gap={10}>
+              <Text size="sm" c="dimmed">{wizardDoctorName} · {draft.roomName}{draft.especialidadeName ? ` · ${draft.especialidadeName}` : ''}</Text>
+              <FloatingSelect
+                label="Dia da semana"
+                required
+                placeholder="Selecione o dia"
+                data={WEEKDAY_OPTIONS}
+                value={draft.weekday || null}
+                onChange={(value) => setDraft((prev) => ({ ...prev, weekday: value || '' }))}
+              />
+              <Group grow>
+                <FloatingInput
+                  label="Início do turno"
+                  type="time"
+                  value={draft.shiftStart}
+                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, shiftStart: value })); }}
+                  required
+                />
+                <FloatingInput
+                  label="Fim do turno"
+                  type="time"
+                  value={draft.shiftEnd}
+                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, shiftEnd: value })); }}
+                  required
+                />
+              </Group>
+              <Group grow>
+                <FloatingInput
+                  label="Data de ativação"
+                  type="date"
+                  value={draft.startDate}
+                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, startDate: value })); }}
+                />
+                <FloatingInput
+                  label="Data de finalização"
+                  type="date"
+                  value={draft.endDate}
+                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, endDate: value })); }}
+                />
+              </Group>
+              <FloatingSelect
+                label="Status"
+                data={STATUS_OPTIONS}
+                value={draft.status}
+                onChange={(value) => setDraft((prev) => ({ ...prev, status: (value || 'ATIVA') as AgendaFormState['status'] }))}
+              />
+            </Stack>
+          )}
+
+          {wizardStep === 3 && (
+            <Stack gap={10}>
+              <Text size="sm" fw={600}>{wizardDoctorName} · {wizardBranchName}</Text>
+              <Text size="sm" c="dimmed">Confira os conjuntos abaixo antes de confirmar o cadastro.</Text>
+              {renderConjuntosGrid(conjuntos, true)}
+            </Stack>
+          )}
+
+          {wizardError ? (
+            <Text size="sm" c="red">{wizardError}</Text>
+          ) : null}
+
+          <Group justify="space-between" mt={8}>
+            <Button variant="default" onClick={wizardStep === 0 ? closeWizard : (wizardStep === 3 ? () => setWizardStep(2) : goToStep0)} size="sm" disabled={submitting}>
+              {wizardStep === 0 ? 'Cancelar' : 'Voltar'}
+            </Button>
+
+            {wizardStep === 0 && (
+              <Button bg={DARK_BLUE} onClick={goToStep1} size="sm">Próximo</Button>
+            )}
+            {wizardStep === 1 && (
+              <Group gap={8}>
+                {conjuntos.length > 0 && (
+                  <Button variant="default" onClick={goToSummary} size="sm">Finalizar e revisar</Button>
+                )}
+                <Button bg={DARK_BLUE} onClick={goToStep2} size="sm">Próximo</Button>
+              </Group>
+            )}
+            {wizardStep === 2 && (
+              <Button bg={DARK_BLUE} onClick={addConjunto} size="sm">Adicionar conjunto</Button>
+            )}
+            {wizardStep === 3 && (
+              <Button bg={DARK_BLUE} onClick={handleWizardSubmit} size="sm" loading={submitting} disabled={submitting || conjuntos.length === 0}>
+                Confirmar cadastro
+              </Button>
+            )}
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Single-record edit modal */}
       <Modal
         opened={modalOpen}
         onClose={() => { if (!saving) setModalOpen(false); }}
-        title={editingId ? 'Editar agenda' : 'Cadastrar agenda'}
+        title="Editar agenda"
         size={isMobile ? '100%' : 560}
         centered
         fullScreen={isMobile}
@@ -518,26 +898,14 @@ export function CadastroAgendas() {
             nothingFoundMessage="Nenhum profissional encontrado para essa unidade"
             onChange={handleDoctorChange}
           />
-          <Group grow>
-            <FloatingSelect
-              label="Dia da semana"
-              required
-              placeholder="Selecione o dia"
-              data={WEEKDAY_OPTIONS}
-              value={form.weekday || null}
-              onChange={(value) => setForm((prev) => ({ ...prev, weekday: value || '' }))}
-            />
-            <FloatingSelect
-              label="Especialidade"
-              placeholder={form.doctorId ? 'Selecione a especialidade' : 'Selecione um profissional primeiro'}
-              data={especialidadeOptionsForDoctor(form.doctorId)}
-              value={form.especialidadeId || null}
-              disabled={!form.doctorId}
-              clearable
-              nothingFoundMessage="Profissional sem especialidades cadastradas"
-              onChange={handleEspecialidadeChange}
-            />
-          </Group>
+          <FloatingSelect
+            label="Dia da semana"
+            required
+            placeholder="Selecione o dia"
+            data={WEEKDAY_OPTIONS}
+            value={form.weekday || null}
+            onChange={(value) => setForm((prev) => ({ ...prev, weekday: value || '' }))}
+          />
           <Group grow>
             <FloatingInput
               label="Início do turno"
@@ -556,14 +924,14 @@ export function CadastroAgendas() {
           </Group>
           <FloatingSelect
             label="Sala"
-            placeholder={form.branchId ? 'Selecione a sala (opcional)' : 'Selecione uma unidade primeiro'}
-            data={roomOptionsForBranch(form.branchId, form.especialidadeId)}
+            placeholder={form.branchId && form.doctorId ? 'Selecione a sala (opcional)' : 'Selecione unidade e profissional primeiro'}
+            data={roomOptionsForDoctorInBranch(form.branchId, form.doctorId)}
             value={form.roomId || null}
-            disabled={!form.branchId}
+            disabled={!form.branchId || !form.doctorId}
             clearable
             searchable
             nothingFoundMessage="Nenhuma sala encontrada"
-            onChange={(value) => setForm((prev) => ({ ...prev, roomId: value || '' }))}
+            onChange={handleFormRoomChange}
           />
           <Group grow>
             <FloatingInput
@@ -595,7 +963,7 @@ export function CadastroAgendas() {
               Cancelar
             </Button>
             <Button bg={DARK_BLUE} onClick={handleSave} size="sm" loading={saving} disabled={saving}>
-              {editingId ? 'Salvar' : 'Cadastrar'}
+              Salvar
             </Button>
           </Group>
         </Stack>
