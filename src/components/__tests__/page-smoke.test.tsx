@@ -514,6 +514,7 @@ const cases: Array<[string, () => Promise<React.ReactElement>, string?]> = [
   ['CadastroProcedimento', async () => React.createElement((await import('../Procedimentos/CadastroProcedimento')).CadastroProcedimento)],
   ['PublicCheckIn', async () => React.createElement((await import('../PublicCheckIn/PublicCheckIn')).PublicCheckIn)],
   ['CadastroSala', async () => React.createElement((await import('../Salas/CadastroSala')).CadastroSala)],
+  ['CadastroAgendas', async () => React.createElement((await import('../Agendas/CadastroAgendas')).CadastroAgendas)],
   ['WhatsAppConfig', async () => React.createElement((await import('../Settings/WhatsAppConfig')).WhatsAppConfig)],
   ['WhatsAppCredentials', async () => React.createElement((await import('../Settings/WhatsAppCredentials')).WhatsAppCredentials, { config: null, onSaved: vi.fn() })],
   ['WhatsAppPage', async () => React.createElement((await import('../Settings/WhatsAppPage')).WhatsAppPage)],

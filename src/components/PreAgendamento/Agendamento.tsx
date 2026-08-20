@@ -48,6 +48,7 @@ import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
+import { useAgendasAdminQuery } from '../../hooks/useAgendasAdminQuery';
 import { useMedicalEquipmentsQuery } from '../../hooks/useMedicalEquipmentsQuery';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { queryKeys } from '../../lib/queryKeys';
@@ -100,6 +101,12 @@ interface PendingPatientRegistration {
   cellphone: string;
   email: string;
 }
+interface AgendaShiftWindow {
+  shiftStart: string;
+  shiftEnd: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
 interface DoctorScheduleMeta {
   id?: string;
   name: string;
@@ -108,6 +115,7 @@ interface DoctorScheduleMeta {
   workingHoursStart?: string;
   workingHoursEnd?: string;
   specialties: string[];
+  agendaByWeekday?: Record<string, AgendaShiftWindow[]>;
 }
 interface ProcedureMeta {
   id?: string;
@@ -124,6 +132,7 @@ interface RoomScheduleMeta {
   workingDays: string[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
+  agendaByWeekday?: Record<string, AgendaShiftWindow[]>;
 }
 interface SuggestedProcedureSchedule {
   procedure: string;
@@ -426,16 +435,71 @@ const formatMinutesToTime = (value: number): string => {
   const minutes = value % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
+const hasAnyAgendaWindow = (agendaByWeekday?: Record<string, AgendaShiftWindow[]>): boolean => (
+  Boolean(agendaByWeekday) && Object.values(agendaByWeekday!).some((windows) => windows.length > 0)
+);
+const isDateWithinAgendaWindow = (date: Date, window: AgendaShiftWindow): boolean => {
+  const day = dayjs(date).startOf('day');
+  if (window.startDate && day.isBefore(dayjs(window.startDate).startOf('day'))) return false;
+  if (window.endDate && day.isAfter(dayjs(window.endDate).startOf('day'))) return false;
+  return true;
+};
+const buildSlotsFromAgendaWindows = (
+  windows: AgendaShiftWindow[],
+  period: 'Manhã' | 'Tarde' | 'Noite',
+  date: Date,
+): string[] => {
+  const [periodStart, periodEnd] = PERIOD_RANGES[period];
+  const slots = new Set<number>();
+  windows
+    .filter((window) => isDateWithinAgendaWindow(date, window))
+    .forEach((window) => {
+      const start = parseTimeToMinutes(window.shiftStart);
+      const end = parseTimeToMinutes(window.shiftEnd);
+      if (start === null || end === null || end <= start) return;
+      const rangeStart = Math.max(start, periodStart);
+      const rangeEnd = Math.min(end, periodEnd);
+      for (let minute = rangeStart; minute < rangeEnd; minute += 15) {
+        slots.add(minute);
+      }
+    });
+  return Array.from(slots).sort((a, b) => a - b).map(formatMinutesToTime);
+};
+const groupAgendasByKey = (
+  agendas: any[],
+  keyOf: (agenda: any) => string | null,
+): Record<string, Record<string, AgendaShiftWindow[]>> => {
+  return agendas.reduce<Record<string, Record<string, AgendaShiftWindow[]>>>((acc, agenda) => {
+    if (agenda?.status !== 'ATIVA') return acc;
+    const key = keyOf(agenda);
+    if (!key) return acc;
+    const weekday = normalizeWeekdayLabel(agenda.weekday);
+    if (!weekday) return acc;
+    if (!acc[key]) acc[key] = {};
+    if (!acc[key][weekday]) acc[key][weekday] = [];
+    acc[key][weekday].push({
+      shiftStart: agenda.shiftStart,
+      shiftEnd: agenda.shiftEnd,
+      startDate: agenda.startDate || null,
+      endDate: agenda.endDate || null,
+    });
+    return acc;
+  }, {});
+};
 const buildDoctorSlots = (
   doctor: DoctorScheduleMeta | undefined,
   period: 'Manhã' | 'Tarde' | 'Noite',
   date: Date,
 ): string[] => {
+  const currentWeekday = getBranchWeekdayLabel(date);
+  if (hasAnyAgendaWindow(doctor?.agendaByWeekday)) {
+    const windows = doctor?.agendaByWeekday?.[currentWeekday] || [];
+    return buildSlotsFromAgendaWindows(windows, period, date);
+  }
   if (!doctor?.workingHoursStart || !doctor?.workingHoursEnd) {
     return TIME_SLOTS[period];
   }
   const normalizedDays = (doctor.workingDays || []).map(normalizeWeekdayLabel);
-  const currentWeekday = getBranchWeekdayLabel(date);
   if (normalizedDays.length > 0 && !normalizedDays.includes(currentWeekday)) {
     return [];
   }
@@ -459,11 +523,15 @@ const buildRoomSlots = (
   period: 'Manhã' | 'Tarde' | 'Noite',
   date: Date,
 ): string[] => {
+  const currentWeekday = getBranchWeekdayLabel(date);
+  if (hasAnyAgendaWindow(room?.agendaByWeekday)) {
+    const windows = room?.agendaByWeekday?.[currentWeekday] || [];
+    return buildSlotsFromAgendaWindows(windows, period, date);
+  }
   if (!room?.workingHoursStart || !room?.workingHoursEnd) {
     return TIME_SLOTS[period];
   }
   const normalizedDays = (room.workingDays || []).map(normalizeWeekdayLabel);
-  const currentWeekday = getBranchWeekdayLabel(date);
   if (normalizedDays.length > 0 && !normalizedDays.includes(currentWeekday)) {
     return [];
   }
@@ -590,6 +658,7 @@ export function Agendamento() {
   const doctorsQuery = useDoctorsAdminQuery();
   const proceduresCatalogQuery = useProceduresAdminQuery();
   const roomsQuery = useRoomsAdminQuery();
+  const agendasQuery = useAgendasAdminQuery();
   const medicalEquipmentsQuery = useMedicalEquipmentsQuery();
   dayjs.locale('pt-br');
   const resetSchedulingForm = (keepDate: Date | null = dataHoraFiltro || new Date()) => {
@@ -983,6 +1052,13 @@ export function Agendamento() {
         return name ?{ value: name, label: name } : null;
       })
       .filter(Boolean) as { value: string; label: string }[];
+    const agendaList: any[] = Array.isArray(agendasQuery.data)
+      ? agendasQuery.data
+      : (Array.isArray((agendasQuery.data as any)?.items) ? (agendasQuery.data as any).items : []);
+    const agendaByDoctorName = groupAgendasByKey(agendaList, (agenda) => {
+      const doctorName = String(agenda?.doctor?.name || '').trim();
+      return doctorName || null;
+    });
     const metaByName = list.reduce<Record<string, DoctorScheduleMeta>>((acc, doctor: any) => {
       const name = (doctor.name || doctor.nome || doctor.fullName || '').toString().trim();
       if (!name) return acc;
@@ -1001,12 +1077,13 @@ export function Agendamento() {
           ...(doctor.specialty ?[String(doctor.specialty)] : []),
           ...(Array.isArray(doctor.specialties) ?doctor.specialties.map((item: any) => String(item)) : []),
         ].filter(Boolean),
+        agendaByWeekday: agendaByDoctorName[name],
       };
       return acc;
     }, {});
     setDoctorOptions(options);
     setDoctorMetaByName(metaByName);
-  }, [doctorsQuery.data]);
+  }, [doctorsQuery.data, agendasQuery.data]);
   useEffect(() => {
     const list: any[] = Array.isArray(proceduresCatalogQuery.data) ?proceduresCatalogQuery.data : [];
     const options = list
@@ -1908,6 +1985,13 @@ export function Agendamento() {
     acc[id] = name || `Sala ${id}`;
     return acc;
   }, {});
+  const agendaListForRooms: any[] = Array.isArray(agendasQuery.data)
+    ? agendasQuery.data
+    : (Array.isArray((agendasQuery.data as any)?.items) ? (agendasQuery.data as any).items : []);
+  const agendaByRoomId = groupAgendasByKey(agendaListForRooms, (agenda) => {
+    const roomId = String(agenda?.roomId || '').trim();
+    return roomId || null;
+  });
   const roomScheduleById = roomsList.reduce<Record<string, RoomScheduleMeta>>((acc, room: any) => {
     const id = String(room?.id || '').trim();
     if (!id) return acc;
@@ -1919,6 +2003,7 @@ export function Agendamento() {
         : [],
       workingHoursStart: String(room?.workingHoursStart || '').trim() || undefined,
       workingHoursEnd: String(room?.workingHoursEnd || '').trim() || undefined,
+      agendaByWeekday: agendaByRoomId[id],
     };
     return acc;
   }, {});

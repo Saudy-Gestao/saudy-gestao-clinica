@@ -53,6 +53,7 @@ import { CadastroEquipamento } from './components/Equipamentos/CadastroEquipamen
 import { CadastroAnamnese } from './components/Anamnese/CadastroAnamnese';
 import { HistoricoAtendimentos } from './components/Historico/HistoricoAtendimentos';
 import { CadastroEnfermagem } from './components/Enfermagem/CadastroEnfermagem';
+import { CadastroAgendas } from './components/Agendas/CadastroAgendas';
 import { CadastroTEA } from './components/TEA/CadastroTEA';
 import { TeaHome } from './components/TEA/TeaHome';
 import { WhatsAppPage } from './components/Settings/WhatsAppPage';
@@ -370,6 +371,10 @@ function App() {
           <Route
             path="/cadastro-enfermagem"
             element={<ProtectedRoute><CadastroEnfermagem /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-agenda"
+            element={<ProtectedRoute><CadastroAgendas /></ProtectedRoute>}
           />
           <Route
             path="/conversas"

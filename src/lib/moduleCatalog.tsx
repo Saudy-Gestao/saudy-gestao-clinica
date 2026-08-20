@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
   Tag,
   Layers3,
+  CalendarClock,
 } from 'lucide-react';
 import { useCurrentUserProfileQuery } from '../hooks/useCurrentUserProfileQuery';
 import { filterModulesForCompanyType, normalizeCompanyModuleType } from '../utils/moduleTypeAccess';
@@ -97,6 +98,7 @@ export const MACRO_SECTIONS: MacroSection[] = [
       { icon: Layers3, label: 'Cadastro de Especialidades', desc: 'Especialidades e métodos por modalidade', route: '/cadastro-especialidade', moduleName: 'cadastro-especialidade' },
       { icon: ClipboardPenLine, label: 'Cadastro de Anamnese', desc: 'Perguntas por procedimento', route: '/cadastro-anamnese', moduleName: 'cadastro-anamnese' },
       { icon: ClipboardCheck, label: 'Cadastro de Enfermagem', desc: 'Triagens por procedimento', route: '/cadastro-enfermagem', moduleName: 'cadastro-enfermagem' },
+      { icon: CalendarClock, label: 'Cadastro de Agendas', desc: 'Agendas de profissionais por unidade, dia e turno', route: '/cadastro-agenda', moduleName: 'cadastro-agenda' },
       { icon: FileText, label: 'Configurações de Laudo', desc: 'Padrões, frases e parâmetros', route: '/laudo-configuracoes', moduleName: 'laudo' },
     ],
   },
@@ -161,6 +163,9 @@ export const normalizeModuleKey = (value: unknown) => {
     'especialidade': 'cadastro-especialidade',
     'cadastro de anamnese': 'cadastro-anamnese',
     'cadastro de enfermagem': 'cadastro-enfermagem',
+    'cadastro de agendas': 'cadastro-agenda',
+    'cadastro de agenda': 'cadastro-agenda',
+    'agendas': 'cadastro-agenda',
     'entrega': 'entrega',
     'estoque': 'estoque',
     'financeiro': 'financeiro',
