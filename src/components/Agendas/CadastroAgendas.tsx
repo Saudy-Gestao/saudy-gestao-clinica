@@ -717,12 +717,13 @@ export function CadastroAgendas() {
         opened={wizardOpen}
         onClose={closeWizard}
         title="Cadastrar agenda"
-        size={isMobile ? '100%' : 720}
+        size={isMobile ? '100%' : 900}
+        padding={isMobile ? 'md' : 'xl'}
         centered
         fullScreen={isMobile}
       >
-        <Stack gap={16}>
-          <Stepper active={wizardStep} onStepClick={(step) => { if (step < wizardStep) setWizardStep(step); }} size="sm" iconSize={28}>
+        <Stack gap={24}>
+          <Stepper active={wizardStep} onStepClick={(step) => { if (step < wizardStep) setWizardStep(step); }} size="md" iconSize={36}>
             <Stepper.Step label="Profissional" description="Unidade e profissional" />
             <Stepper.Step label="Sala" description="Onde vai atender" />
             <Stepper.Step label="Turno" description="Dia e horário" />
@@ -730,7 +731,7 @@ export function CadastroAgendas() {
           </Stepper>
 
           {wizardStep === 0 && (
-            <Stack gap={10}>
+            <Stack gap={16}>
               <FloatingSelect
                 label="Unidade"
                 required
@@ -756,7 +757,7 @@ export function CadastroAgendas() {
           )}
 
           {wizardStep === 1 && (
-            <Stack gap={10}>
+            <Stack gap={16}>
               <Text size="sm" c="dimmed">{wizardDoctorName} · {wizardBranchName}</Text>
               <FloatingSelect
                 label="Sala"
@@ -778,7 +779,7 @@ export function CadastroAgendas() {
           )}
 
           {wizardStep === 2 && (
-            <Stack gap={10}>
+            <Stack gap={16}>
               <Text size="sm" c="dimmed">{wizardDoctorName} · {draft.roomName}{draft.especialidadeName ? ` · ${draft.especialidadeName}` : ''}</Text>
               <FloatingSelect
                 label="Dia da semana"
@@ -828,7 +829,7 @@ export function CadastroAgendas() {
           )}
 
           {wizardStep === 3 && (
-            <Stack gap={10}>
+            <Stack gap={16}>
               <Text size="sm" fw={600}>{wizardDoctorName} · {wizardBranchName}</Text>
               <Text size="sm" c="dimmed">Confira os conjuntos abaixo antes de confirmar o cadastro.</Text>
               {renderConjuntosGrid(conjuntos, true)}
