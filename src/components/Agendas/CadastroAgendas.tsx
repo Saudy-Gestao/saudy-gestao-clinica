@@ -723,7 +723,7 @@ export function CadastroAgendas() {
         fullScreen={isMobile}
       >
         <Stack gap={24}>
-          <Stepper active={wizardStep} onStepClick={(step) => { if (step < wizardStep) setWizardStep(step); }} size="md" iconSize={36}>
+          <Stepper active={wizardStep} onStepClick={(step) => { if (step < wizardStep) setWizardStep(step); }} size="md" iconSize={36} mt={20}>
             <Stepper.Step label="Profissional" description="Unidade e profissional" />
             <Stepper.Step label="Sala" description="Onde vai atender" />
             <Stepper.Step label="Turno" description="Dia e horário" />
