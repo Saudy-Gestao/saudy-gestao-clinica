@@ -36,11 +36,21 @@ export interface CreateDoctorPayload {
   especialidadeGroups?: Array<{
     modalidadeId: string | null;
     especialidadeId: string | null;
+    registrationType: string;
+    registrationNumber: string;
+    registrationState: string;
     metodos: string[];
     procedimentoIds: string[];
+    branchIds?: string[];
   }>;
   branchIds?: string[];
   appointmentDurations?: number[];
+  procedureDurations?: Array<{
+    procedureId: string;
+    procedureName?: string;
+    modalidadeId?: string | null;
+    durationMinutes: number;
+  }>;
 }
 
 export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;
@@ -71,4 +81,3 @@ export default {
     return res.data;
   },
 };
-

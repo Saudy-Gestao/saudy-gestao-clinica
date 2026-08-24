@@ -24,7 +24,7 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar as CalendarIcon, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { showNotification } from '@mantine/notifications';
 import { DARK_BLUE } from '../../themes/theme';
 import { Header } from '../Header/Header';
@@ -64,6 +64,7 @@ type ApiError = {
 };
 
 const isRecord = (value: unknown): value is ApiRecord => typeof value === 'object' && value !== null;
+const ALL_BRANCHES_VALUE = '__ALL_BRANCHES__';
 
 const getString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
@@ -116,8 +117,19 @@ const getApiList = (response: unknown): ApiRecord[] => {
 interface DoctorEspecialidadeGroup {
   modalidadeId: string | null;
   especialidadeId: string | null;
+  registrationType: string;
+  registrationNumber: string;
+  registrationState: string;
   metodos: string[];
   procedimentoIds: string[];
+  branchIds: string[];
+}
+
+interface DoctorProcedureDuration {
+  procedureId: string;
+  procedureName?: string;
+  modalidadeId?: string | null;
+  durationMinutes: number;
 }
 
 interface DoctorForm {
@@ -153,6 +165,7 @@ interface DoctorForm {
   especialidadeGroups: DoctorEspecialidadeGroup[];
   branchIds: string[];
   appointmentDurations: number[];
+  procedureDurations: DoctorProcedureDuration[];
 }
 
 interface DoctorListItem {
@@ -176,62 +189,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
       {children}
     </Title>
-  );
-}
-
-function DurationTagInput({
-  label,
-  placeholder,
-  values,
-  onAdd,
-  onRemove,
-}: {
-  label: string;
-  placeholder?: string;
-  values: number[];
-  onAdd: (value: number) => void;
-  onRemove: (value: number) => void;
-}) {
-  const [input, setInput] = useState('');
-
-  const commit = () => {
-    const parsed = Number(input.trim());
-    if (!Number.isFinite(parsed) || parsed <= 0) return;
-    onAdd(Math.round(parsed));
-    setInput('');
-  };
-
-  return (
-    <Box>
-      <FloatingInput
-        label={label}
-        placeholder={placeholder}
-        value={input}
-        onChange={(e) => setInput(e?.currentTarget?.value ?? '')}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            commit();
-          }
-        }}
-        onBlur={commit}
-      />
-      {values.length > 0 ? (
-        <Group mt={6} gap="xs">
-          {values.map((value) => (
-            <Button
-              key={value}
-              size="compact-xs"
-              variant="light"
-              color="blue"
-              onClick={() => onRemove(value)}
-            >
-              {value} min ×
-            </Button>
-          ))}
-        </Group>
-      ) : null}
-    </Box>
   );
 }
 
@@ -264,6 +221,7 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   especialidadeGroups: [],
   branchIds: [],
   appointmentDurations: [],
+  procedureDurations: [],
 };
 
 const TELECONSULTATION_SPECIALTY_FLAG = '__TELECONSULTA__';
@@ -422,6 +380,24 @@ export function CadastroMedico() {
     return list.filter((p: any) => p?.id && p.isActive !== false);
   }, [proceduresQuery.data]);
 
+  const selectedModalidadeIds = useMemo(() => (
+    new Set(
+      form.especialidadeGroups
+        .map((group) => group.modalidadeId)
+        .filter((modalidadeId): modalidadeId is string => Boolean(modalidadeId)),
+    )
+  ), [form.especialidadeGroups]);
+
+  const procedureOptions = useMemo(() => (
+    procedureList
+      .filter((procedure: any) => selectedModalidadeIds.has(String(procedure.modalidadeId || '')))
+      .map((procedure: any) => ({
+        value: String(procedure.id),
+        label: String(procedure.name || 'Procedimento sem nome'),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  ), [procedureList, selectedModalidadeIds]);
+
   const especialidadeByModalidadeId = useMemo(() => {
     const map = new Map<string, any>();
     especialidadeList.forEach((e: any) => map.set(e.modalidadeId, e));
@@ -438,34 +414,77 @@ export function CadastroMedico() {
       .map((b: any) => ({ value: String(b.id), label: b.tradeName || b.socialName || 'Filial sem nome' }));
   }, [branchesQuery.data]);
 
+  const branchOptionsWithAll = useMemo(
+    () => [{ value: ALL_BRANCHES_VALUE, label: 'Todas as unidades' }, ...branchOptions],
+    [branchOptions],
+  );
+
   const metodoOptionsForModalidade = (modalidadeId: string | null) => {
     const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
     const metodos: string[] = Array.isArray(especialidade?.metodos) ? especialidade.metodos : [];
     return metodos.map((m) => ({ value: m, label: m }));
   };
 
-  const procedureOptionsForModalidade = (modalidadeId: string | null) => (
-    procedureList
-      .filter((p: any) => p.modalidadeId === modalidadeId)
-      .map((p: any) => ({ value: p.id, label: p.name }))
-  );
-
-  const EMPTY_GROUP_DRAFT: DoctorEspecialidadeGroup = { modalidadeId: null, especialidadeId: null, metodos: [], procedimentoIds: [] };
+  const EMPTY_GROUP_DRAFT: DoctorEspecialidadeGroup = {
+    modalidadeId: null,
+    especialidadeId: null,
+    registrationType: form.crmType || 'CRM',
+    registrationNumber: form.crm,
+    registrationState: form.crmState,
+    metodos: [],
+    procedimentoIds: [],
+    branchIds: [ALL_BRANCHES_VALUE],
+  };
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
   const [groupDraft, setGroupDraft] = useState<DoctorEspecialidadeGroup>(EMPTY_GROUP_DRAFT);
   const [groupModalidadeError, setGroupModalidadeError] = useState<string | null>(null);
+  const [availableProcedureSearch, setAvailableProcedureSearch] = useState('');
+  const [linkedProcedureSearch, setLinkedProcedureSearch] = useState('');
+  const [selectedAvailableProcedureIds, setSelectedAvailableProcedureIds] = useState<string[]>([]);
+  const [selectedLinkedProcedureIds, setSelectedLinkedProcedureIds] = useState<string[]>([]);
+
+  const linkedProcedureIds = useMemo(
+    () => new Set(form.procedureDurations.map((item) => item.procedureId)),
+    [form.procedureDurations],
+  );
+
+  const availableProcedureOptions = useMemo(
+    () => procedureOptions.filter((option) => !linkedProcedureIds.has(option.value)),
+    [linkedProcedureIds, procedureOptions],
+  );
+
+  const filteredAvailableProcedures = useMemo(() => {
+    const query = availableProcedureSearch.trim().toLowerCase();
+    if (!query) return availableProcedureOptions;
+    return availableProcedureOptions.filter((option) => option.label.toLowerCase().includes(query));
+  }, [availableProcedureOptions, availableProcedureSearch]);
+
+  const filteredLinkedProcedures = useMemo(() => {
+    const query = linkedProcedureSearch.trim().toLowerCase();
+    return form.procedureDurations.filter((item) => {
+      const procedure = procedureList.find((candidate: any) => String(candidate.id) === item.procedureId);
+      const name = item.procedureName || procedure?.name || '';
+      return !query || name.toLowerCase().includes(query);
+    });
+  }, [form.procedureDurations, linkedProcedureSearch, procedureList]);
 
   const openAddGroupModal = () => {
     setEditingGroupIndex(null);
-    setGroupDraft(EMPTY_GROUP_DRAFT);
+    setGroupDraft({
+      ...EMPTY_GROUP_DRAFT,
+      registrationType: form.crmType || 'CRM',
+      registrationNumber: form.crm,
+      registrationState: form.crmState,
+    });
     setGroupModalidadeError(null);
     setGroupModalOpen(true);
   };
 
   const openEditGroupModal = (index: number) => {
     setEditingGroupIndex(index);
-    setGroupDraft({ ...form.especialidadeGroups[index] });
+    const group = form.especialidadeGroups[index];
+    setGroupDraft({ ...group, branchIds: group.branchIds || [ALL_BRANCHES_VALUE] });
     setGroupModalidadeError(null);
     setGroupModalOpen(true);
   };
@@ -475,8 +494,12 @@ export function CadastroMedico() {
     setGroupDraft({
       modalidadeId,
       especialidadeId: especialidade?.id || null,
+      registrationType: groupDraft.registrationType || form.crmType || 'CRM',
+      registrationNumber: groupDraft.registrationNumber || form.crm,
+      registrationState: groupDraft.registrationState || form.crmState,
       metodos: [],
-      procedimentoIds: [],
+      procedimentoIds: groupDraft.procedimentoIds,
+      branchIds: groupDraft.branchIds || [ALL_BRANCHES_VALUE],
     });
     setGroupModalidadeError(null);
   };
@@ -484,6 +507,10 @@ export function CadastroMedico() {
   const handleSaveGroup = () => {
     if (!groupDraft.modalidadeId) {
       setGroupModalidadeError('Selecione uma modalidade');
+      return;
+    }
+    if (!groupDraft.registrationType || !groupDraft.registrationNumber.trim() || !groupDraft.registrationState) {
+      setGroupModalidadeError('Preencha o tipo, número e UF do registro');
       return;
     }
     setForm((prev) => {
@@ -500,6 +527,67 @@ export function CadastroMedico() {
       ...prev,
       especialidadeGroups: prev.especialidadeGroups.filter((_, i) => i !== index),
     }));
+  };
+
+  const moveProceduresToLinked = () => {
+    if (selectedAvailableProcedureIds.length === 0) return;
+    const selectedIds = new Set(selectedAvailableProcedureIds);
+    const newLinks = availableProcedureOptions
+      .filter((option) => selectedIds.has(option.value))
+      .map((option) => {
+        const procedure = procedureList.find((candidate: any) => String(candidate.id) === option.value);
+        const defaultDuration = Number(procedure?.durationMinutes);
+        return {
+          procedureId: option.value,
+          procedureName: option.label,
+          modalidadeId: procedure?.modalidadeId ? String(procedure.modalidadeId) : null,
+          durationMinutes: Number.isFinite(defaultDuration) && defaultDuration > 0 ? Math.round(defaultDuration) : 0,
+        };
+      });
+
+    setForm((prev) => ({
+      ...prev,
+      procedureDurations: [...prev.procedureDurations, ...newLinks]
+        .sort((a, b) => (a.procedureName || '').localeCompare(b.procedureName || '', 'pt-BR')),
+    }));
+    setSelectedAvailableProcedureIds([]);
+  };
+
+  const moveProceduresToAvailable = () => {
+    if (selectedLinkedProcedureIds.length === 0) return;
+    const selectedIds = new Set(selectedLinkedProcedureIds);
+    setForm((prev) => ({
+      ...prev,
+      procedureDurations: prev.procedureDurations.filter((item) => !selectedIds.has(item.procedureId)),
+    }));
+    setSelectedLinkedProcedureIds([]);
+  };
+
+  const moveAllProceduresToLinked = () => {
+    if (availableProcedureOptions.length === 0) return;
+    const newLinks = availableProcedureOptions.map((option) => {
+      const procedure = procedureList.find((candidate: any) => String(candidate.id) === option.value);
+      const defaultDuration = Number(procedure?.durationMinutes);
+      return {
+        procedureId: option.value,
+        procedureName: option.label,
+        modalidadeId: procedure?.modalidadeId ? String(procedure.modalidadeId) : null,
+        durationMinutes: Number.isFinite(defaultDuration) && defaultDuration > 0 ? Math.round(defaultDuration) : 0,
+      };
+    });
+
+    setForm((prev) => ({
+      ...prev,
+      procedureDurations: [...prev.procedureDurations, ...newLinks]
+        .sort((a, b) => (a.procedureName || '').localeCompare(b.procedureName || '', 'pt-BR')),
+    }));
+    setSelectedAvailableProcedureIds([]);
+  };
+
+  const moveAllProceduresToAvailable = () => {
+    if (form.procedureDurations.length === 0) return;
+    setForm((prev) => ({ ...prev, procedureDurations: [] }));
+    setSelectedLinkedProcedureIds([]);
   };
 
   const clearFieldError = (field: string) => {
@@ -652,14 +740,29 @@ export function CadastroMedico() {
           return {
             modalidadeId: getString(groupRecord.modalidadeId) || null,
             especialidadeId: getString(groupRecord.especialidadeId) || null,
+            registrationType: getString(groupRecord.registrationType) || getString(raw.crmType) || 'CRM',
+            registrationNumber: getString(groupRecord.registrationNumber) || getString(raw.crm),
+            registrationState: getString(groupRecord.registrationState) || getString(raw.crmState ?? raw.ufCrm),
             metodos: Array.isArray(groupRecord.metodos) ? (groupRecord.metodos as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
             procedimentoIds: Array.isArray(groupRecord.procedimentoIds) ? (groupRecord.procedimentoIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
+            branchIds: Array.isArray(groupRecord.branchIds) ? (groupRecord.branchIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
           };
         })
         : [],
       branchIds: Array.isArray(raw.branchIds) ? (raw.branchIds as unknown[]).map((v) => getString(v)).filter(Boolean) : [],
       appointmentDurations: Array.isArray(raw.appointmentDurations)
         ? (raw.appointmentDurations as unknown[]).map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0)
+        : [],
+      procedureDurations: Array.isArray(raw.procedureDurations)
+        ? (raw.procedureDurations as unknown[]).map((item: unknown) => {
+          const record = isRecord(item) ? item : {};
+          return {
+            procedureId: getString(record.procedureId),
+            procedureName: getString(record.procedureName),
+            modalidadeId: getString(record.modalidadeId) || null,
+            durationMinutes: Number(record.durationMinutes),
+          };
+        }).filter((item) => item.procedureId && Number.isFinite(item.durationMinutes) && item.durationMinutes > 0)
         : [],
     });
   };
@@ -738,6 +841,9 @@ export function CadastroMedico() {
     if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
     if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
+    if (data.procedureDurations.some((item) => !Number.isFinite(item.durationMinutes) || item.durationMinutes <= 0)) {
+      errors.procedureDurations = 'Informe o tempo de todos os procedimentos vinculados';
+    }
     if (data.workingSchedules.length > 0) {
       data.workingSchedules.forEach((schedule, idx) => {
         if (!schedule.days.length) errors[`workingSchedules.${idx}.days`] = 'Selecione pelo menos um dia';
@@ -861,9 +967,22 @@ export function CadastroMedico() {
         workingDays: Array.from(allDays),
         workingHoursStart: validSchedules.length > 0 ? validSchedules[0].hoursStart : undefined,
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
-        especialidadeGroups: form.especialidadeGroups.filter((group) => group.modalidadeId),
-        branchIds: form.branchIds,
+        especialidadeGroups: form.especialidadeGroups
+          .filter((group) => group.modalidadeId)
+          .map((group) => ({
+            ...group,
+            registrationType: group.registrationType || form.crmType || 'CRM',
+            registrationNumber: group.registrationNumber.trim() || form.crm.trim(),
+            registrationState: group.registrationState || form.crmState.trim().toUpperCase(),
+            branchIds: (group.branchIds || []).length === 0 || (group.branchIds || []).includes(ALL_BRANCHES_VALUE)
+              ? branchOptions.map((option) => option.value)
+              : group.branchIds,
+          })),
         appointmentDurations: form.appointmentDurations,
+        procedureDurations: form.procedureDurations.map((item) => ({
+          procedureId: item.procedureId,
+          durationMinutes: item.durationMinutes,
+        })),
       };
 
       if (editingDoctorId) {
@@ -1194,8 +1313,9 @@ export function CadastroMedico() {
                           <Table.Tr>
                             <Table.Th>Modalidade</Table.Th>
                             <Table.Th>Especialidade</Table.Th>
+                            <Table.Th>Registro</Table.Th>
                             <Table.Th>Métodos</Table.Th>
-                            <Table.Th>Procedimentos</Table.Th>
+                            <Table.Th>Unidades</Table.Th>
                             <Table.Th style={{ textAlign: 'center', width: 90 }}>Ações</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
@@ -1207,8 +1327,21 @@ export function CadastroMedico() {
                               <Table.Tr key={index}>
                                 <Table.Td><Text size="sm">{modalidadeName}</Text></Table.Td>
                                 <Table.Td><Text size="sm" c="dimmed">{especialidade?.name || '—'}</Text></Table.Td>
+                                <Table.Td>
+                                  <Text size="sm" c="dimmed">
+                                    {group.registrationNumber
+                                      ? `${group.registrationType || 'Registro'} ${group.registrationNumber}${group.registrationState ? `/${group.registrationState}` : ''}`
+                                      : '—'}
+                                  </Text>
+                                </Table.Td>
                                 <Table.Td><Text size="sm" c="dimmed">{group.metodos.length > 0 ? group.metodos.join(', ') : '—'}</Text></Table.Td>
-                                <Table.Td><Text size="sm" c="dimmed">{group.procedimentoIds.length} vinculado(s)</Text></Table.Td>
+                                <Table.Td>
+                                  <Text size="sm" c="dimmed">
+                                    {(group.branchIds || []).length === 0 || (group.branchIds || []).includes(ALL_BRANCHES_VALUE)
+                                      ? 'Todas as unidades'
+                                      : (group.branchIds || []).map((id) => branchOptions.find((option) => option.value === id)?.label || id).join(', ')}
+                                  </Text>
+                                </Table.Td>
                                 <Table.Td style={{ textAlign: 'center' }}>
                                   <Group gap={4} justify="center">
                                     <ActionIcon variant="light" color="blue" size="sm" onClick={() => openEditGroupModal(index)}>
@@ -1249,6 +1382,33 @@ export function CadastroMedico() {
                       nothingFoundMessage="Nenhuma modalidade encontrada"
                       onChange={handleGroupDraftModalidadeChange}
                     />
+                    <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+                      <FloatingSelect
+                        label="Tipo do registro"
+                        required
+                        data={crmTypeOptions}
+                        value={groupDraft.registrationType}
+                        onChange={(value) => setGroupDraft((prev) => ({ ...prev, registrationType: value || '' }))}
+                        searchable
+                      />
+                      <FloatingInput
+                        label="Número do registro"
+                        required
+                        value={groupDraft.registrationNumber}
+                        onChange={(event) => {
+                          const registrationNumber = event.currentTarget.value;
+                          setGroupDraft((prev) => ({ ...prev, registrationNumber }));
+                        }}
+                      />
+                      <FloatingSelect
+                        label="UF do registro"
+                        required
+                        data={statesOptions}
+                        value={groupDraft.registrationState}
+                        onChange={(value) => setGroupDraft((prev) => ({ ...prev, registrationState: value || '' }))}
+                        searchable
+                      />
+                    </SimpleGrid>
                     <FloatingInput
                       label="Especialidade"
                       value={(groupDraft.modalidadeId ? especialidadeByModalidadeId.get(groupDraft.modalidadeId) : null)?.name || ''}
@@ -1268,15 +1428,17 @@ export function CadastroMedico() {
                       onChange={(values) => setGroupDraft((prev) => ({ ...prev, metodos: values }))}
                     />
                     <FloatingMultiSelect
-                      label="Procedimentos"
-                      placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os procedimentos'}
-                      data={procedureOptionsForModalidade(groupDraft.modalidadeId)}
-                      value={groupDraft.procedimentoIds}
-                      disabled={!groupDraft.modalidadeId}
+                      label="Unidades atendidas"
+                      placeholder="Selecione as unidades"
+                      data={branchOptionsWithAll}
+                      value={(groupDraft.branchIds || []).length > 0 ? groupDraft.branchIds : [ALL_BRANCHES_VALUE]}
                       searchable
                       clearable
-                      nothingFoundMessage="Nenhum procedimento disponível"
-                      onChange={(values) => setGroupDraft((prev) => ({ ...prev, procedimentoIds: values }))}
+                      nothingFoundMessage="Nenhuma unidade encontrada"
+                      onChange={(values) => setGroupDraft((prev) => ({
+                        ...prev,
+                        branchIds: values.includes(ALL_BRANCHES_VALUE) ? [ALL_BRANCHES_VALUE] : values,
+                      }))}
                     />
                     <Group justify="flex-end" mt={8}>
                       <Button variant="default" onClick={() => setGroupModalOpen(false)} size="sm">
@@ -1289,27 +1451,219 @@ export function CadastroMedico() {
                   </Stack>
                 </Modal>
 
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingMultiSelect
-                    label="Unidades atendidas"
-                    placeholder="Selecione as unidades"
-                    data={branchOptions}
-                    value={form.branchIds}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhuma unidade encontrada"
-                    onChange={(values) => setForm((prev) => ({ ...prev, branchIds: values }))}
-                  />
-                  <DurationTagInput
-                    label="Tempo de atendimento (minutos)"
-                    placeholder="Digite e pressione Enter"
-                    values={form.appointmentDurations}
-                    onAdd={(value) => setForm((prev) => (prev.appointmentDurations.includes(value)
-                      ? prev
-                      : { ...prev, appointmentDurations: [...prev.appointmentDurations, value].sort((a, b) => a - b) }))}
-                    onRemove={(value) => setForm((prev) => ({ ...prev, appointmentDurations: prev.appointmentDurations.filter((v) => v !== value) }))}
-                  />
-                </SimpleGrid>
+                <Paper withBorder radius="md" p="md" mt="md">
+                  <Group justify="space-between" align="flex-start" mb="md">
+                    <Box>
+                      <Text size="sm" fw={600}>Procedimentos do profissional</Text>
+                      <Text size="xs" c="dimmed">Defina o tempo específico de atendimento para cada procedimento.</Text>
+                    </Box>
+                    <Badge variant="light" color="blue">
+                      {form.procedureDurations.length} vinculado(s)
+                    </Badge>
+                  </Group>
+
+                  {selectedModalidadeIds.size === 0 ? (
+                    <Paper withBorder radius="sm" p="md" mt="md" bg="var(--mantine-color-gray-light)">
+                      <Text size="sm" c="dimmed" ta="center">Adicione uma modalidade nos conjuntos acima para listar os procedimentos disponíveis.</Text>
+                    </Paper>
+                  ) : (
+                    <SimpleGrid
+                      cols={{ base: 1, md: 3 }}
+                      spacing="sm"
+                      mt="md"
+                      style={{
+                        alignItems: 'stretch',
+                        gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 72px minmax(0, 1fr)',
+                      }}
+                    >
+                      <Paper withBorder radius="sm" p="sm">
+                        <Group justify="space-between" mb="xs">
+                          <Text size="sm" fw={600}>Disponíveis</Text>
+                          <Badge variant="light" color="gray">{availableProcedureOptions.length}</Badge>
+                        </Group>
+                        <FloatingInput
+                          label="Buscar procedimento"
+                          value={availableProcedureSearch}
+                          onChange={(event) => setAvailableProcedureSearch(event.currentTarget.value)}
+                          containerProps={{ mb: 'sm' }}
+                        />
+                        <Box style={{ height: 'min(420px, 45vh)', minHeight: 260, overflowY: 'auto' }}>
+                          {filteredAvailableProcedures.length === 0 ? (
+                            <Text size="sm" c="dimmed" ta="center" py="xl">Nenhum procedimento disponível.</Text>
+                          ) : filteredAvailableProcedures.map((option) => {
+                            const selected = selectedAvailableProcedureIds.includes(option.value);
+                            const procedure = procedureList.find((candidate: any) => String(candidate.id) === option.value);
+                            return (
+                              <Paper
+                                key={option.value}
+                                withBorder
+                                radius="sm"
+                                p="xs"
+                                mb={6}
+                                onClick={() => setSelectedAvailableProcedureIds((prev) => selected ? prev.filter((id) => id !== option.value) : [...prev, option.value])}
+                                style={{
+                                  cursor: 'pointer',
+                                  borderColor: selected ? 'var(--mantine-color-blue-6)' : undefined,
+                                  background: selected ? 'var(--mantine-color-blue-light)' : undefined,
+                                }}
+                              >
+                                <Text size="sm" fw={500}>{option.label}</Text>
+                                <Text size="xs" c="dimmed">
+                                  {procedure?.durationMinutes ? `${procedure.durationMinutes} min padrão` : 'Sem duração padrão'}
+                                </Text>
+                              </Paper>
+                            );
+                          })}
+                        </Box>
+                      </Paper>
+
+                      <Stack justify="center" align="center" gap="xs" visibleFrom="md">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          size="lg"
+                          disabled={selectedAvailableProcedureIds.length === 0}
+                          onClick={moveProceduresToLinked}
+                          aria-label="Vincular procedimentos selecionados"
+                        >
+                          <ChevronRight size={18} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          size="lg"
+                          disabled={availableProcedureOptions.length === 0}
+                          onClick={moveAllProceduresToLinked}
+                          aria-label="Vincular todos os procedimentos"
+                        >
+                          <ChevronsRight size={18} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          color="gray"
+                          size="lg"
+                          disabled={selectedLinkedProcedureIds.length === 0}
+                          onClick={moveProceduresToAvailable}
+                          aria-label="Remover procedimentos selecionados"
+                        >
+                          <ChevronLeft size={18} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          color="gray"
+                          size="lg"
+                          disabled={form.procedureDurations.length === 0}
+                          onClick={moveAllProceduresToAvailable}
+                          aria-label="Remover todos os procedimentos"
+                        >
+                          <ChevronsLeft size={18} />
+                        </ActionIcon>
+                      </Stack>
+
+                      <Paper withBorder radius="sm" p="sm" hiddenFrom="md">
+                        <Group justify="center" gap="xs">
+                          <Button variant="light" leftSection={<ChevronRight size={16} />} disabled={selectedAvailableProcedureIds.length === 0} onClick={moveProceduresToLinked}>
+                            Vincular selecionados
+                          </Button>
+                          <Button variant="light" leftSection={<ChevronsRight size={16} />} disabled={availableProcedureOptions.length === 0} onClick={moveAllProceduresToLinked}>
+                            Vincular todos
+                          </Button>
+                          <Button variant="subtle" leftSection={<ChevronLeft size={16} />} disabled={selectedLinkedProcedureIds.length === 0} onClick={moveProceduresToAvailable}>
+                            Remover selecionados
+                          </Button>
+                          <Button variant="subtle" leftSection={<ChevronsLeft size={16} />} disabled={form.procedureDurations.length === 0} onClick={moveAllProceduresToAvailable}>
+                            Remover todos
+                          </Button>
+                        </Group>
+                      </Paper>
+
+                      <Paper withBorder radius="sm" p="sm">
+                        <Group justify="space-between" mb="xs">
+                          <Text size="sm" fw={600}>Vinculados</Text>
+                          <Badge variant="light" color="blue">{form.procedureDurations.length}</Badge>
+                        </Group>
+                        <FloatingInput
+                          label="Buscar vinculados"
+                          value={linkedProcedureSearch}
+                          onChange={(event) => setLinkedProcedureSearch(event.currentTarget.value)}
+                          containerProps={{ mb: 'sm' }}
+                        />
+                        <Box style={{ height: 'min(420px, 45vh)', minHeight: 260, overflowY: 'auto' }}>
+                          {filteredLinkedProcedures.length === 0 ? (
+                            <Text size="sm" c="dimmed" ta="center" py="xl">Nenhum procedimento vinculado.</Text>
+                          ) : filteredLinkedProcedures.map((item) => {
+                            const selected = selectedLinkedProcedureIds.includes(item.procedureId);
+                            const procedure = procedureList.find((candidate: any) => String(candidate.id) === item.procedureId);
+                            const invalidDuration = !Number.isFinite(item.durationMinutes) || item.durationMinutes <= 0;
+                            return (
+                              <Paper
+                                key={item.procedureId}
+                                withBorder
+                                radius="sm"
+                                p="xs"
+                                mb={6}
+                                onClick={() => setSelectedLinkedProcedureIds((prev) => selected ? prev.filter((id) => id !== item.procedureId) : [...prev, item.procedureId])}
+                                style={{
+                                  cursor: 'pointer',
+                                  borderColor: selected ? 'var(--mantine-color-blue-6)' : undefined,
+                                  background: selected ? 'var(--mantine-color-blue-light)' : undefined,
+                                }}
+                              >
+                                <Group justify="space-between" align="center" wrap={isMobile ? 'wrap' : 'nowrap'} gap="sm">
+                                  <Box style={{ minWidth: 0, flex: '1 1 140px' }}>
+                                    <Text size="sm" fw={500} truncate>{item.procedureName || procedure?.name || 'Procedimento'}</Text>
+                                    <Text size="xs" c="dimmed">{procedure?.modalidade?.name || 'Modalidade não informada'}</Text>
+                                  </Box>
+                                    <Box
+                                      onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
+                                      style={{
+                                        width: 112,
+                                        padding: '5px 9px 6px',
+                                        borderRadius: 8,
+                                        border: `1px solid ${invalidDuration ? 'var(--mantine-color-red-5)' : 'var(--mantine-color-default-border)'}`,
+                                        background: isDarkMode ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
+                                      }}
+                                    >
+                                      <Text size="xs" c={invalidDuration ? 'red' : 'dimmed'} mb={2}>Duração</Text>
+                                      <Group gap={5} wrap="nowrap" align="center">
+                                      <input
+                                        aria-label={`Duração de ${item.procedureName || 'procedimento'}`}
+                                        type="number"
+                                        min={1}
+                                        value={String(item.durationMinutes || '')}
+                                        onChange={(event) => {
+                                          const durationMinutes = Number(event.currentTarget.value);
+                                          setForm((prev) => ({
+                                            ...prev,
+                                            procedureDurations: prev.procedureDurations.map((row) => (
+                                              row.procedureId === item.procedureId ? { ...row, durationMinutes } : row
+                                            )),
+                                          }));
+                                        }}
+                                        style={{
+                                          width: 55,
+                                          border: 0,
+                                          outline: 0,
+                                          background: 'transparent',
+                                          color: 'var(--mantine-color-text)',
+                                          fontSize: 15,
+                                          fontWeight: 600,
+                                          textAlign: 'right',
+                                        }}
+                                      />
+                                      <Text size="xs" c="dimmed">min</Text>
+                                      </Group>
+                                      {invalidDuration ? <Text size="xs" c="red" mt={2}>Informe o tempo</Text> : null}
+                                    </Box>
+                                </Group>
+                              </Paper>
+                            );
+                          })}
+                        </Box>
+                      </Paper>
+                    </SimpleGrid>
+                  )}
+                </Paper>
 
                 <Switch
                   mt="md"
@@ -1538,7 +1892,7 @@ export function CadastroMedico() {
                           <Table.Th>CRM</Table.Th>
                           <Table.Th>Especialidade</Table.Th>
                           <Table.Th>Status</Table.Th>
-                          <Table.Th>Ações</Table.Th>
+                          <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -1642,7 +1996,7 @@ export function CadastroMedico() {
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CRM</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Especialidade</Table.Th>}
                           {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -1688,8 +2042,8 @@ export function CadastroMedico() {
                                   </Badge>
                                 </Table.Td>
                               )}
-                              <Table.Td>
-                                <Group justify="flex-end">
+                              <Table.Td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                <Group justify="center" align="center">
                                   <Menu shadow="md" width={220} position="bottom-end" withArrow>
                                     <Menu.Target>
                                       <ActionIcon variant="light" size="sm" aria-label="Ações do profissional">
@@ -1829,6 +2183,3 @@ export function CadastroMedico() {
     </Box>
   );
 }
-
-
-
