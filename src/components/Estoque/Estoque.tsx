@@ -1828,7 +1828,7 @@ export function Estoque() {
         variant={lastItemAction === 'created' ? 'success' : 'success'}
         title={lastItemAction === 'created' ? 'Item cadastrado' : 'Item atualizado'}
         message={lastCreatedItemName ? `${lastCreatedItemName} ${lastItemAction === 'created' ? 'foi adicionado ao estoque.' : 'foi atualizado com sucesso.'}` : (lastItemAction === 'created' ? 'Item adicionado com sucesso.' : 'Item atualizado com sucesso.')}
-        secondary={{ label: 'Voltar', onClick: () => setShowItemSuccessModal(false) }}
+        secondary={{ label: 'Voltar para Gestão e Apoio', onClick: () => { setShowItemSuccessModal(false); navigate('/dashboard?secao=gestao-e-apoio'); } }}
         primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ codigo: '', nome: '', categoria: '', unidade: '', quantidade: null, minimo: null, maximo: null, precoUnitario: null, validade: null }); setShowItemSuccessModal(false); setModalOpen(true); setEditingId(null); } }}
       />
 
@@ -1843,6 +1843,4 @@ export function Estoque() {
     </Box>
   );
 }
-
-
 

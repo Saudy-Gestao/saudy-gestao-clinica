@@ -31,7 +31,7 @@ import { FloatingNumberInput } from '../common/FloatingNumberInput';
 import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
-import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
+import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
@@ -44,7 +44,7 @@ interface ProcedureForm {
   durationMinutes?: number | null;
   supportsTeleconsultation: boolean;
   modalities: string[];
-  modalidadeId: string | null;
+  especialidadeId: string | null;
   branchIds: string[];
 }
 
@@ -54,7 +54,8 @@ interface ProcedureItem {
   appointmentType: 'CONSULTA' | 'EXAME';
   supportsTeleconsultation: boolean;
   modalities: string[];
-  modalidadeId: string | null;
+  especialidadeId: string | null;
+  especialidadeName: string | null;
   modalidadeName: string | null;
   branchIds: string[];
   isActive: boolean;
@@ -67,7 +68,7 @@ const INITIAL_FORM: ProcedureForm = {
   durationMinutes: null,
   supportsTeleconsultation: false,
   modalities: [],
-  modalidadeId: null,
+  especialidadeId: null,
   branchIds: [],
 };
 
@@ -103,16 +104,19 @@ export function CadastroProcedimento() {
   const [procedurePage, setProcedurePage] = useState(1);
   const [procedurePageSize, setProcedurePageSize] = useState(10);
   const proceduresQuery = useProceduresAdminQuery();
-  const modalidadesQuery = useModalidadesAdminQuery();
+  const especialidadesQuery = useEspecialidadesAdminQuery();
   const branchesQuery = useSettingsBranchesQuery();
 
-  const modalidadeOptions = useMemo(() => {
-    const data: any = modalidadesQuery.data;
+  const especialidadeOptions = useMemo(() => {
+    const data: any = especialidadesQuery.data;
     const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
     return list
       .filter((m: any) => m?.id && m.isActive)
-      .map((m: any) => ({ value: m.id, label: m.name }));
-  }, [modalidadesQuery.data]);
+      .map((item: any) => ({
+        value: String(item.id),
+        label: item.modalidade?.name ? `${item.name} — ${item.modalidade.name}` : item.name,
+      }));
+  }, [especialidadesQuery.data]);
 
   const branchOptions = useMemo(() => {
     const data: any = branchesQuery.data;
@@ -188,7 +192,8 @@ export function CadastroProcedimento() {
       modalities: Array.isArray(it.modalities)
         ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
         : [],
-      modalidadeId: it.modalidadeId || it.modalidade?.id || null,
+      especialidadeId: it.especialidadeId || it.especialidade?.id || null,
+      especialidadeName: it.especialidade?.name || null,
       modalidadeName: it.modalidade?.name || null,
       branchIds: Array.isArray(it.branchIds) ? it.branchIds.map((id: any) => String(id)) : [],
       isActive: Boolean(it.isActive ?? true),
@@ -217,7 +222,7 @@ export function CadastroProcedimento() {
           ...form.modalities.filter((modality) => modality !== TELECONSULT_MODALITY),
           ...(form.appointmentType === 'CONSULTA' && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
         ],
-        modalidadeId: form.modalidadeId || null,
+        especialidadeId: form.especialidadeId || null,
         branchIds: form.branchIds,
       };
 
@@ -300,7 +305,7 @@ export function CadastroProcedimento() {
         modalities: Array.isArray(data.modalities)
           ? data.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
           : [],
-        modalidadeId: data.modalidadeId || data.modalidade?.id || null,
+        especialidadeId: data.especialidadeId || data.especialidade?.id || null,
         branchIds: Array.isArray(data.branchIds) ? data.branchIds.map((id: any) => String(id)) : [],
       });
 
@@ -445,14 +450,14 @@ export function CadastroProcedimento() {
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <FloatingSelect
-                    label="Modalidade"
-                    placeholder="Selecione a modalidade de exame"
-                    data={modalidadeOptions}
-                    value={form.modalidadeId}
+                    label="Especialidade"
+                    placeholder="Selecione a especialidade"
+                    data={especialidadeOptions}
+                    value={form.especialidadeId}
                     searchable
                     clearable
-                    nothingFoundMessage="Nenhuma modalidade encontrada"
-                    onChange={(value) => setForm((prev) => ({ ...prev, modalidadeId: value }))}
+                    nothingFoundMessage="Nenhuma especialidade encontrada"
+                    onChange={(value) => setForm((prev) => ({ ...prev, especialidadeId: value }))}
                   />
                   <FloatingMultiSelect
                     label="Unidades atendidas"
@@ -607,9 +612,9 @@ export function CadastroProcedimento() {
                             <Group justify="space-between" align="flex-start" wrap="nowrap">
                               <Stack gap={4} style={{ flex: 1 }}>
                                 <Text fw={600} size="sm">{item.name}</Text>
-                                {item.modalidadeName && (
+                                {item.especialidadeName && (
                                   <Text size="xs" c="dimmed">
-                                    Modalidade: {item.modalidadeName}
+                                    Especialidade: {item.especialidadeName}
                                   </Text>
                                 )}
                                 <Group gap="xs">
@@ -704,9 +709,9 @@ export function CadastroProcedimento() {
                                 <Table.Td>
                                   <Stack gap={2}>
                                     <Text fw={600} size="sm">{item.name}</Text>
-                                    {item.modalidadeName && (
+                                    {item.especialidadeName && (
                                       <Text size="xs" c="dimmed">
-                                        Modalidade: {item.modalidadeName}
+                                        Especialidade: {item.especialidadeName}
                                       </Text>
                                     )}
                                     <Text size="xs" c="dimmed">
@@ -805,10 +810,10 @@ export function CadastroProcedimento() {
           onClick: () => setShowSuccessModal(false),
         }}
         secondary={{
-          label: 'Voltar ao dashboard',
+          label: 'Voltar para Cadastros Clínicos',
           onClick: () => {
             setShowSuccessModal(false);
-            navigate('/dashboard');
+            navigate('/dashboard?secao=cadastros-clinicos');
           },
         }}
       />

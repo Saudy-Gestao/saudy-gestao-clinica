@@ -391,7 +391,13 @@ export function CadastroMedico() {
   const procedureOptions = useMemo(() => (
     procedureList
       .filter((procedure: any) => {
-        const procedureModalidadeId = String(procedure.modalidadeId || procedure.modalidade?.id || '').trim();
+        const procedureModalidadeId = String(
+          procedure.especialidade?.modalidadeId
+            || procedure.especialidade?.modalidade?.id
+            || procedure.modalidadeId
+            || procedure.modalidade?.id
+            || '',
+        ).trim();
         if (procedureModalidadeId && selectedModalidadeIds.has(procedureModalidadeId)) return true;
 
         const selectedModalidades = modalidadeOptions.filter((option) => selectedModalidadeIds.has(option.value));
@@ -552,7 +558,9 @@ export function CadastroMedico() {
         return {
           procedureId: option.value,
           procedureName: option.label,
-          modalidadeId: procedure?.modalidadeId ? String(procedure.modalidadeId) : null,
+          modalidadeId: procedure?.especialidade?.modalidadeId || procedure?.modalidadeId
+            ? String(procedure.especialidade?.modalidadeId || procedure?.modalidadeId)
+            : null,
           durationMinutes: Number.isFinite(defaultDuration) && defaultDuration > 0 ? Math.round(defaultDuration) : 0,
         };
       });
@@ -2177,7 +2185,7 @@ export function CadastroMedico() {
           title="Profissional cadastrado"
           message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Profissional cadastrado com sucesso.'}
           primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ ...INITIAL_DOCTOR_FORM }); setShowSuccessModal(false); } }}
-          secondary={{ label: 'Voltar para o dashboard', onClick: () => { setShowSuccessModal(false); navigate('/dashboard'); } }}
+          secondary={{ label: 'Voltar para Cadastros Clínicos', onClick: () => { setShowSuccessModal(false); navigate('/dashboard?secao=cadastros-clinicos'); } }}
         />
 
         <ResultModal opened={showErrorModal} onClose={() => setShowErrorModal(false)} variant="error" title="Erro ao cadastrar profissional" message={errorMessage || 'Erro ao registrar profissional'} secondary={{ label: 'Fechar', onClick: () => setShowErrorModal(false) }} />

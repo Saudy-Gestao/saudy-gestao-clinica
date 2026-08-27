@@ -1153,11 +1153,11 @@ export function CadastroEquipamento() {
           },
         }}
         secondary={{
-          label: 'Ver lista',
+          label: 'Voltar para Cadastros Clínicos',
           variant: 'default',
           onClick: () => {
             setSuccessOpen(false);
-            setActiveTab('lista');
+            navigate('/dashboard?secao=cadastros-clinicos');
           },
         }}
       />

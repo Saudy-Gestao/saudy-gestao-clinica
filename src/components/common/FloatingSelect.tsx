@@ -23,6 +23,7 @@ export function FloatingSelect({ label, containerProps, value, error, alwaysFloa
       >
         <Select
           {...props}
+          searchable={props.searchable !== false}
           value={value}
           error={undefined}
           label={undefined}

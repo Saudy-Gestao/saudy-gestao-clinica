@@ -7,7 +7,7 @@ export interface CreateProcedurePayload {
   price?: number | null;
   durationMinutes?: number | null;
   modalities?: string[];
-  modalidadeId?: string | null;
+  especialidadeId?: string | null;
   branchIds?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];
@@ -25,7 +25,7 @@ export interface UpdateProcedurePayload {
   price?: number | null;
   durationMinutes?: number | null;
   modalities?: string[];
-  modalidadeId?: string | null;
+  especialidadeId?: string | null;
   branchIds?: string[];
   doctors?: { doctorId: string; doctorName?: string | null }[];
   procedureMaterials?: { inventoryItemId: string; quantity: number }[];

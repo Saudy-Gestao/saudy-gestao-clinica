@@ -1762,7 +1762,7 @@ export function CadastroPaciente() {
           variant="success"
           title="Paciente cadastrado"
           message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Paciente cadastrado com sucesso.'}
-          secondary={{ label: 'Voltar para o dashboard', onClick: () => { setShowSuccessModal(false); navigate('/dashboard'); } }}
+          secondary={{ label: 'Voltar para Cadastros Clínicos', onClick: () => { setShowSuccessModal(false); navigate('/dashboard?secao=cadastros-clinicos'); } }}
           primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ ...INITIAL_PATIENT_FORM }); setShowSuccessModal(false); } }}
         />
 

@@ -138,15 +138,7 @@ export function CadastroEspecialidades() {
       .map((c: any) => ({ value: c.id, label: `${c.code} — ${c.title}` }));
   }, [cbosQuery.data]);
 
-  const modalidadeIdsWithEspecialidade = useMemo(
-    () => new Set(items.filter((it) => it.isActive).map((it) => it.modalidadeId)),
-    [items],
-  );
-
-  const createModalidadeOptions = useMemo(
-    () => modalidadeOptions.filter((opt) => !modalidadeIdsWithEspecialidade.has(opt.value)),
-    [modalidadeOptions, modalidadeIdsWithEspecialidade],
-  );
+  const createModalidadeOptions = modalidadeOptions;
 
   // Modal criar (item único)
   const [createModalOpen, setCreateModalOpen] = useState(false);
