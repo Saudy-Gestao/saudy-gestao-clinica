@@ -390,13 +390,25 @@ export function CadastroMedico() {
 
   const procedureOptions = useMemo(() => (
     procedureList
-      .filter((procedure: any) => selectedModalidadeIds.has(String(procedure.modalidadeId || '')))
+      .filter((procedure: any) => {
+        const procedureModalidadeId = String(procedure.modalidadeId || procedure.modalidade?.id || '').trim();
+        if (procedureModalidadeId && selectedModalidadeIds.has(procedureModalidadeId)) return true;
+
+        const selectedModalidades = modalidadeOptions.filter((option) => selectedModalidadeIds.has(option.value));
+        const legacyModalidades = Array.isArray(procedure.modalidades)
+          ? procedure.modalidades.map((value: unknown) => String(value).trim().toLowerCase())
+          : [];
+        return selectedModalidades.some((option) => (
+          legacyModalidades.includes(String(option.value).toLowerCase())
+          || legacyModalidades.includes(String(option.label).trim().toLowerCase())
+        ));
+      })
       .map((procedure: any) => ({
         value: String(procedure.id),
         label: String(procedure.name || 'Procedimento sem nome'),
       }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
-  ), [procedureList, selectedModalidadeIds]);
+  ), [modalidadeOptions, procedureList, selectedModalidadeIds]);
 
   const especialidadeByModalidadeId = useMemo(() => {
     const map = new Map<string, any>();
