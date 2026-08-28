@@ -109,9 +109,15 @@ export function CadastroSala() {
     return list.filter((e: any) => e?.id && e.isActive);
   }, [especialidadesQuery.data]);
 
-  const especialidadeByModalidadeId = useMemo(() => {
-    const map = new Map<string, any>();
-    especialidadeList.forEach((e: any) => map.set(e.modalidadeId, e));
+  const especialidadesByModalidadeId = useMemo(() => {
+    const map = new Map<string, any[]>();
+    especialidadeList.forEach((especialidade: any) => {
+      const modalidadeId = String(especialidade.modalidadeId || '').trim();
+      if (!modalidadeId) return;
+      const current = map.get(modalidadeId) || [];
+      current.push(especialidade);
+      map.set(modalidadeId, current);
+    });
     return map;
   }, [especialidadeList]);
 
@@ -241,8 +247,7 @@ export function CadastroSala() {
   };
 
   const handleModalidadeChange = (modalidadeId: string | null) => {
-    const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
-    setForm((prev) => ({ ...prev, modalidadeId: modalidadeId || '', especialidadeId: especialidade?.id || '' }));
+    setForm((prev) => ({ ...prev, modalidadeId: modalidadeId || '', especialidadeId: '' }));
   };
 
   const handleSave = async () => {
@@ -618,12 +623,19 @@ export function CadastroSala() {
               clearable
               nothingFoundMessage="Nenhuma modalidade encontrada"
             />
-            <FloatingInput
+            <FloatingSelect
               label="Especialidade"
-              value={(form.modalidadeId ? especialidadeByModalidadeId.get(form.modalidadeId) : null)?.name || ''}
-              disabled
-              containerProps={{ opacity: 0.7 }}
-              placeholder={form.modalidadeId ? 'Modalidade sem especialidade cadastrada' : 'Selecione uma modalidade'}
+              placeholder={form.modalidadeId ? 'Selecione a especialidade' : 'Selecione uma modalidade primeiro'}
+              data={(form.modalidadeId ? especialidadesByModalidadeId.get(form.modalidadeId) || [] : []).map((especialidade: any) => ({
+                value: String(especialidade.id),
+                label: String(especialidade.name || 'Especialidade sem nome'),
+              }))}
+              value={form.especialidadeId || null}
+              onChange={(value) => setForm((prev) => ({ ...prev, especialidadeId: value || '' }))}
+              disabled={!form.modalidadeId}
+              searchable
+              clearable
+              nothingFoundMessage="Nenhuma especialidade disponível"
             />
           </Group>
           <FloatingInput

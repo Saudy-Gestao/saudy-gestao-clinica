@@ -41,7 +41,7 @@ import { PaginatedGrid } from '../common/PaginatedGrid';
 interface ProcedureForm {
   name: string;
   description: string;
-  appointmentType: 'CONSULTA_CLINICA' | 'CONSULTA_TERAPIAS' | 'EXAME';
+  appointmentType: 'CONSULTA_CLINICA' | 'CONSULTA_TERAPIAS' | 'EXAME' | null;
   durationMinutes?: number | null;
   supportsTeleconsultation: boolean;
   modalities: string[];
@@ -68,7 +68,7 @@ interface ProcedureItem {
 const INITIAL_FORM: ProcedureForm = {
   name: '',
   description: '',
-  appointmentType: 'CONSULTA_CLINICA',
+  appointmentType: null,
   durationMinutes: null,
   supportsTeleconsultation: false,
   modalities: [],
@@ -102,6 +102,7 @@ export function CadastroProcedimento() {
   const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [form, setForm] = useState<ProcedureForm>(INITIAL_FORM);
+  const [formResetKey, setFormResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [procedures, setProcedures] = useState<ProcedureItem[]>([]);
   const [proceduresLoading, setProceduresLoading] = useState(false);
@@ -208,7 +209,7 @@ export function CadastroProcedimento() {
     const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
       id: String(it.id ?? it.procedureId ?? ''),
       name: it.name || 'Procedimento',
-      appointmentType: normalizeAppointmentType(it.appointmentType),
+      appointmentType: normalizeAppointmentType(it.appointmentType) as ProcedureItem['appointmentType'],
       supportsTeleconsultation: Array.isArray(it.modalities) ? it.modalities.includes(TELECONSULT_MODALITY) : false,
       modalities: Array.isArray(it.modalities)
         ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
@@ -234,6 +235,15 @@ export function CadastroProcedimento() {
       return;
     }
 
+    if (!form.appointmentType) {
+      showNotification({
+        title: 'Campo obrigatorio',
+        message: 'Informe o tipo do procedimento.',
+        color: 'red',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -254,7 +264,7 @@ export function CadastroProcedimento() {
         await procedureService.updateProcedure(editingProcedureId, payload);
         setLastSaveAction('update');
         setEditingProcedureId(null);
-        setForm(INITIAL_FORM);
+        resetForm();
 
         setActiveTab('lista');
         showNotification({ title: 'Procedimento atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
@@ -263,7 +273,7 @@ export function CadastroProcedimento() {
         setLastSaveAction('create');
         setLastCreatedName(form.name.trim());
         setShowSuccessModal(true);
-        setForm(INITIAL_FORM);
+        resetForm();
 
         setProcedureQuery('');
       }
@@ -277,14 +287,19 @@ export function CadastroProcedimento() {
     }
   };
 
+  const resetForm = () => {
+    setForm({ ...INITIAL_FORM });
+    setFormResetKey((current) => current + 1);
+  };
+
   const handleCancel = () => {
     if (editingProcedureId) {
       setEditingProcedureId(null);
-      setForm(INITIAL_FORM);
+      resetForm();
       setActiveTab('lista');
       return;
     }
-    setForm(INITIAL_FORM);
+    resetForm();
     navigate('/dashboard');
   };
 
@@ -431,7 +446,7 @@ export function CadastroProcedimento() {
               </Group>
 
               {activeTab === 'cadastro' ? (
-                <Paper p="lg">
+                <Paper key={formResetKey} p="lg">
                 {editingProcedureId && (
                   <Text size="sm" c="dimmed" mb="md">
                     Editando procedimento. Ajuste os dados e salve as alterações.
@@ -467,7 +482,7 @@ export function CadastroProcedimento() {
                   <FloatingNumberInput
                     label="Duração (minutos)"
                     placeholder="Ex: 50"
-                    value={form.durationMinutes ?? undefined}
+                    value={form.durationMinutes}
                     onChange={(value) => setForm((prev) => ({ ...prev, durationMinutes: typeof value === 'number' ? value : null }))}
                     min={1}
                     step={5}

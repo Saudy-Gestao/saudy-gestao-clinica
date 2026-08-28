@@ -20,6 +20,7 @@ export const queryKeys = {
   medicalEquipments: ['medical-equipments'] as const,
   patientsAdmin: ['patients-admin'] as const,
   doctorsAdmin: ['doctors-admin'] as const,
+  internsAdmin: ['interns-admin'] as const,
   insurancesAdmin: ['insurances-admin'] as const,
   modalidadesAdmin: ['modalidades-admin'] as const,
   especialidadesAdmin: ['especialidades-admin'] as const,

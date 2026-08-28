@@ -117,6 +117,7 @@ const getApiList = (response: unknown): ApiRecord[] => {
 interface DoctorEspecialidadeGroup {
   modalidadeId: string | null;
   especialidadeId: string | null;
+  especialidadeIds: string[];
   registrationType: string;
   registrationNumber: string;
   registrationState: string;
@@ -416,9 +417,15 @@ export function CadastroMedico() {
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   ), [modalidadeOptions, procedureList, selectedModalidadeIds]);
 
-  const especialidadeByModalidadeId = useMemo(() => {
-    const map = new Map<string, any>();
-    especialidadeList.forEach((e: any) => map.set(e.modalidadeId, e));
+  const especialidadesByModalidadeId = useMemo(() => {
+    const map = new Map<string, any[]>();
+    especialidadeList.forEach((especialidade: any) => {
+      const modalidadeId = String(especialidade.modalidadeId || '').trim();
+      if (!modalidadeId) return;
+      const current = map.get(modalidadeId) || [];
+      current.push(especialidade);
+      map.set(modalidadeId, current);
+    });
     return map;
   }, [especialidadeList]);
 
@@ -438,14 +445,19 @@ export function CadastroMedico() {
   );
 
   const metodoOptionsForModalidade = (modalidadeId: string | null) => {
-    const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
-    const metodos: string[] = Array.isArray(especialidade?.metodos) ? especialidade.metodos : [];
-    return metodos.map((m) => ({ value: m, label: m }));
+    const especialidades = modalidadeId ? especialidadesByModalidadeId.get(modalidadeId) || [] : [];
+    const metodos = Array.from(new Set(
+      especialidades.flatMap((especialidade: any) => (
+        Array.isArray(especialidade?.metodos) ? especialidade.metodos : []
+      )),
+    ));
+    return metodos.map((metodo) => ({ value: metodo, label: metodo }));
   };
 
   const EMPTY_GROUP_DRAFT: DoctorEspecialidadeGroup = {
     modalidadeId: null,
     especialidadeId: null,
+    especialidadeIds: [],
     registrationType: form.crmType || 'CRM',
     registrationNumber: form.crm,
     registrationState: form.crmState,
@@ -502,16 +514,24 @@ export function CadastroMedico() {
   const openEditGroupModal = (index: number) => {
     setEditingGroupIndex(index);
     const group = form.especialidadeGroups[index];
-    setGroupDraft({ ...group, branchIds: group.branchIds || [ALL_BRANCHES_VALUE] });
+    const especialidadeIds = group.especialidadeIds?.length
+      ? group.especialidadeIds
+      : (group.especialidadeId ? [group.especialidadeId] : []);
+    setGroupDraft({
+      ...group,
+      especialidadeIds,
+      especialidadeId: especialidadeIds[0] || null,
+      branchIds: group.branchIds || [ALL_BRANCHES_VALUE],
+    });
     setGroupModalidadeError(null);
     setGroupModalOpen(true);
   };
 
   const handleGroupDraftModalidadeChange = (modalidadeId: string | null) => {
-    const especialidade = modalidadeId ? especialidadeByModalidadeId.get(modalidadeId) : null;
     setGroupDraft({
       modalidadeId,
-      especialidadeId: especialidade?.id || null,
+      especialidadeId: null,
+      especialidadeIds: [],
       registrationType: groupDraft.registrationType || form.crmType || 'CRM',
       registrationNumber: groupDraft.registrationNumber || form.crm,
       registrationState: groupDraft.registrationState || form.crmState,
@@ -760,6 +780,9 @@ export function CadastroMedico() {
           return {
             modalidadeId: getString(groupRecord.modalidadeId) || null,
             especialidadeId: getString(groupRecord.especialidadeId) || null,
+            especialidadeIds: Array.isArray(groupRecord.especialidadeIds)
+              ? (groupRecord.especialidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean)
+              : (getString(groupRecord.especialidadeId) ? [getString(groupRecord.especialidadeId)] : []),
             registrationType: getString(groupRecord.registrationType) || getString(raw.crmType) || 'CRM',
             registrationNumber: getString(groupRecord.registrationNumber) || getString(raw.crm),
             registrationState: getString(groupRecord.registrationState) || getString(raw.crmState ?? raw.ufCrm),
@@ -952,7 +975,10 @@ export function CadastroMedico() {
       // Especialidade principal foi removida da tela; deriva um rótulo a partir
       // das especialidades vinculadas pra manter os consumidores legados (busca, BI) funcionando.
       const derivedSpecialty = form.especialidadeGroups
-        .map((group) => especialidadeList.find((e: any) => e.id === group.especialidadeId)?.name)
+        .flatMap((group) => {
+          const ids = group.especialidadeIds?.length ? group.especialidadeIds : (group.especialidadeId ? [group.especialidadeId] : []);
+          return ids.map((id) => especialidadeList.find((e: any) => e.id === id)?.name);
+        })
         .filter(Boolean)
         .join(', ') || form.specialty || '';
 
@@ -1137,6 +1163,13 @@ export function CadastroMedico() {
                 title: 'Profissionais',
                 desc: 'Visualize, edite e gerencie o status dos profissionais registrados no sistema.',
                 onClick: () => setActiveTab('lista'),
+              },
+              {
+                key: 'estagiarios',
+                icon: UserPlus,
+                title: 'Estagiários',
+                desc: 'Cadastre estagiários e vincule um ou mais profissionais responsáveis.',
+                onClick: () => navigate('/cadastro-estagiario'),
               },
             ].map((card) => (
               <Paper
@@ -1341,12 +1374,15 @@ export function CadastroMedico() {
                         </Table.Thead>
                         <Table.Tbody>
                           {form.especialidadeGroups.map((group, index) => {
-                            const especialidade = group.modalidadeId ? especialidadeByModalidadeId.get(group.modalidadeId) : null;
+                            const especialidadeIds = group.especialidadeIds?.length ? group.especialidadeIds : (group.especialidadeId ? [group.especialidadeId] : []);
+                            const especialidadeNames = especialidadeIds
+                              .map((id) => especialidadeList.find((item: any) => item.id === id)?.name)
+                              .filter(Boolean);
                             const modalidadeName = modalidadeOptions.find((opt) => opt.value === group.modalidadeId)?.label || '—';
                             return (
                               <Table.Tr key={index}>
                                 <Table.Td><Text size="sm">{modalidadeName}</Text></Table.Td>
-                                <Table.Td><Text size="sm" c="dimmed">{especialidade?.name || '—'}</Text></Table.Td>
+                                <Table.Td><Text size="sm" c="dimmed">{especialidadeNames.join(', ') || '—'}</Text></Table.Td>
                                 <Table.Td>
                                   <Text size="sm" c="dimmed">
                                     {group.registrationNumber
@@ -1429,12 +1465,41 @@ export function CadastroMedico() {
                         searchable
                       />
                     </SimpleGrid>
-                    <FloatingInput
-                      label="Especialidade"
-                      value={(groupDraft.modalidadeId ? especialidadeByModalidadeId.get(groupDraft.modalidadeId) : null)?.name || ''}
-                      disabled
-                      containerProps={{ opacity: 0.7 }}
-                      placeholder={groupDraft.modalidadeId ? 'Modalidade sem especialidade cadastrada' : 'Selecione uma modalidade'}
+                    <FloatingMultiSelect
+                      label="Especialidades"
+                      placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione as especialidades'}
+                      data={(groupDraft.modalidadeId ? especialidadesByModalidadeId.get(groupDraft.modalidadeId) || [] : []).map((especialidade: any) => ({
+                        value: String(especialidade.id),
+                        label: String(especialidade.name || 'Especialidade sem nome'),
+                      }))}
+                      value={groupDraft.especialidadeIds || []}
+                      disabled={!groupDraft.modalidadeId}
+                      searchable
+                      clearable
+                      styles={{
+                        input: {
+                          minHeight: 52,
+                          maxHeight: 84,
+                          alignItems: 'flex-start',
+                          overflowY: 'auto',
+                          paddingTop: 24,
+                          paddingBottom: 6,
+                        },
+                        pillsList: {
+                          maxHeight: 48,
+                          overflowY: 'auto',
+                          paddingRight: 24,
+                        },
+                        inputField: {
+                          minWidth: 90,
+                        },
+                      }}
+                      nothingFoundMessage="Nenhuma especialidade disponível"
+                      onChange={(values) => setGroupDraft((prev) => ({
+                        ...prev,
+                        especialidadeIds: values,
+                        especialidadeId: values[0] || null,
+                      }))}
                     />
                     <FloatingMultiSelect
                       label="Métodos"

@@ -1336,13 +1336,116 @@ body {
 }
 
 /* Floating label inputs */
+.mantine-Modal-content {
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 18px;
+  background: var(--mantine-color-body);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 22%), 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.mantine-Modal-header {
+  min-height: 70px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+}
+
+.mantine-Modal-title {
+  color: var(--mantine-color-text);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.mantine-Modal-close {
+  color: var(--mantine-color-dimmed);
+  border-radius: 10px;
+  transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.mantine-Modal-close:hover {
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-default-hover);
+  transform: rotate(4deg);
+}
+
 .mantine-Modal-body {
-  overflow: visible;
+  max-height: calc(100vh - 110px);
+  padding: 26px 28px 28px;
+  background: var(--mantine-color-body);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.mantine-Modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mantine-Modal-body::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-default-border);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.mantine-Modal-body > .mantine-Group:last-child {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mantine-color-default-border);
 }
 
 .mantine-Modal-body .floating-field,
 .mantine-Modal-body .floating-mantine-field {
-  margin-top: 6px;
+  margin-top: 12px;
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Modal-content {
+  background: #24252b;
+  border-color: #4b4d57;
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Modal-header {
+  background: #1c1d22;
+  border-bottom-color: #444650;
+}
+
+:root[data-mantine-color-scheme='dark'] .mantine-Modal-body {
+  background: #292a30;
+}
+
+:root[data-mantine-color-scheme='light'] .mantine-Modal-content {
+  background: #ffffff;
+  border-color: #d9dee8;
+}
+
+:root[data-mantine-color-scheme='light'] .mantine-Modal-header {
+  background: #f6f8fc;
+  border-bottom-color: #e1e5ed;
+}
+
+:root[data-mantine-color-scheme='light'] .mantine-Modal-body {
+  background: #ffffff;
+}
+
+.mantine-Modal-body .mantine-Input-input,
+.mantine-Modal-body .mantine-Select-input,
+.mantine-Modal-body .mantine-MultiSelect-input,
+.mantine-Modal-body .mantine-DatePickerInput-input,
+.mantine-Modal-body .mantine-NumberInput-input,
+.mantine-Modal-body .mantine-Textarea-input {
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.mantine-Modal-body .mantine-Input-input:focus,
+.mantine-Modal-body .mantine-Select-input:focus,
+.mantine-Modal-body .mantine-MultiSelect-input:focus,
+.mantine-Modal-body .mantine-DatePickerInput-input:focus,
+.mantine-Modal-body .mantine-NumberInput-input:focus,
+.mantine-Modal-body .mantine-Textarea-input:focus {
+  box-shadow: 0 2px 0 var(--mantine-color-darkBlue-6);
 }
 
 .floating-field {
@@ -1367,6 +1470,18 @@ body {
   outline: none;
   border-bottom: 2px solid var(--mantine-color-darkBlue-6, #001F54);
   padding-bottom: 5px;
+}
+
+/* Keep the placeholder from colliding with the floating label while idle. */
+.floating-field input::placeholder {
+  color: transparent;
+  opacity: 0;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.floating-field input:focus::placeholder {
+  color: var(--mantine-color-placeholder);
+  opacity: 1;
 }
 
 .floating-field label {

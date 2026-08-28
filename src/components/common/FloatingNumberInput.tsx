@@ -1,9 +1,10 @@
 import { Box, NumberInput, Text, type BoxProps, type NumberInputProps } from '@mantine/core';
 import type { ReactNode } from 'react';
 
-interface FloatingNumberInputProps extends NumberInputProps {
+interface FloatingNumberInputProps extends Omit<NumberInputProps, 'value'> {
   label: ReactNode;
   containerProps?: BoxProps;
+  value?: NumberInputProps['value'] | null;
 }
 
 export function FloatingNumberInput({ label, containerProps, value, error, description, ...props }: FloatingNumberInputProps) {
@@ -18,7 +19,7 @@ export function FloatingNumberInput({ label, containerProps, value, error, descr
       >
         <NumberInput
           {...props}
-          value={value}
+          value={value as NumberInputProps['value']}
           error={undefined}
           description={undefined}
           label={undefined}

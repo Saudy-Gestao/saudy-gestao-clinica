@@ -40,6 +40,7 @@ import { SettingsPage } from './components/Settings/SettingsPage';
 import { Financeiro } from './Financeiro/Financeiro';
 import { Faturamento } from './Faturamento/Faturamento';
 import { CadastroMedico } from './components/Medicos/CadastroMedico';
+import { CadastroEstagiario } from './components/Estagiarios/CadastroEstagiario';
 import { CadastroPaciente } from './components/Patient/CadastroPaciente';
 import { CadastroProcedimento } from './components/Procedimentos/CadastroProcedimento';
 import { CadastroConvenio } from './components/Convenios/CadastroConvenio';
@@ -323,6 +324,10 @@ function App() {
           <Route
             path="/cadastro-medico"
             element={<ProtectedRoute><CadastroMedico /></ProtectedRoute>}
+          />
+          <Route
+            path="/cadastro-estagiario"
+            element={<ProtectedRoute><CadastroEstagiario /></ProtectedRoute>}
           />
           <Route
             path="/cadastro-procedimento"
