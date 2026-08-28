@@ -441,7 +441,10 @@ export function SettingsPage() {
     if (userCompanyId) {
       nextCompanies = nextCompanies.filter((c: any) => c.id === userCompanyId);
     }
-    setCompanies(nextCompanies);
+    setCompanies((previous) => {
+      if (previous.length === nextCompanies.length && previous.every((item, index) => item?.id === nextCompanies[index]?.id)) return previous;
+      return nextCompanies;
+    });
 
     if (!selectedCompanyId && nextCompanies.length > 0) {
       setSelectedCompanyId(nextCompanies[0].id);
@@ -456,13 +459,14 @@ export function SettingsPage() {
 
     const comp = companies.find((c) => c.id === selectedCompanyId);
     if (comp) {
-      setCompanyForm({
+      const nextCompanyForm = {
         cnpj: sanitizeCompanyField(comp.cnpj),
         legalName: sanitizeCompanyField(comp.legalName),
         tradeName: sanitizeCompanyField(comp.tradeName),
         address: sanitizeCompanyField(comp.address),
         phone: sanitizeCompanyField(comp.phone),
-      });
+      };
+      setCompanyForm((previous) => Object.keys(nextCompanyForm).every((key) => previous[key as keyof typeof previous] === nextCompanyForm[key as keyof typeof nextCompanyForm]) ? previous : nextCompanyForm);
       localStorage.removeItem(COMPANY_PREFILL_STORAGE_KEY);
     }
 
@@ -494,7 +498,7 @@ export function SettingsPage() {
     const filtered = (branchesData || [])
       .filter((b: any) => b.companyId === selectedCompanyId)
       .map((b: any) => normalizeBranch(b));
-    setBranches(filtered);
+    setBranches((previous) => previous.length === filtered.length && previous.every((item, index) => item?.id === filtered[index]?.id) ? previous : filtered);
   }, [branchesData, selectedCompanyId]);
 
   useEffect(() => {
@@ -516,8 +520,9 @@ export function SettingsPage() {
     }
 
     const availableSectors = (sectorsData || []).filter((sector: any) => !isRoomSector(sector));
-    setAllSectors(availableSectors);
-    setSectors(availableSectors.filter((s: any) => s.branchId === selectedBranchForSectors));
+    const nextSectors = availableSectors.filter((s: any) => s.branchId === selectedBranchForSectors);
+    setAllSectors((previous) => previous.length === availableSectors.length && previous.every((item, index) => item?.id === availableSectors[index]?.id) ? previous : availableSectors);
+    setSectors((previous) => previous.length === nextSectors.length && previous.every((item, index) => item?.id === nextSectors[index]?.id) ? previous : nextSectors);
   }, [selectedBranchForSectors, sectorsData]);
 
   useEffect(() => {
@@ -541,7 +546,7 @@ export function SettingsPage() {
     } else if (selectedBranchForSectors) {
       filtered = filtered.filter((u: any) => u.sector?.branchId === selectedBranchForSectors);
     }
-    setUsers(filtered);
+    setUsers((previous) => previous.length === filtered.length && previous.every((item, index) => item?.id === filtered[index]?.id) ? previous : filtered);
   }, [usersData, userCompanyId, selectedSectorForUsers, selectedBranchForSectors]);
 
   useEffect(() => {
@@ -554,15 +559,17 @@ export function SettingsPage() {
           : (Array.isArray((doctorsData as any)?.data)
             ? (doctorsData as any).data
             : [])));
-    setDoctors(normalizedDoctors);
+    setDoctors((previous) => previous.length === normalizedDoctors.length && previous.every((item, index) => item?.id === normalizedDoctors[index]?.id) ? previous : normalizedDoctors);
   }, [doctorsData]);
 
   useEffect(() => {
-    setModules(modulesData || []);
+    const nextModules = modulesData || [];
+    setModules((previous) => previous.length === nextModules.length && previous.every((item, index) => item?.id === nextModules[index]?.id) ? previous : nextModules);
   }, [modulesData]);
 
   useEffect(() => {
-    setAccessesList(filterAccessesForCompanyType(accessesData || [], selectedCompanyModuleType));
+    const nextAccesses = filterAccessesForCompanyType(accessesData || [], selectedCompanyModuleType);
+    setAccessesList((previous) => previous.length === nextAccesses.length && previous.every((item, index) => item?.id === nextAccesses[index]?.id) ? previous : nextAccesses);
   }, [accessesData, selectedCompanyModuleType]);
 
   // --- Handlers ---
@@ -1843,11 +1850,11 @@ export function SettingsPage() {
                                 </Grid.Col>
                                 <Grid.Col span={6}>
                                     <FloatingInput 
-                                        label={editingUser ? "Senha (Vazio para manter)" : "Senha"} 
+                                        label={editingUser ? "Senha (vazio para manter)" : "Senha (opcional)"}
                                         type="password" 
                                         value={userForm.password} 
                                         onChange={(e: any) => setUserForm({...userForm, password: e.currentTarget.value})} 
-                                        required={!editingUser}
+                                        required={false}
                                         rightSection={(
                                           <ActionIcon
                                             variant="subtle"

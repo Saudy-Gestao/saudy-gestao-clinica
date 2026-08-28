@@ -112,9 +112,9 @@ describe('validateUserForm', () => {
   it('invalid when email missing', () => expect(validateUserForm({ ...base, email: '' }).isValid).toBe(false));
   it('invalid when email is bad', () => expect(validateUserForm({ ...base, email: 'bad' }).isValid).toBe(false));
   it('invalid when birthDate missing', () => expect(validateUserForm({ ...base, birthDate: '' }).isValid).toBe(false));
-  it('invalid when password missing for new user', () => {
+  it('valid when password is omitted for new user', () => {
     const { password: _, ...noPass } = base;
-    expect(validateUserForm(noPass as any)).toMatchObject({ isValid: false });
+    expect(validateUserForm(noPass as any)).toMatchObject({ isValid: true });
   });
   it('valid when editing without password', () => {
     const { password: _, ...noPass } = base;

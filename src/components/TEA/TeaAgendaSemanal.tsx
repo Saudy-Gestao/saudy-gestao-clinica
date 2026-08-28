@@ -1,19 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Group,
-  Text,
-  Button,
-  Paper,
-  Stack,
-  Badge,
-  Skeleton,
-  ActionIcon,
-} from '@mantine/core';
+import { Badge, Box, Button, Group, Paper, Skeleton, Stack, Text, Tooltip } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ChevronRight, CalendarDays, Search } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Search } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { Header } from '../Header/Header';
@@ -22,379 +12,76 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FloatingInput } from '../common/FloatingInput';
 import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 
-const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
+const SLOTS = ['08:00', '08:45', '09:30', '10:15', '11:00', '11:45', '12:30', '13:15', '14:00', '14:45', '15:30', '16:15', '17:00', '17:45', '18:30', '19:15'];
+const MOCK_PATIENTS = [
+  ['Miguel Torres', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Central)', '08:00', 'CONFIRMED'], ['Helena Pires', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Central)', '09:30', 'SCHEDULED'], ['Davi Rocha', 'Terapia ocupacional', 'Beatriz Alves', 'Sala 3 (Unidade Central)', '11:00', 'CONFIRMED'], ['Alice Barros', 'Fisioterapia', 'Thiago Prado', 'Sala 4 (Unidade Central)', '14:00', 'RESERVED'], ['Bernardo Melo', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Central)', '15:30', 'SCHEDULED'], ['Sofia Ramos', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Sul)', '08:45', 'CONFIRMED'], ['Enzo Martins', 'Terapia ocupacional', 'Beatriz Alves', 'Sala 3 (Unidade Sul)', '10:15', 'CONFIRMED'], ['Laura Nunes', 'Fisioterapia', 'Thiago Prado', 'Sala 4 (Unidade Sul)', '16:15', 'PENDING'], ['Isabela Costa', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Central)', '09:30', 'CONFIRMED'], ['Gabriel Lima', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Central)', '13:15', 'SCHEDULED'], ['João Vitor', 'Terapia ocupacional', 'Beatriz Alves', 'Sala 3 (Unidade Central)', '15:30', 'RESERVED'], ['Ana Beatriz', 'Fisioterapia', 'Thiago Prado', 'Sala 4 (Unidade Central)', '17:00', 'CONFIRMED'], ['Pedro Souza', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Sul)', '11:00', 'SCHEDULED'], ['Maria Fernandes', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Sul)', '14:45', 'CONFIRMED'], ['Lucas Andrade', 'Terapia ocupacional', 'Beatriz Alves', 'Sala 3 (Unidade Sul)', '18:30', 'PENDING'],
+  ['Valentina Alves', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Central)', '10:15', 'RESERVED'], ['Arthur Mendes', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Central)', '11:45', 'PENDING'], ['Manuela Castro', 'Fisioterapia', 'Thiago Prado', 'Sala 4 (Unidade Central)', '08:45', 'RESERVED'], ['Nicolas Freitas', 'Terapia ocupacional', 'Beatriz Alves', 'Sala 3 (Unidade Sul)', '13:15', 'PENDING'], ['Lívia Martins', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Sul)', '17:00', 'RESERVED'], ['Ravi Oliveira', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Sul)', '15:30', 'PENDING'], ['Clara Monteiro', 'Fisioterapia', 'Thiago Prado', 'Sala 4 (Unidade Sul)', '09:30', 'RESERVED'], ['Bento Cardoso', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Central)', '18:30', 'PENDING'], ['Yasmin Ribeiro', 'Terapia ocupacional', 'Beatriz Alves', 'Sala 3 (Unidade Central)', '14:45', 'RESERVED'], ['Cecília Ramos', 'Psicologia', 'Camila Duarte', 'Sala 1 (Unidade Central)', '12:30', 'CANCELED'], ['Gustavo Martins', 'Fonoaudiologia', 'Rafael Nogueira', 'Sala 2 (Unidade Sul)', '17:45', 'CANCELADO'], ['Marina Lopes', 'Fisioterapia', 'Thiago Prado', 'Sala 4 (Unidade Central)', '19:15', 'CANCELED'], ['', '', '', 'Sala 4 (Unidade Central)', '12:30', 'BLOCKED'], ['', '', '', 'Sala 2 (Unidade Sul)', '12:30', 'BLOQUEADO'], ['', '', '', 'Sala 3 (Unidade Central)', '08:00', 'BLOCKED'],
+] as const;
+const createMockAppointments = (weekStart: dayjs.Dayjs): TeaAgendaItem[] => MOCK_PATIENTS.map((item, index) => ({ id: `tea-demo-${index}`, patientName: item[0], specialty: item[1], doctorName: item[2], roomName: item[3], time: item[4], status: item[5], date: weekStart.add(index % 5, 'day').format('YYYY-MM-DD'), type: 'ATENDIMENTO TEA', source: 'APPOINTMENT' }));
+const toWeekStartMonday = (value: dayjs.Dayjs) => value.subtract((value.day() + 6) % 7, 'day').startOf('day');
+const roomUnit = (room: string) => room.match(/\(([^)]+)\)/)?.[1] || 'Unidade não informada';
+const roomDisplay = (room: string) => ({ name: room.replace(/\s*\([^)]*\)\s*$/, '').trim() || room, unit: roomUnit(room) });
+const statusLabel = (value?: string) => { const v = String(value || '').toUpperCase(); if (['CANCELED', 'CANCELADO'].includes(v)) return 'Cancelado'; if (['BLOCKED', 'BLOQUEADO'].includes(v)) return 'Bloqueado'; if (['RESERVED', 'RESERVADO'].includes(v)) return 'Reservado'; if (['PENDING', 'PENDENTE'].includes(v)) return 'Pendente'; return 'Agendado'; };
+const statusColor = (value?: string) => { const v = String(value || '').toUpperCase(); if (['CANCELED', 'CANCELADO'].includes(v)) return 'red'; if (['BLOCKED', 'BLOQUEADO'].includes(v)) return 'orange'; if (['RESERVED', 'RESERVADO'].includes(v)) return 'violet'; if (['PENDING', 'PENDENTE'].includes(v)) return 'yellow'; return 'teal'; };
+const statusSurface = (value?: string) => { const v = String(value || '').toUpperCase(); if (['CANCELED', 'CANCELADO'].includes(v)) return { background: 'rgba(185, 28, 28, .38)', border: 'rgba(239, 68, 68, .9)' }; if (['BLOCKED', 'BLOQUEADO'].includes(v)) return { background: 'rgba(217, 119, 6, .38)', border: 'rgba(245, 158, 11, .9)' }; if (['RESERVED', 'RESERVADO'].includes(v)) return { background: 'rgba(139, 92, 246, .24)', border: 'rgba(139, 92, 246, .7)' }; if (['PENDING', 'PENDENTE'].includes(v)) return { background: 'rgba(234, 179, 8, .2)', border: 'rgba(234, 179, 8, .7)' }; return { background: 'rgba(72, 187, 155, .28)', border: 'rgba(72, 187, 155, .7)' }; };
 
-const normalizeStatusLabel = (value?: string) => {
-  const normalized = String(value || '').toUpperCase().trim();
-  const map: Record<string, string> = {
-    // Fluxo pré-reserva TEA
-    PENDING_SCHEDULING: 'Pendente de marcação',
-    PROPOSED: 'Aguardando aprovação',
-    RESERVED: 'Reservado',
-    PENDING_AUTHORIZATION: 'Aguardando autorização',
-    AUTHORIZED: 'Autorizado',
-    CONVERTED: 'Convertido em agendamento',
-    EXPIRED: 'Expirado',
-    CANCELED: 'Cancelado',
-
-    // Fluxo agendamento
-    AGENDADO: 'Agendado',
-    SCHEDULED: 'Agendado',
-    CANCELADO: 'Cancelado',
-    CONFIRMED: 'Confirmado',
-    CONFIRMADO: 'Confirmado',
-    COMPLETED: 'Concluído',
-    CONCLUIDO: 'Concluído',
-    PENDENTE: 'Pendente',
-  };
-
-  return map[normalized] || (value || 'Pendente');
-};
-
-const getStatusColor = (value?: string) => {
-  const normalized = String(value || '').toUpperCase().trim();
-  if (normalized === 'RESERVED') return 'violet';
-  if (normalized === 'PROPOSED') return 'grape';
-  if (normalized === 'PENDING_AUTHORIZATION') return 'yellow';
-  if (normalized === 'AUTHORIZED') return 'teal';
-  if (normalized === 'AGENDADO' || normalized === 'SCHEDULED') return 'blue';
-  if (normalized === 'CANCELADO' || normalized === 'CANCELED') return 'red';
-  if (normalized === 'CONFIRMED' || normalized === 'CONFIRMADO') return 'teal';
-  if (normalized === 'COMPLETED' || normalized === 'CONCLUIDO') return 'gray';
-  return 'yellow';
-};
-
-const toWeekStartMonday = (reference: dayjs.Dayjs) => {
-  const day = reference.day();
-  const diff = (day + 6) % 7;
-  return reference.subtract(diff, 'day').startOf('day');
-};
+function AppointmentCard({ item, compact = false }: { item: TeaAgendaItem; compact?: boolean }) {
+  const tooltipContent = <Box p={2} style={{ minWidth: 220 }}>
+    <Group justify="space-between" gap="sm" mb={6} wrap="nowrap"><Text size="sm" fw={700}>{item.patientName}</Text><Badge size="sm" variant="light" color={statusColor(item.status)}>{item.time}</Badge></Group>
+    <Text size="xs" c="dimmed" mb={4}>{item.roomName || 'Sala não vinculada'}</Text>
+    <Stack gap={3}><Text size="sm" fw={600}>{item.specialty || 'Terapia não informada'}</Text><Text size="xs">Terapeuta: {item.doctorName || 'Não informado'}</Text><Text size="xs" c="dimmed">Status: {statusLabel(item.status)}</Text></Stack>
+  </Box>;
+  return <Tooltip label={tooltipContent} withArrow position="top" offset={8} openDelay={180} multiline styles={{ tooltip: { background: 'var(--mantine-color-dark-7)', color: 'var(--mantine-color-white)', border: '1px solid var(--mantine-color-default-border)', boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)', padding: 12 }, arrow: { background: 'var(--mantine-color-dark-7)', borderColor: 'var(--mantine-color-default-border)' } }}>
+    <Paper p={compact ? 7 : 'xs'} radius="sm" withBorder style={{ ...statusSurface(item.status), minWidth: 0, marginBottom: 5 }}>
+      <Group gap={5} justify="space-between" wrap="nowrap"><Text fw={700} size={compact ? 'xs' : 'sm'} truncate>{item.patientName || statusLabel(item.status)}</Text><Badge size="xs" variant="light" color={statusColor(item.status)}>{statusLabel(item.status)}</Badge></Group>
+      {item.patientName ? <><Text size="xs" c="dimmed" truncate>{item.specialty || 'Terapia não informada'}</Text>{!compact && <Text size="xs" c="dimmed" truncate>{item.doctorName || 'Terapeuta não informado'}</Text>}</> : <Text size="xs" c="dimmed" truncate>Indisponível para atendimento</Text>}
+    </Paper>
+  </Tooltip>;
+}
 
 export function TeaAgendaSemanal() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const {
-    data: allTeaAppointments = [],
-    isLoading: loading,
-    error,
-  } = useTeaWeeklyAgendaQuery();
-
+  const { data: apiAppointments = [], isLoading: loading, error } = useTeaWeeklyAgendaQuery();
+  const [mode, setMode] = useState<'day' | 'week'>('week');
+  const [selectedDate, setSelectedDate] = useState(() => dayjs().format('YYYY-MM-DD'));
+  const [weekStart, setWeekStart] = useState(() => toWeekStartMonday(dayjs()));
   const [search, setSearch] = useState('');
-  const [procedureFilter, setProcedureFilter] = useState<string[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string[]>([]);
+  const [specialtyFilter, setSpecialtyFilter] = useState<string[]>([]);
   const [doctorFilter, setDoctorFilter] = useState<string[]>([]);
   const [roomFilter, setRoomFilter] = useState<string[]>([]);
-  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
-  const [weekStart, setWeekStart] = useState(() => toWeekStartMonday(dayjs()));
+  const isDemo = !loading && apiAppointments.length === 0;
+  const allAppointments = useMemo(() => isDemo ? createMockAppointments(weekStart) : apiAppointments, [apiAppointments, isDemo, weekStart]);
+  const days = useMemo(() => Array.from({ length: 5 }, (_, index) => weekStart.add(index, 'day')), [weekStart]);
+  const options = useMemo(() => ({ units: Array.from(new Set(allAppointments.map((item) => roomUnit(item.roomName)).filter(Boolean))).sort(), specialties: Array.from(new Set(allAppointments.map((item) => item.specialty).filter(Boolean))).sort(), doctors: Array.from(new Set(allAppointments.map((item) => item.doctorName).filter(Boolean))).sort(), rooms: Array.from(new Set(allAppointments.map((item) => item.roomName).filter(Boolean))).sort() }), [allAppointments]);
+  const filtered = useMemo(() => allAppointments.filter((item) => { const query = search.trim().toLowerCase(); const matchesQuery = !query || [item.patientName, item.specialty, item.doctorName, item.roomName, item.time].some((value) => String(value || '').toLowerCase().includes(query)); return matchesQuery && (!unitFilter.length || unitFilter.includes(roomUnit(item.roomName))) && (!specialtyFilter.length || specialtyFilter.includes(item.specialty)) && (!doctorFilter.length || doctorFilter.includes(item.doctorName)) && (!roomFilter.length || roomFilter.includes(item.roomName)); }), [allAppointments, search, unitFilter, specialtyFilter, doctorFilter, roomFilter]);
+  const bySlot = useMemo(() => { const map = new Map<string, TeaAgendaItem[]>(); filtered.forEach((item) => { const key = `${item.date}#${item.time}`; map.set(key, [...(map.get(key) || []), item]); }); return map; }, [filtered]);
+  const renderSlotItems = (items: TeaAgendaItem[] | undefined, compact = false) => items?.length ? items.map((item) => <AppointmentCard key={item.id} item={item} compact={compact} />) : <Text size="xs" c="dimmed" ta="center" py={compact ? 10 : 14}>Disponível</Text>;
+  const rooms = useMemo(() => Array.from(new Set(filtered.map((item) => item.roomName).filter(Boolean))).sort(), [filtered]);
+  const weekTotal = filtered.filter((item) => item.date >= weekStart.format('YYYY-MM-DD') && item.date <= weekStart.add(4, 'day').format('YYYY-MM-DD')).length;
+  const dateLabel = dayjs(selectedDate).locale('pt-br').format('dddd, DD [de] MMMM [de] YYYY');
+  useEffect(() => { dayjs.locale('pt-br'); }, []);
+  useEffect(() => { if (error) showNotification({ title: 'Erro', message: resolveApiErrorMessage(error as any, 'Erro ao carregar agenda semanal TEA'), color: 'red' }); }, [error]);
+  const moveDay = (amount: number) => { const next = dayjs(selectedDate).add(amount, 'day'); setSelectedDate(next.format('YYYY-MM-DD')); setWeekStart(toWeekStartMonday(next)); };
+  const setToday = () => { const today = dayjs(); setSelectedDate(today.format('YYYY-MM-DD')); setWeekStart(toWeekStartMonday(today)); };
 
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }).map((_, idx) => weekStart.add(idx, 'day')),
-    [weekStart],
-  );
-
-  const filteredAppointments = useMemo(() => {
-    return allTeaAppointments.filter((item) => {
-      const query = search.trim().toLowerCase();
-      const matchesSearch = !query || (
-        item.patientName.toLowerCase().includes(query)
-        || item.doctorName.toLowerCase().includes(query)
-        || item.specialty.toLowerCase().includes(query)
-        || item.time.toLowerCase().includes(query)
-      );
-
-      const matchesProcedure = !procedureFilter
-        || procedureFilter.length === 0
-        || procedureFilter.includes(String(item.specialty || '').trim());
-      const matchesDoctor = !doctorFilter
-        || doctorFilter.length === 0
-        || doctorFilter.includes(String(item.doctorName || '').trim());
-      const matchesRoom = !roomFilter
-        || roomFilter.length === 0
-        || roomFilter.includes(String(item.roomName || '').trim());
-
-      return matchesSearch && matchesProcedure && matchesDoctor && matchesRoom;
-    });
-  }, [allTeaAppointments, search, procedureFilter, doctorFilter, roomFilter]);
-
-  const procedureOptions = useMemo(
-    () => Array.from(new Set(allTeaAppointments.map((item) => String(item.specialty || '').trim()).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b))
-      .map((value) => ({ value, label: value })),
-    [allTeaAppointments],
-  );
-
-  const doctorOptions = useMemo(
-    () => Array.from(new Set(allTeaAppointments.map((item) => String(item.doctorName || '').trim()).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b))
-      .map((value) => ({ value, label: value })),
-    [allTeaAppointments],
-  );
-
-  const roomOptions = useMemo(
-    () => Array.from(new Set(allTeaAppointments.map((item) => String(item.roomName || '').trim()).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b))
-      .map((value) => ({ value, label: value })),
-    [allTeaAppointments],
-  );
-
-  const weekAppointmentsByDate = useMemo(() => {
-    const startIso = weekStart.format('YYYY-MM-DD');
-    const endIso = weekStart.add(6, 'day').format('YYYY-MM-DD');
-    const grouped: Record<string, TeaAgendaItem[]> = {};
-
-    filteredAppointments.forEach((item) => {
-      if (!item.date) return;
-      if (item.date < startIso || item.date > endIso) return;
-      if (!grouped[item.date]) grouped[item.date] = [];
-      grouped[item.date].push(item);
-    });
-
-    Object.keys(grouped).forEach((date) => {
-      grouped[date] = grouped[date].sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
-    });
-
-    return grouped;
-  }, [filteredAppointments, weekStart]);
-
-  const totalInWeek = useMemo(
-    () => Object.values(weekAppointmentsByDate).reduce((acc, list) => acc + list.length, 0),
-    [weekAppointmentsByDate],
-  );
-
-  useEffect(() => {
-    dayjs.locale('pt-br');
-  }, []);
-
-  useEffect(() => {
-    if (!error) return;
-    const err: any = error;
-    showNotification({
-      title: 'Erro',
-      message: resolveApiErrorMessage(err, 'Erro ao carregar agenda semanal TEA'),
-      color: 'red',
-    });
-  }, [error]);
-
-  return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-
-      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
-        <Group mb={18} gap="md" align="flex-start">
-          <ActionIcon
-            variant="default"
-            size={isMobile ? 44 : 52}
-            radius="md"
-            onClick={() => navigate('/tea')}
-            aria-label="Voltar"
-          >
-            <ChevronLeft size={22} />
-          </ActionIcon>
-          <Box>
-            <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Agenda semanal TEA</Text>
-            <Text size="sm" c="dimmed">Visão macro dos agendamentos de todos os pacientes</Text>
-          </Box>
-        </Group>
-
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-          <Stack gap="md">
-            <Group justify="space-between" align="center" wrap="wrap">
-              <Group gap="xs">
-                <CalendarDays size={18} />
-                <Text fw={700}>Calendário semanal geral</Text>
-              </Group>
-              <Badge color="indigo" variant="light">{totalInWeek} agendamento(s) na semana</Badge>
-            </Group>
-
-            <Group justify="space-between" align="center" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<ChevronLeft size={14} />}
-                  onClick={() => setWeekStart((prev) => prev.subtract(7, 'day'))}
-                >
-                  Semana anterior
-                </Button>
-                <Button
-                  size="xs"
-                  variant="default"
-                  rightSection={<ChevronRight size={14} />}
-                  onClick={() => setWeekStart((prev) => prev.add(7, 'day'))}
-                >
-                  Próxima semana
-                </Button>
-                <Button size="xs" variant="light" color="indigo" onClick={() => setWeekStart(toWeekStartMonday(dayjs()))}>
-                  Hoje
-                </Button>
-              </Group>
-              <Text size="sm" c="dimmed">
-                {weekStart.format('DD/MM/YYYY')} até {weekStart.add(6, 'day').format('DD/MM/YYYY')}
-              </Text>
-            </Group>
-
-            <FloatingInput
-              label="Buscar agenda"
-              rightSection={<Search size={14} />}
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-              placeholder="Buscar por paciente, terapia, médico ou horário"
-              alwaysFloatLabel
-            />
-
-            <Group grow align="flex-start">
-              <FloatingMultiSelect
-                label="Procedimento"
-                placeholder="Filtrar por procedimento"
-                data={procedureOptions}
-                value={procedureFilter}
-                onChange={setProcedureFilter}
-                searchable
-                clearable
-                nothingFoundMessage="Nenhum procedimento"
-              />
-              <FloatingMultiSelect
-                label="Médico"
-                placeholder="Filtrar por médico"
-                data={doctorOptions}
-                value={doctorFilter}
-                onChange={setDoctorFilter}
-                searchable
-                clearable
-                nothingFoundMessage="Nenhum médico"
-              />
-              <FloatingMultiSelect
-                label="Sala"
-                placeholder="Filtrar por sala"
-                data={roomOptions}
-                value={roomFilter}
-                onChange={setRoomFilter}
-                searchable
-                clearable
-                nothingFoundMessage="Nenhuma sala"
-              />
-            </Group>
-
-            {loading ? (
-              <Box
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, minmax(0, 1fr))',
-                  gap: 10,
-                }}
-              >
-                {Array.from({ length: 7 }).map((_, index) => (
-                  <Paper key={index} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                    <Stack gap={8}>
-                      <Group justify="space-between" align="center" wrap="nowrap">
-                        <Skeleton height={14} width="48%" radius="xl" />
-                        <Skeleton height={20} width={24} radius="xl" />
-                      </Group>
-                      <Skeleton height={12} width="70%" radius="xl" />
-                      <Skeleton height={12} width="60%" radius="xl" />
-                      <Skeleton height={20} width="52%" radius="xl" />
-                    </Stack>
-                  </Paper>
-                ))}
-              </Box>
-            ) : (
-              <Box
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, minmax(0, 1fr))',
-                  gap: 10,
-                }}
-              >
-                {weekDays.map((day, idx) => {
-                  const dayIso = day.format('YYYY-MM-DD');
-                  const dayItems = weekAppointmentsByDate[dayIso] || [];
-                  return (
-                    <Paper key={dayIso} p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                      <Stack gap={6}>
-                        <Group justify="space-between" align="center" wrap="nowrap">
-                          <Text size="xs" fw={700}>{WEEKDAY_LABELS[idx]} • {day.format('DD/MM')}</Text>
-                          <Badge size="xs" variant="light" color="gray">{dayItems.length}</Badge>
-                        </Group>
-
-                        {dayItems.length === 0 ? (
-                          <Text size="xs" c="dimmed">Sem agendamentos</Text>
-                        ) : (
-                          <Stack gap={6}>
-                            {dayItems.map((item) => {
-                              const isHovered = hoveredCardId === item.id;
-                              return (
-                              <Paper
-                                key={item.id}
-                                p={isHovered ? 10 : 6}
-                                withBorder
-                                onMouseEnter={() => setHoveredCardId(item.id)}
-                                onMouseLeave={() => setHoveredCardId(null)}
-                                style={{
-                                  borderColor: isHovered ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-default-border)',
-                                  transform: isHovered ? 'scale(1.04)' : 'scale(1)',
-                                  transformOrigin: 'center',
-                                  transition: 'transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, padding 120ms ease',
-                                  boxShadow: isHovered ? '0 8px 22px rgba(0, 0, 0, 0.25)' : 'none',
-                                  position: 'relative',
-                                  zIndex: isHovered ? 5 : 1,
-                                }}
-                              >
-                                <Stack gap={3}>
-                                  <Group justify="space-between" wrap="nowrap">
-                                    <Text size={isHovered ? 'sm' : 'xs'} fw={700}>{item.time}</Text>
-                                    {item.source === 'RESERVATION' && (
-                                      <Badge size={isHovered ? 'sm' : 'xs'} variant="outline" color="violet">Pré-reserva</Badge>
-                                    )}
-                                  </Group>
-                                  <Text size={isHovered ? 'sm' : 'xs'} fw={600} lineClamp={isHovered ? undefined : 1}>
-                                    {item.patientName || 'Paciente'}
-                                  </Text>
-                                  <Text size={isHovered ? 'xs' : '10px'} c="dimmed" lineClamp={isHovered ? undefined : 1}>
-                                    {item.specialty || 'Terapia não informada'}
-                                    {item.doctorName ? ` • Dr(a): ${item.doctorName}` : ''}
-                                  </Text>
-                                  <Text size={isHovered ? 'xs' : '10px'} c="dimmed" lineClamp={isHovered ? undefined : 1}>
-                                    {item.roomName ? `Sala: ${item.roomName}` : 'Sala não vinculada'}
-                                  </Text>
-                                  <Group justify="flex-start">
-                                    <Badge
-                                      size={isHovered ? 'sm' : 'xs'}
-                                      variant="light"
-                                      color={getStatusColor(item.status)}
-                                      styles={{
-                                        root: {
-                                          maxWidth: '100%',
-                                          height: 'auto',
-                                          whiteSpace: isHovered ? 'normal' : 'nowrap',
-                                          overflow: 'visible',
-                                          paddingTop: isHovered ? 4 : undefined,
-                                          paddingBottom: isHovered ? 4 : undefined,
-                                        },
-                                        label: {
-                                          whiteSpace: isHovered ? 'normal' : 'nowrap',
-                                          overflow: 'visible',
-                                          textOverflow: 'clip',
-                                          lineHeight: isHovered ? 1.2 : undefined,
-                                          textAlign: 'left',
-                                        },
-                                      }}
-                                    >
-                                      {normalizeStatusLabel(item.status)}
-                                    </Badge>
-                                  </Group>
-                                </Stack>
-                              </Paper>
-                            )})}
-                          </Stack>
-                        )}
-                      </Stack>
-                    </Paper>
-                  );
-                })}
-              </Box>
-            )}
-          </Stack>
-        </Paper>
-      </Box>
-    </Box>
-  );
+  return <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}><Header /><Box p={isMobile ? 'sm' : 'xl'} maw={1600} mx="auto" w="100%">
+    <Group mb="lg" gap="md"><Button variant="default" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>Voltar</Button><Box><Text fw={700} size="lg">Agenda de terapias TEA</Text><Text size="sm" c="dimmed">Acompanhe os atendimentos por paciente, terapeuta e sala</Text></Box></Group>
+    <Paper p={isMobile ? 'sm' : 'md'} withBorder radius="md"><Stack gap="md">
+      <Group justify="space-between" align="center" wrap="wrap"><Group gap="xs"><CalendarDays size={19} /><Text fw={700}>Agenda de atendimentos</Text></Group><Group gap="xs"><Badge color="indigo" variant="light">{weekTotal} agendamento(s)</Badge>{isDemo && <Badge color="orange" variant="light">Dados demonstrativos</Badge>}</Group></Group>
+      <Group justify="space-between" align="center" wrap="wrap"><Group gap={6}><Button size="xs" variant={mode === 'day' ? 'filled' : 'default'} onClick={() => setMode('day')}>Dia</Button><Button size="xs" variant={mode === 'week' ? 'filled' : 'default'} onClick={() => setMode('week')}>Semana</Button></Group><Text size="sm" c="dimmed">{mode === 'day' ? dateLabel : `${weekStart.format('DD/MM/YYYY')} até ${weekStart.add(4, 'day').format('DD/MM/YYYY')}`}</Text></Group>
+      <Group justify="space-between" align="center" wrap="wrap"><Group gap={6}>{mode === 'day' ? <><Button size="xs" variant="default" onClick={() => moveDay(-1)} leftSection={<ChevronLeft size={14} />}>Dia anterior</Button><input aria-label="Selecionar data" type="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.currentTarget.value); setWeekStart(toWeekStartMonday(dayjs(event.currentTarget.value))); }} style={{ height: 30, borderRadius: 6, border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-body)', color: 'var(--mantine-color-text)', padding: '0 8px', fontFamily: 'inherit' }} /><Button size="xs" variant="light" onClick={setToday}>Hoje</Button><Button size="xs" variant="default" onClick={() => moveDay(1)} rightSection={<ChevronRight size={14} />}>Próximo dia</Button></> : <><Button size="xs" variant="default" onClick={() => setWeekStart((prev) => prev.subtract(7, 'day'))} leftSection={<ChevronLeft size={14} />}>Semana anterior</Button><Button size="xs" variant="light" onClick={setToday}>Hoje</Button><Button size="xs" variant="default" onClick={() => setWeekStart((prev) => prev.add(7, 'day'))} rightSection={<ChevronRight size={14} />}>Próxima semana</Button></>}</Group></Group>
+      <FloatingInput label={null} placeholder="Buscar por paciente, sala, terapeuta ou horário" value={search} onChange={(event) => setSearch(event.currentTarget.value)} rightSection={<Search size={17} />} />
+      <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}><FloatingMultiSelect label="Unidade" placeholder="Todas as unidades" data={options.units} value={unitFilter} onChange={setUnitFilter} searchable clearable /><FloatingMultiSelect label="Especialidade" placeholder="Todas as especialidades" data={options.specialties} value={specialtyFilter} onChange={setSpecialtyFilter} searchable clearable /><FloatingMultiSelect label="Terapeuta" placeholder="Todos os terapeutas" data={options.doctors} value={doctorFilter} onChange={setDoctorFilter} searchable clearable /><FloatingMultiSelect label="Sala" placeholder="Todas as salas" data={options.rooms} value={roomFilter} onChange={setRoomFilter} searchable clearable /></Box>
+      <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}><Paper withBorder radius="md" p="sm"><Text size="xl" fw={700}>{weekTotal}</Text><Text size="sm" fw={600}>Atendimentos</Text><Text size="xs" c="dimmed">na semana exibida</Text></Paper><Paper withBorder radius="md" p="sm"><Text size="xl" fw={700}>{new Set(filtered.map((item) => item.patientName)).size}</Text><Text size="sm" fw={600}>Pacientes</Text><Text size="xs" c="dimmed">com atendimento</Text></Paper><Paper withBorder radius="md" p="sm"><Text size="xl" fw={700}>{rooms.length}</Text><Text size="sm" fw={600}>Salas</Text><Text size="xs" c="dimmed">em uso na visão</Text></Paper><Paper withBorder radius="md" p="sm" style={{ borderColor: 'rgba(72, 187, 155, 0.6)', background: 'rgba(72, 187, 155, 0.12)' }}><Text size="xl" fw={700}>{filtered.filter((item) => !['CANCELED', 'CANCELADO'].includes(String(item.status).toUpperCase())).length}</Text><Text size="sm" fw={600}>Agendados</Text><Text size="xs" c="dimmed">atendimentos ativos</Text></Paper></Box>
+      <Group gap="lg" mb={-4}>{[['teal', 'Agendado'], ['violet', 'Reservado'], ['yellow', 'Pendente'], ['orange', 'Bloqueado'], ['red', 'Cancelado']] .map(([color, label]) => <Group key={color} gap={6}><Box w={12} h={12} style={{ borderRadius: 3, background: `var(--mantine-color-${color}-5)`, border: `1px solid var(--mantine-color-${color}-6)` }} /><Text size="xs" c="dimmed">{label}</Text></Group>)}</Group>
+      {loading ? <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 8 }}>{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} height={500} radius="md" />)}</Box> : <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 10 }}>
+        {mode === 'day' ? <Box style={{ minWidth: Math.max(760, 170 + rooms.length * 210) }}><Box style={{ display: 'grid', gridTemplateColumns: `110px repeat(${Math.max(rooms.length, 1)}, minmax(190px, 1fr))`, gap: 6, marginBottom: 8, background: 'rgba(59, 130, 246, 0.08)', borderRadius: 8 }}><Box p="sm"><Text size="xs" fw={700} c="dimmed">HORÁRIO</Text><Text size="xs" c="dimmed">{dayjs(selectedDate).format('DD/MM')}</Text></Box>{rooms.map((room) => <Box key={room} p="sm" style={{ border: '1px solid var(--mantine-color-indigo-5)', borderRadius: 6 }}><Text fw={700} size="sm" truncate>{roomDisplay(room).name}</Text><Text size="xs" c="dimmed">{roomDisplay(room).unit}</Text></Box>)}</Box>{SLOTS.map((slot) => <Box key={slot} style={{ display: 'grid', gridTemplateColumns: `110px repeat(${Math.max(rooms.length, 1)}, minmax(190px, 1fr))`, minHeight: 76, gap: 6, marginBottom: 6 }}><Box p="sm" style={{ display: 'flex', alignItems: 'center', borderRight: '1px solid var(--mantine-color-default-border)' }}><Group gap={5} wrap="nowrap"><Clock3 size={13} /><Text size="xs" c="dimmed">{slot}</Text></Group></Box>{rooms.length ? rooms.map((room) => <Box key={`${slot}-${room}`} p={5} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 6, background: 'var(--mantine-color-body)' }}>{renderSlotItems((bySlot.get(`${selectedDate}#${slot}`) || []).filter((item) => item.roomName === room))}</Box>) : <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }}><Text size="xs" c="dimmed">Nenhum resultado</Text></Box>}</Box>)}</Box> : <Box style={{ minWidth: 900 }}><Box style={{ display: 'grid', gridTemplateColumns: '90px repeat(5, minmax(160px, 1fr))', gap: 8, marginBottom: 8, background: 'rgba(59, 130, 246, 0.08)', borderRadius: 8 }}><Box p="sm"><Text size="xs" fw={700} c="dimmed">HORÁRIO</Text></Box>{days.map((day, index) => <Box key={day.format('YYYY-MM-DD')} p="sm" style={{ border: '1px solid var(--mantine-color-indigo-5)', borderRadius: 6 }}><Text fw={700} size="sm">{WEEKDAY_LABELS[index]} · {day.format('DD/MM')}</Text><Text size="xs" c="dimmed">Salas: {Array.from(new Set(filtered.filter((item) => item.date === day.format('YYYY-MM-DD')).map((item) => item.roomName).filter(Boolean))).map((room) => roomDisplay(room).name).join(' • ') || 'Nenhuma sala'}</Text><Text size="xs" c="dimmed">{filtered.filter((item) => item.date === day.format('YYYY-MM-DD')).length} atendimento(s)</Text></Box>)}</Box>{SLOTS.map((slot) => <Box key={slot} style={{ display: 'grid', gridTemplateColumns: '90px repeat(5, minmax(160px, 1fr))', minHeight: 76, gap: 8, marginBottom: 6 }}><Box p="sm" style={{ display: 'flex', alignItems: 'center', borderRight: '1px solid var(--mantine-color-default-border)' }}><Text size="xs" c="dimmed">{slot}</Text></Box>{days.map((day) => <Box key={`${day.format('YYYY-MM-DD')}-${slot}`} p={5} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 6, background: 'var(--mantine-color-body)' }}>{renderSlotItems(bySlot.get(`${day.format('YYYY-MM-DD')}#${slot}`), true)}</Box>)}</Box>)}</Box>}
+      </Box>}
+      {!loading && !filtered.length && <Text ta="center" c="dimmed" py="xl">Nenhum atendimento encontrado com os filtros atuais.</Text>}
+      {!loading && <Text size="xs" c="dimmed">Passe o mouse sobre um atendimento para consultar os detalhes.</Text>}
+    </Stack></Paper>
+  </Box></Box>;
 }

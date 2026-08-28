@@ -3,16 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
-  Alert,
   Box,
   Button,
-  Badge,
   Group,
   Modal,
   Paper,
-  Progress,
   Skeleton,
-  SimpleGrid,
   Stack,
   Table,
   Tabs,
@@ -20,9 +16,9 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Circle, Clock3, Pencil, Plus, Trash2 } from 'lucide-react';
-import dayjs from 'dayjs';
+import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Header } from '../Header/Header';
+import { MapaSalas } from './MapaSalas';
 import { DARK_BLUE } from '../../themes/theme';
 import sectorService from '../../services/sectorService';
 import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
@@ -34,8 +30,6 @@ import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
-import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
-import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 
@@ -56,56 +50,6 @@ interface SalaRow {
   especialidadeId?: string | null;
   capacity?: number | null;
 }
-
-type RoomMapStatus = 'EM_USO' | 'ALTA_DEMANDA' | 'MODERADA' | 'LIVRE';
-
-interface RoomMapItem {
-  roomId: string;
-  roomName: string;
-  status: RoomMapStatus;
-  utilizationPercent: number;
-  inProgressNow: number;
-  upcomingToday: number;
-  totalToday: number;
-  doneToday: number;
-  noShowOrCanceledToday: number;
-}
-
-const isCanceledOrNoShow = (statusRaw?: string | null) => {
-  const normalized = String(statusRaw || '').trim().toUpperCase();
-  return normalized === 'CANCELADO'
-    || normalized === 'CANCELED'
-    || normalized === 'NAO_COMPARECEU'
-    || normalized === 'NÃO_COMPARECEU'
-    || normalized === 'NO_SHOW'
-    || normalized === 'NO-SHOW'
-    || normalized === 'AUSENTE'
-    || normalized === 'FALTOU';
-};
-
-const isDoneStatus = (statusRaw?: string | null) => {
-  const normalized = String(statusRaw || '').trim().toUpperCase();
-  return normalized === 'CONCLUIDO'
-    || normalized === 'CONCLUÍDO'
-    || normalized === 'COMPLETED'
-    || normalized === 'REALIZADO'
-    || normalized === 'FINALIZADO'
-    || normalized === 'DONE';
-};
-
-const ACTIVE_CONSULTATION_QUEUES = new Set([
-  'EM ATENDIMENTO',
-  'EM TRIAGEM',
-  'CHAMADO PARA EXAME',
-  'EM EXAME',
-]);
-
-const getRoomMapStatusMeta = (status: RoomMapStatus) => {
-  if (status === 'EM_USO') return { label: 'Em uso agora', color: 'teal' as const };
-  if (status === 'ALTA_DEMANDA') return { label: 'Alta demanda', color: 'orange' as const };
-  if (status === 'MODERADA') return { label: 'Fluxo moderado', color: 'blue' as const };
-  return { label: 'Livre', color: 'gray' as const };
-};
 
 const WEEKDAY_OPTIONS = [
   { value: 'segunda', label: 'Segunda' },
@@ -138,8 +82,6 @@ export function CadastroSala() {
   const [deleting, setDeleting] = useState(false);
   const roomsQuery = useRoomsAdminQuery();
   const branchesQuery = useSettingsBranchesQuery();
-  const appointmentsQuery = useAppointmentsQuery();
-  const clinicalQueueQuery = useClinicalQueueQuery();
   const modalidadesQuery = useModalidadesAdminQuery();
   const especialidadesQuery = useEspecialidadesAdminQuery();
 
@@ -188,118 +130,6 @@ export function CadastroSala() {
       || (it.description || '').toLowerCase().includes(q)
     ));
   }, [items, query]);
-
-  const roomMapItems = useMemo<RoomMapItem[]>(() => {
-    const todayKey = dayjs().format('YYYY-MM-DD');
-    const now = dayjs();
-    const appointments = Array.isArray(appointmentsQuery.data) ? appointmentsQuery.data : [];
-    const queueRows = Array.isArray(clinicalQueueQuery.data) ? clinicalQueueQuery.data : [];
-
-    const appointmentById = appointments.reduce<Record<string, any>>((acc, appt: any) => {
-      const id = String(appt?.id || '').trim();
-      if (id) acc[id] = appt;
-      return acc;
-    }, {});
-
-    const inProgressByRoomId = queueRows.reduce<Record<string, number>>((acc, row: any) => {
-      const queue = String(row?.queue || '').trim().toUpperCase();
-      if (!ACTIVE_CONSULTATION_QUEUES.has(queue)) return acc;
-      const appointmentId = String(row?.appointmentId || row?.appointment_id || row?.appointment?.id || '').trim();
-      const linkedAppointment = appointmentId ? appointmentById[appointmentId] : null;
-      const roomId = String(linkedAppointment?.roomId || linkedAppointment?.room_id || '').trim();
-      if (!roomId) return acc;
-      acc[roomId] = (acc[roomId] || 0) + 1;
-      return acc;
-    }, {});
-
-    const roomStatsById = appointments.reduce<Record<string, {
-      totalToday: number;
-      upcomingToday: number;
-      doneToday: number;
-      noShowOrCanceledToday: number;
-    }>>((acc, appt: any) => {
-      const roomId = String(appt?.roomId || appt?.room_id || '').trim();
-      const rawDate = String(appt?.date || appt?.data || '').trim();
-      if (!roomId || !rawDate) return acc;
-
-      const date = dayjs(rawDate).isValid() ? dayjs(rawDate).format('YYYY-MM-DD') : rawDate;
-      if (date !== todayKey) return acc;
-
-      const statusRaw = String(appt?.status || '').trim();
-      const canceledOrNoShow = isCanceledOrNoShow(statusRaw);
-      const done = isDoneStatus(statusRaw);
-
-      const scheduledAt = dayjs(`${date}T${String(appt?.time || appt?.hora || '00:00').trim()}`);
-      const upcoming = !canceledOrNoShow && scheduledAt.isValid() && scheduledAt.isAfter(now);
-
-      if (!acc[roomId]) {
-        acc[roomId] = {
-          totalToday: 0,
-          upcomingToday: 0,
-          doneToday: 0,
-          noShowOrCanceledToday: 0,
-        };
-      }
-
-      if (!canceledOrNoShow) acc[roomId].totalToday += 1;
-      if (upcoming) acc[roomId].upcomingToday += 1;
-      if (done) acc[roomId].doneToday += 1;
-      if (canceledOrNoShow) acc[roomId].noShowOrCanceledToday += 1;
-      return acc;
-    }, {});
-
-    return items
-      .map((room) => {
-        const roomId = room.id;
-        const stats = roomStatsById[roomId] || {
-          totalToday: 0,
-          upcomingToday: 0,
-          doneToday: 0,
-          noShowOrCanceledToday: 0,
-        };
-        const inProgressNow = inProgressByRoomId[roomId] || 0;
-        const doneOrInProgress = stats.doneToday + inProgressNow;
-        const utilizationPercent = stats.totalToday > 0
-          ? Math.max(0, Math.min(100, Math.round((doneOrInProgress / stats.totalToday) * 100)))
-          : 0;
-
-        const status: RoomMapStatus =
-          inProgressNow > 0
-            ? 'EM_USO'
-            : stats.upcomingToday >= 4
-              ? 'ALTA_DEMANDA'
-              : stats.totalToday > 0
-                ? 'MODERADA'
-                : 'LIVRE';
-
-        return {
-          roomId,
-          roomName: room.name,
-          status,
-          utilizationPercent,
-          inProgressNow,
-          upcomingToday: stats.upcomingToday,
-          totalToday: stats.totalToday,
-          doneToday: stats.doneToday,
-          noShowOrCanceledToday: stats.noShowOrCanceledToday,
-        };
-      })
-      .sort((a, b) => {
-        if (b.inProgressNow !== a.inProgressNow) return b.inProgressNow - a.inProgressNow;
-        if (b.upcomingToday !== a.upcomingToday) return b.upcomingToday - a.upcomingToday;
-        return a.roomName.localeCompare(b.roomName, 'pt-BR');
-      });
-  }, [appointmentsQuery.data, clinicalQueueQuery.data, items]);
-
-  const roomMapSummary = useMemo(() => {
-    return roomMapItems.reduce((acc, item) => {
-      if (item.status === 'EM_USO') acc.inUse += 1;
-      if (item.status === 'ALTA_DEMANDA') acc.highDemand += 1;
-      if (item.status === 'MODERADA') acc.moderate += 1;
-      if (item.status === 'LIVRE') acc.free += 1;
-      return acc;
-    }, { inUse: 0, highDemand: 0, moderate: 0, free: 0 });
-  }, [roomMapItems]);
 
   useEffect(() => {
     setLoadingBranches(branchesQuery.isFetching);
@@ -573,17 +403,19 @@ export function CadastroSala() {
           ) : <div />}
         </Group>
 
-        <Group mb={isMobile ? 12 : 18} grow align="flex-end">
-          <FloatingSelect
-            label="Filial"
-            value={selectedBranchId}
-            onChange={setSelectedBranchId}
-            data={branches.map((branch) => ({ value: branch.id, label: branch.label }))}
-            disabled={loadingBranches}
-            searchable
-            nothingFoundMessage="Nenhuma filial encontrada"
-          />
-        </Group>
+        {activeView === 'cadastro' && (
+          <Group mb={isMobile ? 12 : 18} grow align="flex-end">
+            <FloatingSelect
+              label="Filial"
+              value={selectedBranchId}
+              onChange={setSelectedBranchId}
+              data={branches.map((branch) => ({ value: branch.id, label: branch.label }))}
+              disabled={loadingBranches}
+              searchable
+              nothingFoundMessage="Nenhuma filial encontrada"
+            />
+          </Group>
+        )}
         <Tabs value={activeView} onChange={(value) => setActiveView((value as 'cadastro' | 'mapa') || 'cadastro')} keepMounted={false}>
           <Tabs.List mb="md">
             <Tabs.Tab value="cadastro">Cadastro de salas</Tabs.Tab>
@@ -744,98 +576,7 @@ export function CadastroSala() {
           </Tabs.Panel>
 
           <Tabs.Panel value="mapa">
-            <Paper withBorder radius="lg" p={isMobile ? 'md' : 'lg'}>
-              <Group justify="space-between" align="center" mb="sm">
-                <Box>
-                  <Text fw={700} size={isMobile ? 'md' : 'lg'}>Mapa de Salas</Text>
-                  <Text size="sm" c="dimmed">Visualização em tempo real da ocupação por sala</Text>
-                </Box>
-                <Group gap={6} align="center">
-                  <Clock3 size={14} />
-                  <Text size="xs" c="dimmed">Atualizado às {dayjs().format('HH:mm')}</Text>
-                </Group>
-              </Group>
-
-              <Group gap={8} mb="md">
-                <Badge variant="light" color="teal">Em uso: {roomMapSummary.inUse}</Badge>
-                <Badge variant="light" color="orange">Alta demanda: {roomMapSummary.highDemand}</Badge>
-                <Badge variant="light" color="blue">Fluxo moderado: {roomMapSummary.moderate}</Badge>
-                <Badge variant="light" color="gray">Livres: {roomMapSummary.free}</Badge>
-              </Group>
-
-              {(appointmentsQuery.isLoading || clinicalQueueQuery.isLoading) ? (
-                <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="sm">
-                  {Array.from({ length: 4 }).map((_, idx) => (
-                    <Paper key={idx} withBorder radius="md" p="md">
-                      <Stack gap={8}>
-                        <Skeleton height={18} width="60%" radius="sm" />
-                        <Skeleton height={12} width="45%" radius="sm" />
-                        <Skeleton height={8} width="100%" radius="sm" />
-                        <Skeleton height={12} width="75%" radius="sm" />
-                      </Stack>
-                    </Paper>
-                  ))}
-                </SimpleGrid>
-              ) : roomMapItems.length === 0 ? (
-                <Alert color="gray" variant="light" title="Sem salas para exibir">
-                  Cadastre salas nesta filial para habilitar o mapa de utilização.
-                </Alert>
-              ) : (
-                <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="sm">
-                  {roomMapItems.map((roomMap) => {
-                    const statusMeta = getRoomMapStatusMeta(roomMap.status);
-                    return (
-                      <Paper
-                        key={roomMap.roomId}
-                        withBorder
-                        radius="md"
-                        p="sm"
-                        style={{
-                          boxShadow: roomMap.status === 'EM_USO'
-                            ? '0 8px 20px rgba(18,184,134,0.16)'
-                            : '0 6px 14px rgba(15,23,42,0.08)',
-                          background: roomMap.status === 'EM_USO'
-                            ? 'linear-gradient(135deg, rgba(18,184,134,0.14), rgba(34,139,230,0.08))'
-                            : roomMap.status === 'ALTA_DEMANDA'
-                              ? 'linear-gradient(135deg, rgba(253,126,20,0.14), rgba(255,212,59,0.08))'
-                              : 'var(--mantine-color-body)',
-                        }}
-                      >
-                        <Group justify="space-between" align="flex-start" mb={6}>
-                          <Box style={{ minWidth: 0 }}>
-                            <Text fw={700} size="sm" lineClamp={1}>{roomMap.roomName}</Text>
-                            <Group gap={6} align="center">
-                              <Circle size={8} fill="currentColor" color={`var(--mantine-color-${statusMeta.color}-6)`} />
-                              <Text size="xs" c="dimmed">{statusMeta.label}</Text>
-                            </Group>
-                          </Box>
-                          <Badge variant="light" color={statusMeta.color}>{roomMap.utilizationPercent}%</Badge>
-                        </Group>
-                        <Progress value={roomMap.utilizationPercent} color={statusMeta.color} radius="xl" mb={8} />
-                        <SimpleGrid cols={2} spacing={8}>
-                          <Box>
-                            <Text size="10px" c="dimmed">Agora</Text>
-                            <Text fw={700} size="sm">{roomMap.inProgressNow}</Text>
-                          </Box>
-                          <Box>
-                            <Text size="10px" c="dimmed">Próximos</Text>
-                            <Text fw={700} size="sm">{roomMap.upcomingToday}</Text>
-                          </Box>
-                          <Box>
-                            <Text size="10px" c="dimmed">Agenda</Text>
-                            <Text fw={700} size="sm">{roomMap.totalToday}</Text>
-                          </Box>
-                          <Box>
-                            <Text size="10px" c="dimmed">Concluídos</Text>
-                            <Text fw={700} size="sm">{roomMap.doneToday}</Text>
-                          </Box>
-                        </SimpleGrid>
-                      </Paper>
-                    );
-                  })}
-                </SimpleGrid>
-              )}
-            </Paper>
+            <MapaSalas embedded />
           </Tabs.Panel>
         </Tabs>
       </Box>
@@ -965,5 +706,3 @@ export function CadastroSala() {
     </Box>
   );
 }
-
-

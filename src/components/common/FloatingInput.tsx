@@ -60,7 +60,7 @@ export function FloatingInput({ label, rightSection, containerProps, error, alwa
         <input
           {...props}
           value={controlledValue}
-          placeholder=" "
+          placeholder={props.placeholder || ' '}
           maxLength={
             isPhoneField
               ? Math.min(Number(props.maxLength || 15), 15)

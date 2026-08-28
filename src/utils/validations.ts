@@ -164,7 +164,7 @@ export const validateUserForm = (form: {
   password?: string;
   phone?: string;
   address?: string;
-}, isEditing: boolean = false): ValidationResult => {
+}, _isEditing: boolean = false): ValidationResult => {
   const errors: Record<string, string> = {};
 
   if (!form.branchId) {
@@ -191,15 +191,11 @@ export const validateUserForm = (form: {
     errors.birthDate = 'Data inválida';
   }
 
-  // Password validation only for new users or when changing password
-  if (!isEditing || (isEditing && form.password)) {
-    if (!isEditing && !form.password) {
-      errors.password = 'Senha é obrigatória';
-    } else if (form.password) {
-      const passwordCheck = validatePassword(form.password);
-      if (!passwordCheck.isValid) {
-        errors.password = passwordCheck.message || 'Senha inválida';
-      }
+  // A senha informada é validada, mas pode ficar vazia: o usuário poderá defini-la pela recuperação de acesso.
+  if (form.password) {
+    const passwordCheck = validatePassword(form.password);
+    if (!passwordCheck.isValid) {
+      errors.password = passwordCheck.message || 'Senha inválida';
     }
   }
 

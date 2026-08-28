@@ -27,7 +27,6 @@ import { PaginatedGrid } from '../common/PaginatedGrid';
 import especialidadeService, { type Especialidade, type EspecialidadeAuditLogEntry } from '../../services/especialidadeService';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
-import { useCbosQuery } from '../../hooks/useCbosQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 
@@ -120,7 +119,6 @@ export function CadastroEspecialidades() {
 
   const especialidadesQuery = useEspecialidadesAdminQuery();
   const modalidadesQuery = useModalidadesAdminQuery();
-  const cbosQuery = useCbosQuery();
 
   const modalidadeOptions = useMemo(() => {
     const data: any = modalidadesQuery.data;
@@ -129,14 +127,6 @@ export function CadastroEspecialidades() {
       .filter((m: any) => m?.id && m.isActive)
       .map((m: any) => ({ value: m.id, label: m.name }));
   }, [modalidadesQuery.data]);
-
-  const cboOptions = useMemo(() => {
-    const data: any = cbosQuery.data;
-    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
-    return list
-      .filter((c: any) => c?.id)
-      .map((c: any) => ({ value: c.id, label: `${c.code} — ${c.title}` }));
-  }, [cbosQuery.data]);
 
   const createModalidadeOptions = modalidadeOptions;
 
@@ -148,14 +138,13 @@ export function CadastroEspecialidades() {
   const [createName, setCreateName] = useState('');
   const [createNameError, setCreateNameError] = useState<string | null>(null);
   const [pendingMetodos, setPendingMetodos] = useState<string[]>([]);
-  const [createCboId, setCreateCboId] = useState<string | null>(null);
   const [createSimilarWarning, setCreateSimilarWarning] = useState<{ id: string; name: string }[] | null>(null);
 
   // Modal editar (item único)
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingItem, setEditingItem] = useState<Especialidade | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', metodos: [] as string[], cboId: null as string | null, isActive: true });
+  const [editForm, setEditForm] = useState({ name: '', metodos: [] as string[], isActive: true });
   const [editNameError, setEditNameError] = useState<string | null>(null);
   const [editSimilarWarning, setEditSimilarWarning] = useState<{ id: string; name: string }[] | null>(null);
 
@@ -221,7 +210,6 @@ export function CadastroEspecialidades() {
     setCreateName('');
     setCreateNameError(null);
     setPendingMetodos([]);
-    setCreateCboId(null);
     setCreateSimilarWarning(null);
   };
 
@@ -232,7 +220,7 @@ export function CadastroEspecialidades() {
 
   const openEditModal = (item: Especialidade) => {
     setEditingItem(item);
-    setEditForm({ name: item.name, metodos: [...item.metodos], cboId: item.cboId || null, isActive: item.isActive });
+    setEditForm({ name: item.name, metodos: [...item.metodos], isActive: item.isActive });
     setEditNameError(null);
     setEditSimilarWarning(null);
     setEditModalOpen(true);
@@ -258,7 +246,6 @@ export function CadastroEspecialidades() {
         modalidadeId: createModalidadeId,
         name,
         metodos: pendingMetodos,
-        cboId: createCboId,
         force,
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.especialidadesAdmin });
@@ -303,7 +290,6 @@ export function CadastroEspecialidades() {
       await especialidadeService.updateEspecialidade(editingItem.id, {
         name,
         metodos: editForm.metodos,
-        cboId: editForm.cboId,
         isActive: editForm.isActive,
         force,
       });
@@ -372,14 +358,6 @@ export function CadastroEspecialidades() {
     <Badge color={item.isActive ? 'green' : 'red'} variant="light" size="sm">
       {item.isActive ? 'Ativo' : 'Inativo'}
     </Badge>
-  );
-
-  const renderCbo = (item: Especialidade) => (
-    item.cbo ? (
-      <Text size="xs" c="dimmed">{item.cbo.code} — {item.cbo.title}</Text>
-    ) : (
-      <Text size="xs" c="dimmed">—</Text>
-    )
   );
 
   const renderMetodos = (item: Especialidade) => (
@@ -497,7 +475,6 @@ export function CadastroEspecialidades() {
                         <Text fw={600} size="sm">{it.name}</Text>
                         <Text size="xs" c="dimmed">{it.modalidade?.name || '—'}</Text>
                         {renderMetodos(it)}
-                        {renderCbo(it)}
                         {renderAuditInfo(it)}
                       </Stack>
                       {renderStatusBadge(it)}
@@ -541,7 +518,6 @@ export function CadastroEspecialidades() {
                     <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
                     <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidade</Table.Th>
                     {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Métodos</Table.Th>}
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CBO</Table.Th>}
                     <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>
                     {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Última alteração</Table.Th>}
                     <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
@@ -568,7 +544,6 @@ export function CadastroEspecialidades() {
                           <Text size="sm" c="dimmed">{it.modalidade?.name || '—'}</Text>
                         </Table.Td>
                         {!isTablet && <Table.Td>{renderMetodos(it)}</Table.Td>}
-                        {!isTablet && <Table.Td>{renderCbo(it)}</Table.Td>}
                         <Table.Td>{renderStatusBadge(it)}</Table.Td>
                         {!isTablet && <Table.Td>{renderAuditInfo(it)}</Table.Td>}
                         <Table.Td style={{ textAlign: 'center' }}>
@@ -628,7 +603,7 @@ export function CadastroEspecialidades() {
             value={createModalidadeId}
             error={modalidadeError || undefined}
             searchable
-            nothingFoundMessage="Todas as modalidades já têm uma especialidade cadastrada"
+            nothingFoundMessage="Nenhuma modalidade encontrada"
             onChange={(value) => {
               setCreateModalidadeId(value);
               setModalidadeError(null);
@@ -654,17 +629,6 @@ export function CadastroEspecialidades() {
             tags={pendingMetodos}
             onAdd={(value) => setPendingMetodos((prev) => (prev.includes(value) ? prev : [...prev, value]))}
             onRemove={(value) => setPendingMetodos((prev) => prev.filter((m) => m !== value))}
-          />
-
-          <FloatingSelect
-            label="CBO"
-            placeholder="Selecione o CBO (opcional)"
-            data={cboOptions}
-            value={createCboId}
-            searchable
-            clearable
-            nothingFoundMessage="Nenhum CBO encontrado"
-            onChange={(value) => setCreateCboId(value)}
           />
 
           {createSimilarWarning && createSimilarWarning.length > 0 ? (
@@ -731,17 +695,6 @@ export function CadastroEspecialidades() {
             tags={editForm.metodos}
             onAdd={(value) => setEditForm((prev) => (prev.metodos.includes(value) ? prev : { ...prev, metodos: [...prev.metodos, value] }))}
             onRemove={(value) => setEditForm((prev) => ({ ...prev, metodos: prev.metodos.filter((m) => m !== value) }))}
-          />
-
-          <FloatingSelect
-            label="CBO"
-            placeholder="Selecione o CBO (opcional)"
-            data={cboOptions}
-            value={editForm.cboId}
-            searchable
-            clearable
-            nothingFoundMessage="Nenhum CBO encontrado"
-            onChange={(value) => setEditForm((prev) => ({ ...prev, cboId: value }))}
           />
 
           <Switch

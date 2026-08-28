@@ -32,6 +32,7 @@ import { FloatingSelect } from '../common/FloatingSelect';
 import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
+import { useCbosQuery } from '../../hooks/useCbosQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
@@ -40,22 +41,25 @@ import { PaginatedGrid } from '../common/PaginatedGrid';
 interface ProcedureForm {
   name: string;
   description: string;
-  appointmentType: 'CONSULTA' | 'EXAME';
+  appointmentType: 'CONSULTA_CLINICA' | 'CONSULTA_TERAPIAS' | 'EXAME';
   durationMinutes?: number | null;
   supportsTeleconsultation: boolean;
   modalities: string[];
   especialidadeId: string | null;
+  cboId: string | null;
   branchIds: string[];
 }
 
 interface ProcedureItem {
   id: string;
   name: string;
-  appointmentType: 'CONSULTA' | 'EXAME';
+  appointmentType: 'CONSULTA_CLINICA' | 'CONSULTA_TERAPIAS' | 'EXAME';
   supportsTeleconsultation: boolean;
   modalities: string[];
   especialidadeId: string | null;
   especialidadeName: string | null;
+  cboId: string | null;
+  cbo?: { code?: string; title?: string } | null;
   modalidadeName: string | null;
   branchIds: string[];
   isActive: boolean;
@@ -64,15 +68,23 @@ interface ProcedureItem {
 const INITIAL_FORM: ProcedureForm = {
   name: '',
   description: '',
-  appointmentType: 'CONSULTA',
+  appointmentType: 'CONSULTA_CLINICA',
   durationMinutes: null,
   supportsTeleconsultation: false,
   modalities: [],
   especialidadeId: null,
+  cboId: null,
   branchIds: [],
 };
 
 const TELECONSULT_MODALITY = 'Telemedicina';
+const normalizeAppointmentType = (value: unknown): ProcedureForm['appointmentType'] => {
+  const normalized = String(value || '').toUpperCase();
+  if (normalized === 'EXAME') return 'EXAME';
+  if (normalized === 'CONSULTA_TERAPIAS' || normalized === 'CONSULTA TERAPIAS') return 'CONSULTA_TERAPIAS';
+  return 'CONSULTA_CLINICA';
+};
+const appointmentTypeLabel = (value: ProcedureItem['appointmentType']) => value === 'EXAME' ? 'Exame' : value === 'CONSULTA_TERAPIAS' ? 'Consulta terapias' : 'Consulta clínica';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -105,6 +117,7 @@ export function CadastroProcedimento() {
   const [procedurePageSize, setProcedurePageSize] = useState(10);
   const proceduresQuery = useProceduresAdminQuery();
   const especialidadesQuery = useEspecialidadesAdminQuery();
+  const cbosQuery = useCbosQuery();
   const branchesQuery = useSettingsBranchesQuery();
 
   const especialidadeOptions = useMemo(() => {
@@ -127,6 +140,14 @@ export function CadastroProcedimento() {
       .filter((b: any) => b?.id)
       .map((b: any) => ({ value: String(b.id), label: b.tradeName || b.socialName || 'Filial sem nome' }));
   }, [branchesQuery.data]);
+
+  const cboOptions = useMemo(() => {
+    const data: any = cbosQuery.data;
+    const list: any[] = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    return list
+      .filter((c: any) => c?.id && c.isActive !== false)
+      .map((c: any) => ({ value: String(c.id), label: `${c.code} — ${c.title}` }));
+  }, [cbosQuery.data]);
 
   const branchLabelById = useMemo(() => {
     return branchOptions.reduce<Record<string, string>>((acc, option) => {
@@ -187,13 +208,15 @@ export function CadastroProcedimento() {
     const mapped: ProcedureItem[] = list.map((it: any): ProcedureItem => ({
       id: String(it.id ?? it.procedureId ?? ''),
       name: it.name || 'Procedimento',
-      appointmentType: String(it.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
+      appointmentType: normalizeAppointmentType(it.appointmentType),
       supportsTeleconsultation: Array.isArray(it.modalities) ? it.modalities.includes(TELECONSULT_MODALITY) : false,
       modalities: Array.isArray(it.modalities)
         ? it.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
         : [],
       especialidadeId: it.especialidadeId || it.especialidade?.id || null,
       especialidadeName: it.especialidade?.name || null,
+      cboId: it.cboId || it.cbo?.id || null,
+      cbo: it.cbo || null,
       modalidadeName: it.modalidade?.name || null,
       branchIds: Array.isArray(it.branchIds) ? it.branchIds.map((id: any) => String(id)) : [],
       isActive: Boolean(it.isActive ?? true),
@@ -220,9 +243,10 @@ export function CadastroProcedimento() {
         durationMinutes: form.durationMinutes ?? null,
         modalities: [
           ...form.modalities.filter((modality) => modality !== TELECONSULT_MODALITY),
-          ...(form.appointmentType === 'CONSULTA' && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
+          ...((form.appointmentType === 'CONSULTA_CLINICA' || form.appointmentType === 'CONSULTA_TERAPIAS') && form.supportsTeleconsultation ? [TELECONSULT_MODALITY] : []),
         ],
         especialidadeId: form.especialidadeId || null,
+        cboId: form.cboId || null,
         branchIds: form.branchIds,
       };
 
@@ -297,7 +321,7 @@ export function CadastroProcedimento() {
       setForm({
         name: data.name || '',
         description: data.description || '',
-        appointmentType: String(data.appointmentType || 'CONSULTA').toUpperCase() === 'EXAME' ? 'EXAME' : 'CONSULTA',
+        appointmentType: normalizeAppointmentType(data.appointmentType),
         durationMinutes: data.durationMinutes !== undefined && data.durationMinutes !== null
           ? Number(data.durationMinutes)
           : null,
@@ -306,6 +330,7 @@ export function CadastroProcedimento() {
           ? data.modalities.filter((modality: string) => modality !== TELECONSULT_MODALITY)
           : [],
         especialidadeId: data.especialidadeId || data.especialidade?.id || null,
+        cboId: data.cboId || data.cbo?.id || null,
         branchIds: Array.isArray(data.branchIds) ? data.branchIds.map((id: any) => String(id)) : [],
       });
 
@@ -427,13 +452,14 @@ export function CadastroProcedimento() {
                   <FloatingSelect
                     label="Tipo do procedimento"
                     data={[
-                      { value: 'CONSULTA', label: 'Consulta' },
+                      { value: 'CONSULTA_CLINICA', label: 'Consulta clínica' },
+                      { value: 'CONSULTA_TERAPIAS', label: 'Consulta terapias' },
                       { value: 'EXAME', label: 'Exame' },
                     ]}
                     value={form.appointmentType}
                     onChange={(value) => setForm((prev) => ({
                       ...prev,
-                      appointmentType: value === 'EXAME' ? 'EXAME' : 'CONSULTA',
+                      appointmentType: normalizeAppointmentType(value),
                       supportsTeleconsultation: value === 'EXAME' ? false : prev.supportsTeleconsultation,
                     }))}
                     allowDeselect={false}
@@ -459,6 +485,19 @@ export function CadastroProcedimento() {
                     nothingFoundMessage="Nenhuma especialidade encontrada"
                     onChange={(value) => setForm((prev) => ({ ...prev, especialidadeId: value }))}
                   />
+                  <FloatingSelect
+                    label="CBO"
+                    placeholder="Selecione o CBO (opcional)"
+                    data={cboOptions}
+                    value={form.cboId}
+                    searchable
+                    clearable
+                    nothingFoundMessage="Nenhum CBO encontrado"
+                    onChange={(value) => setForm((prev) => ({ ...prev, cboId: value }))}
+                  />
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
                   <FloatingMultiSelect
                     label="Unidades atendidas"
                     placeholder="Selecione as unidades"
@@ -485,7 +524,7 @@ export function CadastroProcedimento() {
                   <Switch
                     label="Suporta teleconsulta"
                     checked={form.supportsTeleconsultation}
-                    disabled={form.appointmentType !== 'CONSULTA'}
+                    disabled={form.appointmentType === 'EXAME'}
                     onChange={(event) => {
                       const checked = event.currentTarget.checked;
                       setForm((prev) => ({ ...prev, supportsTeleconsultation: checked }));
@@ -617,9 +656,14 @@ export function CadastroProcedimento() {
                                     Especialidade: {item.especialidadeName}
                                   </Text>
                                 )}
+                                {item.cbo && (
+                                  <Text size="xs" c="dimmed">
+                                    CBO: {item.cbo.code} — {item.cbo.title}
+                                  </Text>
+                                )}
                                 <Group gap="xs">
                                   <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
-                                    {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                    {appointmentTypeLabel(item.appointmentType)}
                                   </Badge>
                                   {item.supportsTeleconsultation && (
                                     <Badge color="indigo" variant="light" size="sm">
@@ -714,6 +758,11 @@ export function CadastroProcedimento() {
                                         Especialidade: {item.especialidadeName}
                                       </Text>
                                     )}
+                                    {item.cbo && (
+                                      <Text size="xs" c="dimmed">
+                                        CBO: {item.cbo.code} — {item.cbo.title}
+                                      </Text>
+                                    )}
                                     <Text size="xs" c="dimmed">
                                       Unidades: {item.branchIds.length ? item.branchIds.map((id) => branchLabelById[id] || id).join(', ') : 'Todas'}
                                     </Text>
@@ -722,8 +771,8 @@ export function CadastroProcedimento() {
                                 {!isTablet && (
                                   <Table.Td>
                                     <Group gap={6}>
-                                      <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
-                                        {item.appointmentType === 'EXAME' ? 'Exame' : 'Consulta'}
+                                  <Badge color={item.appointmentType === 'EXAME' ? 'orange' : 'blue'} variant="light" size="sm">
+                                    {appointmentTypeLabel(item.appointmentType)}
                                       </Badge>
                                       {item.supportsTeleconsultation && (
                                         <Badge color="indigo" variant="light" size="sm">
