@@ -48,6 +48,7 @@ interface SalaRow {
   workingHoursEnd?: string | null;
   modalidadeId?: string | null;
   especialidadeId?: string | null;
+  especialidadeIds?: string[];
   capacity?: number | null;
 }
 
@@ -93,7 +94,7 @@ export function CadastroSala() {
     workingHoursStart: '',
     workingHoursEnd: '',
     modalidadeId: '' as string,
-    especialidadeId: '' as string,
+    especialidadeIds: [] as string[],
     capacity: '' as string,
   });
 
@@ -209,6 +210,9 @@ export function CadastroSala() {
         workingHoursEnd: sector.workingHoursEnd || null,
         modalidadeId: sector.modalidadeId || null,
         especialidadeId: sector.especialidadeId || null,
+        especialidadeIds: Array.isArray(sector.especialidadeIds) && sector.especialidadeIds.length > 0
+          ? sector.especialidadeIds.map((id: any) => String(id))
+          : (sector.especialidadeId ? [String(sector.especialidadeId)] : []),
         capacity: sector.capacity ?? null,
       }))
       .filter((sector: SalaRow) => sector.id && sector.branchId === selectedBranchId);
@@ -226,7 +230,7 @@ export function CadastroSala() {
         workingHoursStart: String(item.workingHoursStart || ''),
         workingHoursEnd: String(item.workingHoursEnd || ''),
         modalidadeId: item.modalidadeId || '',
-        especialidadeId: item.especialidadeId || '',
+        especialidadeIds: item.especialidadeIds || (item.especialidadeId ? [item.especialidadeId] : []),
         capacity: item.capacity != null ? String(item.capacity) : '',
       });
     } else {
@@ -239,7 +243,7 @@ export function CadastroSala() {
         workingHoursStart: '',
         workingHoursEnd: '',
         modalidadeId: '',
-        especialidadeId: '',
+        especialidadeIds: [],
         capacity: '',
       });
     }
@@ -247,7 +251,7 @@ export function CadastroSala() {
   };
 
   const handleModalidadeChange = (modalidadeId: string | null) => {
-    setForm((prev) => ({ ...prev, modalidadeId: modalidadeId || '', especialidadeId: '' }));
+    setForm((prev) => ({ ...prev, modalidadeId: modalidadeId || '', especialidadeIds: [] }));
   };
 
   const handleSave = async () => {
@@ -297,7 +301,8 @@ export function CadastroSala() {
         workingHoursStart: form.workingHoursStart || null,
         workingHoursEnd: form.workingHoursEnd || null,
         modalidadeId: form.modalidadeId || null,
-        especialidadeId: form.especialidadeId || null,
+        especialidadeId: form.especialidadeIds[0] || null,
+        especialidadeIds: form.especialidadeIds,
         capacity: trimmedCapacity ? Number(trimmedCapacity) : null,
       };
 
@@ -323,6 +328,7 @@ export function CadastroSala() {
             ...item,
             modalidadeId: payload.modalidadeId,
             especialidadeId: payload.especialidadeId,
+            especialidadeIds: payload.especialidadeIds,
             capacity: payload.capacity,
           };
         }
@@ -340,7 +346,7 @@ export function CadastroSala() {
         workingHoursStart: '',
         workingHoursEnd: '',
         modalidadeId: '',
-        especialidadeId: '',
+        especialidadeIds: [],
         capacity: '',
       });
     } catch (err: any) {
@@ -623,15 +629,15 @@ export function CadastroSala() {
               clearable
               nothingFoundMessage="Nenhuma modalidade encontrada"
             />
-            <FloatingSelect
+            <FloatingMultiSelect
               label="Especialidade"
-              placeholder={form.modalidadeId ? 'Selecione a especialidade' : 'Selecione uma modalidade primeiro'}
+              placeholder={form.modalidadeId ? 'Selecione uma ou mais especialidades' : 'Selecione uma modalidade primeiro'}
               data={(form.modalidadeId ? especialidadesByModalidadeId.get(form.modalidadeId) || [] : []).map((especialidade: any) => ({
                 value: String(especialidade.id),
                 label: String(especialidade.name || 'Especialidade sem nome'),
               }))}
-              value={form.especialidadeId || null}
-              onChange={(value) => setForm((prev) => ({ ...prev, especialidadeId: value || '' }))}
+              value={form.especialidadeIds}
+              onChange={(values) => setForm((prev) => ({ ...prev, especialidadeIds: values }))}
               disabled={!form.modalidadeId}
               searchable
               clearable
