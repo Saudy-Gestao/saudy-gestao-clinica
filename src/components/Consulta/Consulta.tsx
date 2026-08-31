@@ -36,6 +36,7 @@ interface ConsultationRow {
   cpf?: string;
   doctorName?: string;
   convenio?: string;
+  procedimento?: string;
   agendadoPara: string;
   agenda: string;
   statusFluxo: string;
@@ -168,6 +169,7 @@ export function Consulta() {
       || '',
     doctorName: String(it.doctorName || it.appointment?.doctorName || '').trim(),
     convenio: it.convenio || '',
+    procedimento: String(it.procedureName || it.procedure || it.appointment?.specialty || it.specialty || '').trim(),
     agendadoPara: it.scheduledFor || '-',
     agenda: it.agenda || '-',
     statusFluxo: it.queue || WAITING_STATUS,
@@ -226,7 +228,7 @@ export function Consulta() {
     const filteredByChip = rows.filter((row) => rowMatchesFilter(row, activeFilter));
     if (!normalized) return filteredByChip;
     return filteredByChip.filter((row) =>
-      [row.nomeCompleto, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo, row.notes, row.doctorName]
+      [row.nomeCompleto, row.procedimento, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo, row.notes, row.doctorName]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized)),
     );
@@ -361,8 +363,8 @@ export function Consulta() {
           p={isMobile ? 'sm' : 'md'}
           radius="md"
           style={{
-            background: isDark ? '#031233' : '#fff',
-            borderColor: isDark ? 'rgba(74, 108, 186, 0.3)' : 'var(--mantine-color-gray-3)',
+            background: isDark ? 'var(--mantine-color-default)' : '#fff',
+            borderColor: isDark ? 'var(--mantine-color-default-border)' : 'var(--mantine-color-gray-3)',
           }}
         >
           {viewMode === VIEW_MODES.LIST && (
@@ -388,7 +390,7 @@ export function Consulta() {
                     key={chip}
                     size="xs"
                     radius="sm"
-                    variant={isActive ? 'filled' : 'light'}
+                    variant={isActive ? 'filled' : (isDark ? 'default' : 'light')}
                     color="darkBlue"
                     onClick={() => setActiveFilter(chip)}
                     rightSection={(
@@ -397,8 +399,8 @@ export function Consulta() {
                         py={1}
                         style={{
                           borderRadius: 4,
-                          background: isActive ? 'rgba(255,255,255,0.16)' : (isDark ? '#0a1d4d' : '#0b1a43'),
-                          color: '#fff',
+                          background: isActive ? 'rgba(255,255,255,0.16)' : (isDark ? 'var(--mantine-color-default-hover)' : '#0b1a43'),
+                          color: isActive ? '#fff' : (isDark ? 'var(--mantine-color-text)' : '#fff'),
                           fontSize: 11,
                           fontWeight: 700,
                           lineHeight: 1.2,
@@ -437,15 +439,17 @@ export function Consulta() {
           </Group>
 
           {viewMode === VIEW_MODES.LIST && (
-            <Box style={{ overflowX: 'auto', border: `1px solid ${isDark ? 'rgba(74,108,186,0.35)' : '#e9ecef'}`, borderRadius: 6 }}>
+            <Box style={{ overflowX: 'auto', border: `1px solid ${isDark ? 'var(--mantine-color-default-border)' : '#e9ecef'}`, borderRadius: 6 }}>
               <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                 <Table.Thead>
                   <Table.Tr style={{ borderBottom: 'none' }}>
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendado para</Table.Th>
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
+                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
+                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendado para</Table.Th>
+                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Procedimento</Table.Th>
+                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Profissional</Table.Th>
+                    {!isTablet && <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
+                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -453,7 +457,7 @@ export function Consulta() {
                     const badge = statusBadge(row.statusFluxo);
                     const isFinalized = isFinalizedRow(row);
                     return (
-                      <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                      <Table.Tr key={row.id} style={{ borderBottom: `1px solid ${isDark ? 'var(--mantine-color-default-border)' : '#e9ecef'}` }}>
                         <Table.Td>
                           <Group gap={isMobile ? 'xs' : 'sm'}>
                             {!isMobile && (
@@ -487,6 +491,12 @@ export function Consulta() {
                         </Table.Td>
                         <Table.Td>
                           <Text size="sm">{parseAppointmentDateTime(row)}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{row.procedimento || '-'}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{row.doctorName || loggedDoctorName || '-'}</Text>
                         </Table.Td>
                         {!isTablet && (
                           <Table.Td>
@@ -536,7 +546,7 @@ export function Consulta() {
                     );
                   }) : (
                     <Table.Tr>
-                      <Table.Td colSpan={5}>
+                      <Table.Td colSpan={isTablet ? 6 : 7}>
                         <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
                       </Table.Td>
                     </Table.Tr>
@@ -562,8 +572,8 @@ export function Consulta() {
                         p="sm"
                         radius="md"
                         style={{
-                          background: isDark ? '#051845' : '#f8f9ff',
-                          borderColor: isDark ? 'rgba(74,108,186,0.45)' : 'var(--mantine-color-gray-3)',
+                          background: isDark ? 'var(--mantine-color-default-hover)' : '#f8f9ff',
+                          borderColor: isDark ? 'var(--mantine-color-default-border)' : 'var(--mantine-color-gray-3)',
                         }}
                       >
                         <Group justify="space-between" align="flex-start" wrap="nowrap">
@@ -574,7 +584,7 @@ export function Consulta() {
                                 width: 36,
                                 height: 36,
                                 borderRadius: 8,
-                                background: isDark ? '#4d67b4' : '#5d78c9',
+                                background: isDark ? 'var(--mantine-color-darkBlue-6)' : '#5d78c9',
                                 color: 'white',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -605,6 +615,11 @@ export function Consulta() {
                           <Clock3 size={14} />
                           <Text size="sm">{dateTimeLabel}</Text>
                         </Group>
+
+                        <Text size="sm" mt={8} lineClamp={1}>
+                          <Text component="span" fw={700}>Procedimento: </Text>
+                          {row.procedimento || '-'}
+                        </Text>
 
                         <Text size="sm" mt={8} lineClamp={2}>
                           <Text component="span" fw={700}>Queixa: </Text>

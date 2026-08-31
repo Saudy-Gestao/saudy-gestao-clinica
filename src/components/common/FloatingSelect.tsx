@@ -8,7 +8,7 @@ interface FloatingSelectProps extends SelectProps {
   alwaysFloatLabel?: boolean;
 }
 
-export function FloatingSelect({ label, containerProps, value, error, alwaysFloatLabel = false, styles, ...props }: FloatingSelectProps) {
+export function FloatingSelect({ label, containerProps, value, error, description, alwaysFloatLabel = false, styles, ...props }: FloatingSelectProps) {
   const hasValue = typeof value === 'string'
     ? value.trim().length > 0
     : value !== null && value !== undefined;
@@ -44,7 +44,9 @@ export function FloatingSelect({ label, containerProps, value, error, alwaysFloa
               top: 'auto',
               bottom: 8,
               transform: 'none',
-              pointerEvents: 'none',
+              // The section contains Mantine's clear button when `clearable`
+              // is enabled. It must receive pointer events so the X works.
+              pointerEvents: 'auto',
             },
             ...styles,
           }}
@@ -52,6 +54,11 @@ export function FloatingSelect({ label, containerProps, value, error, alwaysFloa
         />
         <label style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</label>
       </Box>
+      {description ? (
+        <Text size="xs" c="dimmed" mt={4} lh={1.3}>
+          {description}
+        </Text>
+      ) : null}
       {error ? (
         <Text size="xs" c="red" mt={4}>
           {error}

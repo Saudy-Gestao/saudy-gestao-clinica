@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
+  ActionIcon,
   Badge,
   Box,
   Button,
@@ -21,7 +23,7 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useDebouncedValue } from '@mantine/hooks';
-import { Calendar, FileText, Search, Stethoscope, Video } from 'lucide-react';
+import { Calendar, ChevronLeft, FileText, Search, Stethoscope, Video } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { DARK_BLUE } from '../../themes/theme';
 import consultationService, { type HistoricoItem } from '../../services/consultationService';
@@ -68,7 +70,7 @@ function DetailDrawer({ item, onClose }: { item: HistoricoItem | null; onClose: 
       onClose={onClose}
       title={
         <Group gap="sm">
-          <Stethoscope size={20} color={DARK_BLUE} />
+          <Stethoscope size={20} color={isDark ? 'var(--mantine-color-text)' : DARK_BLUE} />
           <Text fw={700} size="lg">Detalhes do Atendimento</Text>
         </Group>
       }
@@ -221,6 +223,8 @@ function DetailDrawer({ item, onClose }: { item: HistoricoItem | null; onClose: 
 }
 
 export function HistoricoAtendimentos() {
+  const navigate = useNavigate();
+  const isDark = useComputedColorScheme('light') === 'dark';
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -239,10 +243,43 @@ export function HistoricoAtendimentos() {
     offset: (page - 1) * PAGE_SIZE,
   };
 
-  const { data, isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['historico', params],
     queryFn: () => consultationService.listHistorico(params),
   });
+
+  const data = useMemo(() => {
+    if (!rawData) return rawData;
+
+    return {
+      ...rawData,
+      items: (rawData.items || []).map((rawItem: any) => {
+        if (rawItem.appointment) return rawItem;
+
+        const appointmentId = String(rawItem.appointmentId || rawItem.id || '').trim();
+        const hasMedicalRecord = Boolean(rawItem.medicalRecord || rawItem.hasMedicalRecord);
+        return {
+          ...rawItem,
+          status: rawItem.status || rawItem.appointmentStatus || '',
+          appointment: {
+            id: appointmentId,
+            date: rawItem.date || '',
+            time: rawItem.time || '',
+            type: rawItem.type || '',
+            specialty: rawItem.specialty || '',
+            convenio: rawItem.convenio || undefined,
+            durationMinutes: rawItem.durationMinutes,
+            status: rawItem.appointmentStatus || '',
+          },
+          medicalRecord: rawItem.medicalRecord || (hasMedicalRecord ? {
+            id: `${rawItem.id}-record`,
+            chiefComplaint: rawItem.chiefComplaint || undefined,
+            diagnosis: rawItem.diagnosis || undefined,
+          } : undefined),
+        };
+      }),
+    };
+  }, [rawData]);
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -258,8 +295,16 @@ export function HistoricoAtendimentos() {
       <Box p="lg" maw={1200} mx="auto">
         <Group mb="lg" justify="space-between">
           <Group gap="sm">
-            <Calendar size={24} color={DARK_BLUE} />
-            <Title order={2} c={DARK_BLUE}>Histórico de Atendimentos</Title>
+            <ActionIcon
+              variant="default"
+              size="xl"
+              onClick={() => navigate(-1)}
+              aria-label="Voltar"
+            >
+              <ChevronLeft size={28} />
+            </ActionIcon>
+            <Calendar size={24} color={isDark ? 'var(--mantine-color-text)' : DARK_BLUE} />
+            <Title order={2} c={isDark ? 'var(--mantine-color-text)' : DARK_BLUE}>Histórico de Atendimentos</Title>
           </Group>
           <Text size="sm" c="dimmed">{total} atendimento{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}</Text>
         </Group>

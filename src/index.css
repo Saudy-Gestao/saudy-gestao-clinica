@@ -1559,7 +1559,9 @@ body {
   transform: none;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  /* Keep clear buttons and date controls clickable. Non-interactive custom
+     icons opt out individually through their own inline style. */
+  pointer-events: auto;
 }
 
 /* Keep number input step controls clickable */

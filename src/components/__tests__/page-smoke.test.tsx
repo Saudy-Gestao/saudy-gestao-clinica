@@ -159,6 +159,7 @@ vi.mock('@mantine/hooks', () => ({
   useDisclosure: (initial = false) => [initial, { open: vi.fn(), close: vi.fn(), toggle: vi.fn() }],
   useLocalStorage: ({ defaultValue }: any) => [defaultValue, vi.fn()],
   useMediaQuery: () => false,
+  useElementSize: () => ({ ref: vi.fn(), width: 1024, height: 0, x: 0, y: 0 }),
 }));
 
 const iconMock = (props: any) => <span aria-hidden="true" {...props} />;

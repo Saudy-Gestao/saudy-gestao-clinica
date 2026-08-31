@@ -642,7 +642,7 @@ export function Agendamento() {
   const [detailAttachmentsLoading, setDetailAttachmentsLoading] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   // Estados para os filtros
-  const [especialidade, setEspecialidade] = useState<string | null>(null);
+  const [procedimentoFiltro, setProcedimentoFiltro] = useState<string | null>(null);
   const [convenio, setConvenio] = useState<string | null>(null);
   const [dataHoraFiltro, setDataHoraFiltro] = useState<Date | null>(new Date());
   const [statusFiltro, setStatusFiltro] = useState<string | null>(null);
@@ -710,7 +710,15 @@ export function Agendamento() {
     roomId: String(it.roomId || it.room_id || '').trim() || undefined,
     medicalEquipmentId: String(it.medicalEquipmentId || it.medical_equipment_id || '').trim() || undefined,
     especialidade: it.specialty || it.procedure || it.procedureName || it.procedure_name || it.procedure?.name || it.procedimento || it.especialidade || '',
-    convenio: it.convenio || it.insurance || it.healthInsuranceName || '',
+    convenio: String(
+      it.convenio
+      || it.insurance
+      || it.healthInsuranceName
+      || it.insuranceName
+      || it.insurance_name
+      || it.convenioName
+      || '',
+    ).trim(),
     convenioNumber: it.convenioNumber || it.convenio_number || it.healthInsuranceNumber || it.insuranceCardNumber || '',
     convenioValidUntil: it.convenioValidUntil || it.convenio_valid_until || it.healthInsuranceExpiry || it.healthInsuranceValidity || '',
     convenioStatus: it.convenioStatus || it.convenio_status || '',
@@ -1017,24 +1025,40 @@ export function Agendamento() {
       ?data
       : (Array.isArray(data?.items)
         ?data.items
+        : (Array.isArray(data?.insurances)
+          ?data.insurances
         : (Array.isArray(data?.data?.items)
           ?data.data.items
-          : (Array.isArray(data?.data)
-            ?data.data
-            : [])));
-    const options = list
+          : (Array.isArray(data?.data?.insurances)
+            ?data.data.insurances
+            : (Array.isArray(data?.data)
+              ?data.data
+              : [])))));
+    const catalogOptions = list
       .filter((it: any) => it?.isActive !== false)
       .map((it: any) => {
         const name = (it.name || it.nome || '').toString().trim();
         return name ?{ value: name, label: name } : null;
       })
       .filter(Boolean) as { value: string; label: string }[];
+    // Keep the filter useful even when an appointment references an insurance
+    // that is not returned by the current catalog response (for example, a
+    // legacy or mock appointment).
+    const appointmentOptions = agendamentos
+      .map((item) => String(item.convenio || '').trim())
+      .filter(Boolean)
+      .map((name) => ({ value: name, label: name }));
     const mergedOptions = [
       { value: PARTICULAR_INSURANCE_LABEL, label: PARTICULAR_INSURANCE_LABEL },
-      ...options.filter((item, index, arr) => arr.findIndex((current) => current.value === item.value) === index),
+      ...catalogOptions,
+      ...appointmentOptions,
     ];
-    setInsuranceOptions(mergedOptions);
-  }, [insurancesQuery.data]);
+    setInsuranceOptions(
+      mergedOptions.filter((item, index, arr) => arr.findIndex((current) => (
+        normalizeComparableText(current.value) === normalizeComparableText(item.value)
+      )) === index),
+    );
+  }, [insurancesQuery.data, agendamentos]);
   useEffect(() => {
     const data: any = doctorsQuery.data;
     const list: any[] = Array.isArray(data)
@@ -1126,17 +1150,18 @@ export function Agendamento() {
       || agendamento.pacienteNome.toLowerCase().includes(normalizedSearch)
       || agendamento.pacienteCPF.includes(normalizedSearch)
       || agendamento.medicoNome.toLowerCase().includes(normalizedSearch);
-    const normalizedEspecialidade = String(especialidade || '').trim().toLowerCase();
-    const matchesEspecialidade = !normalizedEspecialidade
-      || agendamento.especialidade.toLowerCase().includes(normalizedEspecialidade)
-      || agendamento.tipoConsulta.toLowerCase().includes(normalizedEspecialidade);
+    const normalizedProcedimento = String(procedimentoFiltro || '').trim().toLowerCase();
+    const appointmentProcedimento = String(agendamento.especialidade || '').trim().toLowerCase();
+    const matchesProcedimento = !normalizedProcedimento
+      || appointmentProcedimento.includes(normalizedProcedimento);
     const normalizedConvenio = String(convenio || '').trim().toLowerCase();
+    const appointmentConvenio = String(agendamento.convenio || '').trim().toLowerCase();
     const matchesConvenio = !normalizedConvenio
-      || agendamento.convenio.toLowerCase().includes(normalizedConvenio);
+      || appointmentConvenio.includes(normalizedConvenio);
     const matchesDate = !dataHoraFiltro
       || dayjs(agendamento.data).isSame(dayjs(dataHoraFiltro), 'day');
     const matchesStatus = !statusFiltro || agendamento.status === statusFiltro;
-    return matchesSearch && matchesEspecialidade && matchesConvenio && matchesDate && matchesStatus;
+    return matchesSearch && matchesProcedimento && matchesConvenio && matchesDate && matchesStatus;
   });
 
   useEffect(() => {
@@ -4015,11 +4040,11 @@ export function Agendamento() {
           >
             {/* Filtros */}
             <FloatingSelect
-              label="Especialidade"
+              label="Procedimento"
               alwaysFloatLabel
               data={procedureOptions}
-              value={especialidade}
-              onChange={setEspecialidade}
+              value={procedimentoFiltro}
+              onChange={setProcedimentoFiltro}
               searchable
               clearable
               disabled={proceduresLoading}
