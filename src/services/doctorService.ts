@@ -56,9 +56,9 @@ export interface CreateDoctorPayload {
 export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;
 
 export default {
-  async listDoctors() {
+  async listDoctors(branchId?: string) {
     const url = '/accounts/doctors/';
-    const res = await api.get(url);
+    const res = branchId ? await api.get(url, { params: { branchId } }) : await api.get(url);
     return res.data;
   },
 

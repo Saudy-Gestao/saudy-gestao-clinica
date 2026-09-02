@@ -2,6 +2,8 @@ import api from './api';
 
 export interface InternPayload {
   name: string;
+  branchId?: string;
+  especialidadeId?: string | null;
   cpf?: string;
   email?: string;
   phone?: string;
@@ -10,6 +12,14 @@ export interface InternPayload {
   startDate?: string;
   endDate?: string;
   professionalIds: string[];
+  workingDays?: string[];
+  workingHoursStart?: string;
+  workingHoursEnd?: string;
+  workingSchedules?: Array<{
+    days: string[];
+    hoursStart: string;
+    hoursEnd: string;
+  }>;
   isActive?: boolean;
 }
 
