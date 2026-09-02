@@ -642,6 +642,17 @@ export function CadastroSala() {
               searchable
               clearable
               nothingFoundMessage="Nenhuma especialidade disponível"
+              styles={{
+                pillsList: {
+                  flexWrap: 'nowrap',
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
+                  scrollbarWidth: 'thin',
+                },
+                inputField: {
+                  minWidth: 88,
+                },
+              }}
             />
           </Group>
           <FloatingInput
