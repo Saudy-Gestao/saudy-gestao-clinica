@@ -6,9 +6,7 @@ import {
   Divider,
   Group,
   Paper,
-  SegmentedControl,
   Stack,
-  Table,
   Text,
 } from '@mantine/core';
 import { Plus, Trash2, X } from 'lucide-react';
@@ -68,12 +66,6 @@ const DURATION_OPTIONS = Array.from({ length: 60 }, (_, index) => ({
   value: String(index + 1),
   label: `${index + 1} min`,
 }));
-
-const STATUS_COLOR: Record<string, string> = {
-  ATIVA: 'green',
-  INATIVA: 'gray',
-  BLOQUEADA: 'red',
-};
 
 const makeKey = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -158,13 +150,6 @@ export function CadastroAgendaEscalaForm({
 
   const assignedDays = useMemo(() => new Set(blocks.flatMap((block) => block.days)), [blocks]);
   const availableDays = DAYS.filter((day) => !assignedDays.has(day.value));
-
-  const updateDraft = (key: keyof ScaleSlot, value: string | string[]) => {
-    setDraft((current) => current ? ({
-      ...current,
-      slots: current.slots.map((slot, index) => index === 0 ? { ...slot, [key]: value } : slot),
-    }) : current);
-  };
 
   const updateDraftSlot = (slotKey: string, key: keyof ScaleSlot, value: string | string[]) => {
     setDraft((current) => current ? ({

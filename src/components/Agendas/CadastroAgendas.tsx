@@ -349,16 +349,6 @@ export function CadastroAgendas() {
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const openWizard = () => {
-    setWizardStep(0);
-    setWizardBranchId(filterBranchId || '');
-    setWizardDoctorId('');
-    setDraft(EMPTY_DRAFT);
-    setConjuntos([]);
-    setWizardError(null);
-    setWizardOpen(true);
-  };
-
   const closeWizard = () => { if (!submitting) setWizardOpen(false); };
 
   const handleWizardBranchChange = (branchId: string | null) => {
@@ -579,7 +569,7 @@ export function CadastroAgendas() {
             especialidades={getApiList(especialidadesQuery.data)}
             rooms={roomList}
             interns={internList}
-            isMobile={isMobile}
+            isMobile={Boolean(isMobile)}
             onCancel={() => setCreateScaleOpen(false)}
             onSaved={async () => {
               await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
