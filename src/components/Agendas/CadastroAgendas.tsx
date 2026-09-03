@@ -31,9 +31,12 @@ import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
+import { useInternsAdminQuery } from '../../hooks/useInternsAdminQuery';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import './CadastroAgendas.css';
+import { CadastroAgendaEscalaForm } from './CadastroAgendaEscalaForm';
 
 const WEEKDAY_OPTIONS = [
   { value: 'segunda', label: 'Segunda' },
@@ -149,6 +152,7 @@ export function CadastroAgendas() {
   const doctorsQuery = useDoctorsAdminQuery();
   const especialidadesQuery = useEspecialidadesAdminQuery();
   const roomsQuery = useRoomsAdminQuery();
+  const internsQuery = useInternsAdminQuery();
 
   const items = useMemo(() => getApiList(agendasQuery.data), [agendasQuery.data]);
 
@@ -167,6 +171,7 @@ export function CadastroAgendas() {
   }, [especialidadesQuery.data]);
 
   const roomList = useMemo(() => getApiList(roomsQuery.data).filter((s: any) => isRoomSector(s)), [roomsQuery.data]);
+  const internList = useMemo(() => getApiList(internsQuery.data).filter((item: any) => item?.id), [internsQuery.data]);
 
   const doctorOptionsForBranch = (branchId: string) => doctorList
     .filter((d: any) => (Array.isArray(d.branchIds) && d.branchIds.includes(branchId)) || d.branchId === branchId)
@@ -201,6 +206,7 @@ export function CadastroAgendas() {
   };
 
   const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
+  const [createScaleOpen, setCreateScaleOpen] = useState(false);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -533,31 +539,63 @@ export function CadastroAgendas() {
   const loading = agendasQuery.isLoading && items.length === 0;
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box className="cadastro-agendas-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box className="cadastro-agendas-shell" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group className="cadastro-agendas-page-header" mb={isMobile ? 20 : 30} justify="space-between" align="flex-end" wrap="wrap">
           <Group align="center">
             <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
               <ChevronLeft size={28} />
             </ActionIcon>
             <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Agendas
+              <Text className="cadastro-agendas-eyebrow">
+                OPERAÇÃO ADMINISTRATIVA · ESCALAS
               </Text>
-              <Text size="sm" c="dimmed">
-                Agendas de profissionais por unidade, dia e turno
+              <Text className="cadastro-agendas-page-title" fw={700} size={isMobile ? 'xl' : '2rem'} c="var(--mantine-color-text)">
+                Cadastro de agendas
+              </Text>
+              <Text className="cadastro-agendas-page-subtitle" size="sm" c="dimmed">
+                Defina unidade, profissional, sala e os horários de atendimento da semana.
               </Text>
             </Box>
           </Group>
 
-          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={openWizard} size={isMobile ? 'sm' : 'md'}>
-            Nova agenda
-          </Button>
+          {createScaleOpen ? (
+            <Button className="cadastro-agendas-primary-action" variant="default" onClick={() => setCreateScaleOpen(false)} size={isMobile ? 'sm' : 'md'}>
+              Voltar para agendas
+            </Button>
+          ) : (
+            <Button className="cadastro-agendas-primary-action" bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => setCreateScaleOpen(true)} size={isMobile ? 'sm' : 'md'}>
+              Nova agenda
+            </Button>
+          )}
         </Group>
 
-        <Group mb={isMobile ? 20 : 30} grow={isMobile} align="flex-end">
+        {createScaleOpen ? (
+          <CadastroAgendaEscalaForm
+            branchOptions={branchOptions}
+            doctors={doctorList}
+            especialidades={getApiList(especialidadesQuery.data)}
+            rooms={roomList}
+            interns={internList}
+            isMobile={isMobile}
+            onCancel={() => setCreateScaleOpen(false)}
+            onSaved={async () => {
+              await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
+              setCreateScaleOpen(false);
+            }}
+          />
+        ) : (
+          <>
+        <Box className="cadastro-agendas-filters-panel">
+          <Box className="cadastro-agendas-section-heading">
+            <Text className="cadastro-agendas-section-title" fw={700}>Filtros</Text>
+            <Text className="cadastro-agendas-section-hint" size="sm" c="dimmed">
+              Encontre agendas por unidade, profissional, especialidade ou sala.
+            </Text>
+          </Box>
+          <Group className="cadastro-agendas-filter-row" mb={isMobile ? 20 : 30} grow={isMobile} align="flex-end">
           <FloatingSelect
             label="Filtrar por unidade"
             placeholder="Todas as unidades"
@@ -574,7 +612,21 @@ export function CadastroAgendas() {
             onChange={(e) => setQuery(e.currentTarget.value)}
             placeholder={isMobile ? 'Buscar...' : 'Buscar por profissional, unidade, especialidade ou sala...'}
           />
-        </Group>
+          </Group>
+        </Box>
+
+        <Box className="cadastro-agendas-list-panel">
+          <Group className="cadastro-agendas-list-heading" justify="space-between" align="flex-end" wrap="wrap">
+            <Box>
+              <Text className="cadastro-agendas-section-title" fw={700}>Agendas cadastradas</Text>
+              <Text className="cadastro-agendas-section-hint" size="sm" c="dimmed">
+                Consulte, edite ou remova os horários configurados para cada profissional.
+              </Text>
+            </Box>
+            <Badge className="cadastro-agendas-count" variant="light" color="darkBlue" size="lg">
+              {filteredItems.length} {filteredItems.length === 1 ? 'agenda' : 'agendas'}
+            </Badge>
+          </Group>
 
         {loading ? (
           <Stack gap="sm">
@@ -709,6 +761,9 @@ export function CadastroAgendas() {
               </Table>
             </PaginatedGrid>
           )
+        )}
+        </Box>
+          </>
         )}
       </Box>
 
