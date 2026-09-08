@@ -1587,7 +1587,7 @@ export function SettingsPage() {
                                     <FloatingInput
                                       label="CNPJ"
                                       value={branchCnpjDraft.cnpj}
-                                      onChange={(e: any) => { setBranchCnpjDraft((prev) => ({ ...prev, cnpj: e.currentTarget.value })); setBranchCnpjError(null); }}
+                                      onChange={(e: any) => { const value = e.currentTarget.value; setBranchCnpjDraft((prev) => ({ ...prev, cnpj: value })); setBranchCnpjError(null); }}
                                       error={branchCnpjError || undefined}
                                     />
                                   </Box>
@@ -1596,7 +1596,7 @@ export function SettingsPage() {
                                       label="Apelido (opcional)"
                                       placeholder="Ex: Exames"
                                       value={branchCnpjDraft.label}
-                                      onChange={(e: any) => setBranchCnpjDraft((prev) => ({ ...prev, label: e.currentTarget.value }))}
+                                      onChange={(e: any) => { const value = e.currentTarget.value; setBranchCnpjDraft((prev) => ({ ...prev, label: value })); }}
                                     />
                                   </Box>
                                   <Button variant="light" onClick={handleAddBranchCnpj}>Adicionar</Button>
