@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
-import { Badge, Button, Group, Loader, Select, SegmentedControl, TextInput, Textarea } from '@mantine/core';
+import { Badge, Button, Group, Loader, Select, SegmentedControl, TextInput, Textarea } from '@/components/ui';
 import {
   Activity, AlertCircle, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
   Clock, MapPin, Moon, ShieldCheck, ShieldOff, Stethoscope, Sun, Sunrise, User, Video,
@@ -238,13 +238,13 @@ export default function PatientSelfScheduling() {
             const isLast  = i === STEP_ORDER.length - 1;
 
             const circleColor = done
-              ? 'var(--mantine-color-blue-5)'
+              ? 'var(--ui-primary)'
               : current
-                ? 'var(--mantine-color-blue-5)'
+                ? 'var(--ui-primary)'
                 : 'var(--mantine-color-default-border)';
 
             const circleBg = done
-              ? 'var(--mantine-color-blue-5)'
+              ? 'var(--ui-primary)'
               : current
                 ? 'var(--mantine-color-blue-0, rgba(34,139,230,0.08))'
                 : 'transparent';
@@ -268,14 +268,14 @@ export default function PatientSelfScheduling() {
                     ) : (
                       <span style={{
                         fontSize: 11, fontWeight: 700,
-                        color: current ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-dimmed)',
+                        color: current ? 'var(--ui-primary)' : 'var(--mantine-color-dimmed)',
                         transition: 'color 300ms',
                       }}>{i + 1}</span>
                     )}
                   </div>
                   <span style={{
                     fontSize: 10, fontWeight: current ? 700 : 500,
-                    color: future ? 'var(--mantine-color-dimmed)' : current ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-text)',
+                    color: future ? 'var(--mantine-color-dimmed)' : current ? 'var(--ui-primary)' : 'var(--mantine-color-text)',
                     whiteSpace: 'nowrap',
                     transition: 'color 300ms',
                   }}>{STEP_SHORT[s]}</span>
@@ -285,7 +285,7 @@ export default function PatientSelfScheduling() {
                   <div style={{ flex: 1, height: 2, margin: '0 6px', marginBottom: 20, borderRadius: 99, background: 'var(--mantine-color-default-border)', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%', borderRadius: 99,
-                      background: 'var(--mantine-color-blue-5)',
+                      background: 'var(--ui-primary)',
                       width: done ? '100%' : '0%',
                       transition: 'width 400ms cubic-bezier(.22,1,.36,1)',
                     }}/>
@@ -317,7 +317,7 @@ export default function PatientSelfScheduling() {
           width: 96, height: 96, borderRadius: '50%',
           background: 'rgba(18,184,134,0.1)', border: '2px solid rgba(18,184,134,0.2)',
           display:'flex', alignItems:'center', justifyContent:'center',
-          color: 'var(--mantine-color-teal-6)',
+          color: 'var(--ui-hue-teal)',
           animation: 'pp2Pop 500ms cubic-bezier(.175,.885,.32,1.275) both',
         }}>
           <CheckCircle size={44} strokeWidth={1.8}/>
@@ -387,8 +387,8 @@ export default function PatientSelfScheduling() {
       </p>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         {([
-          { type:'CONSULTA' as ApptType, label:'Consulta', desc:'Atendimento com médico ou especialista', icon:<Stethoscope size={30}/>, color:'var(--mantine-color-blue-6)', bg:'rgba(34,139,230,0.1)' },
-          { type:'EXAME'    as ApptType, label:'Exame',    desc:'Exames laboratoriais ou de imagem',       icon:<Activity size={30}/>,    color:'var(--mantine-color-teal-6)',  bg:'rgba(18,184,134,0.1)'  },
+          { type:'CONSULTA' as ApptType, label:'Consulta', desc:'Atendimento com médico ou especialista', icon:<Stethoscope size={30}/>, color:'var(--ui-hue-blue)', bg:'rgba(34,139,230,0.1)' },
+          { type:'EXAME'    as ApptType, label:'Exame',    desc:'Exames laboratoriais ou de imagem',       icon:<Activity size={30}/>,    color:'var(--ui-hue-teal)',  bg:'rgba(18,184,134,0.1)'  },
         ] as const).map((opt, i) => (
           <TypeCard key={opt.type} {...opt} delay={i*60} onClick={() => {
             setSel(s => ({ ...s, apptType: opt.type, procedure: null, doctor: null, date:'', time:'' }));
@@ -539,9 +539,9 @@ export default function PatientSelfScheduling() {
               <CenterLoader/>
             ) : insuranceCheckResult ? (
               insuranceCheckResult.covered ? (
-                <div style={{ border:'1.5px solid var(--mantine-color-green-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(18,184,134,0.05)' }}>
+                <div style={{ border:'1.5px solid var(--ui-hue-green)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(18,184,134,0.05)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                    <ShieldCheck size={20} color="var(--mantine-color-teal-6)"/>
+                    <ShieldCheck size={20} color="var(--ui-hue-teal)"/>
                     <span style={{ fontWeight:700, fontSize:15 }}>Procedimento coberto!</span>
                   </div>
                   {insuranceCheckResult.authorizationDays != null && insuranceCheckResult.authorizationDays > 0 ? (
@@ -554,9 +554,9 @@ export default function PatientSelfScheduling() {
                   )}
                 </div>
               ) : (
-                <div style={{ border:'1.5px solid var(--mantine-color-orange-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
+                <div style={{ border:'1.5px solid var(--ui-hue-orange)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                    <ShieldOff size={20} color="var(--mantine-color-orange-6)"/>
+                    <ShieldOff size={20} color="var(--ui-hue-orange)"/>
                     <span style={{ fontWeight:700, fontSize:15 }}>Procedimento não coberto</span>
                   </div>
                   <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>
@@ -610,9 +610,9 @@ export default function PatientSelfScheduling() {
                   <CenterLoader/>
                 ) : insuranceCheckResult ? (
                   insuranceCheckResult.covered ? (
-                    <div style={{ border:'1.5px solid var(--mantine-color-green-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(18,184,134,0.05)' }}>
+                    <div style={{ border:'1.5px solid var(--ui-hue-green)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(18,184,134,0.05)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                        <ShieldCheck size={20} color="var(--mantine-color-teal-6)"/>
+                        <ShieldCheck size={20} color="var(--ui-hue-teal)"/>
                         <span style={{ fontWeight:700, fontSize:15 }}>Procedimento coberto!</span>
                       </div>
                       {insuranceCheckResult.authorizationDays != null && insuranceCheckResult.authorizationDays > 0 ? (
@@ -625,9 +625,9 @@ export default function PatientSelfScheduling() {
                       )}
                     </div>
                   ) : (
-                    <div style={{ border:'1.5px solid var(--mantine-color-orange-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
+                    <div style={{ border:'1.5px solid var(--ui-hue-orange)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                        <ShieldOff size={20} color="var(--mantine-color-orange-6)"/>
+                        <ShieldOff size={20} color="var(--ui-hue-orange)"/>
                         <span style={{ fontWeight:700, fontSize:15 }}>Procedimento não coberto</span>
                       </div>
                       <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>
@@ -640,9 +640,9 @@ export default function PatientSelfScheduling() {
             )}
 
             {newInsuranceName && newInsuranceNotInSystem && (
-              <div style={{ border:'1.5px solid var(--mantine-color-orange-5)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
+              <div style={{ border:'1.5px solid var(--ui-hue-orange)', borderRadius:14, padding:'16px 20px', marginBottom:24, background:'rgba(253,126,20,0.05)' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                  <AlertCircle size={20} color="var(--mantine-color-orange-6)"/>
+                  <AlertCircle size={20} color="var(--ui-hue-orange)"/>
                   <span style={{ fontWeight:700, fontSize:15 }}>Convênio não encontrado</span>
                 </div>
                 <p style={{ margin:0, fontSize:13, color:'var(--mantine-color-dimmed)' }}>
@@ -692,7 +692,7 @@ export default function PatientSelfScheduling() {
                 <ListRow key={doc.id} delay={i*35}
                   left={<>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <div style={{ width:38, height:38, borderRadius:'50%', flexShrink:0, background:'linear-gradient(135deg,var(--mantine-color-blue-5),var(--mantine-color-violet-5))', color:'#fff', fontWeight:700, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:38, height:38, borderRadius:'50%', flexShrink:0, background:'linear-gradient(135deg,var(--ui-primary),var(--ui-hue-violet))', color:'#fff', fontWeight:700, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>
                         {initials(doc.name)}
                       </div>
                       <div style={col()}>
@@ -746,8 +746,8 @@ export default function PatientSelfScheduling() {
                         style={{
                           display:'flex', flexDirection:'column', alignItems:'center',
                           minWidth:60, padding:'11px 8px', borderRadius:14, flexShrink:0, cursor:'pointer',
-                          border: on ? '2px solid var(--mantine-color-blue-5)' : '1.5px solid var(--mantine-color-default-border)',
-                          background: on ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-default)',
+                          border: on ? '2px solid var(--ui-primary)' : '1.5px solid var(--mantine-color-default-border)',
+                          background: on ? 'var(--ui-primary)' : 'var(--mantine-color-default)',
                           transition:'all 150ms', outline:'none',
                         }}
                       >
@@ -755,7 +755,7 @@ export default function PatientSelfScheduling() {
                         <span style={{ fontSize:21, fontWeight:800, lineHeight:1.1, color: on?'#fff':'var(--mantine-color-text)' }}>{d.format('DD')}</span>
                         <span style={{ fontSize:10, textTransform:'uppercase', color: on?'rgba(255,255,255,0.7)':'var(--mantine-color-dimmed)' }}>{MONTHS[d.month()]}</span>
                         {day.slots.length <= 3 && (
-                          <span style={{ marginTop:4, fontSize:9, fontWeight:700, background: on?'rgba(255,255,255,0.25)':'var(--mantine-color-orange-5)', color: on?'#fff':'#fff', borderRadius:6, padding:'1px 5px' }}>
+                          <span style={{ marginTop:4, fontSize:9, fontWeight:700, background: on?'rgba(255,255,255,0.25)':'var(--ui-hue-orange)', color: on?'#fff':'#fff', borderRadius:6, padding:'1px 5px' }}>
                             {day.slots.length}
                           </span>
                         )}
@@ -782,8 +782,8 @@ export default function PatientSelfScheduling() {
                                 style={{
                                   padding:'9px 18px', borderRadius:10, cursor:'pointer', outline:'none',
                                   fontSize:13, fontWeight:600, transition:'all 130ms',
-                                  border: on ? '2px solid var(--mantine-color-blue-5)' : '1.5px solid var(--mantine-color-default-border)',
-                                  background: on ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-default)',
+                                  border: on ? '2px solid var(--ui-primary)' : '1.5px solid var(--mantine-color-default-border)',
+                                  background: on ? 'var(--ui-primary)' : 'var(--mantine-color-default)',
                                   color: on ? '#fff' : 'var(--mantine-color-text)',
                                   boxShadow: on ? '0 3px 12px rgba(34,139,230,0.3)' : 'none',
                                   transform: on ? 'translateY(-1px)' : 'none',
@@ -826,7 +826,7 @@ export default function PatientSelfScheduling() {
 
       <div style={{ border:'1.5px solid var(--mantine-color-default-border)', borderRadius:18, overflow:'hidden', maxWidth:520, marginBottom:16 }}>
         {/* hero */}
-        <div style={{ padding:'22px 22px 18px', background:'linear-gradient(120deg,var(--mantine-color-blue-6),var(--mantine-color-blue-9))' }}>
+        <div style={{ padding:'22px 22px 18px', background:'linear-gradient(120deg,var(--ui-hue-blue),#0A2568)' }}>
           <p style={{ margin:0, fontSize:18, fontWeight:800, color:'#fff', letterSpacing:'-0.3px' }}>{sel.procedure?.name}</p>
           <p style={{ margin:'4px 0 0', fontSize:14, color:'rgba(255,255,255,0.8)' }}>{sel.doctor?.name}</p>
         </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Text, Stack, Group, Button, ThemeIcon, useMantineColorScheme } from '@mantine/core';
+import { Box, Title, Text, Stack, Group, Button, ThemeIcon } from '@/components/ui';
 import { useSearchParams } from 'react-router-dom';
-import { useMediaQuery } from '@mantine/hooks';
+import { useMediaQuery } from '@/components/ui';
 import { Camera } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
 import { StatsCards } from '../StatsCards/StatsCards';
 import { PatientQueue } from '../PatientQueue/PatientQueue';
@@ -16,7 +16,7 @@ import authService from '../../services/authService';
 import { isDoctorUser } from '../../utils/userRole';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 import { MACRO_SECTIONS } from '../../lib/moduleCatalog';
-import { DARK_BLUE } from '../../themes/theme';
+import './Dashboard.css';
 
 export function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -32,11 +32,10 @@ export function Dashboard() {
   const { data: profileUser } = useCurrentUserProfileQuery();
   const currentUser = (profileUser || authService.getCurrentUser()) as any;
   const doctorView = isDoctorUser(currentUser);
-  const { colorScheme } = useMantineColorScheme();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const [searchParams] = useSearchParams();
   const activeSection = MACRO_SECTIONS.find((section) => section.key === searchParams.get('secao')) || null;
-  const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
+  const accentColor = 'var(--ui-primary)';
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000); // Atualiza a cada minuto
@@ -99,14 +98,15 @@ export function Dashboard() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box className="dashboard-page">
       <Header />
-      <Box p="xl" maw={1400} mx="auto">
+      <main className="dashboard-container">
         {activeSection ? (
           <>
             {/* Blocos do macro selecionado na sidebar */}
-            <Group mb={30} gap="md" align="center">
+            <Group className="dashboard-section-heading" gap="md" align="center">
               <ThemeIcon
+                className="dashboard-section-heading__icon"
                 size={48}
                 variant="transparent"
                 color="darkBlue"
@@ -125,11 +125,12 @@ export function Dashboard() {
         ) : (
           <>
             {/* Visão Geral */}
-            <Group mb={30} justify="space-between" align="center">
-              <Stack gap="xs">
-                <Title order={1} fw={600} style={{ fontSize: '2rem' }}>{getGreeting()}</Title>
-                <Text c="dimmed" size="lg">O que você precisa fazer hoje?</Text>
-              </Stack>
+            <header className="dashboard-hero">
+              <div className="dashboard-hero__copy">
+                <Text className="dashboard-eyebrow">PAINEL DE GESTÃO · OPERAÇÃO CLÍNICA</Text>
+                <Title order={1} className="dashboard-hero__title">{getGreeting()}</Title>
+                <Text className="dashboard-hero__subtitle">O que você precisa acompanhar hoje?</Text>
+              </div>
 
               {!doctorView ? (
                 <Button
@@ -139,19 +140,12 @@ export function Dashboard() {
                   loading={recognizing}
                   variant="default"
                   radius="md"
-                  styles={{
-                    root: {
-                      fontWeight: 500,
-                      '&:hover': {
-                        backgroundColor: 'var(--mantine-color-default-hover)',
-                      },
-                    },
-                  }}
+                  className="dashboard-hero__action"
                 >
                   Identificar Paciente
                 </Button>
               ) : null}
-            </Group>
+            </header>
 
             <StatsCards user={currentUser} />
             {!doctorView ? <PatientQueue limit={3} /> : null}
@@ -159,7 +153,7 @@ export function Dashboard() {
             {isMobile ? <WorkflowSections /> : null}
           </>
         )}
-      </Box>
+      </main>
 
       {/* Modal de Captura Facial */}
       <FacialCapture

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Loader, Text } from '@mantine/core';
+import { Box, Loader, Text } from '@/components/ui';
 import cornerstone from 'cornerstone-core';
 
 type SeriesThumbnailProps = {

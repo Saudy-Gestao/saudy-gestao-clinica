@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { ActionIcon, Box, Button, Group, Loader, Radio, Stack, Text, Textarea, TextInput, useMantineColorScheme } from '@mantine/core';
+import { ActionIcon, Box, Button, Group, Loader, Radio, Stack, Text, Textarea, TextInput, useColorScheme } from '@/components/ui';
 import { Camera, CheckCircle, LampDesk, Mic, MicOff, PhoneOff, Send, SignalHigh, VideoOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { showNotification } from '@mantine/notifications';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
 import teleconsultationLinkService, { type TeleconsultationPublicTokenMeta } from '../../services/teleconsultationLinkService';
 import consultationService from '../../services/consultationService';
@@ -60,7 +60,7 @@ const getInitials = (name?: string | null) => {
 export function TeleconsultaPatientWaiting() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const [now, setNow] = useState<Date>(() => new Date());
   const [doctorJoined, setDoctorJoined] = useState(false);
   const [doctorInConsultation, setDoctorInConsultation] = useState(false);
@@ -884,7 +884,20 @@ export function TeleconsultaPatientWaiting() {
 
   return (
     <Box bg={doctorInCallMode ? '#efefef' : 'var(--mantine-color-body)'} style={{ minHeight: '100vh' }}>
-      {isDoctorRole ? <Header /> : null}
+      {isDoctorRole ? <Header contextLabel="Teleconsulta" /> : null}
+      {!isDoctorRole ? (
+        <Box className={styles.publicHeader}>
+          <Box className={styles.publicBrandMark}>S</Box>
+          <Box>
+            <Text className={styles.publicBrand}>Saudy</Text>
+            <Text className={styles.publicContext}>Teleconsulta segura</Text>
+          </Box>
+          <Box className={styles.publicHeaderStatus}>
+            <span className={styles.statusIndicator} />
+            Atendimento protegido
+          </Box>
+        </Box>
+      ) : null}
       <Box className={`${styles.page} ${doctorInCallMode ? styles.pageConsultation : (isDark ? styles.pageDark : styles.pageLight)}`}>
         <Box className={styles.wrapper}>
           {!doctorInCallMode ? <Text className={styles.title}>Teleconsulta</Text> : null}
@@ -1287,7 +1300,7 @@ export function TeleconsultaPatientWaiting() {
           )}
 
           {!doctorInCallMode && !withinWindow && !isDoctorRole ? (
-            <Text c="yellow.3" mt={10}>
+            <Text c="var(--ui-hue-yellow)" mt={10}>
               A consulta será liberada {allowJoinFromMinutesBefore} minutos antes do horário agendado.
             </Text>
           ) : null}

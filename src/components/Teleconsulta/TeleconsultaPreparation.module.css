@@ -1,327 +1,136 @@
 .page {
-  min-height: calc(100vh - 80px);
-  padding: 14px 20px 12px;
+  min-height: calc(100vh - 70px);
+  padding: 30px 28px 42px;
+  color: var(--tele-text);
+  background: var(--tele-bg);
 }
 
 .pageDark {
-  background: linear-gradient(180deg, #050f34 0%, #020726 100%);
-  color: #f3f6ff;
+  --tele-bg: #0d1119;
+  --tele-surface: #151b27;
+  --tele-surface-raised: #1b2332;
+  --tele-surface-soft: #111722;
+  --tele-border: #2b374a;
+  --tele-text: #f4f7fc;
+  --tele-muted: #a6b0c1;
+  --tele-primary: #7b9cff;
+  --tele-success: #55d49b;
+  --tele-warning: #f2bd5b;
+  --tele-danger: #ff7b86;
 }
 
 .pageLight {
-  background: #e8e8e8;
-  color: #1f2330;
+  --tele-bg: #f4f7fb;
+  --tele-surface: #ffffff;
+  --tele-surface-raised: #f8faff;
+  --tele-surface-soft: #edf2fa;
+  --tele-border: #d6deeb;
+  --tele-text: #162238;
+  --tele-muted: #64738b;
+  --tele-primary: #315fda;
+  --tele-success: #11845b;
+  --tele-warning: #b36a00;
+  --tele-danger: #bd3546;
 }
 
-.wrapper {
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-.title {
-  font-size: 46px;
-  line-height: 1.1;
-  font-weight: 800;
-  margin-bottom: 14px;
-  letter-spacing: 0;
-}
-
-.doctorCard {
-  border-radius: 16px;
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.doctorCardDark {
-  background: rgba(8, 38, 111, 0.92);
-  border: 1px solid rgba(179, 204, 255, 0.14);
-  color: #f0f4ff;
-}
-
-.doctorCardLight {
-  background: rgba(242, 242, 242, 0.92);
-  border: 1px solid #cfcfcf;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  color: #262a33;
-}
-
-.surfaceDark {
-  background: #08266f;
-  border: 1px solid rgba(179, 204, 255, 0.12);
-  color: #f0f4ff;
-}
-
-.surfaceLight {
-  background: #f1f1f1;
-  border: 1px solid #cccccc;
-  color: #262a33;
-}
-
-.doctorLeft {
+.publicHeader {
+  min-height: 72px;
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 14px 28px;
+  color: #f4f7fc;
+  background: #111722;
+  border-bottom: 1px solid #2b374a;
 }
 
-.avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  background: linear-gradient(140deg, #63d6ff 0%, #2454ff 70%);
+.publicBrandMark {
   display: grid;
+  width: 34px;
+  height: 34px;
   place-items: center;
-  font-size: 18px;
-  color: #f8fbff;
-  font-weight: 800;
-}
-
-.doctorLabel {
-  margin: 0;
-  font-size: 13px;
-  opacity: 0.9;
-  font-weight: 700;
-}
-
-.doctorName {
-  margin: 2px 0;
-  font-size: 22px;
-  line-height: 1;
-  font-weight: 800;
-}
-
-.doctorSpecialty {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  opacity: 0.95;
-}
-
-.schedule {
-  text-align: right;
-}
-
-.scheduleLabel {
-  margin: 0;
-  font-weight: 700;
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-.scheduleTime {
-  margin: 2px 0 0;
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 800;
-}
-
-.mainGrid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: 1fr 1.04fr;
-  align-items: stretch;
-  gap: 12px;
-}
-
-.leftPanel {
-  display: flex;
-  flex-direction: column;
-}
-
-.rightColumn {
-  display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  height: 100%;
-}
-
-.rightPanel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.panel {
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.videoBox {
   border-radius: 10px;
-  overflow: hidden;
-  position: relative;
-  aspect-ratio: 16 / 9;
-}
-
-.videoDark {
-  background: #020a24;
-}
-
-.videoLight {
-  background: #1a1c22;
-}
-
-.video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.videoFallback {
-  height: 100%;
-  display: grid;
-  place-items: center;
-  color: #d4def7;
+  background: linear-gradient(145deg, #86a4ff, #5578ee);
+  color: #0f1930;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 850;
 }
 
-.cameraActions {
-  margin-top: 10px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
+.publicBrand,
+.publicContext,
+.publicHeaderStatus { margin: 0; }
+.publicBrand { color: #f4f7fc !important; font-size: 15px; font-weight: 800; letter-spacing: .01em; }
+.publicContext { color: #9eabc0 !important; font-size: 12px; }
+.publicHeaderStatus { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; color: #aeb9cb; font-size: 12px; font-weight: 600; }
+.statusIndicator { width: 8px; height: 8px; border-radius: 50%; background: #55d49b; box-shadow: 0 0 0 4px rgba(85, 212, 155, .12); }
 
-.controlHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
+.wrapper { width: min(1180px, 100%); margin: 0 auto; }
+.title { margin: 0 0 24px; color: var(--tele-text) !important; font-size: clamp(30px, 4vw, 48px); font-weight: 800; letter-spacing: -.045em; }
 
-.controlTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.icon {
-  width: 18px;
-  height: 18px;
-}
-
-.progressTrack {
-  margin-top: 10px;
-  width: 100%;
-  height: 11px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
-  overflow: hidden;
-}
-
-.progressBar {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 180ms ease;
-}
-
-.progressGreen {
-  background: #55cb22;
-}
-
-.progressYellow {
-  background: #f2c322;
-}
-
-.progressRed {
-  background: #eb4d4b;
-}
-
-.deviceLabel {
-  margin-top: 10px;
-  margin-bottom: 6px;
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-.connectionCard {
-  margin-top: 0;
-}
-
-.connectionRow {
-  margin-top: 9px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.ingressarRow {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.tipsRow {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 14px;
-}
-
+.doctorCard,
+.panel,
 .tipCard {
-  border-radius: 10px;
-  min-height: 88px;
-  display: grid;
-  place-items: center;
-  padding: 8px 12px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
+  border: 1px solid var(--tele-border);
+  background: var(--tele-surface);
+  box-shadow: 0 14px 36px rgba(2, 8, 20, .12);
 }
 
-.tipDark {
-  background: linear-gradient(180deg, rgba(30, 57, 125, 0.86) 0%, rgba(18, 37, 86, 0.9) 100%);
-  border: 1px solid rgba(153, 188, 255, 0.28);
-  box-shadow:
-    0 8px 20px rgba(3, 10, 30, 0.35),
-    inset 0 1px 0 rgba(200, 220, 255, 0.14);
-  color: #f2f6ff;
-}
+.doctorCard { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; border-radius: 18px; }
+.doctorCardDark, .surfaceDark { color: var(--tele-text); }
+.doctorCardLight, .surfaceLight { color: var(--tele-text); }
+.doctorLeft { display: flex; min-width: 0; align-items: center; gap: 16px; }
+.avatar { display: grid; width: 58px; height: 58px; flex: 0 0 auto; place-items: center; border-radius: 16px; background: color-mix(in srgb, var(--tele-primary) 18%, transparent); color: var(--tele-primary); font-size: 18px; font-weight: 800; }
+.doctorLabel, .doctorName, .doctorSpecialty, .scheduleLabel, .scheduleTime { margin: 0; }
+.doctorLabel, .scheduleLabel { color: var(--tele-muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.doctorName { margin-top: 5px; overflow: hidden; color: var(--tele-text); font-size: 21px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.doctorSpecialty { margin-top: 4px; color: var(--tele-muted); font-size: 14px; }
+.schedule { min-width: 130px; text-align: right; }
+.scheduleTime { margin-top: 5px; color: var(--tele-text); font-size: 30px; font-weight: 800; letter-spacing: -.04em; }
 
-.tipLight {
-  background: #f3f3f3;
-  border: 1px solid #bfc2c8;
-  box-shadow:
-    0 4px 12px rgba(20, 26, 40, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  color: #22242a;
-}
+.mainGrid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(330px, .88fr); gap: 18px; margin-top: 18px; }
+.leftPanel { display: flex; min-width: 0; flex-direction: column; padding: 18px; border-radius: 18px; }
+.rightColumn { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 14px; min-width: 0; }
+.rightPanel { display: flex; min-width: 0; flex-direction: column; justify-content: center; padding: 20px; border-radius: 18px; }
+.videoBox { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border: 1px solid var(--tele-border); border-radius: 14px; background: #080c13; }
+.videoDark, .videoLight { background: #080c13; }
+.video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.videoFallback { display: grid; height: 100%; place-items: center; color: #c9d4e7; font-size: 16px; font-weight: 650; }
+.cameraActions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 14px; }
+.cameraActions select { min-width: 0; }
+.controlHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.controlTitle { display: inline-flex; align-items: center; gap: 9px; color: var(--tele-text); font-size: 16px; font-weight: 750; }
+.icon { width: 18px; height: 18px; color: var(--tele-primary); }
+.deviceLabel { margin: 18px 0 8px; color: var(--tele-muted) !important; font-size: 12px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.progressTrack { width: 100%; height: 8px; margin-top: 18px; overflow: hidden; border-radius: 999px; background: var(--tele-surface-soft); }
+.progressBar { height: 100%; border-radius: inherit; transition: width 180ms ease; }
+.progressGreen { background: var(--tele-success); }
+.progressYellow { background: var(--tele-warning); }
+.progressRed { background: var(--tele-danger); }
+.connectionCard { justify-content: flex-start; }
+.connectionRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; color: var(--tele-text); font-size: 14px; font-weight: 650; }
+.ingressarRow { display: flex; justify-content: flex-end; margin-top: 20px; }
+.ingressarRow button { min-width: 150px; }
+.tipsRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.tipCard { display: grid; min-height: 106px; place-items: center; gap: 8px; padding: 16px; border-radius: 14px; color: var(--tele-muted); text-align: center; }
+.tipCard svg { color: var(--tele-primary); }
+.tipDark, .tipLight { color: var(--tele-muted); }
+.tipText { margin: 0; color: var(--tele-text) !important; font-size: 13px; font-weight: 650; line-height: 1.35; }
 
-.tipText {
-  margin-top: 4px;
-  font-size: 16px;
-  line-height: 1.15;
-  font-weight: 700;
-}
-
-@media (max-width: 1440px) {
-  .title { font-size: 36px; }
-  .doctorName { font-size: 20px; }
-  .doctorSpecialty { font-size: 13px; }
-  .scheduleTime { font-size: 18px; }
-  .controlTitle { font-size: 14px; }
-  .connectionRow { font-size: 13px; }
-}
-
-@media (max-width: 1100px) {
-  .page { padding: 12px; }
+@media (max-width: 850px) {
+  .page { padding: 22px 16px 32px; }
+  .publicHeader { padding-inline: 16px; }
+  .publicHeaderStatus { display: none; }
+  .doctorCard { align-items: flex-start; flex-direction: column; padding: 18px; }
+  .schedule { text-align: left; }
   .mainGrid { grid-template-columns: 1fr; }
   .rightColumn { grid-template-rows: none; }
-  .doctorCard { flex-direction: column; align-items: flex-start; }
-  .schedule { text-align: left; }
-  .title { font-size: 30px; }
-  .doctorName { font-size: 18px; }
-  .doctorSpecialty { font-size: 12px; }
-  .scheduleTime { font-size: 17px; }
-  .tipsRow { grid-template-columns: 1fr; gap: 8px; }
+  .tipsRow { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .title { margin-bottom: 18px; font-size: 32px; }
+  .doctorName { font-size: 19px; }
+  .leftPanel, .rightPanel { padding: 14px; }
+  .cameraActions { grid-template-columns: 1fr; }
+  .cameraActions button { width: 100%; }
 }

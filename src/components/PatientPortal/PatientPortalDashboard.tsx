@@ -8,9 +8,10 @@ import {
   Box,
   Button,
   Card,
+  DateInput,
   Group,
   Loader,
-  MantineProvider,
+  ThemeProvider,
   Modal,
   Paper,
   Select,
@@ -22,8 +23,8 @@ import {
   TextInput,
   Textarea,
   Title,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+} from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { CalendarDays, CalendarPlus, Check, ClipboardList, Copy, Download, Eye, FileClock, FileText, FolderOpen, Link2, LogOut, Moon, ScanLine, Stethoscope, Sun, Trash2, AlertTriangle, X } from 'lucide-react';
 import PatientSelfScheduling from './PatientSelfScheduling';
 import patientPortalService, {
@@ -314,6 +315,19 @@ export function PatientPortalDashboard() {
     events: Array<{ type: 'published' | 'removed'; createdAt: string }>;
   } | null>(null);
   const [preferredDeliveryDate, setPreferredDeliveryDate] = useState('');
+  const parseIsoDate = (value: string): Date | null => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+  const formatIsoDate = (date: Date | null): string => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [requestingDeliveryFor, setRequestingDeliveryFor] = useState<string | null>(null);
   const [generatingShareLinkFor, setGeneratingShareLinkFor] = useState<string | null>(null);
@@ -650,20 +664,20 @@ export function PatientPortalDashboard() {
 
   if (loading && !summary) {
     return (
-      <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+      <ThemeProvider theme={theme} forceColorScheme={portalColorScheme}>
         <PatientPortalDashboardSkeleton />
-      </MantineProvider>
+      </ThemeProvider>
     );
   }
 
   return (
-    <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+    <ThemeProvider theme={theme} forceColorScheme={portalColorScheme}>
       <Modal
         opened={deleteAccountModalOpen}
         onClose={() => setDeleteAccountModalOpen(false)}
         title={
           <Group gap="xs">
-            <AlertTriangle size={18} color="var(--mantine-color-red-6)" />
+            <AlertTriangle size={18} color="var(--ui-hue-red)" />
             <Text fw={700} c="red">Excluir minha conta permanentemente</Text>
           </Group>
         }
@@ -677,8 +691,8 @@ export function PatientPortalDashboard() {
               Ao confirmar, seu acesso ao portal será encerrado e seus dados pessoais serão excluídos permanentemente. Não há como recuperar a conta após a exclusão.
             </Text>
           </Alert>
-          <Box style={{ background: 'var(--mantine-color-red-0)', borderRadius: 8, padding: '12px 14px' }}>
-            <Text size="sm" fw={600} c="red.8" mb={4}>O que será excluído:</Text>
+          <Box style={{ background: 'color-mix(in srgb, var(--ui-hue-red) 12%, var(--ui-surface))', borderRadius: 8, padding: '12px 14px' }}>
+            <Text size="sm" fw={600} c="var(--ui-hue-red)" mb={4}>O que será excluído:</Text>
             <Stack gap={2}>
               <Text size="sm">• Seu acesso ao portal do paciente</Text>
               <Text size="sm">• Seus dados de cadastro e contato</Text>
@@ -1069,7 +1083,7 @@ export function PatientPortalDashboard() {
                         </Box>
                       ) : null}
                       {item.isUnderReview ? (
-                        <Text size="xs" c="orange.6">
+                        <Text size="xs" c="var(--ui-hue-orange)">
                           {item.patientWarning || 'Este laudo esta em revisao. Voce visualiza a ultima versao publicada.'}
                         </Text>
                       ) : null}
@@ -1153,15 +1167,11 @@ export function PatientPortalDashboard() {
           <Text size="sm" c="dimmed">
             Solicite a impressão sob demanda e informe a data preferencial para retirada.
           </Text>
-          <Box className="patient-portal-input-wrap">
-            <label htmlFor="preferred-delivery-date">Data preferencial</label>
-            <input
-              id="preferred-delivery-date"
-              type="date"
-              value={preferredDeliveryDate}
-              onChange={(event) => setPreferredDeliveryDate(event.currentTarget.value)}
-            />
-          </Box>
+          <DateInput
+            label="Data preferencial"
+            value={parseIsoDate(preferredDeliveryDate)}
+            onChange={(date) => setPreferredDeliveryDate(formatIsoDate(date ?? null))}
+          />
           <Textarea
             label="Observações (opcional)"
             placeholder="Ex.: retirar no período da tarde."
@@ -1210,9 +1220,7 @@ export function PatientPortalDashboard() {
         </Stack>
       </Modal>
       </Box>
-    </MantineProvider>
+    </ThemeProvider>
   );
 }
-
-
 

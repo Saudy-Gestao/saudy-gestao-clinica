@@ -1,27 +1,38 @@
-import { Box, Button, Paper, Stack, Text, Title } from '@mantine/core';
-import { CheckCircle2 } from 'lucide-react';
+import { Box, Button, Paper, Stack, Text, Title } from '@/components/ui';
+import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import styles from './TeleconsultaFinished.module.css';
 
 export function TeleconsultaFinished() {
   const navigate = useNavigate();
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
-      <Paper withBorder radius="md" p="xl" maw={560} w="100%">
-        <Stack gap="md" align="center">
-          <CheckCircle2 size={56} color="#2f9e44" />
-          <Title order={3} ta="center">Teleconsulta finalizada com sucesso</Title>
-          <Text c="dimmed" ta="center">
-            Seu atendimento foi encerrado. Se quiser, você pode voltar para o Portal do Paciente.
+    <Box className={styles.page}>
+      <Box className={styles.header}>
+        <Box className={styles.brandMark}>S</Box>
+        <Box>
+          <Text className={styles.brand}>Saudy</Text>
+          <Text className={styles.context}>Teleconsulta segura</Text>
+        </Box>
+        <Box className={styles.headerStatus}><span /> Sessão encerrada</Box>
+      </Box>
+
+      <Box className={styles.content}>
+        <Paper className={styles.card} withBorder>
+          <Box className={styles.successIcon}><CheckCircle2 size={30} /></Box>
+          <Text className={styles.overline}><ShieldCheck size={15} /> Atendimento concluído</Text>
+          <Title order={1} className={styles.title}>Teleconsulta finalizada</Title>
+          <Text className={styles.description}>
+            O atendimento foi encerrado com segurança. Obrigado por utilizar a plataforma Saudy.
           </Text>
-          <Button color="darkBlue" onClick={() => navigate('/portal')}>
-            Ir para o Portal do Paciente
-          </Button>
-          <Text size="sm" c="dimmed" ta="center">
-            Se preferir, você já pode fechar esta página.
-          </Text>
-        </Stack>
-      </Paper>
+          <Stack gap="sm" className={styles.actions}>
+            <Button fullWidth size="lg" rightSection={<ArrowRight size={18} />} onClick={() => navigate('/portal')}>
+              Ir para o Portal do Paciente
+            </Button>
+            <Text className={styles.helper}>Você já pode fechar esta página.</Text>
+          </Stack>
+        </Paper>
+      </Box>
     </Box>
   );
 }

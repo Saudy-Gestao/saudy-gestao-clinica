@@ -1,0 +1,27 @@
+.page {
+  min-height: 100vh;
+  color: #f4f7fc;
+  background: radial-gradient(circle at 50% -10%, rgba(104, 137, 255, .16), transparent 42%), #0d1119;
+}
+
+.header { display: flex; min-height: 72px; align-items: center; gap: 12px; padding: 14px 28px; border-bottom: 1px solid #2b374a; background: #111722; }
+.brandMark { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: linear-gradient(145deg, #86a4ff, #5578ee); color: #0f1930; font-size: 20px; font-weight: 850; }
+.brand, .context, .headerStatus { margin: 0; }
+.brand { color: #f4f7fc !important; font-size: 15px; font-weight: 800; }
+.context { color: #a4afc0 !important; font-size: 12px; }
+.headerStatus { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; color: #a4afc0; font-size: 12px; font-weight: 650; }
+.headerStatus span { width: 8px; height: 8px; border-radius: 50%; background: #a4afc0; }
+.content { display: grid; min-height: calc(100vh - 72px); place-items: center; padding: 32px 18px; }
+.card { width: min(100%, 540px); padding: 38px; border: 1px solid #334158; border-radius: 22px; background: #151b27 !important; color: #f4f7fc; box-shadow: 0 24px 70px rgba(0, 0, 0, .28); text-align: center; }
+.successIcon { display: grid; width: 64px; height: 64px; margin: 0 auto 20px; place-items: center; border: 1px solid rgba(85, 212, 155, .35); border-radius: 18px; background: rgba(85, 212, 155, .12); color: #55d49b; }
+.overline { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px; color: #55d49b; font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.title { margin: 0; color: #f4f7fc; font-size: clamp(28px, 5vw, 38px); letter-spacing: -.04em; }
+.description { max-width: 390px; margin: 14px auto 0; color: #a6b0c1; font-size: 15px; line-height: 1.6; }
+.actions { margin-top: 28px; }
+.helper { margin: 4px 0 0; color: #7d899d; font-size: 12px; }
+
+@media (max-width: 520px) {
+  .header { padding-inline: 16px; }
+  .headerStatus { display: none; }
+  .card { padding: 28px 20px; border-radius: 18px; }
+}
