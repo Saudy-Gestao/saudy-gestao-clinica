@@ -1,0 +1,56 @@
+.cadastro-paciente-list-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-paciente-list-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.cadastro-paciente-list-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .cadastro-paciente-list-actions,
+  .cadastro-paciente-list-actions .cadastro-paciente-list-search,
+  .cadastro-paciente-list-actions .ui-button {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+}
+
+.cadastro-paciente-list-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.cadastro-paciente-list-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-paciente-list-th-actions {
+  text-align: right !important;
+}
+
+.cadastro-paciente-list-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.cadastro-paciente-list-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-paciente-list-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

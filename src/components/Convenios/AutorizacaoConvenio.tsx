@@ -7,21 +7,21 @@ import {
   Box,
   Button,
   Group,
+  MultiSelect,
   Paper,
   Skeleton,
   Select,
   Stack,
   Table,
   Text,
+  TextInput,
   Modal,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ShieldCheck, Upload } from 'lucide-react';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { Eye, Search, ShieldCheck, Upload } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import convenioAuthorizationService, {
   type ConvenioAuthorizationAttachment,
@@ -31,6 +31,8 @@ import convenioAuthorizationService, {
 import { useConvenioAuthorizationsQuery } from '../../hooks/useConvenioAuthorizationsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { formatCPF } from '../../utils/formatters';
+import './AutorizacaoConvenio.css';
 
 type AuthorizationItem = {
   id: string;
@@ -258,8 +260,8 @@ export function AutorizacaoConvenio() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="autorizacao-convenio-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
 
       <Modal
         opened={Boolean(uploadPreview)}
@@ -267,6 +269,16 @@ export function AutorizacaoConvenio() {
         title="Confirmar envio de documento"
         centered
         size="xl"
+        footer={(
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={closeUploadPreview}>
+              Cancelar envio
+            </Button>
+            <Button onClick={confirmUploadPreview} leftSection={<Upload size={14} />}>
+              Confirmar envio
+            </Button>
+          </Group>
+        )}
       >
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
@@ -274,7 +286,7 @@ export function AutorizacaoConvenio() {
           </Text>
 
           {uploadPreview && (
-            <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+            <Paper className="autorizacao-convenio-preview-box" withBorder p="xs">
               <Stack gap={6}>
                 <Text size="sm" fw={600} lineClamp={1}>{uploadPreview.file.name}</Text>
                 <Text size="xs" c="dimmed">
@@ -283,15 +295,7 @@ export function AutorizacaoConvenio() {
                 </Text>
 
                 {uploadPreview.objectUrl && uploadPreview.file.type.startsWith('image/') && (
-                  <Box
-                    style={{
-                      border: '1px solid var(--mantine-color-default-border)',
-                      borderRadius: 6,
-                      padding: 8,
-                      maxHeight: '60vh',
-                      overflow: 'auto',
-                    }}
-                  >
+                  <Box className="autorizacao-convenio-preview-box" style={{ maxHeight: '50vh', overflow: 'auto' }}>
                     <img
                       src={uploadPreview.objectUrl}
                       alt={uploadPreview.file.name}
@@ -301,14 +305,7 @@ export function AutorizacaoConvenio() {
                 )}
 
                 {uploadPreview.objectUrl && uploadPreview.file.type === 'application/pdf' && (
-                  <Box
-                    style={{
-                      border: '1px solid var(--mantine-color-default-border)',
-                      borderRadius: 6,
-                      overflow: 'hidden',
-                      height: '60vh',
-                    }}
-                  >
+                  <Box className="autorizacao-convenio-preview-box" style={{ overflow: 'hidden', height: '50vh' }}>
                     <iframe
                       src={uploadPreview.objectUrl}
                       title={uploadPreview.file.name}
@@ -325,73 +322,74 @@ export function AutorizacaoConvenio() {
               </Stack>
             </Paper>
           )}
-
-          <Group justify="flex-end" gap="xs">
-            <Button variant="default" onClick={closeUploadPreview}>
-              Cancelar envio
-            </Button>
-            <Button color="indigo" onClick={confirmUploadPreview} leftSection={<Upload size={14} />}>
-              Confirmar envio
-            </Button>
-          </Group>
         </Stack>
       </Modal>
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Autorização de Convênio</Text>
-              <Text size="sm" c="dimmed">Central de autorização de agendamentos e TEA</Text>
-            </Box>
+      <Box className="autorizacao-convenio-content" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
+        <Group className="autorizacao-convenio-hero" justify="space-between" align="flex-end" mb="xl" wrap="wrap">
+          <Box>
+            <Text className="autorizacao-convenio-eyebrow">OPERAÇÃO CLÍNICA · CONVÊNIOS</Text>
+            <Text className="autorizacao-convenio-title" fw={700} size="2xl">Autorização de Convênio</Text>
+            <Text className="autorizacao-convenio-subtitle" size="sm">Central de autorização de agendamentos e Terapias</Text>
+          </Box>
+
+          <Group className="autorizacao-convenio-hero-meta" gap="xs" wrap="wrap">
+            <Badge color="yellow" variant="light">Pendentes: {summary.pending}</Badge>
+            <Badge color="teal" variant="light">Autorizados: {summary.authorized}</Badge>
+            <Badge color="red" variant="light">Negados: {summary.denied}</Badge>
           </Group>
         </Group>
 
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-          <Stack gap="md">
-            <Group wrap="wrap" gap="xs">
-              <Badge color="yellow" variant="light">Pendentes: {summary.pending}</Badge>
-              <Badge color="teal" variant="light">Autorizados: {summary.authorized}</Badge>
-              <Badge color="red" variant="light">Negados: {summary.denied}</Badge>
+        <Stack gap="lg">
+          <Box className="autorizacao-convenio-search-panel">
+            <Text className="autorizacao-convenio-search-kicker">BUSCAR E FILTRAR</Text>
+            <Group align="flex-end" gap="md" wrap="wrap">
+              <Box className="autorizacao-convenio-search-input">
+                <TextInput
+                  label="Buscar autorizações"
+                  placeholder="Buscar por paciente, CPF, procedimento, médico ou sala"
+                  value={search}
+                  onChange={(e) => setSearch(e.currentTarget.value)}
+                  leftSection={<Search size={17} aria-hidden="true" />}
+                />
+              </Box>
+              <Box className="autorizacao-convenio-filter-field">
+                <MultiSelect
+                  label="Origem"
+                  placeholder="Todas"
+                  data={[
+                    { value: 'APPOINTMENT', label: 'Agendamento' },
+                    { value: 'TEA', label: 'Pré-reserva de Terapias' },
+                  ]}
+                  value={sourceFilter}
+                  onChange={(value) => setSourceFilter(value as ConvenioAuthorizationSourceType[])}
+                  clearable
+                />
+              </Box>
+              <Box className="autorizacao-convenio-filter-field">
+                <MultiSelect
+                  label="Status"
+                  placeholder="Todos"
+                  data={STATUS_OPTIONS}
+                  value={statusFilter}
+                  onChange={(value) => setStatusFilter(value as ConvenioAuthorizationStatus[])}
+                  clearable
+                />
+              </Box>
+              <Box className="autorizacao-convenio-filter-field">
+                <MultiSelect
+                  label="Convênio"
+                  placeholder="Todos"
+                  data={insuranceTypeOptions}
+                  value={insuranceTypeFilter}
+                  onChange={(value) => setInsuranceTypeFilter(value as string[])}
+                  clearable
+                />
+              </Box>
             </Group>
+          </Box>
 
-            <FloatingInput
-              label="Buscar autorizações"
-              placeholder="Buscar por paciente, CPF, procedimento, médico ou sala"
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-            />
-
-            <Group grow>
-              <FloatingMultiSelect
-                label="Origem"
-                data={[
-                  { value: 'APPOINTMENT', label: 'Agendamento' },
-                  { value: 'TEA', label: 'Pré-reserva TEA' },
-                ]}
-                value={sourceFilter}
-                onChange={(value) => setSourceFilter(value as ConvenioAuthorizationSourceType[])}
-                clearable
-              />
-              <FloatingMultiSelect
-                label="Status"
-                data={STATUS_OPTIONS}
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value as ConvenioAuthorizationStatus[])}
-                clearable
-              />
-              <FloatingMultiSelect
-                label="Convênio"
-                data={insuranceTypeOptions}
-                value={insuranceTypeFilter}
-                onChange={(value) => setInsuranceTypeFilter(value as string[])}
-                clearable
-              />
-            </Group>
-
+          <Paper className="autorizacao-convenio-panel" p="md">
             <PaginatedGrid
               totalItems={filteredItems.length}
               page={page}
@@ -402,15 +400,13 @@ export function AutorizacaoConvenio() {
               maxHeight={isMobile ? 500 : 620}
               showFooter={!tableLoading}
             >
-                <Table verticalSpacing="sm" horizontalSpacing="md">
+                <Table className="autorizacao-convenio-table" verticalSpacing="sm" horizontalSpacing="md">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Origem</Table.Th>
                       <Table.Th>Paciente</Table.Th>
                       <Table.Th style={{ width: 132 }}>Convênio</Table.Th>
                       <Table.Th>Procedimento</Table.Th>
                       <Table.Th>Médico</Table.Th>
-                      <Table.Th>Sala</Table.Th>
                       <Table.Th>Data/Hora</Table.Th>
                       <Table.Th style={{ width: 124 }}>Status</Table.Th>
                       <Table.Th style={{ width: 148 }}>Ação</Table.Th>
@@ -421,7 +417,6 @@ export function AutorizacaoConvenio() {
                     {tableLoading ? (
                       Array.from({ length: 5 }).map((_, index) => (
                         <Table.Tr key={`authorization-skeleton-${index}`}>
-                          <Table.Td><Skeleton height={24} width={100} radius="xl" /></Table.Td>
                           <Table.Td>
                             <Stack gap={6}>
                               <Skeleton height={16} width="60%" radius="sm" />
@@ -431,7 +426,6 @@ export function AutorizacaoConvenio() {
                           <Table.Td><Skeleton height={24} width={90} radius="xl" /></Table.Td>
                           <Table.Td><Skeleton height={16} width="75%" radius="sm" /></Table.Td>
                           <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
-                          <Table.Td><Skeleton height={16} width="80%" radius="sm" /></Table.Td>
                           <Table.Td><Skeleton height={16} width="65%" radius="sm" /></Table.Td>
                           <Table.Td><Skeleton height={24} width={95} radius="xl" /></Table.Td>
                           <Table.Td><Skeleton height={30} width={130} radius="sm" /></Table.Td>
@@ -440,7 +434,7 @@ export function AutorizacaoConvenio() {
                       ))
                     ) : filteredItems.length === 0 ? (
                       <Table.Tr>
-                        <Table.Td colSpan={10}>
+                        <Table.Td colSpan={8}>
                           <Stack align="center" py="lg" gap={6}>
                             <Text fw={600} size="sm">Nenhuma autorização encontrada</Text>
                             <Text size="sm" c="dimmed">Ajuste os filtros ou aguarde novos pedidos entrarem na fila de autorização.</Text>
@@ -454,33 +448,22 @@ export function AutorizacaoConvenio() {
                         return (
                           <Table.Tr key={rowKey}>
                             <Table.Td>
-                              <Badge variant="outline" color={item.sourceType === 'TEA' ? 'violet' : 'blue'}>
-                                {item.sourceType === 'TEA' ? 'Pré-Reserva' : 'Agendamento'}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>
                               <Stack gap={0}>
                                 <Text size="sm" fw={600}>{item.patientName || '-'}</Text>
-                                {item.patientCpf && <Text size="xs" c="dimmed">{item.patientCpf}</Text>}
+                                {item.patientCpf && <Text size="xs" c="dimmed">{formatCPF(item.patientCpf)}</Text>}
                               </Stack>
                             </Table.Td>
                             <Table.Td style={{ width: 132 }}>
                               <Badge
                                 variant="light"
                                 color={resolvedInsuranceName.toLowerCase() === 'particular' ? 'gray' : 'blue'}
-                                styles={{
-                                  root: { whiteSpace: 'nowrap' },
-                                  label: { whiteSpace: 'nowrap' },
-                                }}
+                                style={{ whiteSpace: 'nowrap' }}
                               >
                                 {resolvedInsuranceName}
                               </Badge>
                             </Table.Td>
                             <Table.Td><Text size="sm">{item.procedureName || '-'}</Text></Table.Td>
                             <Table.Td><Text size="sm">{item.doctorName || '-'}</Text></Table.Td>
-                            <Table.Td>
-                              <Text size="sm" lineClamp={2}>{item.roomName || '-'}</Text>
-                            </Table.Td>
                             <Table.Td>
                               {item.sourceType === 'TEA' ? (
                                 <Stack gap={0}>
@@ -502,16 +485,14 @@ export function AutorizacaoConvenio() {
                               <Badge
                                 color={STATUS_COLOR[item.status as ConvenioAuthorizationStatus]}
                                 variant="light"
-                                styles={{
-                                  root: { whiteSpace: 'nowrap' },
-                                  label: { whiteSpace: 'nowrap' },
-                                }}
+                                style={{ whiteSpace: 'nowrap' }}
                               >
                                 {STATUS_OPTIONS.find((opt) => opt.value === item.status)?.label || item.status}
                               </Badge>
                             </Table.Td>
                             <Table.Td style={{ width: 148 }}>
                               <Select
+                                className="autorizacao-convenio-status-select"
                                 size="xs"
                                 placeholder="Alterar"
                                 data={STATUS_OPTIONS}
@@ -522,33 +503,18 @@ export function AutorizacaoConvenio() {
                                 }}
                                 disabled={updatingKey === rowKey}
                                 leftSection={<ShieldCheck size={14} />}
-                                styles={{
-                                  input: {
-                                    minWidth: 132,
-                                    width: 132,
-                                  },
-                                }}
                               />
                             </Table.Td>
                             <Table.Td style={{ width: 116 }}>
                               <Stack gap={4}>
                                 <Button
                                   component="label"
+                                  className="autorizacao-convenio-attach-button"
                                   size="xs"
                                   variant="light"
                                   color="indigo"
                                   leftSection={<Upload size={14} />}
                                   disabled={updatingKey === rowKey}
-                                  styles={{
-                                    root: {
-                                      minWidth: 96,
-                                      width: 96,
-                                      paddingInline: 8,
-                                    },
-                                    label: {
-                                      fontSize: 12,
-                                    },
-                                  }}
                                 >
                                   Anexar
                                   <input
@@ -576,7 +542,7 @@ export function AutorizacaoConvenio() {
                                       loading={openingAttachmentId === doc.id}
                                       title="Visualizar anexo"
                                     >
-                                      <Upload size={12} />
+                                      <Eye size={12} />
                                     </ActionIcon>
                                   </Group>
                                 ))}
@@ -589,8 +555,8 @@ export function AutorizacaoConvenio() {
                   </Table.Tbody>
                 </Table>
             </PaginatedGrid>
-          </Stack>
-        </Paper>
+          </Paper>
+        </Stack>
       </Box>
     </Box>
   );

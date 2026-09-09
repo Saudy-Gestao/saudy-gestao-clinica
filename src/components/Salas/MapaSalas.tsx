@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ActionIcon, Badge, Box, Button, Divider, Group, Paper, Skeleton, Stack, Text, Tooltip } from '@mantine/core';
-import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
+import { Badge, Box, Button, Divider, Group, MultiSelect, Paper, SimpleGrid, Skeleton, Stack, Text, TextInput, Tooltip } from '@/components/ui';
+import { useElementSize, useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
 import { useTeaWeeklyAgendaQuery, type TeaAgendaItem } from '../../hooks/useTeaWeeklyAgendaQuery';
 import { useAgendasAdminQuery } from '../../hooks/useAgendasAdminQuery';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { isRoomSector } from '../../utils/sectorClassification';
-import { resolveAgendaCardPresentation } from '../../utils/agendaCardDensity';
+import { formatCardInitials, resolveAgendaCardPresentation } from '../../utils/agendaCardDensity';
+import './MapaSalas.css';
 
 const SLOTS = Array.from({ length: 16 }, (_, index) => {
   const minutes = 8 * 60 + index * 45;
@@ -40,16 +39,16 @@ const getTimelineOffset = (minute: number, rowHeight: number, rowGap: number) =>
 const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const WEEKDAY_TOKENS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
 const STATUS_META = {
-  available: { label: 'Disponível', color: 'var(--mantine-color-body)', border: 'var(--mantine-color-default-border)' },
-  occupied: { label: 'Ocupado', color: 'rgba(72, 187, 155, 0.28)', border: 'rgba(72, 187, 155, 0.7)' },
-  blocked: { label: 'Bloqueado', color: 'rgba(240, 153, 123, 0.3)', border: 'rgba(240, 153, 123, 0.7)' },
+  available: { label: 'Disponível' },
+  occupied: { label: 'Ocupado' },
+  blocked: { label: 'Bloqueado' },
 } as const;
 const toWeekStartMonday = (value: dayjs.Dayjs) => value.subtract((value.day() + 6) % 7, 'day').startOf('day');
 const normalizeList = (data: any): any[] => Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.data) ? data.data : []));
 type SlotStatus = keyof typeof STATUS_META;
 
 function StatCard({ label, value, detail, highlight = false }: { label: string; value: number; detail: string; highlight?: boolean }) {
-  return <Paper withBorder radius="md" p="sm" style={{ borderColor: highlight ? 'rgba(72, 187, 155, 0.6)' : 'var(--mantine-color-default-border)', background: highlight ? 'rgba(72, 187, 155, 0.12)' : 'var(--mantine-color-body)' }}><Text size="xl" fw={700}>{value}</Text><Text size="sm" fw={600}>{label}</Text><Text size="xs" c="dimmed">{detail}</Text></Paper>;
+  return <Paper className={`mapa-salas-stat-card${highlight ? ' mapa-salas-stat-card--highlight' : ''}`} withBorder radius="md" p="sm"><Text size="xl" fw={700}>{value}</Text><Text size="sm" fw={600}>{label}</Text><Text size="xs" c="dimmed">{detail}</Text></Paper>;
 }
 
 export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
@@ -304,16 +303,51 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
     const isBlocked = agenda.status === 'BLOQUEADA';
     const start = String(agenda.shiftStart || '');
     const end = String(agenda.shiftEnd || '');
-    const presentation = resolveAgendaCardPresentation(availableWidth, 1, 'full');
-    const detailLevel = presentation.hideContent || presentation.patientOnly ? 'minimal' : presentation.detailLevel;
-    const showCardText = !presentation.hideContent;
-    const content = <Box p={2} style={{ minWidth: 220 }}><Group justify="space-between" gap="sm" mb={6} wrap="nowrap"><Text size="sm" fw={700}>{isBlocked ? 'Agenda bloqueada' : 'Detalhes da agenda'}</Text>{detailLevel === 'minimal' && <Badge size="sm" variant="light" color={isBlocked ? 'orange' : 'teal'}>{start}–{end}</Badge>}</Group><Text size="xs" c="dimmed" mb={detailLevel === 'full' ? 0 : 6}>{roomName}</Text>{detailLevel !== 'full' && <Stack gap={3}>{detailLevel === 'minimal' && <Text size="sm" fw={600}>{agenda.especialidade?.name || 'Especialidade não informada'}</Text>}<Text size="xs">Profissional: {agenda.doctor?.name || 'Não informado'}</Text></Stack>}</Box>;
     const interval = `${start}–${end}`;
-    return <Tooltip key={`${date.format('YYYY-MM-DD')}-${roomName}-${agenda.id || start}`} label={content} withArrow position="top" offset={8} openDelay={180} multiline styles={{ tooltip: { background: 'var(--mantine-color-dark-7)', color: 'var(--mantine-color-white)', border: '1px solid var(--mantine-color-default-border)', boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)', padding: 12 }, arrow: { background: 'var(--mantine-color-dark-7)', borderColor: 'var(--mantine-color-default-border)' } }}><Box style={{ height: '100%', minHeight: compact ? 28 : 42, padding: detailLevel === 'minimal' ? 4 : 8, border: `1px solid ${isBlocked ? STATUS_META.blocked.border : STATUS_META.occupied.border}`, borderRadius: 8, background: isBlocked ? STATUS_META.blocked.color : 'rgba(72, 187, 155, 0.34)', color: 'var(--mantine-color-text)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: compact ? 10 : 12, fontWeight: 600, overflow: 'hidden', gap: detailLevel === 'full' ? 4 : 2 }}>
-      {showCardText && detailLevel === 'full' && <Text size="sm" fw={700} truncate w="100%">{agenda.doctor?.name || 'Agenda da sala'}</Text>}
-      {showCardText && detailLevel !== 'minimal' && <Text size="xs" c="dimmed" truncate w="100%">{isBlocked ? 'Bloqueado' : agenda.especialidade?.name || 'Agenda da sala'}</Text>}
-      {showCardText && <Text size={detailLevel === 'minimal' ? 'xs' : 'sm'} fw={700}>{interval}</Text>}
-    </Box></Tooltip>;
+    const presentation = resolveAgendaCardPresentation(availableWidth, 1, 'full');
+    const { hideContent, patientOnly, showInitials, detailLevel } = presentation;
+    const showFull = !hideContent && !patientOnly;
+    const content = (
+      <Box p={2} style={{ minWidth: 220 }}>
+        <Group justify="space-between" gap="sm" mb={6} wrap="nowrap">
+          <Text size="sm" fw={700}>{isBlocked ? 'Agenda bloqueada' : 'Detalhes da agenda'}</Text>
+          {!showFull && <Badge size="sm" variant="light" color={isBlocked ? 'orange' : 'teal'}>{interval}</Badge>}
+        </Group>
+        <Text size="xs" c="dimmed" mb={showFull ? 0 : 6}>{roomName}</Text>
+        {!showFull && (
+          <Stack gap={3}>
+            <Text size="sm" fw={600}>{agenda.especialidade?.name || 'Especialidade não informada'}</Text>
+            <Text size="xs">Profissional: {agenda.doctor?.name || 'Não informado'}</Text>
+          </Stack>
+        )}
+      </Box>
+    );
+    return (
+      <Tooltip key={`${date.format('YYYY-MM-DD')}-${roomName}-${agenda.id || start}`} label={content} withArrow position="top" offset={8} openDelay={180} multiline>
+        <Box
+          className={`mapa-salas-block ${isBlocked ? 'mapa-salas-block--blocked' : 'mapa-salas-block--occupied'}`}
+          style={{
+            height: '100%',
+            minHeight: compact ? 28 : 42,
+            padding: hideContent ? 4 : 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            fontSize: compact ? 10 : 12,
+            fontWeight: 600,
+            overflow: 'hidden',
+            gap: showFull && detailLevel === 'full' ? 4 : 2,
+          }}
+        >
+          {showFull && detailLevel === 'full' && <Text size="sm" fw={700} truncate w="100%">{agenda.doctor?.name || 'Agenda da sala'}</Text>}
+          {showFull && <Text size="xs" c="dimmed" truncate w="100%">{isBlocked ? 'Bloqueado' : agenda.especialidade?.name || 'Agenda da sala'}</Text>}
+          {patientOnly && showInitials && !hideContent && <Text size="sm" fw={700}>{formatCardInitials(agenda.doctor?.name)}</Text>}
+          {!hideContent && <Text size={showFull ? 'sm' : 'xs'} fw={700}>{interval}</Text>}
+        </Box>
+      </Tooltip>
+    );
   };
   const renderRoomTimeline = (date: dayjs.Dayjs, roomName: string, compact = false) => {
     const rowHeight = compact ? 40 : 42;
@@ -353,7 +387,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
     const availablePresentation = resolveAgendaCardPresentation(laneWidth, 1, 'full');
     return <Box style={{ position: 'relative', height: timelineHeight, minWidth: 0 }}>
       {availableSegments.map((segment) => <Tooltip key={`${roomName}-available-${segment.lane}-${segment.startMinute}`} label={`Disponível · ${minutesToTime(segment.startMinute)}–${minutesToTime(segment.endMinute)}`} withArrow openDelay={180}>
-        <Box style={{ ...getSegmentStyle(segment.startMinute, segment.endMinute), ...getLaneStyle(segment.lane), border: '1px solid var(--mantine-color-default-border)', borderRadius: 10, background: 'rgba(255, 255, 255, 0.025)', boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mantine-color-dimmed)', fontSize: compact ? 11 : 13, zIndex: 1 }}>
+        <Box className="mapa-salas-segment-available" style={{ ...getSegmentStyle(segment.startMinute, segment.endMinute), ...getLaneStyle(segment.lane), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: compact ? 11 : 13, zIndex: 1 }}>
           {!availablePresentation.hideContent && <Stack gap={2} align="center"><Text size={compact ? 'xs' : 'sm'} c="dimmed">{availablePresentation.patientOnly ? 'Livre' : 'Disponível'}</Text>{!availablePresentation.patientOnly && <Text size="xs" c="dimmed">{minutesToTime(segment.startMinute)}–{minutesToTime(segment.endMinute)}</Text>}</Stack>}
         </Box>
       </Tooltip>)}
@@ -365,98 +399,191 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
     </Box>;
   };
 
-  return <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-    {!embedded && <Header />}
-    <Box p={embedded ? 0 : isMobile ? 'sm' : 'xl'} maw={embedded ? 'none' : 1500} mx={embedded ? 0 : 'auto'} w="100%">
-      <Group mb="lg" gap="md" align="flex-start" style={{ display: embedded ? 'none' : undefined }}><ActionIcon variant="default" size={isMobile ? 44 : 52} radius="md" onClick={() => navigate('/cadastro-sala')} aria-label="Voltar"><ChevronLeft size={22} /></ActionIcon><Box><Group gap="xs"><Text fw={700} size="lg">Mapa de salas</Text>{usingMockData && <Badge size="sm" variant="light" color="yellow">Dados demonstrativos</Badge>}</Group><Text size="sm" c="dimmed">Capacidade e oferta da agenda de terapias</Text></Box></Group>
-      <Paper p={isMobile ? 'sm' : 'md'} withBorder radius="md"><Stack gap="md">
-        <Group justify="flex-end" align="center" wrap="wrap"><Group gap={6}><Button size="xs" variant={view === 'day' ? 'filled' : 'default'} onClick={() => setView('day')}>Dia</Button><Button size="xs" variant={view === 'week' ? 'filled' : 'default'} onClick={() => setView('week')}>Semana</Button></Group></Group>
-        <Group grow align="flex-start" wrap="wrap"><FloatingMultiSelect label="Unidade" placeholder="Todas" data={units.map((value) => ({ value, label: value }))} value={unitFilter} onChange={setUnitFilter} searchable clearable /><FloatingMultiSelect label="Especialidade" placeholder="Todas" data={specialties.map((value) => ({ value, label: value }))} value={specialtyFilter} onChange={setSpecialtyFilter} searchable clearable /><FloatingMultiSelect label="Sala" placeholder="Todas" data={roomNames.map((value) => ({ value, label: value }))} value={roomFilter} onChange={setRoomFilter} searchable clearable /><FloatingMultiSelect label="Terapeuta" placeholder="Todos" data={doctors.map((value) => ({ value, label: value }))} value={doctorFilter} onChange={setDoctorFilter} searchable clearable /></Group>
-        <Group justify="space-between" align="center" wrap="wrap"><Paper withBorder radius="md" p={4} style={{ background: 'rgba(59, 130, 246, 0.04)' }}><Group gap="xs" wrap="wrap">{view === 'day' ? <><Button size="xs" variant="default" leftSection={<ChevronLeft size={14} />} onClick={() => moveDay(-1)}>Dia anterior</Button><Button size="xs" variant="light" onClick={() => { const today = dayjs().startOf('day'); setSelectedDate(today); setWeekStart(toWeekStartMonday(today)); }}>Hoje</Button><Button size="xs" variant="default" rightSection={<ChevronRight size={14} />} onClick={() => moveDay(1)}>Próximo dia</Button><Divider orientation="vertical" my={4} /><Group gap={2} wrap="nowrap">{WEEKDAY_LABELS.map((label, index) => { const day = weekStart.add(index, 'day'); const selected = selectedDate.isSame(day, 'day'); return <Button key={label} size="xs" variant={selected ? 'filled' : 'subtle'} color={selected ? 'blue' : undefined} px={10} onClick={() => setSelectedDate(day)} aria-label={`Selecionar ${label}`}>{label}</Button>; })}</Group></> : <><Button size="xs" variant="default" leftSection={<ChevronLeft size={14} />} onClick={() => setWeekStart((current) => current.subtract(7, 'day'))}>Semana anterior</Button><Button size="xs" variant="light" onClick={() => setWeekStart(toWeekStartMonday(dayjs()))}>Hoje</Button><Button size="xs" variant="default" rightSection={<ChevronRight size={14} />} onClick={() => setWeekStart((current) => current.add(7, 'day'))}>Próxima semana</Button></>}</Group></Paper><Group gap="xs" align="center"><FloatingInput label={null} placeholder="Buscar por sala, especialidade, terapeuta ou horário" value={search} onChange={(event) => setSearch(event.currentTarget.value)} rightSection={<Search size={14} />} /><Text size="sm" c="dimmed">{view === 'day' ? selectedDate.format('dddd, DD [de] MMMM [de] YYYY') : `${weekStart.format('DD/MM/YYYY')} até ${weekStart.add(6, 'day').format('DD/MM/YYYY')}`}</Text></Group></Group>
-        <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', gap: 10 }}><StatCard label="Capacidade total" value={stats.total} detail="horários possíveis" /><StatCard label="Ofertado" value={stats.total} detail="100% da capacidade" /><StatCard label="Ocupado" value={stats.occupied} detail={`${stats.total ? Math.round((stats.occupied / stats.total) * 100) : 0}% do ofertado`} highlight /><StatCard label="Disponível" value={stats.available} detail={`${stats.total ? Math.round((stats.available / stats.total) * 100) : 0}% do ofertado`} /><StatCard label="Bloqueado" value={stats.blocked} detail="manutenção ou reserva interna" /></Box>
-        <Group gap="lg" mb={-4}>{(['available', 'occupied', 'blocked'] as SlotStatus[]).map((status) => <Group key={status} gap={6}><Box w={12} h={12} style={{ borderRadius: 3, background: STATUS_META[status].color, border: `1px solid ${STATUS_META[status].border}` }} /><Text size="xs" c="dimmed">{STATUS_META[status].label}</Text></Group>)}</Group>
-        {loading ? <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>{Array.from({ length: 4 }).map((_, index) => <Paper key={index} withBorder p="md"><Stack gap="sm"><Skeleton height={20} /><Skeleton height={180} /></Stack></Paper>)}</Box> : view === 'day' ? <Box ref={scheduleRef} style={{ overflowX: 'auto' }}>
-          <Paper withBorder radius="md" p="xs" style={{ minWidth: Math.max(700, visibleRooms.length * 190 + 100) }}>
-            <Box style={{ display: 'grid', gridTemplateColumns: `82px repeat(${Math.max(visibleRooms.length, 1)}, minmax(160px, 1fr))`, gap: 6, marginBottom: 8 }}>
-              <Paper withBorder radius="sm" p="xs" style={{ background: 'rgba(59, 130, 246, 0.08)' }}>
-                <Text size="xs" fw={700} c="dimmed">Horário</Text>
-                <Text size="xs" c="dimmed">{selectedDate.format('DD/MM')}</Text>
-              </Paper>
-              {visibleRooms.length
-                ? visibleRooms.map((room) => (
-                  <Paper key={room} withBorder radius="sm" p="xs" style={{ borderColor: 'var(--mantine-color-indigo-5)', background: 'rgba(59, 130, 246, 0.08)' }}>
-                    <Tooltip label={room} withArrow openDelay={180} multiline styles={{ tooltip: { background: 'var(--mantine-color-dark-7)', color: 'var(--mantine-color-white)', border: '1px solid var(--mantine-color-default-border)', boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)' }, arrow: { background: 'var(--mantine-color-dark-7)', borderColor: 'var(--mantine-color-default-border)' } }}>
-                      <Text size="sm" fw={700} lineClamp={1}>{room}</Text>
-                    </Tooltip>
-                    <Text size="xs" c="dimmed" lineClamp={1}>{roomSubtitleByName.get(room) || 'Sala de atendimento'}</Text>
-                  </Paper>
-                ))
-                : <Paper withBorder p="xs"><Text size="sm" c="dimmed">Nenhuma sala encontrada</Text></Paper>}
-            </Box>
-            <Box style={{ display: 'grid', gridTemplateColumns: `82px repeat(${Math.max(visibleRooms.length, 1)}, minmax(160px, 1fr))`, gap: 6, height: getTimelineHeight(42, 6), alignItems: 'start' }}>
-              <Box style={{ borderRight: '1px solid var(--mantine-color-default-border)' }}>{renderTimelineMarkers(42, 6)}</Box>
-              {visibleRooms.length ? visibleRooms.map((room) => <Box key={room}>{renderRoomTimeline(selectedDate, room)}</Box>) : <Box />}
-            </Box>
-          </Paper>
-        </Box> : <Box ref={scheduleRef} style={{ overflowX: 'auto' }}>
-          <Box style={{ minWidth: Math.max(1120, 62 + weekDays.length * (Math.max(visibleRooms.length, 1) * 112 + 18)) }}>
-            <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8, marginBottom: 8 }}>
-              <Box />
-              {weekDays.map((day) => (
-                <Paper
-                  key={day.format('YYYY-MM-DD')}
-                  withBorder
-                  radius="md"
-                  p="xs"
-                  style={{
-                    borderColor: 'var(--mantine-color-indigo-5)',
-                    background: 'rgba(59, 130, 246, 0.08)',
-                  }}
-                >
-                  <Text size="sm" fw={700} ta="center">
-                    {WEEKDAY_LABELS[day.day() === 0 ? 6 : day.day() - 1]} · {day.format('DD/MM')}
-                  </Text>
-                  <Text size="xs" c="dimmed" ta="center">
-                    {visibleRooms.length} {visibleRooms.length === 1 ? 'sala' : 'salas'}
-                  </Text>
-                </Paper>
-              ))}
-            </Box>
-
-            <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8, marginBottom: 8 }}>
-              <Box />
-              {weekDays.map((day) => (
-                <Box
-                  key={`rooms-${day.format('YYYY-MM-DD')}`}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${Math.max(visibleRooms.length, 1)}, minmax(100px, 1fr))`,
-                    gap: 5,
-                    padding: '0 6px 6px',
-                    borderLeft: '1px solid var(--mantine-color-default-border)',
-                    borderRight: '1px solid var(--mantine-color-default-border)',
-                  }}
-                >
-                  {(visibleRooms.length ? visibleRooms : ['Sem sala']).map((room) => (
-                    <Tooltip key={`${day.format('YYYY-MM-DD')}-room-${room}`} label={room} withArrow openDelay={180} multiline styles={{ tooltip: { background: 'var(--mantine-color-dark-7)', color: 'var(--mantine-color-white)', border: '1px solid var(--mantine-color-default-border)', boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)' }, arrow: { background: 'var(--mantine-color-dark-7)', borderColor: 'var(--mantine-color-default-border)' } }}>
-                      <Text size="xs" c="dimmed" ta="center" lineClamp={1}>{room}</Text>
-                    </Tooltip>
-                  ))}
-                </Box>
-              ))}
-            </Box>
-
-            <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8 }}>
-              {renderTimelineMarkers(40, 6)}
-              {weekDays.map((day) => (
-                <Box key={`day-timeline-${day.format('YYYY-MM-DD')}`} style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(visibleRooms.length, 1)}, minmax(100px, 1fr))`, gap: 5, padding: '0 5px', height: getTimelineHeight(40, 6), alignItems: 'start', borderLeft: '1px solid var(--mantine-color-default-border)', borderRight: '1px solid var(--mantine-color-default-border)', background: 'rgba(255, 255, 255, 0.015)' }}>
-                  {visibleRooms.length ? visibleRooms.map((room) => <Box key={`${day.format('YYYY-MM-DD')}-${room}`}>{renderRoomTimeline(day, room, true)}</Box>) : <Text size="xs" c="dimmed" ta="center">Nenhuma sala encontrada</Text>}
-                </Box>
-              ))}
-            </Box>
+  return (
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      {!embedded && <Header back={{ label: 'Voltar', onClick: () => navigate('/cadastro-sala') }} />}
+      <Box p={embedded ? 0 : isMobile ? 'sm' : 'xl'} maw={embedded ? 'none' : 1500} mx={embedded ? 0 : 'auto'} w="100%">
+        {!embedded && (
+          <Box className="mapa-salas-hero">
+            <Text className="mapa-salas-eyebrow">CADASTROS CLÍNICOS</Text>
+            <Group gap="xs" align="center">
+              <Text className="mapa-salas-title" fw={700} size="2xl">Mapa de salas</Text>
+              {usingMockData && <Badge size="sm" variant="light" color="yellow">Dados demonstrativos</Badge>}
+            </Group>
+            <Text className="mapa-salas-subtitle" size="sm">Capacidade e oferta da agenda de terapias</Text>
           </Box>
-        </Box>}
-      </Stack></Paper>
+        )}
+        <Paper className="mapa-salas-panel" p={isMobile ? 'sm' : 'md'} withBorder radius="md">
+          <Stack gap="md">
+            <Group justify="space-between" align="center" wrap="wrap">
+              {usingMockData && embedded && <Badge size="sm" variant="light" color="yellow">Dados demonstrativos</Badge>}
+              <Group gap={6} ml="auto">
+                <Button size="xs" variant={view === 'day' ? 'filled' : 'default'} onClick={() => setView('day')}>Dia</Button>
+                <Button size="xs" variant={view === 'week' ? 'filled' : 'default'} onClick={() => setView('week')}>Semana</Button>
+              </Group>
+            </Group>
+
+            <SimpleGrid cols={{ base: 1, xs: 2, sm: 4 }} spacing="sm">
+              <MultiSelect label="Unidade" placeholder="Todas" data={units.map((value) => ({ value, label: value }))} value={unitFilter} onChange={setUnitFilter} searchable clearable />
+              <MultiSelect label="Especialidade" placeholder="Todas" data={specialties.map((value) => ({ value, label: value }))} value={specialtyFilter} onChange={setSpecialtyFilter} searchable clearable />
+              <MultiSelect label="Sala" placeholder="Todas" data={roomNames.map((value) => ({ value, label: value }))} value={roomFilter} onChange={setRoomFilter} searchable clearable />
+              <MultiSelect label="Terapeuta" placeholder="Todos" data={doctors.map((value) => ({ value, label: value }))} value={doctorFilter} onChange={setDoctorFilter} searchable clearable />
+            </SimpleGrid>
+
+            <TextInput
+              placeholder="Buscar por sala, especialidade, terapeuta ou horário"
+              value={search}
+              onChange={(event) => setSearch(event.currentTarget.value)}
+              leftSection={<Search size={14} aria-hidden="true" />}
+            />
+
+            <Paper className="mapa-salas-nav-bar" withBorder radius="md" p="xs">
+              <Stack gap={8}>
+                <Group justify="space-between" align="center" wrap="wrap" gap="xs">
+                  <Group gap="xs" wrap="wrap">
+                    {view === 'day' ? (
+                      <>
+                        <Button size="xs" variant="default" leftSection={<ChevronLeft size={14} />} onClick={() => moveDay(-1)}>Dia anterior</Button>
+                        <Button size="xs" variant="light" onClick={() => { const today = dayjs().startOf('day'); setSelectedDate(today); setWeekStart(toWeekStartMonday(today)); }}>Hoje</Button>
+                        <Button size="xs" variant="default" rightSection={<ChevronRight size={14} />} onClick={() => moveDay(1)}>Próximo dia</Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button size="xs" variant="default" leftSection={<ChevronLeft size={14} />} onClick={() => setWeekStart((current) => current.subtract(7, 'day'))}>Semana anterior</Button>
+                        <Button size="xs" variant="light" onClick={() => setWeekStart(toWeekStartMonday(dayjs()))}>Hoje</Button>
+                        <Button size="xs" variant="default" rightSection={<ChevronRight size={14} />} onClick={() => setWeekStart((current) => current.add(7, 'day'))}>Próxima semana</Button>
+                      </>
+                    )}
+                  </Group>
+                  <Text size="sm" c="dimmed">
+                    {view === 'day' ? selectedDate.format('dddd, DD [de] MMMM [de] YYYY') : `${weekStart.format('DD/MM/YYYY')} até ${weekStart.add(6, 'day').format('DD/MM/YYYY')}`}
+                  </Text>
+                </Group>
+                {view === 'day' && (
+                  <>
+                    <Divider />
+                    <Group gap={4} wrap="wrap">
+                      {WEEKDAY_LABELS.map((label, index) => {
+                        const day = weekStart.add(index, 'day');
+                        const selected = selectedDate.isSame(day, 'day');
+                        return <Button key={label} size="xs" variant={selected ? 'filled' : 'subtle'} color={selected ? 'blue' : undefined} style={{ minWidth: 48 }} onClick={() => setSelectedDate(day)} aria-label={`Selecionar ${label}`}>{label}</Button>;
+                      })}
+                    </Group>
+                  </>
+                )}
+              </Stack>
+            </Paper>
+
+            <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', gap: 10 }}>
+              <StatCard label="Capacidade total" value={stats.total} detail="horários possíveis" />
+              <StatCard label="Ofertado" value={stats.total} detail="100% da capacidade" />
+              <StatCard label="Ocupado" value={stats.occupied} detail={`${stats.total ? Math.round((stats.occupied / stats.total) * 100) : 0}% do ofertado`} highlight />
+              <StatCard label="Disponível" value={stats.available} detail={`${stats.total ? Math.round((stats.available / stats.total) * 100) : 0}% do ofertado`} />
+              <StatCard label="Bloqueado" value={stats.blocked} detail="manutenção ou reserva interna" />
+            </Box>
+
+            <Group gap="lg" mb={-4}>
+              {(['available', 'occupied', 'blocked'] as SlotStatus[]).map((status) => (
+                <Group key={status} gap={6}>
+                  <span className={`mapa-salas-legend-dot mapa-salas-legend-dot--${status}`} />
+                  <Text size="xs" c="dimmed">{STATUS_META[status].label}</Text>
+                </Group>
+              ))}
+            </Group>
+
+            {loading ? (
+              <Box style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Paper key={index} withBorder p="md"><Stack gap="sm"><Skeleton height={20} /><Skeleton height={180} /></Stack></Paper>
+                ))}
+              </Box>
+            ) : view === 'day' ? (
+              <Box ref={scheduleRef} className="mapa-salas-table-wrap">
+                <Paper withBorder radius="md" p="xs" style={{ minWidth: Math.max(700, visibleRooms.length * 190 + 100) }}>
+                  <Box style={{ display: 'grid', gridTemplateColumns: `82px repeat(${Math.max(visibleRooms.length, 1)}, minmax(160px, 1fr))`, gap: 6, marginBottom: 8 }}>
+                    <Paper className="mapa-salas-hour-header" withBorder radius="sm" p="xs">
+                      <Text size="xs" fw={700} c="dimmed">Horário</Text>
+                      <Text size="xs" c="dimmed">{selectedDate.format('DD/MM')}</Text>
+                    </Paper>
+                    {visibleRooms.length ? visibleRooms.map((room) => (
+                      <Paper key={room} className="mapa-salas-room-header" withBorder radius="sm" p="xs">
+                        <Tooltip label={room} withArrow openDelay={180} multiline>
+                          <Text size="sm" fw={700} lineClamp={1}>{room}</Text>
+                        </Tooltip>
+                        <Text size="xs" c="dimmed" lineClamp={1}>{roomSubtitleByName.get(room) || 'Sala de atendimento'}</Text>
+                      </Paper>
+                    )) : <Paper withBorder p="xs"><Text size="sm" c="dimmed">Nenhuma sala encontrada</Text></Paper>}
+                  </Box>
+                  <Box style={{ display: 'grid', gridTemplateColumns: `82px repeat(${Math.max(visibleRooms.length, 1)}, minmax(160px, 1fr))`, gap: 6, height: getTimelineHeight(42, 6), alignItems: 'start' }}>
+                    <Box style={{ borderRight: '1px solid var(--ui-border)' }} className="mapa-salas-timeline-marker">{renderTimelineMarkers(42, 6)}</Box>
+                    {visibleRooms.length ? visibleRooms.map((room) => <Box key={room}>{renderRoomTimeline(selectedDate, room)}</Box>) : <Box />}
+                  </Box>
+                </Paper>
+              </Box>
+            ) : (
+              <Box ref={scheduleRef} className="mapa-salas-table-wrap">
+                <Box style={{ minWidth: Math.max(1120, 62 + weekDays.length * (Math.max(visibleRooms.length, 1) * 112 + 18)) }}>
+                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8, marginBottom: 8 }}>
+                    <Box />
+                    {weekDays.map((day) => (
+                      <Paper key={day.format('YYYY-MM-DD')} className="mapa-salas-day-header" withBorder radius="md" p="xs">
+                        <Text size="sm" fw={700} ta="center">
+                          {WEEKDAY_LABELS[day.day() === 0 ? 6 : day.day() - 1]} · {day.format('DD/MM')}
+                        </Text>
+                        <Text size="xs" c="dimmed" ta="center">
+                          {visibleRooms.length} {visibleRooms.length === 1 ? 'sala' : 'salas'}
+                        </Text>
+                      </Paper>
+                    ))}
+                  </Box>
+
+                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8, marginBottom: 8 }}>
+                    <Box />
+                    {weekDays.map((day) => (
+                      <Box
+                        key={`rooms-${day.format('YYYY-MM-DD')}`}
+                        className="mapa-salas-day-column"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${Math.max(visibleRooms.length, 1)}, minmax(100px, 1fr))`,
+                          gap: 5,
+                          padding: '0 6px 6px',
+                        }}
+                      >
+                        {(visibleRooms.length ? visibleRooms : ['Sem sala']).map((room) => (
+                          <Tooltip key={`${day.format('YYYY-MM-DD')}-room-${room}`} label={room} withArrow openDelay={180} multiline>
+                            <Text size="xs" c="dimmed" ta="center" lineClamp={1}>{room}</Text>
+                          </Tooltip>
+                        ))}
+                      </Box>
+                    ))}
+                  </Box>
+
+                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8 }}>
+                    {renderTimelineMarkers(40, 6)}
+                    {weekDays.map((day) => (
+                      <Box
+                        key={`day-timeline-${day.format('YYYY-MM-DD')}`}
+                        className="mapa-salas-day-timeline-column"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${Math.max(visibleRooms.length, 1)}, minmax(100px, 1fr))`,
+                          gap: 5,
+                          padding: '0 5px',
+                          height: getTimelineHeight(40, 6),
+                          alignItems: 'start',
+                        }}
+                      >
+                        {visibleRooms.length ? visibleRooms.map((room) => <Box key={`${day.format('YYYY-MM-DD')}-${room}`}>{renderRoomTimeline(day, room, true)}</Box>) : <Text size="xs" c="dimmed" ta="center">Nenhuma sala encontrada</Text>}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </Box>
+            )}
+          </Stack>
+        </Paper>
+      </Box>
     </Box>
-  </Box>;
+  );
 }

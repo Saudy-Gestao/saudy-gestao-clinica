@@ -1,0 +1,20 @@
+.cadastro-paciente-form-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-paciente-form-section-title {
+  color: var(--ui-foreground) !important;
+}
+
+.cadastro-paciente-form-subbox {
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+  padding: .85rem;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}
+
+.cadastro-paciente-form-dashed-box {
+  border: 2px dashed var(--ui-border);
+  border-radius: .7rem;
+}

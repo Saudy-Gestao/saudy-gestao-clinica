@@ -1,0 +1,115 @@
+.mapa-salas-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.mapa-salas-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.mapa-salas-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.mapa-salas-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.mapa-salas-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.mapa-salas-nav-bar {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-primary) 6%, var(--ui-surface));
+}
+
+.mapa-salas-stat-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.mapa-salas-stat-card--highlight {
+  border-color: color-mix(in srgb, var(--ui-hue-teal) 55%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-hue-teal) 12%, var(--ui-surface)) !important;
+}
+
+.mapa-salas-legend-dot {
+  display: inline-block;
+  width: .75rem;
+  height: .75rem;
+  border-radius: .2rem;
+  border: 1px solid var(--ui-border);
+}
+
+.mapa-salas-legend-dot--available { background: var(--ui-surface); }
+.mapa-salas-legend-dot--occupied { background: color-mix(in srgb, var(--ui-hue-teal) 30%, transparent); border-color: color-mix(in srgb, var(--ui-hue-teal) 65%, transparent); }
+.mapa-salas-legend-dot--blocked { background: color-mix(in srgb, var(--ui-hue-orange) 28%, transparent); border-color: color-mix(in srgb, var(--ui-hue-orange) 65%, transparent); }
+
+.mapa-salas-table-wrap {
+  overflow-x: auto;
+}
+
+.mapa-salas-hour-header {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-primary) 7%, var(--ui-surface)) !important;
+}
+
+.mapa-salas-room-header {
+  border-color: color-mix(in srgb, var(--ui-hue-indigo) 55%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-hue-indigo) 8%, var(--ui-surface)) !important;
+}
+
+.mapa-salas-day-header {
+  border-color: color-mix(in srgb, var(--ui-hue-indigo) 55%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-hue-indigo) 8%, var(--ui-surface)) !important;
+}
+
+.mapa-salas-day-column {
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+}
+
+.mapa-salas-day-timeline-column {
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-foreground) 2%, transparent);
+}
+
+.mapa-salas-timeline-marker {
+  color: var(--ui-muted);
+}
+
+.mapa-salas-segment-available {
+  border: 1px solid var(--ui-border);
+  border-radius: .6rem;
+  background: color-mix(in srgb, var(--ui-foreground) 3%, transparent);
+  color: var(--ui-muted);
+}
+
+.mapa-salas-block {
+  color: var(--ui-foreground);
+  border-radius: .5rem;
+}
+
+.mapa-salas-block--occupied {
+  border: 1px solid color-mix(in srgb, var(--ui-hue-teal) 65%, transparent);
+  background: color-mix(in srgb, var(--ui-hue-teal) 26%, var(--ui-surface));
+}
+
+.mapa-salas-block--blocked {
+  border: 1px solid color-mix(in srgb, var(--ui-hue-orange) 65%, transparent);
+  background: color-mix(in srgb, var(--ui-hue-orange) 24%, var(--ui-surface));
+}
+
+.mapa-salas-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

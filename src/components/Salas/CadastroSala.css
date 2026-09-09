@@ -1,0 +1,120 @@
+.cadastro-sala-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.cadastro-sala-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cadastro-sala-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.cadastro-sala-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.cadastro-sala-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-sala-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.cadastro-sala-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .cadastro-sala-actions,
+  .cadastro-sala-actions .cadastro-sala-search,
+  .cadastro-sala-actions .ui-button {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+}
+
+.cadastro-sala-branch-select {
+  max-width: 320px;
+}
+
+.cadastro-sala-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.cadastro-sala-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-sala-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.cadastro-sala-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-sala-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}
+
+.cadastro-sala-hub-grid {
+  gap: 1rem !important;
+}
+
+.cadastro-sala-hub-card {
+  position: relative;
+  padding: 1.15rem !important;
+  min-height: 6rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.cadastro-sala-hub-card:hover,
+.cadastro-sala-hub-card:focus-within {
+  border-color: var(--ui-primary);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / .14);
+  transform: translateY(-2px);
+}
+
+.cadastro-sala-hub-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 42%, var(--ui-border));
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--ui-primary) 12%, var(--ui-background));
+  color: var(--ui-primary);
+}
+
+.cadastro-sala-hub-chevron {
+  color: var(--ui-muted);
+}

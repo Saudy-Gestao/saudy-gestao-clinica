@@ -2,28 +2,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Group,
-  Text,
-  Button,
-  Table,
-  Modal,
-  Stack,
   ActionIcon,
   Badge,
-  Paper,
-  Skeleton,
+  Box,
+  Button,
+  DateInput,
+  Group,
   Menu,
-  Stepper,
-  Divider,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+  Modal,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import agendaService, { type Agenda } from '../../services/agendaService';
 import { useAgendasAdminQuery } from '../../hooks/useAgendasAdminQuery';
@@ -31,9 +29,12 @@ import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
+import { useInternsAdminQuery } from '../../hooks/useInternsAdminQuery';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { CadastroAgendaEscalaForm } from './CadastroAgendaEscalaForm';
+import './CadastroAgendas.css';
 
 const WEEKDAY_OPTIONS = [
   { value: 'segunda', label: 'Segunda' },
@@ -77,7 +78,20 @@ const toDateInputValue = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
-const genKey = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const parseISODate = (value: string): Date | null => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const formatISODate = (date: Date | null): string => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 interface AgendaFormState {
   branchId: string;
@@ -105,35 +119,6 @@ const EMPTY_FORM: AgendaFormState = {
   status: 'ATIVA',
 };
 
-interface ConjuntoDraft {
-  key: string;
-  roomId: string;
-  roomName: string;
-  especialidadeId: string | null;
-  especialidadeName: string | null;
-  weekday: string;
-  shiftStart: string;
-  shiftEnd: string;
-  startDate: string;
-  endDate: string;
-  status: AgendaFormState['status'];
-  error?: string;
-}
-
-const EMPTY_DRAFT: ConjuntoDraft = {
-  key: '',
-  roomId: '',
-  roomName: '',
-  especialidadeId: null,
-  especialidadeName: null,
-  weekday: '',
-  shiftStart: '',
-  shiftEnd: '',
-  startDate: '',
-  endDate: '',
-  status: 'ATIVA',
-};
-
 export function CadastroAgendas() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -143,12 +128,14 @@ export function CadastroAgendas() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [createScaleOpen, setCreateScaleOpen] = useState(false);
 
   const agendasQuery = useAgendasAdminQuery();
   const branchesQuery = useSettingsBranchesQuery();
   const doctorsQuery = useDoctorsAdminQuery();
   const especialidadesQuery = useEspecialidadesAdminQuery();
   const roomsQuery = useRoomsAdminQuery();
+  const internsQuery = useInternsAdminQuery();
 
   const items = useMemo(() => getApiList(agendasQuery.data), [agendasQuery.data]);
 
@@ -167,6 +154,7 @@ export function CadastroAgendas() {
   }, [especialidadesQuery.data]);
 
   const roomList = useMemo(() => getApiList(roomsQuery.data).filter((s: any) => isRoomSector(s)), [roomsQuery.data]);
+  const internList = useMemo(() => getApiList(internsQuery.data).filter((item: any) => item?.id), [internsQuery.data]);
 
   const doctorOptionsForBranch = (branchId: string) => doctorList
     .filter((d: any) => (Array.isArray(d.branchIds) && d.branchIds.includes(branchId)) || d.branchId === branchId)
@@ -232,7 +220,7 @@ export function CadastroAgendas() {
     }
   }, [agendasQuery.error]);
 
-  // --- Single-record edit modal (existing agendas only; creation goes through the wizard below) ---
+  // --- Single-record edit modal (existing agendas only; creation goes through the scale form below) ---
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AgendaFormState>(EMPTY_FORM);
@@ -333,196 +321,6 @@ export function CadastroAgendas() {
     }
   };
 
-  // --- Creation wizard: Unidade/Profissional -> Sala -> Turno, with a staging mini-grid for multiple conjuntos ---
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
-  const [wizardBranchId, setWizardBranchId] = useState('');
-  const [wizardDoctorId, setWizardDoctorId] = useState('');
-  const [draft, setDraft] = useState<ConjuntoDraft>(EMPTY_DRAFT);
-  const [conjuntos, setConjuntos] = useState<ConjuntoDraft[]>([]);
-  const [wizardError, setWizardError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const openWizard = () => {
-    setWizardStep(0);
-    setWizardBranchId(filterBranchId || '');
-    setWizardDoctorId('');
-    setDraft(EMPTY_DRAFT);
-    setConjuntos([]);
-    setWizardError(null);
-    setWizardOpen(true);
-  };
-
-  const closeWizard = () => { if (!submitting) setWizardOpen(false); };
-
-  const handleWizardBranchChange = (branchId: string | null) => {
-    setWizardBranchId(branchId || '');
-    setWizardDoctorId('');
-    setDraft(EMPTY_DRAFT);
-    setConjuntos([]);
-    setWizardError(null);
-  };
-
-  const handleWizardDoctorChange = (doctorId: string | null) => {
-    setWizardDoctorId(doctorId || '');
-    setDraft(EMPTY_DRAFT);
-    setConjuntos([]);
-    setWizardError(null);
-  };
-
-  const handleDraftRoomChange = (roomId: string | null) => {
-    const room = roomList.find((r: any) => r.id === roomId);
-    const { especialidadeId, especialidadeName } = deriveEspecialidadeForRoom(wizardDoctorId, roomId || '');
-    setDraft((prev) => ({ ...prev, roomId: roomId || '', roomName: room?.name || '', especialidadeId, especialidadeName }));
-  };
-
-  const goToStep0 = () => { setWizardError(null); setWizardStep(0); };
-  const goToStep1 = () => {
-    if (!wizardBranchId || !wizardDoctorId) { setWizardError('Selecione a unidade e o profissional'); return; }
-    setWizardError(null);
-    setWizardStep(1);
-  };
-  const goToStep2 = () => {
-    if (!draft.roomId) { setWizardError('Selecione a sala'); return; }
-    setWizardError(null);
-    setWizardStep(2);
-  };
-
-  const addConjunto = () => {
-    if (!draft.weekday || !draft.shiftStart || !draft.shiftEnd) {
-      setWizardError('Preencha o dia da semana e o turno');
-      return;
-    }
-    if (draft.shiftEnd <= draft.shiftStart) {
-      setWizardError('O fim do turno deve ser maior que o início');
-      return;
-    }
-    setWizardError(null);
-    setConjuntos((prev) => [...prev, { ...draft, key: genKey() }]);
-    setDraft(EMPTY_DRAFT);
-    setWizardStep(1);
-  };
-
-  const removeConjunto = (key: string) => setConjuntos((prev) => prev.filter((c) => c.key !== key));
-
-  const editConjunto = (item: ConjuntoDraft) => {
-    setDraft({ ...item, error: undefined });
-    setConjuntos((prev) => prev.filter((c) => c.key !== item.key));
-    setWizardStep(1);
-    setWizardError(null);
-  };
-
-  const goToSummary = () => {
-    if (conjuntos.length === 0) { setWizardError('Adicione pelo menos um conjunto antes de finalizar'); return; }
-    setWizardError(null);
-    setWizardStep(3);
-  };
-
-  const handleWizardSubmit = async () => {
-    if (conjuntos.length === 0) return;
-    setSubmitting(true);
-    let successCount = 0;
-    const remaining: ConjuntoDraft[] = [];
-    for (const item of conjuntos) {
-      try {
-        await agendaService.createAgenda({
-          branchId: wizardBranchId,
-          doctorId: wizardDoctorId,
-          weekday: item.weekday,
-          shiftStart: item.shiftStart,
-          shiftEnd: item.shiftEnd,
-          especialidadeId: item.especialidadeId,
-          roomId: item.roomId,
-          startDate: item.startDate || null,
-          endDate: item.endDate || null,
-          status: item.status,
-        });
-        successCount += 1;
-      } catch (err: any) {
-        const errorCode = err?.response?.data?.error;
-        const message = errorCode === 'AGENDA_OVERLAP'
-          ? 'Já existe uma agenda ativa nesse dia/turno para esse profissional'
-          : resolveApiErrorMessage(err, 'Erro ao cadastrar esse conjunto');
-        remaining.push({ ...item, error: message });
-      }
-    }
-    setConjuntos(remaining);
-    setSubmitting(false);
-
-    if (successCount > 0) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
-    }
-    if (remaining.length === 0) {
-      showNotification({ title: 'Cadastradas', message: `${successCount} conjunto(s) de agenda cadastrado(s) com sucesso`, color: 'green' });
-      setWizardOpen(false);
-    } else if (successCount > 0) {
-      showNotification({ title: 'Parcialmente cadastrado', message: `${successCount} cadastrado(s), ${remaining.length} com erro. Corrija e tente novamente.`, color: 'yellow' });
-    } else {
-      showNotification({ title: 'Erro', message: 'Não foi possível cadastrar os conjuntos. Verifique os erros na lista.', color: 'red' });
-    }
-  };
-
-  const roomOptionsForWizard = useMemo(
-    () => roomOptionsForDoctorInBranch(wizardBranchId, wizardDoctorId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wizardBranchId, wizardDoctorId, roomList, doctorList],
-  );
-
-  const wizardDoctorName = doctorList.find((d: any) => d.id === wizardDoctorId)?.name || '';
-  const wizardBranchName = branchOptions.find((b) => b.value === wizardBranchId)?.label || '';
-
-  const renderVigenciaText = (start?: string | null, end?: string | null) => {
-    const s = formatDate(start);
-    const e = formatDate(end);
-    if (!s && !e) return 'Sem prazo';
-    return `${s || '—'} até ${e || 'sem fim'}`;
-  };
-
-  const renderConjuntosGrid = (list: ConjuntoDraft[], showErrors: boolean) => (
-    <Table horizontalSpacing="sm" verticalSpacing="xs">
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th style={{ fontSize: '0.75rem' }}>Sala</Table.Th>
-          <Table.Th style={{ fontSize: '0.75rem' }}>Especialidade</Table.Th>
-          <Table.Th style={{ fontSize: '0.75rem' }}>Dia</Table.Th>
-          <Table.Th style={{ fontSize: '0.75rem' }}>Turno</Table.Th>
-          <Table.Th style={{ fontSize: '0.75rem' }}>Vigência</Table.Th>
-          <Table.Th style={{ fontSize: '0.75rem' }}>Status</Table.Th>
-          <Table.Th style={{ fontSize: '0.75rem', width: 76, textAlign: 'center' }}>Ações</Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {list.map((item) => (
-          <Table.Tr key={item.key}>
-            <Table.Td>
-              <Text size="sm">{item.roomName}</Text>
-              {showErrors && item.error ? <Text size="xs" c="red">{item.error}</Text> : null}
-            </Table.Td>
-            <Table.Td><Text size="sm" c="dimmed">{item.especialidadeName || '—'}</Text></Table.Td>
-            <Table.Td><Text size="sm" c="dimmed">{WEEKDAY_LABEL[item.weekday] || item.weekday}</Text></Table.Td>
-            <Table.Td><Text size="sm" c="dimmed">{item.shiftStart} - {item.shiftEnd}</Text></Table.Td>
-            <Table.Td><Text size="xs" c="dimmed">{renderVigenciaText(item.startDate, item.endDate)}</Text></Table.Td>
-            <Table.Td>
-              <Badge color={STATUS_COLOR[item.status]} variant="light" size="sm">
-                {STATUS_OPTIONS.find((s) => s.value === item.status)?.label || item.status}
-              </Badge>
-            </Table.Td>
-            <Table.Td>
-              <Group gap={4} justify="center" wrap="nowrap">
-                <ActionIcon variant="light" size="sm" onClick={() => editConjunto(item)}>
-                  <Pencil size={14} />
-                </ActionIcon>
-                <ActionIcon variant="light" color="red" size="sm" onClick={() => removeConjunto(item.key)}>
-                  <Trash2 size={14} />
-                </ActionIcon>
-              </Group>
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
-  );
-
   const renderVigencia = (item: Agenda) => {
     const start = formatDate(item.startDate);
     const end = formatDate(item.endDate);
@@ -534,339 +332,203 @@ export function CadastroAgendas() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => (createScaleOpen ? setCreateScaleOpen(false) : navigate('/dashboard?secao=cadastros-clinicos')) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Agendas
-              </Text>
-              <Text size="sm" c="dimmed">
-                Agendas de profissionais por unidade, dia e turno
-              </Text>
-            </Box>
-          </Group>
-
-          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={openWizard} size={isMobile ? 'sm' : 'md'}>
-            Nova agenda
-          </Button>
-        </Group>
-
-        <Group mb={isMobile ? 20 : 30} grow={isMobile} align="flex-end">
-          <FloatingSelect
-            label="Filtrar por unidade"
-            placeholder="Todas as unidades"
-            data={branchOptions}
-            value={filterBranchId}
-            onChange={setFilterBranchId}
-            searchable
-            clearable
-            nothingFoundMessage="Nenhuma unidade encontrada"
-          />
-          <FloatingInput
-            label="Buscar agendas"
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            placeholder={isMobile ? 'Buscar...' : 'Buscar por profissional, unidade, especialidade ou sala...'}
-          />
-        </Group>
-
-        {loading ? (
-          <Stack gap="sm">
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <Paper key={idx} withBorder radius="md" p="md">
-                <Group justify="space-between" align="flex-start" wrap="nowrap">
-                  <Stack gap={8} style={{ flex: 1 }}>
-                    <Skeleton height={18} width="56%" radius="sm" />
-                    <Skeleton height={14} width="28%" radius="sm" />
-                  </Stack>
-                  <Skeleton height={24} width={76} radius="xl" />
-                </Group>
-              </Paper>
-            ))}
-          </Stack>
+        {createScaleOpen ? (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Text fw={600} size="lg">Nova agenda</Text>
+            </Group>
+            <CadastroAgendaEscalaForm
+              branchOptions={branchOptions}
+              doctors={doctorList}
+              especialidades={getApiList(especialidadesQuery.data)}
+              rooms={roomList}
+              interns={internList}
+              isMobile={Boolean(isMobile)}
+              onCancel={() => setCreateScaleOpen(false)}
+              onSaved={async () => {
+                await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
+                setCreateScaleOpen(false);
+              }}
+            />
+          </>
         ) : (
-          isMobile ? (
-            filteredItems.length === 0 ? (
-              <Paper withBorder radius="md" p="xl">
-                <Text size="sm" c="dimmed" ta="center">
-                  Nenhuma agenda encontrada. Ajuste os filtros ou cadastre uma nova agenda.
-                </Text>
-              </Paper>
-            ) : (
-              <Stack gap="sm">
-                {filteredItems.map((it: Agenda) => (
-                  <Paper key={it.id} withBorder radius="md" p="md">
-                    <Group justify="space-between" align="flex-start" wrap="nowrap">
-                      <Stack gap={4} style={{ flex: 1 }}>
-                        <Text fw={600} size="sm">{it.doctor?.name || '—'}</Text>
-                        <Text size="xs" c="dimmed">{it.branch?.tradeName || '—'} · {WEEKDAY_LABEL[it.weekday] || it.weekday}</Text>
-                        <Text size="xs" c="dimmed">{it.shiftStart} - {it.shiftEnd}</Text>
-                        <Text size="xs" c="dimmed">{it.room?.name || 'Sem sala definida'}</Text>
-                        {renderVigencia(it)}
-                      </Stack>
-                      <Badge color={STATUS_COLOR[it.status]} variant="light" size="sm">
-                        {STATUS_OPTIONS.find((s) => s.value === it.status)?.label || it.status}
-                      </Badge>
-                    </Group>
-                    <Group gap={8} mt="md" wrap="nowrap">
-                      <ActionIcon variant="light" color="blue" onClick={() => openEditModal(it)}>
-                        <Pencil size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="light"
-                        color="red"
-                        onClick={() => { setDeleteTarget(it); setDeleteModalOpen(true); }}
-                      >
-                        <Trash2 size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Paper>
-                ))}
-              </Stack>
-            )
-          ) : (
-            <PaginatedGrid
-              totalItems={filteredItems.length}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              isMobile={isMobile}
-              maxHeight={620}
-              showFooter
-            >
-              <Table horizontalSpacing="md" verticalSpacing="md">
-                <Table.Thead>
-                  <Table.Tr style={{ borderBottom: 'none' }}>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Profissional</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Unidade</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Dia</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Turno</Table.Th>
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Sala</Table.Th>}
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Vigência</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
-                      Ações
-                    </Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {filteredItems.length === 0 ? (
-                    <Table.Tr>
-                      <Table.Td colSpan={isTablet ? 6 : 8}>
-                        <Text size="sm" c="dimmed" ta="center">
-                          Nenhuma agenda encontrada. Ajuste os filtros ou cadastre uma nova agenda.
-                        </Text>
-                      </Table.Td>
-                    </Table.Tr>
+          <>
+            <Box className="cadastro-agendas-hero">
+              <Text className="cadastro-agendas-eyebrow">CADASTROS CLÍNICOS</Text>
+              <Text className="cadastro-agendas-title" fw={700} size="2xl">Agendas</Text>
+              <Text className="cadastro-agendas-subtitle" size="sm">Agendas de profissionais por unidade, dia e turno.</Text>
+            </Box>
+
+            <Paper className="cadastro-agendas-panel" p={isMobile ? 'sm' : 'lg'} withBorder radius="md" mb="lg">
+              <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+                <Group align="flex-end" wrap="wrap" gap="sm" style={{ flex: 1 }}>
+                  <Select
+                    label="Filtrar por unidade"
+                    placeholder="Todas as unidades"
+                    data={branchOptions}
+                    value={filterBranchId}
+                    onChange={setFilterBranchId}
+                    searchable
+                    clearable
+                    style={{ flex: '1 1 220px', maxWidth: isMobile ? '100%' : 280 }}
+                  />
+                  <TextInput
+                    label="Buscar agendas"
+                    value={query}
+                    onChange={(e) => setQuery(e.currentTarget.value)}
+                    placeholder={isMobile ? 'Buscar...' : 'Buscar por profissional, unidade, especialidade ou sala...'}
+                    style={{ flex: '1 1 260px', maxWidth: isMobile ? '100%' : 420 }}
+                  />
+                </Group>
+                <Button leftSection={<Plus size={16} />} onClick={() => setCreateScaleOpen(true)} fullWidth={isMobile}>
+                  Nova agenda
+                </Button>
+              </Group>
+            </Paper>
+
+            <Paper className="cadastro-agendas-panel" p={isMobile ? 'sm' : 'lg'} withBorder radius="md">
+              {loading ? (
+                <Stack gap="sm">
+                  {Array.from({ length: 4 }).map((_, idx) => (
+                    <Paper key={idx} withBorder radius="md" p="md">
+                      <Group justify="space-between" align="flex-start" wrap="nowrap">
+                        <Stack gap={8} style={{ flex: 1 }}>
+                          <Skeleton height={18} width="56%" radius="sm" />
+                          <Skeleton height={14} width="28%" radius="sm" />
+                        </Stack>
+                        <Skeleton height={24} width={76} radius="xl" />
+                      </Group>
+                    </Paper>
+                  ))}
+                </Stack>
+              ) : (
+                isMobile ? (
+                  filteredItems.length === 0 ? (
+                    <Paper withBorder radius="md" p="xl">
+                      <Text size="sm" c="dimmed" ta="center">
+                        Nenhuma agenda encontrada. Ajuste os filtros ou cadastre uma nova agenda.
+                      </Text>
+                    </Paper>
                   ) : (
-                    paginatedItems.map((it: Agenda) => (
-                      <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                        <Table.Td><Text fw={600} size="sm">{it.doctor?.name || '—'}</Text></Table.Td>
-                        <Table.Td><Text size="sm" c="dimmed">{it.branch?.tradeName || '—'}</Text></Table.Td>
-                        <Table.Td><Text size="sm" c="dimmed">{WEEKDAY_LABEL[it.weekday] || it.weekday}</Text></Table.Td>
-                        <Table.Td><Text size="sm" c="dimmed">{it.shiftStart} - {it.shiftEnd}</Text></Table.Td>
-                        {!isTablet && <Table.Td><Text size="sm" c="dimmed">{it.room?.name || '—'}</Text></Table.Td>}
-                        {!isTablet && <Table.Td>{renderVigencia(it)}</Table.Td>}
-                        <Table.Td>
-                          <Badge color={STATUS_COLOR[it.status]} variant="light" size="sm">
-                            {STATUS_OPTIONS.find((s) => s.value === it.status)?.label || it.status}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td style={{ textAlign: 'center' }}>
-                          <Group justify="center">
-                            <Menu shadow="md" width={200} position="bottom" withArrow>
-                              <Menu.Target>
-                                <ActionIcon variant="light" size="sm" aria-label="Ações da agenda">
-                                  <MoreVertical size={16} />
-                                </ActionIcon>
-                              </Menu.Target>
-                              <Menu.Dropdown>
-                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openEditModal(it)}>
-                                  Editar
-                                </Menu.Item>
-                                <Menu.Item
-                                  leftSection={<Trash2 size={14} />}
-                                  color="red"
-                                  onClick={() => { setDeleteTarget(it); setDeleteModalOpen(true); }}
-                                >
-                                  Excluir
-                                </Menu.Item>
-                              </Menu.Dropdown>
-                            </Menu>
+                    <Stack gap="sm">
+                      {filteredItems.map((it: Agenda) => (
+                        <Paper key={it.id} withBorder radius="md" p="md">
+                          <Group justify="space-between" align="flex-start" wrap="nowrap">
+                            <Stack gap={4} style={{ flex: 1 }}>
+                              <Text fw={600} size="sm">{it.doctor?.name || '—'}</Text>
+                              <Text size="xs" c="dimmed">{it.branch?.tradeName || '—'} · {WEEKDAY_LABEL[it.weekday] || it.weekday}</Text>
+                              <Text size="xs" c="dimmed">{it.shiftStart} - {it.shiftEnd}</Text>
+                              <Text size="xs" c="dimmed">{it.room?.name || 'Sem sala definida'}</Text>
+                              {renderVigencia(it)}
+                            </Stack>
+                            <Badge color={STATUS_COLOR[it.status]} variant="light" size="sm">
+                              {STATUS_OPTIONS.find((s) => s.value === it.status)?.label || it.status}
+                            </Badge>
                           </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))
-                  )}
-                </Table.Tbody>
-              </Table>
-            </PaginatedGrid>
-          )
+                          <Group gap={8} mt="md" wrap="nowrap">
+                            <ActionIcon variant="light" color="blue" onClick={() => openEditModal(it)} aria-label="Editar agenda">
+                              <Pencil size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() => { setDeleteTarget(it); setDeleteModalOpen(true); }}
+                              aria-label="Excluir agenda"
+                            >
+                              <Trash2 size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  )
+                ) : (
+                  <PaginatedGrid
+                    totalItems={filteredItems.length}
+                    page={page}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                    isMobile={isMobile}
+                    maxHeight={620}
+                    showFooter
+                  >
+                    <Table horizontalSpacing="md" verticalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th className="cadastro-agendas-th">Profissional</Table.Th>
+                          <Table.Th className="cadastro-agendas-th">Unidade</Table.Th>
+                          <Table.Th className="cadastro-agendas-th">Dia</Table.Th>
+                          <Table.Th className="cadastro-agendas-th">Turno</Table.Th>
+                          {!isTablet && <Table.Th className="cadastro-agendas-th">Sala</Table.Th>}
+                          {!isTablet && <Table.Th className="cadastro-agendas-th">Vigência</Table.Th>}
+                          <Table.Th className="cadastro-agendas-th">Status</Table.Th>
+                          <Table.Th className="cadastro-agendas-th" style={{ textAlign: 'center', width: 96 }}>
+                            Ações
+                          </Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {filteredItems.length === 0 ? (
+                          <Table.Tr>
+                            <Table.Td colSpan={isTablet ? 6 : 8}>
+                              <Text size="sm" c="dimmed" ta="center">
+                                Nenhuma agenda encontrada. Ajuste os filtros ou cadastre uma nova agenda.
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ) : (
+                          paginatedItems.map((it: Agenda) => (
+                            <Table.Tr key={it.id} className="cadastro-agendas-row">
+                              <Table.Td><Text fw={600} size="sm">{it.doctor?.name || '—'}</Text></Table.Td>
+                              <Table.Td><Text size="sm" c="dimmed">{it.branch?.tradeName || '—'}</Text></Table.Td>
+                              <Table.Td><Text size="sm" c="dimmed">{WEEKDAY_LABEL[it.weekday] || it.weekday}</Text></Table.Td>
+                              <Table.Td><Text size="sm" c="dimmed">{it.shiftStart} - {it.shiftEnd}</Text></Table.Td>
+                              {!isTablet && <Table.Td><Text size="sm" c="dimmed">{it.room?.name || '—'}</Text></Table.Td>}
+                              {!isTablet && <Table.Td>{renderVigencia(it)}</Table.Td>}
+                              <Table.Td>
+                                <Badge color={STATUS_COLOR[it.status]} variant="light" size="sm">
+                                  {STATUS_OPTIONS.find((s) => s.value === it.status)?.label || it.status}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td style={{ textAlign: 'center' }}>
+                                <Group justify="center">
+                                  <Menu shadow="md" width={200} position="bottom-end" withArrow>
+                                    <Menu.Target>
+                                      <ActionIcon variant="light" size="sm" aria-label="Ações da agenda">
+                                        <MoreVertical size={16} />
+                                      </ActionIcon>
+                                    </Menu.Target>
+                                    <Menu.Dropdown>
+                                      <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openEditModal(it)}>
+                                        Editar
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        leftSection={<Trash2 size={14} />}
+                                        color="red"
+                                        onClick={() => { setDeleteTarget(it); setDeleteModalOpen(true); }}
+                                      >
+                                        Excluir
+                                      </Menu.Item>
+                                    </Menu.Dropdown>
+                                  </Menu>
+                                </Group>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))
+                        )}
+                      </Table.Tbody>
+                    </Table>
+                  </PaginatedGrid>
+                )
+              )}
+            </Paper>
+          </>
         )}
       </Box>
-
-      {/* Creation wizard */}
-      <Modal
-        opened={wizardOpen}
-        onClose={closeWizard}
-        title="Cadastrar agenda"
-        size={isMobile ? '100%' : 900}
-        padding={isMobile ? 'md' : 'xl'}
-        centered
-        fullScreen={isMobile}
-      >
-        <Stack gap={24}>
-          <Stepper active={wizardStep} onStepClick={(step) => { if (step < wizardStep) setWizardStep(step); }} size="md" iconSize={36} mt={20}>
-            <Stepper.Step label="Profissional" description="Unidade e profissional" />
-            <Stepper.Step label="Sala" description="Onde vai atender" />
-            <Stepper.Step label="Turno" description="Dia e horário" />
-            <Stepper.Step label="Resumo" description="Confirmar cadastro" />
-          </Stepper>
-
-          {wizardStep === 0 && (
-            <Stack gap={16}>
-              <FloatingSelect
-                label="Unidade"
-                required
-                placeholder="Selecione a unidade"
-                data={branchOptions}
-                value={wizardBranchId || null}
-                searchable
-                nothingFoundMessage="Nenhuma unidade encontrada"
-                onChange={handleWizardBranchChange}
-              />
-              <FloatingSelect
-                label="Profissional"
-                required
-                placeholder={wizardBranchId ? 'Selecione o profissional' : 'Selecione uma unidade primeiro'}
-                data={doctorOptionsForBranch(wizardBranchId)}
-                value={wizardDoctorId || null}
-                disabled={!wizardBranchId}
-                searchable
-                nothingFoundMessage="Nenhum profissional encontrado para essa unidade"
-                onChange={handleWizardDoctorChange}
-              />
-            </Stack>
-          )}
-
-          {wizardStep === 1 && (
-            <Stack gap={16}>
-              <Text size="sm" c="dimmed">{wizardDoctorName} · {wizardBranchName}</Text>
-              <FloatingSelect
-                label="Sala"
-                required
-                placeholder={roomOptionsForWizard.length ? 'Selecione a sala' : 'Nenhuma sala compatível com as modalidades do profissional'}
-                data={roomOptionsForWizard}
-                value={draft.roomId || null}
-                searchable
-                nothingFoundMessage="Nenhuma sala encontrada"
-                onChange={handleDraftRoomChange}
-              />
-              {conjuntos.length > 0 && (
-                <>
-                  <Divider label={`${conjuntos.length} conjunto(s) já adicionado(s)`} labelPosition="left" mt={8} />
-                  {renderConjuntosGrid(conjuntos, false)}
-                </>
-              )}
-            </Stack>
-          )}
-
-          {wizardStep === 2 && (
-            <Stack gap={16}>
-              <Text size="sm" c="dimmed">{wizardDoctorName} · {draft.roomName}{draft.especialidadeName ? ` · ${draft.especialidadeName}` : ''}</Text>
-              <FloatingSelect
-                label="Dia da semana"
-                required
-                placeholder="Selecione o dia"
-                data={WEEKDAY_OPTIONS}
-                value={draft.weekday || null}
-                onChange={(value) => setDraft((prev) => ({ ...prev, weekday: value || '' }))}
-              />
-              <Group grow>
-                <FloatingInput
-                  label="Início do turno"
-                  type="time"
-                  value={draft.shiftStart}
-                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, shiftStart: value })); }}
-                  required
-                />
-                <FloatingInput
-                  label="Fim do turno"
-                  type="time"
-                  value={draft.shiftEnd}
-                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, shiftEnd: value })); }}
-                  required
-                />
-              </Group>
-              <Group grow>
-                <FloatingInput
-                  label="Data de ativação"
-                  type="date"
-                  value={draft.startDate}
-                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, startDate: value })); }}
-                />
-                <FloatingInput
-                  label="Data de finalização"
-                  type="date"
-                  value={draft.endDate}
-                  onChange={(e) => { const value = e.currentTarget.value; setDraft((prev) => ({ ...prev, endDate: value })); }}
-                />
-              </Group>
-              <FloatingSelect
-                label="Status"
-                data={STATUS_OPTIONS}
-                value={draft.status}
-                onChange={(value) => setDraft((prev) => ({ ...prev, status: (value || 'ATIVA') as AgendaFormState['status'] }))}
-              />
-            </Stack>
-          )}
-
-          {wizardStep === 3 && (
-            <Stack gap={16}>
-              <Text size="sm" fw={600}>{wizardDoctorName} · {wizardBranchName}</Text>
-              <Text size="sm" c="dimmed">Confira os conjuntos abaixo antes de confirmar o cadastro.</Text>
-              {renderConjuntosGrid(conjuntos, true)}
-            </Stack>
-          )}
-
-          {wizardError ? (
-            <Text size="sm" c="red">{wizardError}</Text>
-          ) : null}
-
-          <Group justify="space-between" mt={8}>
-            <Button variant="default" onClick={wizardStep === 0 ? closeWizard : (wizardStep === 3 ? () => setWizardStep(2) : goToStep0)} size="sm" disabled={submitting}>
-              {wizardStep === 0 ? 'Cancelar' : 'Voltar'}
-            </Button>
-
-            {wizardStep === 0 && (
-              <Button bg={DARK_BLUE} onClick={goToStep1} size="sm">Próximo</Button>
-            )}
-            {wizardStep === 1 && (
-              <Group gap={8}>
-                {conjuntos.length > 0 && (
-                  <Button variant="default" onClick={goToSummary} size="sm">Finalizar e revisar</Button>
-                )}
-                <Button bg={DARK_BLUE} onClick={goToStep2} size="sm">Próximo</Button>
-              </Group>
-            )}
-            {wizardStep === 2 && (
-              <Button bg={DARK_BLUE} onClick={addConjunto} size="sm">Adicionar conjunto</Button>
-            )}
-            {wizardStep === 3 && (
-              <Button bg={DARK_BLUE} onClick={handleWizardSubmit} size="sm" loading={submitting} disabled={submitting || conjuntos.length === 0}>
-                Confirmar cadastro
-              </Button>
-            )}
-          </Group>
-        </Stack>
-      </Modal>
 
       {/* Single-record edit modal */}
       <Modal
@@ -878,17 +540,16 @@ export function CadastroAgendas() {
         fullScreen={isMobile}
       >
         <Stack gap={10}>
-          <FloatingSelect
+          <Select
             label="Unidade"
             required
             placeholder="Selecione a unidade"
             data={branchOptions}
             value={form.branchId || null}
             searchable
-            nothingFoundMessage="Nenhuma unidade encontrada"
             onChange={handleBranchChange}
           />
-          <FloatingSelect
+          <Select
             label="Profissional"
             required
             placeholder={form.branchId ? 'Selecione o profissional' : 'Selecione uma unidade primeiro'}
@@ -896,10 +557,9 @@ export function CadastroAgendas() {
             value={form.doctorId || null}
             disabled={!form.branchId}
             searchable
-            nothingFoundMessage="Nenhum profissional encontrado para essa unidade"
             onChange={handleDoctorChange}
           />
-          <FloatingSelect
+          <Select
             label="Dia da semana"
             required
             placeholder="Selecione o dia"
@@ -908,14 +568,14 @@ export function CadastroAgendas() {
             onChange={(value) => setForm((prev) => ({ ...prev, weekday: value || '' }))}
           />
           <Group grow>
-            <FloatingInput
+            <TextInput
               label="Início do turno"
               type="time"
               value={form.shiftStart}
               onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, shiftStart: value })); }}
               required
             />
-            <FloatingInput
+            <TextInput
               label="Fim do turno"
               type="time"
               value={form.shiftEnd}
@@ -923,7 +583,7 @@ export function CadastroAgendas() {
               required
             />
           </Group>
-          <FloatingSelect
+          <Select
             label="Sala"
             placeholder={form.branchId && form.doctorId ? 'Selecione a sala (opcional)' : 'Selecione unidade e profissional primeiro'}
             data={roomOptionsForDoctorInBranch(form.branchId, form.doctorId)}
@@ -931,24 +591,21 @@ export function CadastroAgendas() {
             disabled={!form.branchId || !form.doctorId}
             clearable
             searchable
-            nothingFoundMessage="Nenhuma sala encontrada"
             onChange={handleFormRoomChange}
           />
           <Group grow>
-            <FloatingInput
+            <DateInput
               label="Data de ativação"
-              type="date"
-              value={form.startDate}
-              onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, startDate: value })); }}
+              value={parseISODate(form.startDate)}
+              onChange={(date) => setForm((prev) => ({ ...prev, startDate: formatISODate(date) }))}
             />
-            <FloatingInput
+            <DateInput
               label="Data de finalização"
-              type="date"
-              value={form.endDate}
-              onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, endDate: value })); }}
+              value={parseISODate(form.endDate)}
+              onChange={(date) => setForm((prev) => ({ ...prev, endDate: formatISODate(date) }))}
             />
           </Group>
-          <FloatingSelect
+          <Select
             label="Status"
             data={STATUS_OPTIONS}
             value={form.status}
@@ -963,7 +620,7 @@ export function CadastroAgendas() {
             <Button variant="default" onClick={() => setModalOpen(false)} size="sm" disabled={saving}>
               Cancelar
             </Button>
-            <Button bg={DARK_BLUE} onClick={handleSave} size="sm" loading={saving} disabled={saving}>
+            <Button onClick={handleSave} size="sm" loading={saving} disabled={saving}>
               Salvar
             </Button>
           </Group>

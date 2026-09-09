@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '../../lib/utils';
 import {
   Box,
   Group,
@@ -10,26 +11,24 @@ import {
   Stack,
   Button,
   Switch,
+  TextInput,
+  Select,
+  MultiSelect,
+  NumberInput,
+  Textarea,
   SimpleGrid,
   Table,
   Badge,
   Skeleton,
   Menu,
-  useComputedColorScheme,
-} from '@mantine/core';
+} from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Power, Pencil, UserPlus, Users, MoreVertical } from 'lucide-react';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
+import { ChevronRight, Power, Pencil, UserPlus, Users, MoreVertical, Search } from 'lucide-react';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import procedureService from '../../services/procedureService';
 import ResultModal from '../common/ResultModal';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
-import { FloatingNumberInput } from '../common/FloatingNumberInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useCbosQuery } from '../../hooks/useCbosQuery';
@@ -37,6 +36,9 @@ import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import './CadastroProcedimentoHub.css';
+import './CadastroProcedimentoForm.css';
+import './CadastroProcedimentoList.css';
 
 interface ProcedureForm {
   name: string;
@@ -88,7 +90,7 @@ const appointmentTypeLabel = (value: ProcedureItem['appointmentType']) => value 
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
+    <Title order={5} fw={600} className="cadastro-procedimento-form-section-title" mb="sm" mt="md">
       {children}
     </Title>
   );
@@ -99,7 +101,6 @@ export function CadastroProcedimento() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [form, setForm] = useState<ProcedureForm>(INITIAL_FORM);
   const [formResetKey, setFormResetKey] = useState(0);
@@ -303,6 +304,12 @@ export function CadastroProcedimento() {
     navigate('/dashboard');
   };
 
+  const handleNewProcedure = () => {
+    setEditingProcedureId(null);
+    resetForm();
+    setActiveTab('cadastro');
+  };
+
   const handleNameChange = (value: string) => {
     setForm((prev) => ({ ...prev, name: value }));
   };
@@ -361,92 +368,67 @@ export function CadastroProcedimento() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="cadastro-procedimento-hub-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeTab === 'hub' ? navigate('/dashboard?secao=cadastros-clinicos') : setActiveTab('hub')) }} />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Stack gap="md">
-          <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Group align="center">
-              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-                <ChevronLeft size={28} />
-              </ActionIcon>
-              <Box>
-                <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Procedimentos</Text>
-                <Text size="sm" c="dimmed">Procedimentos, modalidades, preços e convênios aceitos.</Text>
-              </Box>
-            </Group>
-          </Group>
-
           {activeTab === 'hub' ? (
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              {[
-                {
-                  key: 'cadastro',
-                  icon: UserPlus,
-                  title: 'Cadastrar procedimento',
-                  desc: 'Registre procedimentos com regras clínicas, modalidade, unidades e convênios aceitos.',
-                  onClick: () => setActiveTab('cadastro'),
-                },
-                {
-                  key: 'lista',
-                  icon: Users,
-                  title: 'Procedimentos cadastrados',
-                  desc: 'Consulte, edite e ative/desative procedimentos já cadastrados.',
-                  onClick: () => setActiveTab('lista'),
-                },
-              ].map((card) => (
-                <Paper
-                  key={card.key}
-                  p="lg"
-                  withBorder
-                  onClick={card.onClick}
-                  style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-                >
-                  <Group justify="space-between" align="center" wrap="nowrap">
-                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                      <Box
-                        w={44}
-                        h={44}
-                        style={{
-                          borderRadius: 10,
-                          border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                      </Box>
-                      <Box style={{ minWidth: 0 }}>
-                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                      </Box>
+            <>
+              <Box className="cadastro-procedimento-hub-hero">
+                <Text className="cadastro-procedimento-hub-eyebrow">CADASTROS CLÍNICOS</Text>
+                <Text className="cadastro-procedimento-hub-title" fw={700} size="2xl">Cadastro de Procedimentos</Text>
+                <Text className="cadastro-procedimento-hub-subtitle" size="sm">Procedimentos, modalidades, preços e convênios aceitos.</Text>
+              </Box>
+
+              <SimpleGrid className="cadastro-procedimento-hub-grid" cols={{ base: 1, sm: 2 }}>
+                {[
+                  {
+                    key: 'cadastro',
+                    icon: UserPlus,
+                    title: 'Cadastrar procedimento',
+                    desc: 'Registre procedimentos com regras clínicas, modalidade, unidades e convênios aceitos.',
+                    onClick: () => setActiveTab('cadastro'),
+                  },
+                  {
+                    key: 'lista',
+                    icon: Users,
+                    title: 'Procedimentos cadastrados',
+                    desc: 'Consulte, edite e ative/desative procedimentos já cadastrados.',
+                    onClick: () => setActiveTab('lista'),
+                  },
+                ].map((card) => (
+                  <Paper
+                    key={card.key}
+                    className="cadastro-procedimento-hub-card"
+                    withBorder
+                    onClick={card.onClick}
+                  >
+                    <Group justify="space-between" align="center" wrap="nowrap">
+                      <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                        <Box className="cadastro-procedimento-hub-icon">
+                          <card.icon size={20} />
+                        </Box>
+                        <Box style={{ minWidth: 0 }}>
+                          <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                          <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                        </Box>
+                      </Group>
+                      <ChevronRight size={18} className="cadastro-procedimento-hub-chevron" style={{ flexShrink: 0 }} />
                     </Group>
-                    <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                  </Group>
-                </Paper>
-              ))}
-            </SimpleGrid>
+                  </Paper>
+                ))}
+              </SimpleGrid>
+            </>
           ) : (
             <>
               <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-                <Group gap="xs">
-                  <Button
-                    variant="default"
-                    leftSection={<ChevronLeft size={16} />}
-                    onClick={() => setActiveTab('hub')}
-                  >
-                    Voltar
-                  </Button>
-                  <Text fw={600}>
-                    {activeTab === 'cadastro' ? 'Cadastrar procedimento' : 'Procedimentos cadastrados'}
-                  </Text>
-                </Group>
+                <Text fw={600} size="lg">
+                  {activeTab === 'cadastro' ? 'Cadastrar procedimento' : 'Procedimentos cadastrados'}
+                </Text>
               </Group>
 
               {activeTab === 'cadastro' ? (
-                <Paper key={formResetKey} p="lg">
+                <Paper key={formResetKey} className="cadastro-procedimento-form-panel" p="lg" withBorder radius="md">
                 {editingProcedureId && (
                   <Text size="sm" c="dimmed" mb="md">
                     Editando procedimento. Ajuste os dados e salve as alterações.
@@ -454,7 +436,7 @@ export function CadastroProcedimento() {
                 )}
                 <SectionTitle>Procedimento</SectionTitle>
                 <Box mb="md">
-                  <FloatingInput
+                  <TextInput
                     label="Nome do procedimento"
                     placeholder="Ex: Consulta cardiologica"
                     value={form.name}
@@ -464,7 +446,7 @@ export function CadastroProcedimento() {
                 </Box>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingSelect
+                  <Select
                     label="Tipo do procedimento"
                     data={[
                       { value: 'CONSULTA_CLINICA', label: 'Consulta clínica' },
@@ -479,7 +461,7 @@ export function CadastroProcedimento() {
                     }))}
                     allowDeselect={false}
                   />
-                  <FloatingNumberInput
+                  <NumberInput
                     label="Duração (minutos)"
                     placeholder="Ex: 50"
                     value={form.durationMinutes}
@@ -490,7 +472,7 @@ export function CadastroProcedimento() {
                 </SimpleGrid>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingSelect
+                  <Select
                     label="Especialidade"
                     placeholder="Selecione a especialidade"
                     data={especialidadeOptions}
@@ -500,7 +482,7 @@ export function CadastroProcedimento() {
                     nothingFoundMessage="Nenhuma especialidade encontrada"
                     onChange={(value) => setForm((prev) => ({ ...prev, especialidadeId: value }))}
                   />
-                  <FloatingSelect
+                  <Select
                     label="CBO"
                     placeholder="Selecione o CBO (opcional)"
                     data={cboOptions}
@@ -513,7 +495,7 @@ export function CadastroProcedimento() {
                 </SimpleGrid>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingMultiSelect
+                  <MultiSelect
                     label="Unidades atendidas"
                     placeholder="Selecione as unidades"
                     data={branchOptions}
@@ -525,7 +507,7 @@ export function CadastroProcedimento() {
                   />
                 </SimpleGrid>
 
-                <FloatingTextarea
+                <Textarea
                   mt="md"
                   label="Descrição"
                   placeholder="Descreva o procedimento"
@@ -535,26 +517,35 @@ export function CadastroProcedimento() {
                 />
 
                 <SectionTitle>Forma de Atendimento</SectionTitle>
-                <Group align="flex-end" gap="md" wrap="wrap">
-                  <Switch
-                    label="Suporta teleconsulta"
-                    checked={form.supportsTeleconsultation}
-                    disabled={form.appointmentType === 'EXAME'}
-                    onChange={(event) => {
-                      const checked = event.currentTarget.checked;
-                      setForm((prev) => ({ ...prev, supportsTeleconsultation: checked }));
-                    }}
-                  />
-                </Group>
+                <Box className="ui-toggle-card ui-toggle-card--dashed" p="md">
+                  <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                    <Box>
+                      <Text fw={600} size="sm">Teleconsulta</Text>
+                      <Text size="xs" c="dimmed">
+                        {form.appointmentType === 'EXAME'
+                          ? 'Não disponível para procedimentos do tipo Exame.'
+                          : 'Permite agendar este procedimento como atendimento por videochamada.'}
+                      </Text>
+                    </Box>
+                    <Switch
+                      label={form.supportsTeleconsultation ? 'Ativo' : 'Inativo'}
+                      checked={form.supportsTeleconsultation}
+                      disabled={form.appointmentType === 'EXAME'}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setForm((prev) => ({ ...prev, supportsTeleconsultation: checked }));
+                      }}
+                    />
+                  </Group>
+                </Box>
 
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
-                  <FloatingMultiSelect
+                  <MultiSelect
                     label="Forma de Atendimento"
                     data={modalityOptions}
                     value={form.modalities}
                     onChange={(values) => setForm((prev) => ({ ...prev, modalities: values }))}
                     searchable
-                    maxDropdownHeight={220}
                   />
                 </SimpleGrid>
 
@@ -563,8 +554,6 @@ export function CadastroProcedimento() {
                     Cancelar
                   </Button>
                   <Button
-                    bg={DARK_BLUE}
-                    c="white"
                     onClick={handleSave}
                     loading={saving}
                     fullWidth={isMobile}
@@ -575,22 +564,28 @@ export function CadastroProcedimento() {
                 </Group>
               </Paper>
               ) : (
-              <Paper p="lg">
-                <Group justify="space-between" mb="md" wrap="wrap">
+              <Paper className="cadastro-procedimento-list-panel" p="lg" withBorder radius="md">
+                <Group justify="space-between" mb="md" wrap="wrap" gap="sm">
                   <SectionTitle>Procedimentos cadastrados</SectionTitle>
-                  <FloatingInput
-                    label="Buscar procedimentos"
-                    value={procedureQuery}
-                    onChange={(e) => setProcedureQuery(e.currentTarget.value)}
-                    containerProps={{ w: isMobile ? '100%' : 320 }}
-                  />
+                  <Group gap="sm" wrap={isMobile ? 'wrap' : 'nowrap'} align="center" className="cadastro-procedimento-list-actions">
+                    <TextInput
+                      className="cadastro-procedimento-list-search"
+                      placeholder="Buscar por nome"
+                      value={procedureQuery}
+                      onChange={(e) => setProcedureQuery(e.currentTarget.value)}
+                      leftSection={<Search size={16} aria-hidden="true" />}
+                    />
+                    <Button leftSection={<UserPlus size={16} />} onClick={handleNewProcedure}>
+                      Cadastrar procedimento
+                    </Button>
+                  </Group>
                 </Group>
 
                 {proceduresLoading ? (
                   isMobile ? (
                     <Stack gap="sm">
                       {Array.from({ length: 4 }).map((_, idx) => (
-                        <Paper key={idx} withBorder radius="md" p="md">
+                        <Paper key={idx} className="cadastro-procedimento-list-card" withBorder radius="md" p="md">
                           <Group justify="space-between" align="flex-start" wrap="nowrap">
                             <Stack gap={8} style={{ flex: 1 }}>
                               <Skeleton height={18} width="56%" radius="sm" />
@@ -609,24 +604,22 @@ export function CadastroProcedimento() {
                       ))}
                     </Stack>
                   ) : (
-                    <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <Box className="cadastro-procedimento-list-table-wrap">
                       <Table horizontalSpacing="md" verticalSpacing="md">
                         <Table.Thead>
                           <Table.Tr>
-                            <Table.Th>Nome</Table.Th>
-                            <Table.Th>Tipo</Table.Th>
-                            <Table.Th>Convênio</Table.Th>
-                            <Table.Th>Modalidades</Table.Th>
-                            <Table.Th>Status</Table.Th>
-                            <Table.Th>Ações</Table.Th>
+                            <Table.Th className="cadastro-procedimento-list-th">Nome</Table.Th>
+                            <Table.Th className="cadastro-procedimento-list-th">Tipo</Table.Th>
+                            <Table.Th className="cadastro-procedimento-list-th">Forma de Atendimento</Table.Th>
+                            <Table.Th className="cadastro-procedimento-list-th">Status</Table.Th>
+                            <Table.Th className="cadastro-procedimento-list-th">Ações</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
                           {Array.from({ length: 5 }).map((_, idx) => (
-                            <Table.Tr key={idx}>
+                            <Table.Tr key={idx} className="cadastro-procedimento-list-row">
                               <Table.Td><Skeleton height={16} width="72%" radius="sm" /></Table.Td>
                               <Table.Td><Skeleton height={24} width={82} radius="xl" /></Table.Td>
-                              <Table.Td><Skeleton height={14} width="45%" radius="sm" /></Table.Td>
                               <Table.Td><Skeleton height={14} width="70%" radius="sm" /></Table.Td>
                               <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
                               <Table.Td>
@@ -644,7 +637,7 @@ export function CadastroProcedimento() {
                 ) : (
                   isMobile ? (
                     filteredProcedures.length === 0 ? (
-                      <Paper withBorder radius="md" p="xl">
+                      <Paper className="cadastro-procedimento-list-empty" withBorder radius="md" p="xl">
                         <Text size="sm" c="dimmed" ta="center">
                           Nenhum procedimento encontrado. Ajuste a busca ou cadastre um novo procedimento.
                         </Text>
@@ -654,14 +647,10 @@ export function CadastroProcedimento() {
                         {filteredProcedures.map((item) => (
                           <Paper
                             key={item.id}
+                            className={cn('cadastro-procedimento-list-card', !item.isActive && 'cadastro-procedimento-list-card-inactive')}
                             withBorder
                             radius="md"
                             p="md"
-                            style={{
-                              backgroundColor: item.isActive
-                                ? 'transparent'
-                                : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5'),
-                            }}
                           >
                             <Group justify="space-between" align="flex-start" wrap="nowrap">
                               <Stack gap={4} style={{ flex: 1 }}>
@@ -701,7 +690,7 @@ export function CadastroProcedimento() {
                               <ActionIcon
                                 variant="light"
                                 color="blue"
-                                style={{ color: item.isActive ? undefined : '#adb5bd' }}
+                                style={{ color: item.isActive ? undefined : 'var(--ui-muted)' }}
                                 onClick={() => item.isActive && handleEditProcedure(item.id)}
                                 title={item.isActive ? 'Editar' : 'Ative o procedimento para editar'}
                                 disabled={!item.isActive}
@@ -735,12 +724,11 @@ export function CadastroProcedimento() {
                       <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                         <Table.Thead>
                           <Table.Tr style={{ borderBottom: 'none' }}>
-                            <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Forma de Atendimento</Table.Th>}
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                            <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
+                            <Table.Th className="cadastro-procedimento-list-th">Nome</Table.Th>
+                            {!isTablet && <Table.Th className="cadastro-procedimento-list-th">Tipo</Table.Th>}
+                            {!isTablet && <Table.Th className="cadastro-procedimento-list-th">Forma de Atendimento</Table.Th>}
+                            {!isTablet && <Table.Th className="cadastro-procedimento-list-th">Status</Table.Th>}
+                            <Table.Th className="cadastro-procedimento-list-th cadastro-procedimento-list-th-actions" style={{ width: 96 }}>
                               Ações
                             </Table.Th>
                           </Table.Tr>
@@ -748,7 +736,7 @@ export function CadastroProcedimento() {
                         <Table.Tbody>
                           {filteredProcedures.length === 0 ? (
                             <Table.Tr>
-                              <Table.Td colSpan={isTablet ? 2 : 6}>
+                              <Table.Td colSpan={isTablet ? 2 : 5}>
                                 <Text size="sm" c="dimmed" ta="center">
                                   Nenhum procedimento encontrado. Ajuste a busca ou cadastre um novo procedimento.
                                 </Text>
@@ -758,12 +746,7 @@ export function CadastroProcedimento() {
                             paginatedProcedures.map((item) => (
                               <Table.Tr
                                 key={item.id}
-                                style={{
-                                  borderBottom: '1px solid #e9ecef',
-                                  backgroundColor: item.isActive
-                                    ? 'transparent'
-                                    : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f1f3f5'),
-                                }}
+                                className={cn('cadastro-procedimento-list-row', !item.isActive && 'cadastro-procedimento-list-row-inactive')}
                               >
                                 <Table.Td>
                                   <Stack gap={2}>
@@ -815,7 +798,7 @@ export function CadastroProcedimento() {
                                 )}
                                 <Table.Td style={{ textAlign: 'center' }}>
                                   <Group justify="center">
-                                    <Menu shadow="md" width={210} position="bottom" withArrow>
+                                    <Menu shadow="md" width={210} position="bottom-end" withArrow>
                                       <Menu.Target>
                                         <ActionIcon variant="light" size="sm" aria-label="Ações do procedimento">
                                           <MoreVertical size={16} />

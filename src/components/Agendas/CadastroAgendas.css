@@ -1,0 +1,201 @@
+.cadastro-agendas-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.cadastro-agendas-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cadastro-agendas-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.cadastro-agendas-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.cadastro-agendas-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-agendas-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-agendas-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* --- Escala creation form --- */
+
+.cadastro-agenda-scale-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cadastro-agenda-form-intro {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--ui-border);
+  border-radius: .95rem;
+  background: var(--ui-surface);
+}
+
+.cadastro-agenda-form-kicker,
+.cadastro-agenda-draft-label {
+  color: var(--ui-primary);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+  line-height: 1.35;
+}
+
+.cadastro-agenda-form-title {
+  margin-top: .25rem;
+  color: var(--ui-foreground);
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  letter-spacing: -.03em;
+  line-height: 1.15;
+}
+
+.cadastro-agenda-form-section {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--ui-border);
+  border-radius: .95rem;
+  background: var(--ui-surface);
+}
+
+.cadastro-agenda-form-section-heading {
+  margin-bottom: 1.15rem;
+}
+
+.cadastro-agenda-form-section-title {
+  color: var(--ui-foreground);
+  font-size: 1.1rem;
+  letter-spacing: -.02em;
+}
+
+.cadastro-agenda-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.cadastro-agenda-recurrence-row {
+  max-width: 32rem;
+  gap: 1rem;
+}
+
+.cadastro-agenda-recurrence-row > *:first-child {
+  flex: 0 1 12rem;
+}
+
+.cadastro-agenda-recurrence-row > *:last-child {
+  flex: 0 1 14rem;
+}
+
+.cadastro-agenda-empty-blocks,
+.cadastro-agenda-summary {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface)) !important;
+}
+
+.cadastro-agenda-block-card,
+.cadastro-agenda-draft-card {
+  border-color: color-mix(in srgb, var(--ui-primary) 28%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-primary) 4%, var(--ui-surface)) !important;
+}
+
+.cadastro-agenda-draft-card {
+  border-style: dashed !important;
+}
+
+.cadastro-agenda-slot {
+  padding: 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: .75rem;
+  background: var(--ui-surface);
+}
+
+.cadastro-agenda-slot-heading {
+  padding-bottom: .65rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
+}
+
+.cadastro-agenda-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.cadastro-agenda-slot-grid > * {
+  min-width: 0;
+}
+
+.cadastro-agenda-new-block {
+  font-weight: 700;
+}
+
+.cadastro-agenda-day-picker .ui-button.is-selected {
+  box-shadow: 0 0 0 1px var(--ui-primary) inset;
+}
+
+.cadastro-agenda-form-error {
+  padding: .75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 35%, transparent);
+  border-radius: .6rem;
+  background: color-mix(in srgb, var(--ui-danger) 8%, var(--ui-surface));
+}
+
+.cadastro-agenda-form-actions {
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+@media (max-width: 1050px) {
+  .cadastro-agenda-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cadastro-agenda-slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 799px) {
+  .cadastro-agenda-form-intro,
+  .cadastro-agenda-form-section {
+    padding: 1rem;
+  }
+
+  .cadastro-agenda-form-intro .ui-button {
+    width: 100%;
+  }
+
+  .cadastro-agenda-filter-grid,
+  .cadastro-agenda-slot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cadastro-agenda-slot {
+    padding: .8rem;
+  }
+
+  .cadastro-agenda-form-actions .ui-button {
+    flex: 1 1 12rem;
+  }
+}

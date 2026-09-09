@@ -7,31 +7,32 @@ import {
   Button,
   Group,
   Modal,
+  MultiSelect,
+  NumberInput,
   Paper,
+  Select,
+  SimpleGrid,
   Skeleton,
   Stack,
   Table,
-  Tabs,
   Text,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+  TextInput,
+  Textarea,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { ChevronRight, Map as MapIcon, Pencil, Search, Trash2, UserPlus, Warehouse } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { MapaSalas } from './MapaSalas';
-import { DARK_BLUE } from '../../themes/theme';
 import sectorService from '../../services/sectorService';
 import { isRoomSector, markRoomDescription, stripRoomMarker } from '../../utils/sectorClassification';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import './CadastroSala.css';
 
 interface BranchOption {
   id: string;
@@ -44,8 +45,6 @@ interface SalaRow {
   description?: string | null;
   branchId: string;
   workingDays: string[];
-  workingHoursStart?: string | null;
-  workingHoursEnd?: string | null;
   modalidadeId?: string | null;
   especialidadeId?: string | null;
   especialidadeIds?: string[];
@@ -69,7 +68,7 @@ export function CadastroSala() {
   const isTablet = useMediaQuery('(max-width: 1279px)');
 
   const [query, setQuery] = useState('');
-  const [activeView, setActiveView] = useState<'cadastro' | 'mapa'>('cadastro');
+  const [activeView, setActiveView] = useState<'hub' | 'cadastro' | 'mapa'>('hub');
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [items, setItems] = useState<SalaRow[]>([]);
@@ -91,8 +90,6 @@ export function CadastroSala() {
     description: '',
     branchId: '',
     workingDays: [] as string[],
-    workingHoursStart: '',
-    workingHoursEnd: '',
     modalidadeId: '' as string,
     especialidadeIds: [] as string[],
     capacity: '' as string,
@@ -206,8 +203,6 @@ export function CadastroSala() {
         workingDays: Array.isArray(sector.workingDays)
           ? sector.workingDays.map((day: any) => String(day || '').trim()).filter(Boolean)
           : [],
-        workingHoursStart: sector.workingHoursStart || null,
-        workingHoursEnd: sector.workingHoursEnd || null,
         modalidadeId: sector.modalidadeId || null,
         especialidadeId: sector.especialidadeId || null,
         especialidadeIds: Array.isArray(sector.especialidadeIds) && sector.especialidadeIds.length > 0
@@ -227,8 +222,6 @@ export function CadastroSala() {
         description: item.description || '',
         branchId: item.branchId || selectedBranchId || '',
         workingDays: Array.isArray(item.workingDays) ? item.workingDays : [],
-        workingHoursStart: String(item.workingHoursStart || ''),
-        workingHoursEnd: String(item.workingHoursEnd || ''),
         modalidadeId: item.modalidadeId || '',
         especialidadeIds: item.especialidadeIds || (item.especialidadeId ? [item.especialidadeId] : []),
         capacity: item.capacity != null ? String(item.capacity) : '',
@@ -240,8 +233,6 @@ export function CadastroSala() {
         description: '',
         branchId: selectedBranchId || '',
         workingDays: [],
-        workingHoursStart: '',
-        workingHoursEnd: '',
         modalidadeId: '',
         especialidadeIds: [],
         capacity: '',
@@ -267,25 +258,6 @@ export function CadastroSala() {
 
     setSaving(true);
     try {
-      if ((form.workingHoursStart && !form.workingHoursEnd) || (!form.workingHoursStart && form.workingHoursEnd)) {
-        showNotification({
-          title: 'Erro',
-          message: 'Informe horário inicial e final do funcionamento da sala.',
-          color: 'red',
-        });
-        setSaving(false);
-        return;
-      }
-      if (form.workingHoursStart && form.workingHoursEnd && form.workingHoursEnd <= form.workingHoursStart) {
-        showNotification({
-          title: 'Erro',
-          message: 'O horário final deve ser maior que o horário inicial.',
-          color: 'red',
-        });
-        setSaving(false);
-        return;
-      }
-
       const trimmedCapacity = form.capacity.trim();
       if (trimmedCapacity && (!/^\d+$/.test(trimmedCapacity) || Number(trimmedCapacity) < 1)) {
         showNotification({ title: 'Erro', message: 'Capacidade de slots deve ser um número inteiro maior que zero', color: 'red' });
@@ -298,8 +270,6 @@ export function CadastroSala() {
         description: markRoomDescription(form.description || ''),
         branchId: form.branchId,
         workingDays: form.workingDays || [],
-        workingHoursStart: form.workingHoursStart || null,
-        workingHoursEnd: form.workingHoursEnd || null,
         modalidadeId: form.modalidadeId || null,
         especialidadeId: form.especialidadeIds[0] || null,
         especialidadeIds: form.especialidadeIds,
@@ -343,8 +313,6 @@ export function CadastroSala() {
         description: '',
         branchId: selectedBranchId || '',
         workingDays: [],
-        workingHoursStart: '',
-        workingHoursEnd: '',
         modalidadeId: '',
         especialidadeIds: [],
         capacity: '',
@@ -382,72 +350,94 @@ export function CadastroSala() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => (activeView === 'hub' ? navigate('/dashboard?secao=cadastros-clinicos') : setActiveView('hub')) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Salas
-              </Text>
-              <Text size="sm" c="dimmed">
-                Cadastro de salas por filial
-              </Text>
+        {activeView === 'hub' ? (
+          <>
+            <Box className="cadastro-sala-hero">
+              <Text className="cadastro-sala-eyebrow">CADASTROS CLÍNICOS</Text>
+              <Text className="cadastro-sala-title" fw={700} size="2xl">Salas</Text>
+              <Text className="cadastro-sala-subtitle" size="sm">Cadastro de salas por filial</Text>
             </Box>
-          </Group>
 
-          {activeView === 'cadastro' ? (
-            <Button
-              bg={DARK_BLUE}
-              c="white"
-              leftSection={<Plus size={16} />}
-              onClick={() => openModal()}
-              size={isMobile ? 'sm' : 'md'}
-              disabled={!selectedBranchId}
-            >
-              Nova sala
-            </Button>
-          ) : <div />}
-        </Group>
-
-        {activeView === 'cadastro' && (
-          <Group mb={isMobile ? 12 : 18} grow align="flex-end">
-            <FloatingSelect
-              label="Filial"
-              value={selectedBranchId}
-              onChange={setSelectedBranchId}
-              data={branches.map((branch) => ({ value: branch.id, label: branch.label }))}
-              disabled={loadingBranches}
-              searchable
-              nothingFoundMessage="Nenhuma filial encontrada"
-            />
-          </Group>
-        )}
-        <Tabs value={activeView} onChange={(value) => setActiveView((value as 'cadastro' | 'mapa') || 'cadastro')} keepMounted={false}>
-          <Tabs.List mb="md">
-            <Tabs.Tab value="cadastro">Cadastro de salas</Tabs.Tab>
-            <Tabs.Tab value="mapa">Mapa de salas</Tabs.Tab>
-          </Tabs.List>
-
-          <Tabs.Panel value="cadastro">
-            <Group mb={isMobile ? 16 : 24} grow align="flex-end">
-              <FloatingInput
-                label="Buscar sala"
-                placeholder="Buscar por nome ou descrição..."
-                value={query}
-                onChange={(e) => setQuery(e.currentTarget.value)}
-              />
+            <SimpleGrid className="cadastro-sala-hub-grid" cols={{ base: 1, sm: 2 }}>
+              {[
+                {
+                  key: 'cadastro',
+                  icon: Warehouse,
+                  title: 'Cadastro de salas',
+                  desc: 'Cadastre, edite e organize as salas de cada filial.',
+                  onClick: () => setActiveView('cadastro'),
+                },
+                {
+                  key: 'mapa',
+                  icon: MapIcon,
+                  title: 'Mapa de salas',
+                  desc: 'Acompanhe ocupação, disponibilidade e agenda das salas por dia ou semana.',
+                  onClick: () => setActiveView('mapa'),
+                },
+              ].map((card) => (
+                <Paper key={card.key} className="cadastro-sala-hub-card" withBorder onClick={card.onClick}>
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="cadastro-sala-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="cadastro-sala-hub-chevron" style={{ flexShrink: 0 }} />
+                  </Group>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
+        ) : activeView === 'mapa' ? (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Text fw={600} size="lg">Mapa de salas</Text>
+            </Group>
+            <MapaSalas embedded />
+          </>
+        ) : (
+          <>
+            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+              <Text fw={600} size="lg">Cadastro de salas</Text>
+            </Group>
+            <Paper className="cadastro-sala-panel" p="lg" withBorder radius="md">
+            <Group justify="flex-end" mb="lg" wrap="wrap" gap="sm">
+              <Group gap="sm" wrap="wrap" align="flex-end" className="cadastro-sala-actions">
+                <Select
+                  label="Filial"
+                  className="cadastro-sala-branch-select"
+                  value={selectedBranchId}
+                  onChange={setSelectedBranchId}
+                  data={branches.map((branch) => ({ value: branch.id, label: branch.label }))}
+                  disabled={loadingBranches}
+                  searchable
+                  nothingFoundMessage="Nenhuma filial encontrada"
+                />
+                <TextInput
+                  className="cadastro-sala-search"
+                  placeholder="Buscar por nome ou descrição"
+                  leftSection={<Search size={16} aria-hidden="true" />}
+                  value={query}
+                  onChange={(e) => setQuery(e.currentTarget.value)}
+                />
+                <Button leftSection={<UserPlus size={16} />} onClick={() => openModal()} disabled={!selectedBranchId}>
+                  Nova sala
+                </Button>
+              </Group>
             </Group>
 
             {loading ? (
               isMobile ? (
                 <Stack gap="sm">
                   {Array.from({ length: 4 }).map((_, idx) => (
-                    <Paper key={idx} withBorder radius="md" p="md">
+                    <Paper key={idx} className="cadastro-sala-card" withBorder radius="md" p="md">
                       <Group justify="space-between" align="flex-start" wrap="nowrap">
                         <Stack gap={8} style={{ flex: 1 }}>
                           <Skeleton height={18} width="52%" radius="sm" />
@@ -463,19 +453,19 @@ export function CadastroSala() {
                   ))}
                 </Stack>
               ) : (
-                <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <Box className="cadastro-sala-table-wrap">
                   <Table horizontalSpacing="md" verticalSpacing="md">
                     <Table.Thead>
                       <Table.Tr>
-                        <Table.Th>Nome da sala</Table.Th>
-                        <Table.Th>Descrição</Table.Th>
-                        <Table.Th>Filial</Table.Th>
-                        <Table.Th>Ações</Table.Th>
+                        <Table.Th className="cadastro-sala-th">Nome da sala</Table.Th>
+                        <Table.Th className="cadastro-sala-th">Descrição</Table.Th>
+                        <Table.Th className="cadastro-sala-th">Filial</Table.Th>
+                        <Table.Th className="cadastro-sala-th">Ações</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                       {Array.from({ length: 5 }).map((_, idx) => (
-                        <Table.Tr key={idx}>
+                        <Table.Tr key={idx} className="cadastro-sala-row">
                           <Table.Td><Skeleton height={16} width="58%" radius="sm" /></Table.Td>
                           <Table.Td><Skeleton height={14} width="70%" radius="sm" /></Table.Td>
                           <Table.Td><Skeleton height={14} width="62%" radius="sm" /></Table.Td>
@@ -495,7 +485,7 @@ export function CadastroSala() {
             ) : (
               isMobile ? (
                 filteredItems.length === 0 ? (
-                  <Paper withBorder radius="md" p="xl">
+                  <Paper className="cadastro-sala-empty" withBorder radius="md" p="xl">
                     <Text c="dimmed" ta="center">
                       Nenhuma sala encontrada para esta filial.
                     </Text>
@@ -503,7 +493,7 @@ export function CadastroSala() {
                 ) : (
                   <Stack gap="sm">
                     {filteredItems.map((item) => (
-                      <Paper key={item.id} withBorder radius="md" p="md">
+                      <Paper key={item.id} className="cadastro-sala-card" withBorder radius="md" p="md">
                         <Group justify="space-between" align="flex-start" wrap="nowrap">
                           <Stack gap={4} style={{ flex: 1 }}>
                             <Text fw={600}>{item.name}</Text>
@@ -534,19 +524,19 @@ export function CadastroSala() {
                   </Stack>
                 )
               ) : (
-                <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <Box className="cadastro-sala-table-wrap">
                   <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                     <Table.Thead>
                       <Table.Tr style={{ borderBottom: 'none' }}>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome da sala</Table.Th>
-                        {!isMobile && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>}
-                        {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Filial</Table.Th>}
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
+                        <Table.Th className="cadastro-sala-th">Nome da sala</Table.Th>
+                        {!isMobile && <Table.Th className="cadastro-sala-th">Descrição</Table.Th>}
+                        {!isTablet && <Table.Th className="cadastro-sala-th">Filial</Table.Th>}
+                        <Table.Th className="cadastro-sala-th">Ações</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                       {filteredItems.map((item) => (
-                        <Table.Tr key={item.id}>
+                        <Table.Tr key={item.id} className="cadastro-sala-row">
                           <Table.Td>
                             <Text fw={600}>{item.name}</Text>
                           </Table.Td>
@@ -574,7 +564,7 @@ export function CadastroSala() {
                       ))}
                       {filteredItems.length === 0 && (
                         <Table.Tr>
-                          <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
+                          <Table.Td colSpan={isTablet ? 3 : 4} style={{ textAlign: 'center' }}>
                             <Text c="dimmed" py="md">Nenhuma sala encontrada para esta filial.</Text>
                           </Table.Td>
                         </Table.Tr>
@@ -584,12 +574,9 @@ export function CadastroSala() {
                 </Box>
               )
             )}
-          </Tabs.Panel>
-
-          <Tabs.Panel value="mapa">
-            <MapaSalas embedded />
-          </Tabs.Panel>
-        </Tabs>
+            </Paper>
+          </>
+        )}
       </Box>
 
       <Modal
@@ -599,7 +586,7 @@ export function CadastroSala() {
         centered
       >
         <Stack>
-          <FloatingSelect
+          <Select
             label="Filial"
             value={form.branchId}
             onChange={(value) => setForm((prev) => ({ ...prev, branchId: value || '' }))}
@@ -608,7 +595,7 @@ export function CadastroSala() {
             nothingFoundMessage="Nenhuma filial encontrada"
             required
           />
-          <FloatingInput
+          <TextInput
             label="Nome da sala"
             placeholder="Ex.: Sala 01"
             value={form.name}
@@ -619,7 +606,7 @@ export function CadastroSala() {
             required
           />
           <Group grow>
-            <FloatingSelect
+            <Select
               label="Modalidade"
               placeholder="Selecione a modalidade"
               value={form.modalidadeId || null}
@@ -629,7 +616,7 @@ export function CadastroSala() {
               clearable
               nothingFoundMessage="Nenhuma modalidade encontrada"
             />
-            <FloatingMultiSelect
+            <MultiSelect
               label="Especialidade"
               placeholder={form.modalidadeId ? 'Selecione uma ou mais especialidades' : 'Selecione uma modalidade primeiro'}
               data={(form.modalidadeId ? especialidadesByModalidadeId.get(form.modalidadeId) || [] : []).map((especialidade: any) => ({
@@ -642,27 +629,16 @@ export function CadastroSala() {
               searchable
               clearable
               nothingFoundMessage="Nenhuma especialidade disponível"
-              styles={{
-                pillsList: {
-                  flexWrap: 'nowrap',
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
-                  scrollbarWidth: 'thin',
-                },
-                inputField: {
-                  minWidth: 88,
-                },
-              }}
             />
           </Group>
-          <FloatingInput
+          <NumberInput
             label="Capacidade de slots"
-            type="number"
             placeholder="Ex.: 1"
-            value={form.capacity}
-            onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, capacity: value })); }}
+            min={1}
+            value={form.capacity === '' ? '' : Number(form.capacity)}
+            onChange={(value) => setForm((prev) => ({ ...prev, capacity: value === '' ? '' : String(value) }))}
           />
-          <FloatingMultiSelect
+          <MultiSelect
             label="Dias de funcionamento"
             value={form.workingDays}
             onChange={(values) => setForm((prev) => ({ ...prev, workingDays: values }))}
@@ -671,21 +647,7 @@ export function CadastroSala() {
             clearable
             nothingFoundMessage="Nenhum dia encontrado"
           />
-          <Group grow>
-            <FloatingInput
-              label="Início do funcionamento"
-              type="time"
-              value={form.workingHoursStart}
-              onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, workingHoursStart: value })); }}
-            />
-            <FloatingInput
-              label="Fim do funcionamento"
-              type="time"
-              value={form.workingHoursEnd}
-              onChange={(e) => { const value = e.currentTarget.value; setForm((prev) => ({ ...prev, workingHoursEnd: value })); }}
-            />
-          </Group>
-          <FloatingTextarea
+          <Textarea
             label="Descrição"
             placeholder="Informações adicionais da sala"
             minRows={3}
@@ -695,7 +657,7 @@ export function CadastroSala() {
               setForm((prev) => ({ ...prev, description: value }));
             }}
           />
-          <Button bg={DARK_BLUE} c="white" onClick={handleSave} loading={saving}>
+          <Button onClick={handleSave} loading={saving}>
             {editingId ? 'Salvar alterações' : 'Cadastrar sala'}
           </Button>
         </Stack>

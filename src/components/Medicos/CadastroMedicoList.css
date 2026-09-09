@@ -1,0 +1,56 @@
+.cadastro-medico-list-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-medico-list-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.cadastro-medico-list-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .cadastro-medico-list-actions,
+  .cadastro-medico-list-actions .cadastro-medico-list-search,
+  .cadastro-medico-list-actions .ui-button {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+}
+
+.cadastro-medico-list-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.cadastro-medico-list-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-medico-list-th-actions {
+  text-align: center !important;
+}
+
+.cadastro-medico-list-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.cadastro-medico-list-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-medico-list-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

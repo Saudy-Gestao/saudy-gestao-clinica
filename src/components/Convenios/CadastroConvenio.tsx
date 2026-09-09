@@ -6,30 +6,28 @@ import {
   Group,
   Text,
   Button,
+  TextInput,
   Table,
   Modal,
   Stack,
   ActionIcon,
-  Switch,
   Badge,
   Paper,
   Skeleton,
   Menu,
   SimpleGrid,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { useComputedColorScheme } from '@mantine/core';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, MoreVertical, FilePlus, List } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { ChevronRight, Plus, Pencil, Trash2, MoreVertical, FilePlus, List, Search } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingTextarea } from '../common/FloatingTextarea';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import insuranceService from '../../services/insuranceService';
 import { useInsurancesAdminQuery } from '../../hooks/useInsurancesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import './CadastroConvenioHub.css';
+import './CadastroConvenioList.css';
 
 interface InsuranceRow {
   id: string;
@@ -52,7 +50,6 @@ export function CadastroConvenio() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
   const [activeTab, setActiveTab] = useState<'hub' | 'lista'>('hub');
 
   const [query, setQuery] = useState('');
@@ -60,28 +57,10 @@ export function CadastroConvenio() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InsuranceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const insurancesQuery = useInsurancesAdminQuery();
-
-  const [form, setForm] = useState({
-    name: '',
-    code: '',
-    description: '',
-    tissRegistroAns: '',
-    tissOperadoraCnpj: '',
-    tissVersao: '3.05.00',
-    tissPrestadorCnpj: '',
-    tissPrestadorCnes: '',
-    tissCodigoPrestadorOperadora: '',
-    isActive: true,
-    subInsurances: [] as string[],
-  });
-  const [subInsuranceInput, setSubInsuranceInput] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -160,77 +139,6 @@ export function CadastroConvenio() {
     setItems(mapped);
   }, [insurancesQuery.data]);
 
-  const handleSave = async () => {
-    if (!form.name.trim()) {
-      showNotification({ title: 'Erro', message: 'Nome do convenio e obrigatorio', color: 'red' });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      if (editingId) {
-        await insuranceService.updateInsurance(editingId, {
-          name: form.name.trim(),
-          code: form.code.trim() || undefined,
-          description: form.description.trim() || undefined,
-          tissRegistroAns: form.tissRegistroAns.trim() || undefined,
-          tissOperadoraCnpj: form.tissOperadoraCnpj.trim() || undefined,
-          tissVersao: form.tissVersao.trim() || undefined,
-          tissPrestadorCnpj: form.tissPrestadorCnpj.trim() || undefined,
-          tissPrestadorCnes: form.tissPrestadorCnes.trim() || undefined,
-          tissCodigoPrestadorOperadora: form.tissCodigoPrestadorOperadora.trim() || undefined,
-          isActive: form.isActive,
-          subInsurances: form.subInsurances,
-        });
-
-        await queryClient.invalidateQueries({ queryKey: queryKeys.insurancesAdmin });
-        showNotification({ title: 'Atualizado', message: 'Convenio atualizado', color: 'green' });
-      } else {
-        await insuranceService.createInsurance({
-          name: form.name.trim(),
-          code: form.code.trim() || undefined,
-          description: form.description.trim() || undefined,
-          tissRegistroAns: form.tissRegistroAns.trim() || undefined,
-          tissOperadoraCnpj: form.tissOperadoraCnpj.trim() || undefined,
-          tissVersao: form.tissVersao.trim() || undefined,
-          tissPrestadorCnpj: form.tissPrestadorCnpj.trim() || undefined,
-          tissPrestadorCnes: form.tissPrestadorCnes.trim() || undefined,
-          tissCodigoPrestadorOperadora: form.tissCodigoPrestadorOperadora.trim() || undefined,
-          isActive: form.isActive,
-          subInsurances: form.subInsurances,
-        });
-
-        await queryClient.invalidateQueries({ queryKey: queryKeys.insurancesAdmin });
-        showNotification({ title: 'Adicionado', message: 'Convenio cadastrado', color: 'green' });
-      }
-
-      setModalOpen(false);
-      setEditingId(null);
-      setForm({
-        name: '',
-        code: '',
-        description: '',
-        tissRegistroAns: '',
-        tissOperadoraCnpj: '',
-        tissVersao: '3.05.00',
-        tissPrestadorCnpj: '',
-        tissPrestadorCnes: '',
-        tissCodigoPrestadorOperadora: '',
-        isActive: true,
-        subInsurances: [],
-      });
-      setSubInsuranceInput('');
-    } catch (err: any) {
-      showNotification({
-        title: 'Erro',
-        message: resolveApiErrorMessage(err, 'Erro ao salvar convenio'),
-        color: 'red',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDeactivate = async (item: InsuranceRow) => {
     setDeleting(true);
     try {
@@ -250,127 +158,81 @@ export function CadastroConvenio() {
     }
   };
 
-  const handleNameChange = (value: string) => {
-    setForm((prev) => ({ ...prev, name: value }));
-  };
-
-  const handleCodeChange = (value: string) => {
-    setForm((prev) => ({ ...prev, code: value }));
-  };
-
-  const handleDescriptionChange = (value: string) => {
-    setForm((prev) => ({ ...prev, description: value }));
-  };
-
-  const handleActiveChange = (checked: boolean) => {
-    setForm((prev) => ({ ...prev, isActive: checked }));
-  };
-
-  const handleAddSubInsurance = () => {
-    const name = subInsuranceInput.trim();
-    if (!name) return;
-    setForm((prev) => (
-      prev.subInsurances.includes(name)
-        ? prev
-        : { ...prev, subInsurances: [...prev.subInsurances, name] }
-    ));
-    setSubInsuranceInput('');
-  };
-
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="cadastro-convenio-hub-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeTab === 'hub' ? navigate('/dashboard?secao=cadastros-clinicos') : setActiveTab('hub')) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => activeTab === 'hub' ? navigate(-1) : setActiveTab('hub')}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Convênios
-              </Text>
-              <Text size="sm" c="dimmed">
-                {activeTab === 'hub' ? 'Gestão de convênios' : 'Convênios cadastrados'}
-              </Text>
+        {activeTab === 'hub' ? (
+          <>
+            <Box className="cadastro-convenio-hub-hero">
+              <Text className="cadastro-convenio-hub-eyebrow">CADASTROS CLÍNICOS</Text>
+              <Text className="cadastro-convenio-hub-title" fw={700} size="2xl">Convênios</Text>
+              <Text className="cadastro-convenio-hub-subtitle" size="sm">Gestão de convênios</Text>
             </Box>
-          </Group>
 
-          {activeTab === 'lista' && (
-            <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => navigate('/convenios/novo')} size={isMobile ? 'sm' : 'md'}>
+            <SimpleGrid className="cadastro-convenio-hub-grid" cols={{ base: 1, sm: 2 }}>
+              {[
+                {
+                  key: 'novo',
+                  icon: FilePlus,
+                  title: 'Cadastrar convênio',
+                  desc: 'Registre um novo convênio com procedimentos aceitos, valores e prazos de autorização.',
+                  onClick: () => navigate('/convenios/novo'),
+                },
+                {
+                  key: 'lista',
+                  icon: List,
+                  title: 'Convênios cadastrados',
+                  desc: 'Consulte, edite e gerencie os convênios já cadastrados.',
+                  onClick: () => setActiveTab('lista'),
+                },
+              ].map((card) => (
+                <Paper
+                  key={card.key}
+                  className="cadastro-convenio-hub-card"
+                  withBorder
+                  onClick={card.onClick}
+                >
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="cadastro-convenio-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="cadastro-convenio-hub-chevron" style={{ flexShrink: 0 }} />
+                  </Group>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
+        ) : (
+          <Paper className="cadastro-convenio-list-panel" p="lg" withBorder radius="md">
+        <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
+          <Text fw={600} size="lg">Convênios cadastrados</Text>
+          <Group gap="sm" wrap={isMobile ? 'wrap' : 'nowrap'} align="center" className="cadastro-convenio-list-actions">
+            <TextInput
+              className="cadastro-convenio-list-search"
+              placeholder="Buscar por nome ou código"
+              value={query}
+              onChange={(e) => setQuery(e.currentTarget.value)}
+              leftSection={<Search size={16} aria-hidden="true" />}
+            />
+            <Button leftSection={<Plus size={16} />} onClick={() => navigate('/convenios/novo')}>
               Novo convênio
             </Button>
-          )}
+          </Group>
         </Group>
-
-        {activeTab === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-            {[
-              {
-                key: 'novo',
-                icon: FilePlus,
-                title: 'Cadastrar convênio',
-                desc: 'Registre um novo convênio com procedimentos aceitos, valores e prazos de autorização.',
-                onClick: () => navigate('/convenios/novo'),
-              },
-              {
-                key: 'lista',
-                icon: List,
-                title: 'Convênios cadastrados',
-                desc: 'Consulte, edite e gerencie os convênios já cadastrados.',
-                onClick: () => setActiveTab('lista'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
-                  </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
-        ) : (
-          <>
-        <Box mb={isMobile ? 20 : 30}>
-          <FloatingInput
-            label="Buscar convênios"
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            placeholder={isMobile ? 'Buscar...' : 'Buscar convênio por nome ou código...'}
-          />
-        </Box>
 
         {itemsLoading ? (
           isMobile ? (
             <Stack gap="sm">
               {Array.from({ length: 4 }).map((_, idx) => (
-                <Paper key={idx} withBorder radius="md" p="md">
+                <Paper key={idx} className="cadastro-convenio-list-card" withBorder radius="md" p="md">
                   <Group justify="space-between" align="flex-start" wrap="nowrap">
                     <Stack gap={8} style={{ flex: 1 }}>
                       <Skeleton height={18} width="56%" radius="sm" />
@@ -388,19 +250,19 @@ export function CadastroConvenio() {
               ))}
             </Stack>
           ) : (
-            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <Box className="cadastro-convenio-list-table-wrap">
               <Table horizontalSpacing="md" verticalSpacing="md">
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Nome</Table.Th>
-                    <Table.Th>Código</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Ações</Table.Th>
+                    <Table.Th className="cadastro-convenio-list-th">Nome</Table.Th>
+                    <Table.Th className="cadastro-convenio-list-th">Código</Table.Th>
+                    <Table.Th className="cadastro-convenio-list-th">Status</Table.Th>
+                    <Table.Th className="cadastro-convenio-list-th">Ações</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {Array.from({ length: 5 }).map((_, idx) => (
-                    <Table.Tr key={idx}>
+                    <Table.Tr key={idx} className="cadastro-convenio-list-row">
                       <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
                       <Table.Td><Skeleton height={14} width="45%" radius="sm" /></Table.Td>
                       <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
@@ -419,7 +281,7 @@ export function CadastroConvenio() {
         ) : (
           isMobile ? (
             filtered.length === 0 ? (
-              <Paper withBorder radius="md" p="xl">
+              <Paper className="cadastro-convenio-list-empty" withBorder radius="md" p="xl">
                 <Text size="sm" c="dimmed" ta="center">
                   Nenhum convênio encontrado. Ajuste a busca ou cadastre um novo convênio.
                 </Text>
@@ -427,7 +289,7 @@ export function CadastroConvenio() {
             ) : (
               <Stack gap="sm">
                 {filtered.map((it) => (
-                  <Paper key={it.id} withBorder radius="md" p="md">
+                  <Paper key={it.id} className="cadastro-convenio-list-card" withBorder radius="md" p="md">
                     <Group justify="space-between" align="flex-start" wrap="nowrap">
                       <Stack gap={4} style={{ flex: 1 }}>
                         <Text fw={600} size="sm">{it.name}</Text>
@@ -473,10 +335,10 @@ export function CadastroConvenio() {
               <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                 <Table.Thead>
                   <Table.Tr style={{ borderBottom: 'none' }}>
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Código</Table.Th>}
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
+                    <Table.Th className="cadastro-convenio-list-th">Nome</Table.Th>
+                    {!isTablet && <Table.Th className="cadastro-convenio-list-th">Código</Table.Th>}
+                    {!isTablet && <Table.Th className="cadastro-convenio-list-th">Status</Table.Th>}
+                    <Table.Th className="cadastro-convenio-list-th cadastro-convenio-list-th-actions" style={{ width: 96 }}>
                       Ações
                     </Table.Th>
                   </Table.Tr>
@@ -492,7 +354,7 @@ export function CadastroConvenio() {
                     </Table.Tr>
                   ) : (
                     paginatedItems.map((it) => (
-                      <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                      <Table.Tr key={it.id} className="cadastro-convenio-list-row">
                         <Table.Td>
                           <Stack gap={2}>
                             <Text fw={600} size="sm">{it.name}</Text>
@@ -503,7 +365,7 @@ export function CadastroConvenio() {
                         </Table.Td>
                         {!isTablet && (
                           <Table.Td>
-                            <Text size="sm" c={it.code ? 'var(--mantine-color-text)' : 'dimmed'}>
+                            <Text size="sm" c={it.code ? undefined : 'dimmed'}>
                               {it.code || 'Sem código'}
                             </Text>
                           </Table.Td>
@@ -517,7 +379,7 @@ export function CadastroConvenio() {
                         )}
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
-                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                            <Menu shadow="md" width={210} position="bottom-end" withArrow>
                               <Menu.Target>
                                 <ActionIcon variant="light" size="sm" aria-label="Ações do convênio">
                                   <MoreVertical size={16} />
@@ -549,174 +411,9 @@ export function CadastroConvenio() {
             </PaginatedGrid>
           )
         )}
-          </>
+          </Paper>
         )}
       </Box>
-
-      <Modal
-        opened={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editingId ? 'Editar convenio' : 'Cadastrar convenio'}
-        size={isMobile ? '100%' : 520}
-        centered={false}
-        fullScreen={isMobile}
-        styles={{
-          content: { left: 48, bottom: 96, top: 'auto', transform: 'none', width: isMobile ? '100%' : 520 },
-          body: { overflowY: 'auto' },
-        }}
-      >
-        <Stack gap={10}>
-          <Box style={{ padding: 8 }}>
-            <FloatingInput
-              label="Nome do convênio"
-              required
-              placeholder="Ex: Unimed"
-              value={form.name}
-              onChange={(e) => handleNameChange(e?.currentTarget?.value ?? '')}
-            />
-
-            <Box mt="sm">
-              <FloatingInput
-                label="Código"
-                placeholder="Opcional"
-                value={form.code}
-                onChange={(e) => handleCodeChange(e?.currentTarget?.value ?? '')}
-              />
-            </Box>
-
-            <FloatingTextarea
-              mt="sm"
-              label="Descrição"
-              placeholder="Detalhes do convenio"
-              minRows={3}
-              value={form.description}
-              onChange={(e) => handleDescriptionChange(e?.currentTarget?.value ?? '')}
-            />
-
-            <Text fw={600} size="sm" mt="md">Configuração TISS</Text>
-            <Text size="xs" c="dimmed" mb="xs">
-              Esses dados são usados na geração do XML TISS.
-            </Text>
-
-            <FloatingInput
-              label="Registro ANS da operadora"
-              placeholder="Ex: 123456"
-              value={form.tissRegistroAns}
-              onChange={(e) => {
-                const value = e?.currentTarget?.value ?? '';
-                setForm((prev) => ({ ...prev, tissRegistroAns: value }));
-              }}
-            />
-
-            <Box mt="sm">
-              <FloatingInput
-                label="CNPJ da operadora"
-                placeholder="Somente números"
-                value={form.tissOperadoraCnpj}
-                onChange={(e) => {
-                  const value = e?.currentTarget?.value ?? '';
-                  setForm((prev) => ({ ...prev, tissOperadoraCnpj: value }));
-                }}
-              />
-            </Box>
-
-            <Box mt="sm">
-              <FloatingInput
-                label="Versão TISS"
-                placeholder="Ex: 3.05.00"
-                value={form.tissVersao}
-                onChange={(e) => {
-                  const value = e?.currentTarget?.value ?? '';
-                  setForm((prev) => ({ ...prev, tissVersao: value }));
-                }}
-              />
-            </Box>
-
-            <Box mt="sm">
-              <FloatingInput
-                label="CNPJ do prestador executante"
-                placeholder="Somente números"
-                value={form.tissPrestadorCnpj}
-                onChange={(e) => {
-                  const value = e?.currentTarget?.value ?? '';
-                  setForm((prev) => ({ ...prev, tissPrestadorCnpj: value }));
-                }}
-              />
-            </Box>
-
-            <Box mt="sm">
-              <FloatingInput
-                label="CNES do prestador executante"
-                placeholder="Ex: 1234567"
-                value={form.tissPrestadorCnes}
-                onChange={(e) => {
-                  const value = e?.currentTarget?.value ?? '';
-                  setForm((prev) => ({ ...prev, tissPrestadorCnes: value }));
-                }}
-              />
-            </Box>
-
-            <Box mt="sm">
-              <FloatingInput
-                label="Código do prestador na operadora"
-                placeholder="Código contratado"
-                value={form.tissCodigoPrestadorOperadora}
-                onChange={(e) => {
-                  const value = e?.currentTarget?.value ?? '';
-                  setForm((prev) => ({ ...prev, tissCodigoPrestadorOperadora: value }));
-                }}
-              />
-            </Box>
-
-            <Switch
-              mt="sm"
-              label="Convenio ativo"
-              checked={form.isActive}
-              onChange={(e) => handleActiveChange(e?.currentTarget?.checked ?? !form.isActive)}
-            />
-
-            <Box mt="sm">
-              <FloatingInput
-                label="Subconvênio"
-                placeholder="Digite e pressione Enter"
-                value={subInsuranceInput}
-                onChange={(e) => {
-                  const value = e?.currentTarget?.value ?? '';
-                  setSubInsuranceInput(value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddSubInsurance();
-                  }
-                }}
-              />
-            </Box>
-            <Group mt={6} gap="xs">
-              {form.subInsurances.map((sub) => (
-                <Button
-                  key={sub}
-                  size="compact-xs"
-                  variant="light"
-                  color="blue"
-                  onClick={() => setForm((prev) => ({ ...prev, subInsurances: prev.subInsurances.filter((item) => item !== sub) }))}
-                >
-                  {sub} ×
-                </Button>
-              ))}
-            </Group>
-
-            <Group justify="flex-end" mt={16}>
-              <Button variant="default" onClick={() => setModalOpen(false)} size="sm">
-                Cancelar
-              </Button>
-              <Button bg={DARK_BLUE} onClick={handleSave} size="sm" loading={saving} disabled={saving}>
-                {editingId ? 'Atualizar' : 'Cadastrar'}
-              </Button>
-            </Group>
-          </Box>
-        </Stack>
-      </Modal>
 
       <Modal
         opened={deleteModalOpen}

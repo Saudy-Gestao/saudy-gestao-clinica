@@ -7,22 +7,24 @@ import {
   Button,
   Checkbox,
   Group,
+  Menu,
   Modal,
   Paper,
+  Select,
   Skeleton,
   SimpleGrid,
   Stack,
   Switch,
   Table,
   Text,
-  Menu,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardCheck, Pencil, Plus, Power, Trash2, MoreVertical } from 'lucide-react';
+  TextInput,
+  Textarea,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { ClipboardCheck, MoreVertical, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import procedureNursingTemplateService, {
   type NursingQuestionPayload,
   type ProcedureNursingTemplateItem,
@@ -31,10 +33,8 @@ import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useNursingTemplatesQuery } from '../../hooks/useNursingTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import './CadastroEnfermagem.css';
 
 type QuestionForm = NursingQuestionPayload & {
   id: string;
@@ -381,34 +381,31 @@ export function CadastroEnfermagem() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Enfermagem</Text>
-              <Text size="sm" c="dimmed">Triagens e preparos por procedimento para exames.</Text>
-            </Box>
-          </Group>
-          <Button bg={DARK_BLUE} leftSection={<Plus size={16} />} onClick={openCreate}>
-            Nova triagem
-          </Button>
-        </Group>
+        <Box className="cadastro-enfermagem-hero">
+          <Text className="cadastro-enfermagem-eyebrow">CADASTROS CLÍNICOS</Text>
+          <Text className="cadastro-enfermagem-title" fw={700} size="2xl">Cadastro de Enfermagem</Text>
+          <Text className="cadastro-enfermagem-subtitle" size="sm">Triagens e preparos por procedimento para exames.</Text>
+        </Box>
 
-        <Paper withBorder radius="lg" p="md" mb="lg">
-          <FloatingInput
-            label="Buscar triagens"
-            placeholder="Buscar por procedimento, nome da triagem ou pergunta..."
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-          />
+        <Paper className="cadastro-enfermagem-panel" withBorder radius="lg" p="lg" mb="lg">
+          <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+            <TextInput
+              label="Buscar triagens"
+              placeholder="Buscar por procedimento, nome da triagem ou pergunta..."
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              style={{ flex: '1 1 260px', maxWidth: isMobile ? '100%' : 420 }}
+            />
+            <Button leftSection={<Plus size={16} />} onClick={openCreate} fullWidth={isMobile}>
+              Nova triagem
+            </Button>
+          </Group>
         </Paper>
 
-        <Paper withBorder radius="lg" p="md">
+        <Paper className="cadastro-enfermagem-panel" withBorder radius="lg" p="lg">
           {loading ? (
             <Stack gap="md">
               <Skeleton height={20} width="28%" radius="xl" />
@@ -481,7 +478,7 @@ export function CadastroEnfermagem() {
                             </Table.Td>
                             <Table.Td style={{ textAlign: 'center' }}>
                               <Group justify="center">
-                                <Menu shadow="md" width={210} position="bottom" withArrow>
+                                <Menu shadow="md" width={210} position="bottom-end" withArrow>
                                   <Menu.Target>
                                     <ActionIcon variant="light" size="sm" aria-label="Ações da triagem">
                                       <MoreVertical size={16} />
@@ -577,23 +574,20 @@ export function CadastroEnfermagem() {
         title={editingId ? 'Editar triagem' : 'Nova triagem'}
         size="xl"
         centered
-        styles={{ body: { paddingTop: 28 } }}
       >
         <Stack gap="lg">
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-            <FloatingSelect
+            <Select
               label="Procedimento"
               placeholder="Selecione"
               data={procedures}
               searchable
-              alwaysFloatLabel
               value={form.procedureId}
               onChange={(value) => setForm((prev) => ({ ...prev, procedureId: value || '' }))}
             />
-            <FloatingInput
+            <TextInput
               label="Nome da triagem"
               placeholder="Ex.: Triagem de contraste"
-              alwaysFloatLabel
               value={form.name}
               onChange={(event) => {
                 const value = event.currentTarget.value;
@@ -602,7 +596,7 @@ export function CadastroEnfermagem() {
             />
           </SimpleGrid>
 
-          <FloatingTextarea
+          <Textarea
             label="Descrição"
             placeholder="Instruções gerais e contexto da triagem"
             minRows={2}
@@ -613,22 +607,29 @@ export function CadastroEnfermagem() {
             }}
           />
 
+          <Box p="md" className="ui-toggle-card">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Box>
+                <Text fw={600} size="sm">Triagem ativa</Text>
+                <Text size="xs" c="dimmed">Triagens inativas deixam de ficar disponíveis para novos atendimentos.</Text>
+              </Box>
+              <Switch
+                label={form.isActive ? 'Ativa' : 'Inativa'}
+                checked={form.isActive}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setForm((prev) => ({ ...prev, isActive: checked }));
+                }}
+              />
+            </Group>
+          </Box>
+
           <Paper withBorder radius="md" p="md">
             <Stack gap="sm">
-              <Group justify="space-between" align="center">
-                <Box>
-                  <Text fw={600}>Campos clínicos padrão</Text>
-                  <Text size="sm" c="dimmed">Ative os sinais vitais e checagens que devem aparecer sempre nessa triagem.</Text>
-                </Box>
-                <Switch
-                  label="Template ativo"
-                  checked={form.isActive}
-                  onChange={(event) => {
-                    const checked = event.currentTarget.checked;
-                    setForm((prev) => ({ ...prev, isActive: checked }));
-                  }}
-                />
-              </Group>
+              <Box>
+                <Text fw={600}>Campos clínicos padrão</Text>
+                <Text size="sm" c="dimmed">Ative os sinais vitais e checagens que devem aparecer sempre nessa triagem.</Text>
+              </Box>
               <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs">
                 {STANDARD_FIELDS.map((field) => (
                   <Checkbox
@@ -672,7 +673,7 @@ export function CadastroEnfermagem() {
                   </Group>
 
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    <FloatingInput
+                    <TextInput
                       label="Pergunta"
                       placeholder="Ex.: Vai realizar contraste?"
                       value={question.label}
@@ -681,7 +682,7 @@ export function CadastroEnfermagem() {
                         updateQuestion(question.id, { label: value });
                       }}
                     />
-                    <FloatingSelect
+                    <Select
                       label="Tipo de resposta"
                       data={RESPONSE_TYPE_OPTIONS}
                       value={question.responseType}
@@ -690,7 +691,7 @@ export function CadastroEnfermagem() {
                   </SimpleGrid>
 
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    <FloatingInput
+                    <TextInput
                       label="Ajuda"
                       placeholder="Texto complementar"
                       value={question.helpText || ''}
@@ -699,7 +700,7 @@ export function CadastroEnfermagem() {
                         updateQuestion(question.id, { helpText: value });
                       }}
                     />
-                    <FloatingInput
+                    <TextInput
                       label="Placeholder"
                       placeholder="Ex.: Informe o medicamento"
                       value={question.placeholder || ''}
@@ -720,7 +721,7 @@ export function CadastroEnfermagem() {
                   />
 
                   {shouldShowOptions(question.responseType) && (
-                    <FloatingTextarea
+                    <Textarea
                       label="Opções"
                       placeholder="Uma opção por linha"
                       minRows={3}
@@ -743,7 +744,7 @@ export function CadastroEnfermagem() {
             }}>
               Cancelar
             </Button>
-            <Button bg={DARK_BLUE} leftSection={<ClipboardCheck size={16} />} onClick={handleSave} loading={saving}>
+            <Button leftSection={<ClipboardCheck size={16} />} onClick={handleSave} loading={saving}>
               {editingId ? 'Salvar alterações' : 'Cadastrar triagem'}
             </Button>
           </Group>

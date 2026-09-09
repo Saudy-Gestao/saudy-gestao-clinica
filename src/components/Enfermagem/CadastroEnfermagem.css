@@ -1,0 +1,27 @@
+.cadastro-enfermagem-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.cadastro-enfermagem-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cadastro-enfermagem-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.cadastro-enfermagem-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.cadastro-enfermagem-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}

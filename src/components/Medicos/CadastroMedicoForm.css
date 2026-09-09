@@ -1,0 +1,56 @@
+.cadastro-medico-form-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-medico-form-section-title {
+  color: var(--ui-foreground) !important;
+}
+
+.cadastro-medico-form-subbox {
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+  padding: .85rem;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}
+
+.cadastro-medico-form-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.cadastro-medico-form-pick-item {
+  cursor: pointer;
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-medico-form-pick-item-selected {
+  border-color: var(--ui-primary) !important;
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+}
+
+.cadastro-medico-form-duration-box {
+  border: 1px solid var(--ui-border);
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}
+
+.cadastro-medico-form-duration-box-invalid {
+  border-color: var(--ui-hue-red);
+}
+
+.cadastro-medico-form-duration-input {
+  color: var(--ui-foreground);
+}
+
+.cadastro-medico-form-signature-preview {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}
+
+.cadastro-medico-form-shift-card {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

@@ -6,32 +6,30 @@ import {
   Box,
   Button,
   Group,
+  Menu,
   Modal,
+  MultiSelect,
+  NumberInput,
   Paper,
+  Select,
   Skeleton,
   SimpleGrid,
   Stack,
   Switch,
   Table,
   Text,
+  TextInput,
+  Textarea,
   Title,
   Tooltip,
-  Menu,
-  useComputedColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ChevronRight, CircleHelp, Pencil, Power, ScanLine, UserPlus, Wrench, MoreVertical } from 'lucide-react';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { ChevronRight, CircleHelp, MoreVertical, Pencil, Power, ScanLine, UserPlus, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
 import ResultModal from '../common/ResultModal';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
-import { FloatingNumberInput } from '../common/FloatingNumberInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
-import { DARK_BLUE } from '../../themes/theme';
 import medicalEquipmentService, { type MedicalEquipmentItem } from '../../services/medicalEquipmentService';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { useMedicalEquipmentsQuery } from '../../hooks/useMedicalEquipmentsQuery';
@@ -40,6 +38,7 @@ import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import './CadastroEquipamento.css';
 
 interface EquipmentForm {
   name: string;
@@ -146,7 +145,7 @@ const integrationTypeOptions = [
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
+    <Title order={5} fw={600} mb="sm" mt="md">
       {children}
     </Title>
   );
@@ -219,7 +218,6 @@ export function CadastroEquipamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [form, setForm] = useState<EquipmentForm>(INITIAL_FORM);
   const [items, setItems] = useState<MedicalEquipmentItem[]>([]);
@@ -280,20 +278,6 @@ export function CadastroEquipamento() {
   const procedureOptions = useMemo(() => {
     return procedures.map((procedure) => ({ value: procedure.value, label: procedure.label }));
   }, [procedures]);
-
-  const procedureLabelById = useMemo(() => {
-    return procedures.reduce<Record<string, string>>((acc, procedure) => {
-      acc[procedure.value] = procedure.label;
-      return acc;
-    }, {});
-  }, [procedures]);
-
-  const branchLabelById = useMemo(() => {
-    return branches.reduce<Record<string, string>>((acc, branch) => {
-      acc[branch.value] = branch.label;
-      return acc;
-    }, {});
-  }, [branches]);
 
   useEffect(() => {
     setLoading(equipmentsQuery.isLoading && items.length === 0);
@@ -484,92 +468,58 @@ export function CadastroEquipamento() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-      <Box p={isMobile ? 'sm' : 'md'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Cadastro de Equipamentos
-              </Text>
-              <Text size="sm" c="dimmed">
-                Equipamentos de exame com dados operacionais, modalidade e integração DICOM.
-              </Text>
-            </Box>
-          </Group>
-        </Group>
-
+      <Header back={{ label: 'Voltar', onClick: () => (activeTab === 'hub' ? navigate('/dashboard?secao=cadastros-clinicos') : setActiveTab('hub')) }} />
+      <Box p={isMobile ? 'sm' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeTab === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-            {[
-              {
-                key: 'cadastro',
-                icon: UserPlus,
-                title: 'Cadastrar equipamento',
-                desc: 'Cadastre equipamentos de exame com localização, modalidade e parâmetros de integração DICOM.',
-                onClick: () => setActiveTab('cadastro'),
-              },
-              {
-                key: 'lista',
-                icon: Wrench,
-                title: 'Equipamentos cadastrados',
-                desc: 'Consulte, edite, teste comunicação e ative/desative equipamentos já cadastrados.',
-                onClick: () => setActiveTab('lista'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
+          <>
+            <Box className="cadastro-equipamento-hero">
+              <Text className="cadastro-equipamento-eyebrow">CADASTROS CLÍNICOS</Text>
+              <Text className="cadastro-equipamento-title" fw={700} size="2xl">Equipamentos</Text>
+              <Text className="cadastro-equipamento-subtitle" size="sm">Equipamentos de exame com dados operacionais, modalidade e integração DICOM.</Text>
+            </Box>
+
+            <SimpleGrid className="cadastro-equipamento-hub-grid" cols={{ base: 1, sm: 2 }}>
+              {[
+                {
+                  key: 'cadastro',
+                  icon: UserPlus,
+                  title: 'Cadastrar equipamento',
+                  desc: 'Cadastre equipamentos de exame com localização, modalidade e parâmetros de integração DICOM.',
+                  onClick: () => setActiveTab('cadastro'),
+                },
+                {
+                  key: 'lista',
+                  icon: Wrench,
+                  title: 'Equipamentos cadastrados',
+                  desc: 'Consulte, edite, teste comunicação e ative/desative equipamentos já cadastrados.',
+                  onClick: () => setActiveTab('lista'),
+                },
+              ].map((card) => (
+                <Paper key={card.key} className="cadastro-equipamento-hub-card" withBorder onClick={card.onClick}>
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="cadastro-equipamento-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="cadastro-equipamento-hub-chevron" style={{ flexShrink: 0 }} />
                   </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveTab('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>
-                  {activeTab === 'cadastro' ? 'Cadastrar equipamento' : 'Equipamentos cadastrados'}
-                </Text>
-              </Group>
+              <Text fw={600} size="lg">
+                {activeTab === 'cadastro' ? 'Cadastrar equipamento' : 'Equipamentos cadastrados'}
+              </Text>
             </Group>
-            <Paper withBorder p="lg" radius="md" style={{ borderColor: isDarkMode ? '#2c3553' : 'rgba(13, 49, 120, 0.08)' }}>
+            <Paper className="cadastro-equipamento-panel" withBorder p="lg" radius="md">
               {activeTab === 'cadastro' ? (
               <>
               <SectionTitle>Dados do Equipamento</SectionTitle>
@@ -577,7 +527,7 @@ export function CadastroEquipamento() {
                 Cadastro operacional do aparelho, localização e vínculo com os exames realizados.
               </Text>
               <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="md">
-                <FloatingInput
+                <TextInput
                   label="Nome do Equipamento"
                   placeholder="Ex.: Tomógrafo Philips 128"
                   value={form.name}
@@ -586,7 +536,7 @@ export function CadastroEquipamento() {
                     setForm((prev) => ({ ...prev, name: value }));
                   }}
                 />
-                <FloatingInput
+                <TextInput
                   label="Fabricante"
                   placeholder="Ex.: Philips"
                   value={form.manufacturer}
@@ -595,7 +545,7 @@ export function CadastroEquipamento() {
                     setForm((prev) => ({ ...prev, manufacturer: value }));
                   }}
                 />
-                <FloatingInput
+                <TextInput
                   label="Modelo"
                   placeholder="Ex.: Ingenuity CT"
                   value={form.model}
@@ -604,14 +554,14 @@ export function CadastroEquipamento() {
                     setForm((prev) => ({ ...prev, model: value }));
                   }}
                 />
-                <FloatingSelect
+                <Select
                   label="Modalidade"
                   data={modalityOptions}
                   searchable
                   value={form.modality}
                   onChange={(value) => setForm((prev) => ({ ...prev, modality: value || '' }))}
                 />
-                <FloatingInput
+                <TextInput
                   label="Número de Série"
                   placeholder="Ex.: SN-2026-001"
                   value={form.serialNumber}
@@ -620,7 +570,7 @@ export function CadastroEquipamento() {
                     setForm((prev) => ({ ...prev, serialNumber: value }));
                   }}
                 />
-                <FloatingInput
+                <TextInput
                   label="Código Patrimonial"
                   placeholder="Ex.: TOM-001"
                   value={form.patrimonyCode}
@@ -629,33 +579,41 @@ export function CadastroEquipamento() {
                     setForm((prev) => ({ ...prev, patrimonyCode: value }));
                   }}
                 />
-                <FloatingSelect
+                <Select
                   label="Status Operacional"
                   data={statusOptions}
                   value={form.status}
                   onChange={(value) => setForm((prev) => ({ ...prev, status: value || 'Ativo' }))}
                 />
-                <Switch
-                  mt={30}
-                  label="Equipamento ativo"
-                  checked={form.isActive}
-                  onChange={(event) => {
-                    const checked = event.currentTarget.checked;
-                    setForm((prev) => ({ ...prev, isActive: checked }));
-                  }}
-                />
               </SimpleGrid>
+
+              <Box mt="md" p="md" className="ui-toggle-card">
+                <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                  <Box>
+                    <Text fw={600} size="sm">Equipamento ativo</Text>
+                    <Text size="xs" c="dimmed">Equipamentos inativos deixam de ficar disponíveis para agendamento.</Text>
+                  </Box>
+                  <Switch
+                    label={form.isActive ? 'Ativo' : 'Inativo'}
+                    checked={form.isActive}
+                    onChange={(event) => {
+                      const checked = event.currentTarget.checked;
+                      setForm((prev) => ({ ...prev, isActive: checked }));
+                    }}
+                  />
+                </Group>
+              </Box>
 
               <SectionTitle>Localização e Fluxo</SectionTitle>
               <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="md">
-                <FloatingSelect
+                <Select
                   label="Filial"
                   data={branches}
                   searchable
                   value={form.branchId}
                   onChange={(value) => setForm((prev) => ({ ...prev, branchId: value || '', roomId: value === prev.branchId ? prev.roomId : '' }))}
                 />
-                <FloatingSelect
+                <Select
                   label="Sala"
                   placeholder={form.branchId ? 'Selecione' : 'Escolha a filial antes'}
                   data={roomOptions}
@@ -664,7 +622,7 @@ export function CadastroEquipamento() {
                   value={form.roomId}
                   onChange={(value) => setForm((prev) => ({ ...prev, roomId: value || '' }))}
                 />
-                <FloatingMultiSelect
+                <MultiSelect
                   label="Procedimentos Relacionados"
                   searchable
                   data={procedureOptions}
@@ -678,13 +636,13 @@ export function CadastroEquipamento() {
                 Dados técnicos do bridge e da comunicação DICOM usados para conectar o equipamento ao ecossistema.
               </Text>
               <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="md">
-                <FloatingSelect
+                <Select
                   label={<FieldLabel label="Tipo de Integração" help="Define como o equipamento se conecta: via bridge MWL, integração DICOM direta ou operação manual sem comunicação automática." />}
                   data={integrationTypeOptions}
                   value={form.integrationType}
                   onChange={(value) => setForm((prev) => ({ ...prev, integrationType: value || 'MWL_BRIDGE' }))}
                 />
-                <FloatingInput
+                <TextInput
                   label={<FieldLabel label="Identificador do Bridge" help="Nome interno do conector/bridge que atende este equipamento. Ajuda a identificar qual serviço faz a mediação da comunicação." />}
                   placeholder="Ex.: bridge-tc-01"
                   value={form.bridgeIdentifier}
@@ -694,7 +652,7 @@ export function CadastroEquipamento() {
                   }}
                 />
                 {form.integrationType !== 'MANUAL' && (
-                  <FloatingInput
+                  <TextInput
                     label={<FieldLabel label="AE Title Local" help="Nome DICOM do próprio equipamento na rede. Funciona como o identificador lógico do aparelho na comunicação DICOM." />}
                     placeholder="Ex.: CT_SAUDY_01"
                     value={form.aeTitle}
@@ -704,7 +662,7 @@ export function CadastroEquipamento() {
                     }}
                   />
                 )}
-                <FloatingInput
+                <TextInput
                   label={<FieldLabel label="Station Name" help="Nome lógico da estação ou console do equipamento. Normalmente representa a sala ou posição de aquisição." />}
                   placeholder="Ex.: Sala TC 01"
                   value={form.stationName}
@@ -721,8 +679,8 @@ export function CadastroEquipamento() {
                   <Text c="dimmed" size="sm" mb="sm">
                     Destino usado para consulta da worklist. Pode ser o mesmo IP do Store, mas fica cadastrado separadamente.
                   </Text>
-                  <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="md">
-                    <FloatingInput
+                  <SimpleGrid cols={{ base: 1, md: 2, xl: 3 }} spacing="md">
+                    <TextInput
                       label={<FieldLabel label="AE Title Remoto MWL" help="Nome DICOM do destino usado para worklist. Normalmente é o AE do bridge ou do servidor MWL." />}
                       placeholder="Ex.: SAUDY_MWL"
                       value={form.mwlRemoteAeTitle}
@@ -731,7 +689,7 @@ export function CadastroEquipamento() {
                         setForm((prev) => ({ ...prev, mwlRemoteAeTitle: value }));
                       }}
                     />
-                    <FloatingInput
+                    <TextInput
                       label={<FieldLabel label="Host MWL" help="IP ou hostname do serviço que responde pela worklist. Mesmo que seja a mesma máquina do Orthanc, o cadastro é específico para MWL." />}
                       placeholder="Ex.: 10.0.0.25"
                       value={form.mwlHost}
@@ -740,23 +698,30 @@ export function CadastroEquipamento() {
                         setForm((prev) => ({ ...prev, mwlHost: value }));
                       }}
                     />
-                    <FloatingNumberInput
+                    <NumberInput
                       label={<FieldLabel label="Porta MWL" help="Porta TCP usada para worklist. Mesmo com o mesmo IP do Store, a porta normalmente muda." />}
                       min={1}
                       max={65535}
                       value={form.mwlPort ?? undefined}
                       onChange={(value) => setForm((prev) => ({ ...prev, mwlPort: typeof value === 'number' ? value : null }))}
                     />
-                    <Switch
-                      mt={30}
-                      label={<FieldLabel label="Habilita Worklist" help="Indica que o equipamento consulta a worklist para buscar exames agendados antes da aquisição." />}
-                      checked={form.supportsWorklist}
-                      onChange={(event) => {
-                        const checked = event.currentTarget.checked;
-                        setForm((prev) => ({ ...prev, supportsWorklist: checked }));
-                      }}
-                    />
                   </SimpleGrid>
+                  <Box mt="md" p="md" className="ui-toggle-card">
+                    <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                      <Box>
+                        <Text fw={600} size="sm">Habilita Worklist</Text>
+                        <Text size="xs" c="dimmed">O equipamento consulta a worklist para buscar exames agendados antes da aquisição.</Text>
+                      </Box>
+                      <Switch
+                        label={form.supportsWorklist ? 'Ativo' : 'Inativo'}
+                        checked={form.supportsWorklist}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setForm((prev) => ({ ...prev, supportsWorklist: checked }));
+                        }}
+                      />
+                    </Group>
+                  </Box>
                 </>
               )}
 
@@ -766,8 +731,8 @@ export function CadastroEquipamento() {
                   <Text c="dimmed" size="sm" mb="sm">
                     Destino que recebe as imagens DICOM enviadas pelo equipamento, como Orthanc ou PACS.
                   </Text>
-                  <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="md">
-                    <FloatingInput
+                  <SimpleGrid cols={{ base: 1, md: 2, xl: 3 }} spacing="md">
+                    <TextInput
                       label={<FieldLabel label="AE Title Remoto Store" help="Nome DICOM do destino que recebe as imagens enviadas pelo equipamento." />}
                       placeholder="Ex.: SAUDY_STORE"
                       value={form.storeRemoteAeTitle}
@@ -776,7 +741,7 @@ export function CadastroEquipamento() {
                         setForm((prev) => ({ ...prev, storeRemoteAeTitle: value }));
                       }}
                     />
-                    <FloatingInput
+                    <TextInput
                       label={<FieldLabel label="Host Store" help="IP ou hostname do destino que recebe os DICOMs. Pode ser o mesmo IP do MWL, cadastrado separadamente." />}
                       placeholder="Ex.: 10.0.0.25"
                       value={form.storeHost}
@@ -785,31 +750,47 @@ export function CadastroEquipamento() {
                         setForm((prev) => ({ ...prev, storeHost: value }));
                       }}
                     />
-                    <FloatingNumberInput
+                    <NumberInput
                       label={<FieldLabel label="Porta Store" help="Porta TCP usada para envio das imagens DICOM ao destino configurado." />}
                       min={1}
                       max={65535}
                       value={form.storePort ?? undefined}
                       onChange={(value) => setForm((prev) => ({ ...prev, storePort: typeof value === 'number' ? value : null }))}
                     />
-                    <Switch
-                      mt={30}
-                      label={<FieldLabel label="Habilita Store" help="Indica que o equipamento envia imagens DICOM automaticamente para o destino configurado, como PACS, Orthanc ou bridge." />}
-                      checked={form.supportsStore}
-                      onChange={(event) => {
-                        const checked = event.currentTarget.checked;
-                        setForm((prev) => ({ ...prev, supportsStore: checked }));
-                      }}
-                    />
-                    <Switch
-                      mt={30}
-                      label={<FieldLabel label="Habilita Print" help="Indica uso de impressão DICOM. Só faz sentido em cenários onde o equipamento precisa enviar jobs de impressão." />}
-                      checked={form.supportsPrint}
-                      onChange={(event) => {
-                        const checked = event.currentTarget.checked;
-                        setForm((prev) => ({ ...prev, supportsPrint: checked }));
-                      }}
-                    />
+                  </SimpleGrid>
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="md">
+                    <Box p="md" className="ui-toggle-card">
+                      <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                        <Box>
+                          <Text fw={600} size="sm">Habilita Store</Text>
+                          <Text size="xs" c="dimmed">O equipamento envia imagens DICOM automaticamente ao destino configurado (PACS, Orthanc ou bridge).</Text>
+                        </Box>
+                        <Switch
+                          label={form.supportsStore ? 'Ativo' : 'Inativo'}
+                          checked={form.supportsStore}
+                          onChange={(event) => {
+                            const checked = event.currentTarget.checked;
+                            setForm((prev) => ({ ...prev, supportsStore: checked }));
+                          }}
+                        />
+                      </Group>
+                    </Box>
+                    <Box p="md" className="ui-toggle-card ui-toggle-card--dashed">
+                      <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                        <Box>
+                          <Text fw={600} size="sm">Habilita Print</Text>
+                          <Text size="xs" c="dimmed">Uso de impressão DICOM — só relevante quando o equipamento envia jobs de impressão.</Text>
+                        </Box>
+                        <Switch
+                          label={form.supportsPrint ? 'Ativo' : 'Inativo'}
+                          checked={form.supportsPrint}
+                          onChange={(event) => {
+                            const checked = event.currentTarget.checked;
+                            setForm((prev) => ({ ...prev, supportsPrint: checked }));
+                          }}
+                        />
+                      </Group>
+                    </Box>
                   </SimpleGrid>
                 </>
               )}
@@ -818,7 +799,7 @@ export function CadastroEquipamento() {
                 <>
                   <SectionTitle>Acesso Web</SectionTitle>
                   <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="md">
-                    <FloatingInput
+                    <TextInput
                       label={<FieldLabel label="DICOMweb / WADO URL" help="Endpoint HTTP usado quando a integração direta consome DICOMweb/WADO para acesso ou consulta às imagens." />}
                       placeholder="Ex.: https://pacs.exemplo.com/dicom-web"
                       value={form.dicomWebPath}
@@ -844,7 +825,7 @@ export function CadastroEquipamento() {
               )}
 
               <SectionTitle>Observações</SectionTitle>
-              <FloatingTextarea
+              <Textarea
                 label="Notas técnicas"
                 minRows={4}
                 placeholder="Informações úteis sobre integração, manutenção, protocolos, etc."
@@ -863,7 +844,7 @@ export function CadastroEquipamento() {
                   <Button variant="default" onClick={() => setActiveTab('lista')}>
                     Ver lista
                   </Button>
-                  <Button bg={DARK_BLUE} c="white" loading={saving} onClick={handleSubmit}>
+                  <Button loading={saving} onClick={handleSubmit}>
                     {editingId ? 'Salvar alterações' : 'Cadastrar equipamento'}
                   </Button>
                 </Group>
@@ -871,15 +852,15 @@ export function CadastroEquipamento() {
               </>
               ) : (
               <>
-              <Group justify="space-between" align="end" mb="md">
-                <FloatingInput
+              <Group justify="space-between" align="end" wrap="wrap" gap="sm" mb="md">
+                <TextInput
                   label="Buscar equipamentos"
                   value={query}
                   onChange={(event) => setQuery(event.currentTarget.value)}
                   placeholder="Nome, modelo, modalidade, AE Title..."
-                  containerProps={{ style: { flex: 1, maxWidth: 420 } }}
+                  style={{ flex: '1 1 220px', maxWidth: isMobile ? '100%' : 420 }}
                 />
-                <Button leftSection={<ScanLine size={18} />} onClick={() => setActiveTab('cadastro')}>
+                <Button leftSection={<ScanLine size={18} />} onClick={() => setActiveTab('cadastro')} fullWidth={isMobile}>
                   Novo equipamento
                 </Button>
               </Group>
@@ -953,21 +934,21 @@ export function CadastroEquipamento() {
                           </Text>
                           <Group gap={6}>
                             <Badge variant="light">{item.modality || 'N/A'}</Badge>
-                            <Badge variant="outline" color="gray">
-                              {branchLabelById[item.branchId || ''] || 'Sem filial'}
-                            </Badge>
                             <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
                               {item.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                            <Badge color={communicationBadgeColor(item.lastTestStatus)} variant="light">
+                              {communicationBadgeLabel(item.lastTestStatus)}
                             </Badge>
                           </Group>
                           <Text size="xs" c="dimmed">
                             {rooms.find((room) => room.value === item.roomId)?.label || 'Sem sala'}
                           </Text>
-                          <Text size="xs" c="dimmed" lineClamp={2}>
-                            {item.lastTestMessage || (item.procedureIds?.length
-                              ? item.procedureIds.map((id) => procedureLabelById[id] || id).join(', ')
-                              : 'Nenhum procedimento vinculado')}
-                          </Text>
+                          {(item.lastTestStatus === 'WARNING' || item.lastTestStatus === 'ERROR') && item.lastTestMessage && (
+                            <Text size="xs" c="dimmed" lineClamp={2}>
+                              {item.lastTestMessage}
+                            </Text>
+                          )}
                           <Group gap="xs">
                             <ActionIcon variant="light" color="blue" onClick={() => openEdit(item)}>
                               <Pencil size={16} />
@@ -1008,94 +989,81 @@ export function CadastroEquipamento() {
                         <Table.Thead>
                           <Table.Tr>
                             <Table.Th>Equipamento</Table.Th>
-                            <Table.Th>Local / Modalidade</Table.Th>
+                            <Table.Th>Local</Table.Th>
                             <Table.Th>Integração</Table.Th>
                             <Table.Th>Situação</Table.Th>
                             <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
-                          {paginatedItems.map((item) => (
-                            <Table.Tr key={item.id}>
-                              <Table.Td>
-                                <Stack gap={10}>
-                                  <Text fw={600}>{item.name}</Text>
-                                  <Text size="sm" c="dimmed">
-                                    {[item.manufacturer, item.model].filter(Boolean).join(' • ') || 'Sem fabricante/modelo'}
-                                  </Text>
-                                  {(item.serialNumber || item.patrimonyCode) && (
-                                    <Text size="xs" c="dimmed">
-                                      {[item.serialNumber && `S/N ${item.serialNumber}`, item.patrimonyCode && `Patrimônio ${item.patrimonyCode}`]
-                                        .filter(Boolean)
-                                        .join(' • ')}
+                          {paginatedItems.map((item) => {
+                            const technicalDetailLines = [
+                              item.bridgeIdentifier && `Bridge: ${item.bridgeIdentifier}`,
+                              item.aeTitle && `AE Title: ${item.aeTitle}`,
+                              item.mwlRemoteAeTitle && item.mwlHost && item.mwlPort
+                                ? `MWL: ${item.mwlRemoteAeTitle} • ${item.mwlHost}:${item.mwlPort}`
+                                : '',
+                              item.storeRemoteAeTitle && item.storeHost && item.storePort
+                                ? `Store: ${item.storeRemoteAeTitle} • ${item.storeHost}:${item.storePort}`
+                                : '',
+                              item.dicomWebPath && `DICOMweb: ${item.dicomWebPath}`,
+                            ].filter(Boolean) as string[];
+                            const technicalDetails = technicalDetailLines.length ? (
+                              <>
+                                {technicalDetailLines.map((line, index) => (
+                                  <span key={index}>{line}{index < technicalDetailLines.length - 1 && <br />}</span>
+                                ))}
+                              </>
+                            ) : 'Sem configuração técnica adicional.';
+
+                            const testTooltip = item.lastTestedAt ? (
+                              <>
+                                {item.lastTestMessage || 'Teste executado.'}
+                                <br />
+                                Último teste: {new Date(item.lastTestedAt).toLocaleString('pt-BR')}
+                              </>
+                            ) : 'Nenhum teste de comunicação realizado ainda.';
+
+                            return (
+                              <Table.Tr key={item.id}>
+                                <Table.Td>
+                                  <Stack gap={4}>
+                                    <Text fw={600}>{item.name}</Text>
+                                    <Text size="sm" c="dimmed">
+                                      {[item.manufacturer, item.model].filter(Boolean).join(' • ') || 'Sem fabricante/modelo'}
                                     </Text>
-                                  )}
-                                </Stack>
-                              </Table.Td>
-                              <Table.Td>
-                                <Stack gap={8}>
-                                  <Group gap={6}>
+                                  </Stack>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Stack gap={4}>
                                     <Badge variant="light">{item.modality || 'N/A'}</Badge>
-                                    <Badge variant="outline" color="gray">
-                                      {branchLabelById[item.branchId || ''] || 'Sem filial'}
-                                    </Badge>
-                                  </Group>
-                                  <Text size="xs" c="dimmed">
-                                    {rooms.find((room) => room.value === item.roomId)?.label || 'Sem sala'}
-                                  </Text>
-                                </Stack>
-                              </Table.Td>
-                              <Table.Td>
-                                <Stack gap={8}>
-                                  <Group gap={6}>
-                                    <Badge color="blue" variant="light">
+                                    <Text size="xs" c="dimmed">
+                                      {rooms.find((room) => room.value === item.roomId)?.label || 'Sem sala'}
+                                    </Text>
+                                  </Stack>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Tooltip label={technicalDetails} multiline maw={280} withArrow>
+                                    <Badge color="blue" variant="light" style={{ cursor: 'help' }}>
                                       {integrationTypeLabel[item.integrationType || ''] || item.integrationType || 'Integração'}
                                     </Badge>
-                                    {item.bridgeIdentifier && (
-                                      <Badge variant="outline" color="blue">
-                                        {item.bridgeIdentifier}
-                                      </Badge>
-                                    )}
-                                  </Group>
-                                  <Text size="sm">{item.aeTitle || 'Sem AE local'}</Text>
-                                  <Text size="xs" c="dimmed" lineClamp={2}>
-                                    {[
-                                      item.mwlRemoteAeTitle && `MWL ${item.mwlRemoteAeTitle}`,
-                                      item.mwlHost && item.mwlPort ? `${item.mwlHost}:${item.mwlPort}` : '',
-                                      item.storeRemoteAeTitle && `STORE ${item.storeRemoteAeTitle}`,
-                                      item.storeHost && item.storePort ? `${item.storeHost}:${item.storePort}` : '',
-                                    ].filter(Boolean).join(' • ') || item.dicomWebPath || 'Sem configuração técnica'}
-                                  </Text>
-                                </Stack>
-                              </Table.Td>
-                              <Table.Td>
-                                <Stack gap={8}>
+                                  </Tooltip>
+                                </Table.Td>
+                                <Table.Td>
                                   <Group gap={6}>
                                     <Badge color={item.isActive ? 'green' : 'gray'} variant="light">
                                       {item.isActive ? 'Ativo' : 'Inativo'}
                                     </Badge>
-                                    <Badge color={communicationBadgeColor(item.lastTestStatus)} variant="light">
-                                      {communicationBadgeLabel(item.lastTestStatus)}
-                                    </Badge>
-                                    <Badge variant="outline" color="gray">
-                                      {item.procedureIds?.length || 0} proc.
-                                    </Badge>
+                                    <Tooltip label={testTooltip} multiline maw={280} withArrow>
+                                      <Badge color={communicationBadgeColor(item.lastTestStatus)} variant="light" style={{ cursor: 'help' }}>
+                                        {communicationBadgeLabel(item.lastTestStatus)}
+                                      </Badge>
+                                    </Tooltip>
                                   </Group>
-                                  <Text size="xs" c="dimmed" lineClamp={2}>
-                                    {item.lastTestMessage || (item.procedureIds?.length
-                                      ? item.procedureIds.map((id) => procedureLabelById[id] || id).join(', ')
-                                      : 'Nenhum procedimento vinculado')}
-                                  </Text>
-                                  {item.lastTestedAt && (
-                                    <Text size="xs" c="dimmed">
-                                      {new Date(item.lastTestedAt).toLocaleString('pt-BR')}
-                                    </Text>
-                                  )}
-                                </Stack>
-                              </Table.Td>
+                                </Table.Td>
                               <Table.Td style={{ verticalAlign: 'top', textAlign: 'center' }}>
                                 <Group justify="center">
-                                  <Menu shadow="md" width={230} position="bottom" withArrow>
+                                  <Menu shadow="md" width={230} position="bottom-end" withArrow>
                                     <Menu.Target>
                                       <ActionIcon variant="light" size="sm" aria-label="Ações do equipamento">
                                         <MoreVertical size={16} />
@@ -1125,7 +1093,8 @@ export function CadastroEquipamento() {
                                 </Group>
                               </Table.Td>
                             </Table.Tr>
-                          ))}
+                            );
+                          })}
                         </Table.Tbody>
                       </Table>
                     </Box>
