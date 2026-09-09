@@ -12,8 +12,8 @@ import {
   Textarea,
   ThemeIcon,
   Title,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+} from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { BookOpen, Check, RefreshCw, Trash2, X } from 'lucide-react';
 import { Header } from '../Header/Header';
 import aiHelpService, { type KnowledgeSuggestion } from '../../services/aiHelpService';
@@ -120,14 +120,14 @@ function SuggestionCard({
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }} mb={4}>Contexto do código</Text>
             <Box
               style={{
-                background: 'var(--mantine-color-dark-8)',
+                background: '#0d1220',
                 borderRadius: 8,
                 padding: '10px 14px',
                 maxHeight: 200,
                 overflow: 'auto',
               }}
             >
-              <Text size="xs" c="gray.4" ff="monospace" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              <Text size="xs" c="#a6adbb" ff="monospace" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                 {item.codeContext}
               </Text>
             </Box>

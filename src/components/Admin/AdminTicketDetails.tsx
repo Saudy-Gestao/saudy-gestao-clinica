@@ -15,13 +15,13 @@ import {
   Textarea,
   ThemeIcon,
   Title,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+} from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { ArrowLeft, LifeBuoy, Paperclip, Send, X } from 'lucide-react';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import ticketService, { type TicketItem, type TicketType, type TicketStatus, type TicketMessageItem, type TicketPriority } from '../../services/ticketService';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
+import './AdminTicketDetails.css';
 
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'OPEN', label: 'Aberto' },
@@ -121,10 +121,6 @@ const formatBytes = (size?: number | null) => {
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 };
-
-const adaptiveSubtleSurface = 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6))';
-const adaptiveNestedSurface = 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5))';
-const adaptiveTimelineLine = 'light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-3))';
 
 const AdminTicketDetailsSkeleton = () => (
   <Stack gap="md">
@@ -261,11 +257,11 @@ export function AdminTicketDetails() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1280} mx="auto">
         <Stack gap="lg">
-          <Paper p="xl" radius="lg" style={{ background: `linear-gradient(135deg, ${DARK_BLUE} 0%, #16357f 100%)`, color: 'white' }}>
+          <Paper p="xl" radius="lg" className="admin-ticket-details-hero">
             <Group justify="space-between" align="flex-start">
               <Stack gap="sm">
                 <Group gap="sm">
@@ -284,7 +280,7 @@ export function AdminTicketDetails() {
             <AdminTicketDetailsSkeleton />
           ) : !ticket ? null : (
             <>
-              <Paper withBorder radius="md" p="sm" style={{ background: adaptiveSubtleSurface }}>
+              <Paper withBorder radius="md" p="sm" className="admin-ticket-details-subtle-surface">
                 <Group justify="space-between" align="flex-start" gap="sm">
                   <Stack gap={4}>
                     <Group gap={6}>
@@ -331,12 +327,12 @@ export function AdminTicketDetails() {
                         if (showDateDivider) lastDateKey = dateKey;
                         const roleColor = message.authorRole === 'ADMIN' ? 'indigo' : message.authorRole === 'USER' ? 'blue' : 'gray';
                         const roleLabel = message.authorRole === 'ADMIN' ? 'Atualização da Equipe Interna' : message.authorRole === 'USER' ? 'Interação do Solicitante' : 'Registro de Sistema';
-                        const roleDot = message.authorRole === 'ADMIN' ? 'var(--mantine-color-indigo-6)' : message.authorRole === 'USER' ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-gray-6)';
+                        const roleDot = message.authorRole === 'ADMIN' ? 'var(--ui-hue-indigo)' : message.authorRole === 'USER' ? 'var(--ui-hue-blue)' : 'var(--ui-muted)';
                         return (
                           <Stack key={message.id} gap={8}>
                             {showDateDivider ? <Group justify="center" py={4}><Badge variant="filled" color="gray">{formatDayLabel(message.createdAt)}</Badge></Group> : null}
                             <Box style={{ position: 'relative', paddingLeft: 24 }}>
-                              {index < messages.length - 1 ? <Box style={{ position: 'absolute', left: 7, top: 18, bottom: -14, borderLeft: `1px solid ${adaptiveTimelineLine}` }} /> : null}
+                              {index < messages.length - 1 ? <Box className="admin-ticket-details-timeline-line" style={{ position: 'absolute', left: 7, top: 18, bottom: -14 }} /> : null}
                               <Box style={{ position: 'absolute', left: 2, top: 10, width: 10, height: 10, borderRadius: '50%', background: roleDot }} />
                               <Paper withBorder p="md" radius="md">
                                 <Group justify="space-between" align="flex-start" mb={6}>
@@ -350,7 +346,7 @@ export function AdminTicketDetails() {
                                 <Divider my={8} />
                                 <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{message.message}</Text>
                                 {message.attachmentName || message.attachmentObjectName ? (
-                                  <Paper withBorder p="xs" radius="sm" mt="sm" style={{ background: adaptiveNestedSurface }}>
+                                  <Paper withBorder p="xs" radius="sm" mt="sm" className="admin-ticket-details-nested-surface">
                                     <Group justify="space-between" wrap="nowrap">
                                       <Stack gap={0}>
                                         <Text size="xs" fw={600} lineClamp={1}>{message.attachmentName || 'Anexo'}</Text>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ActionIcon,
   Badge,
   Box,
   Button,
@@ -13,13 +12,14 @@ import {
   Table,
   Text,
   TextInput,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, MessageCircleMore, Search } from 'lucide-react';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { MessageCircleMore, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 import { type TicketPriority, type TicketStatus, type TicketType } from '../../services/ticketService';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import './MyTicketsPage.css';
 
 const statusOptions: Array<{ value: TicketStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'Todos os status' },
@@ -142,49 +142,39 @@ export function MyTicketsPage() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=gestao-e-apoio') }} />
       <Box p={isMobile ? 'sm' : 'md'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Stack gap="xl">
-          <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Group align="center">
-              <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-                <ChevronLeft size={28} />
-              </ActionIcon>
-              <Box>
-                <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                  Meus Chamados
-                </Text>
-                <Text size="sm" c="dimmed">
-                  Acompanhe os tickets que você abriu e os status da análise interna.
-                </Text>
-              </Box>
-            </Group>
-          </Group>
+          <Box className="my-tickets-hero">
+            <Text className="my-tickets-eyebrow">GESTÃO E APOIO</Text>
+            <Text className="my-tickets-title" fw={700} size="2xl">Meus Chamados</Text>
+            <Text className="my-tickets-subtitle" size="sm">Acompanhe os tickets que você abriu e os status da análise interna.</Text>
+          </Box>
 
           <Paper p="lg" withBorder radius="lg">
-            <Group align="flex-end" gap="md">
+            <Group align="flex-end" gap="md" wrap="wrap">
               <TextInput
                 label="Buscar"
                 placeholder="Descrição, fluxo ou módulo"
                 leftSection={<Search size={16} />}
                 value={search}
                 onChange={(event) => setSearch(event.currentTarget.value)}
-                style={{ flex: 1 }}
+                style={{ flex: '1 1 220px' }}
               />
               <Select
                 label="Status"
                 data={statusOptions}
                 value={statusFilter}
                 onChange={(value) => setStatusFilter((value as TicketStatus | 'ALL' | null) || 'ALL')}
-                w={220}
+                style={{ flex: '1 1 180px' }}
               />
               <Select
                 label="Tipo"
                 data={typeOptions}
                 value={typeFilter}
                 onChange={(value) => setTypeFilter((value as TicketType | 'ALL' | null) || 'ALL')}
-                w={180}
+                style={{ flex: '1 1 160px' }}
               />
             </Group>
           </Paper>

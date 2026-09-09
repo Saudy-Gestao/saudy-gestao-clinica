@@ -1,0 +1,21 @@
+.ticket-details-hero {
+  background: linear-gradient(135deg, var(--ui-primary) 0%, #16357f 100%) !important;
+  color: #fff;
+}
+
+.ticket-details-subtle-surface {
+  background: color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface)) !important;
+}
+
+.ticket-details-nested-surface {
+  background: color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface)) !important;
+}
+
+.ticket-details-timeline-line {
+  border-left: 1px solid var(--ui-border);
+}
+
+.ticket-details-warning-surface {
+  background: color-mix(in srgb, var(--ui-hue-yellow) 12%, var(--ui-surface)) !important;
+  border-color: color-mix(in srgb, var(--ui-hue-yellow) 45%, var(--ui-border)) !important;
+}

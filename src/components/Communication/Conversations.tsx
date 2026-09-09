@@ -26,14 +26,13 @@ import {
   Textarea,
   ThemeIcon,
   Tooltip,
-  useMantineColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
+  useColorScheme,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import {
   Check,
   CheckCheck,
-  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Clipboard,
@@ -259,8 +258,8 @@ const bubbleStyles = (message: HumanConversationMessage, colorScheme: 'light' | 
   if (message.authorType === 'PATIENT') {
     return {
       alignSelf: 'flex-start',
-      background: colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
-      borderColor: colorScheme === 'dark' ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)',
+      background: 'color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface))',
+      borderColor: 'var(--ui-border)',
     };
   }
 
@@ -291,7 +290,7 @@ export function Conversations() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const queryClient = useQueryClient();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -998,20 +997,15 @@ export function Conversations() {
 
   return (
     <Box style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=comunicacao') }} />
       <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <Stack gap="md" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <Group justify="space-between" align="center" wrap="wrap">
-              <Group align="center" gap="sm">
-                <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-                  <ChevronLeft size={28} />
-                </ActionIcon>
-                <Box>
-                  <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Conversas</Text>
-                  <Text c="dimmed" size="sm">Fila humanizada do WhatsApp com protocolo, histórico, eventos e acompanhamento em tempo real.</Text>
-                </Box>
-              </Group>
+              <Box>
+                <Text fw={600} size={isMobile ? 'md' : 'lg'}>Conversas</Text>
+                <Text c="dimmed" size="sm">Fila humanizada do WhatsApp com protocolo, histórico, eventos e acompanhamento em tempo real.</Text>
+              </Box>
               <Group gap="xs">
                 {isCurrentOperatorActive ? (
                   <Button variant="light" leftSection={<FileText size={16} />} onClick={() => setTemplatesModalOpen(true)}>
@@ -1113,7 +1107,7 @@ export function Conversations() {
                       padding="md"
                       style={{
                         cursor: 'pointer',
-                        borderColor: selectedConversation?.id === item.id ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-default-border)',
+                        borderColor: selectedConversation?.id === item.id ? 'var(--ui-primary)' : 'var(--ui-border)',
                         background: selectedConversation?.id === item.id
                           ? (colorScheme === 'dark' ? 'rgba(34, 139, 230, 0.09)' : 'rgba(34, 139, 230, 0.05)')
                           : undefined,
@@ -1302,7 +1296,7 @@ export function Conversations() {
                             ...styles,
                             maxWidth: isEventMessage(message) ? '70%' : '82%',
                             ...(isMatch && messageSearch ? {
-                              boxShadow: '0 0 0 2px var(--mantine-color-blue-5)',
+                              boxShadow: '0 0 0 2px var(--ui-primary)',
                               transition: 'box-shadow 0.3s ease',
                             } : {}),
                           }}
@@ -1314,13 +1308,13 @@ export function Conversations() {
                           {message.authorType === 'OPERATOR' && messageState ? (
                             <Group justify="flex-end" gap={4} mt={8}>
                               {messageState === 'SENT' ? (
-                                <Check size={14} color="var(--mantine-color-gray-5)" />
+                                <Check size={14} color="var(--ui-muted)" />
                               ) : null}
                               {messageState === 'DELIVERED' ? (
-                                <CheckCheck size={14} color="var(--mantine-color-gray-5)" />
+                                <CheckCheck size={14} color="var(--ui-muted)" />
                               ) : null}
                               {messageState === 'READ' ? (
-                                <CheckCheck size={14} color="var(--mantine-color-blue-5)" />
+                                <CheckCheck size={14} color="var(--ui-primary)" />
                               ) : null}
                             </Group>
                           ) : null}
@@ -1498,7 +1492,7 @@ export function Conversations() {
 
                         {/* Shortcut editing inline */}
                         {editingShortcutTemplateId === template.id && (
-                          <Paper withBorder radius="sm" p="sm" style={{ background: colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-grape-0)' }}>
+                          <Paper withBorder radius="sm" p="sm" style={{ background: 'color-mix(in srgb, var(--ui-hue-grape) 12%, var(--ui-surface))' }}>
                             <Stack gap="xs">
                               <Text size="xs" c="dimmed">
                                 Digite o atalho desejado no campo abaixo, ou pressione a combinação de teclas diretamente.
@@ -1554,7 +1548,7 @@ export function Conversations() {
                           radius="md"
                           p="sm"
                           style={{
-                            background: colorScheme === 'dark' ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
+                            background: 'color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface))',
                             maxHeight: 180,
                             overflow: 'auto',
                           }}
@@ -2001,7 +1995,7 @@ export function Conversations() {
                       p="sm"
                       style={{
                         ...(isMatch ? {
-                          boxShadow: '0 0 0 2px var(--mantine-color-blue-5)',
+                          boxShadow: '0 0 0 2px var(--ui-primary)',
                           transition: 'box-shadow 0.3s ease',
                         } : {}),
                       }}
