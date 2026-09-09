@@ -1,0 +1,27 @@
+.cadastro-anamnese-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.cadastro-anamnese-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cadastro-anamnese-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.cadastro-anamnese-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.cadastro-anamnese-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}

@@ -1,0 +1,59 @@
+.convenio-form-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.convenio-form-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.convenio-form-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.convenio-form-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.convenio-form-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.convenio-form-section-title {
+  color: var(--ui-foreground) !important;
+}
+
+.convenio-form-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.convenio-form-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.convenio-form-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.convenio-form-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.convenio-form-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

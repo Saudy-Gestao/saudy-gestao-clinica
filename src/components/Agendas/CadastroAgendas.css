@@ -1,26 +1,61 @@
-.cadastro-agendas-page {
-  --agenda-surface: color-mix(in srgb, var(--mantine-color-body) 94%, var(--mantine-color-white));
-  --agenda-surface-strong: color-mix(in srgb, var(--mantine-primary-color-6) 7%, var(--mantine-color-body));
-  --agenda-border: var(--mantine-color-default-border);
-  background:
-    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--mantine-primary-color-6) 10%, transparent), transparent 28rem),
-    var(--mantine-color-body);
+.cadastro-agendas-hero {
+  padding: 1.25rem 0 1.5rem;
 }
 
+.cadastro-agendas-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cadastro-agendas-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.cadastro-agendas-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.cadastro-agendas-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-agendas-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-agendas-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* --- Escala creation form --- */
+
 .cadastro-agenda-scale-form {
-  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .cadastro-agenda-form-intro {
-  padding: 1.35rem 1.5rem;
-  border: 1px solid var(--agenda-border);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--ui-border);
   border-radius: .95rem;
-  background: var(--agenda-surface-strong);
+  background: var(--ui-surface);
 }
 
 .cadastro-agenda-form-kicker,
 .cadastro-agenda-draft-label {
-  color: var(--mantine-primary-color-6);
+  color: var(--ui-primary);
   font-size: .7rem;
   font-weight: 800;
   letter-spacing: .13em;
@@ -29,18 +64,17 @@
 
 .cadastro-agenda-form-title {
   margin-top: .25rem;
-  color: var(--mantine-color-text);
+  color: var(--ui-foreground);
   font-size: clamp(1.35rem, 2vw, 1.8rem);
-  letter-spacing: -.04em;
+  letter-spacing: -.03em;
   line-height: 1.15;
 }
 
 .cadastro-agenda-form-section {
-  margin-top: 1rem;
   padding: 1.25rem 1.5rem;
-  border: 1px solid var(--agenda-border);
+  border: 1px solid var(--ui-border);
   border-radius: .95rem;
-  background: var(--agenda-surface);
+  background: var(--ui-surface);
 }
 
 .cadastro-agenda-form-section-heading {
@@ -48,9 +82,9 @@
 }
 
 .cadastro-agenda-form-section-title {
-  color: var(--mantine-color-text);
+  color: var(--ui-foreground);
   font-size: 1.1rem;
-  letter-spacing: -.025em;
+  letter-spacing: -.02em;
 }
 
 .cadastro-agenda-filter-grid {
@@ -62,6 +96,7 @@
 
 .cadastro-agenda-recurrence-row {
   max-width: 32rem;
+  gap: 1rem;
 }
 
 .cadastro-agenda-recurrence-row > *:first-child {
@@ -74,33 +109,30 @@
 
 .cadastro-agenda-empty-blocks,
 .cadastro-agenda-summary {
-  background: var(--agenda-surface-strong);
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface)) !important;
 }
 
 .cadastro-agenda-block-card,
 .cadastro-agenda-draft-card {
-  border-color: color-mix(in srgb, var(--mantine-primary-color-6) 28%, var(--agenda-border));
-  background: var(--agenda-surface-strong);
+  border-color: color-mix(in srgb, var(--ui-primary) 28%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-primary) 4%, var(--ui-surface)) !important;
 }
 
 .cadastro-agenda-draft-card {
-  border-style: dashed;
-}
-
-.cadastro-agenda-day-picker .mantine-Button-root {
-  min-height: 2.35rem;
+  border-style: dashed !important;
 }
 
 .cadastro-agenda-slot {
   padding: 1rem;
-  border: 1px solid var(--agenda-border);
+  border: 1px solid var(--ui-border);
   border-radius: .75rem;
-  background: var(--agenda-surface);
+  background: var(--ui-surface);
 }
 
 .cadastro-agenda-slot-heading {
   padding-bottom: .65rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--agenda-border) 75%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
 }
 
 .cadastro-agenda-slot-grid {
@@ -118,17 +150,20 @@
   font-weight: 700;
 }
 
+.cadastro-agenda-day-picker .ui-button.is-selected {
+  box-shadow: 0 0 0 1px var(--ui-primary) inset;
+}
+
 .cadastro-agenda-form-error {
-  margin-top: 1rem;
   padding: .75rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--mantine-color-red-6) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 35%, transparent);
   border-radius: .6rem;
-  background: color-mix(in srgb, var(--mantine-color-red-6) 8%, var(--agenda-surface));
+  background: color-mix(in srgb, var(--ui-danger) 8%, var(--ui-surface));
 }
 
 .cadastro-agenda-form-actions {
-  padding: 1rem 0 2rem;
-  border-top: 1px solid var(--agenda-border);
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--ui-border);
 }
 
 @media (max-width: 1050px) {
@@ -147,7 +182,7 @@
     padding: 1rem;
   }
 
-  .cadastro-agenda-form-intro .mantine-Button-root {
+  .cadastro-agenda-form-intro .ui-button {
     width: 100%;
   }
 
@@ -160,206 +195,7 @@
     padding: .8rem;
   }
 
-  .cadastro-agenda-form-actions .mantine-Button-root {
+  .cadastro-agenda-form-actions .ui-button {
     flex: 1 1 12rem;
-  }
-}
-
-.cadastro-agendas-shell {
-  width: min(100%, 1400px);
-  padding: clamp(1.5rem, 4vw, 3.25rem) clamp(1rem, 3vw, 3.25rem) !important;
-}
-
-.cadastro-agendas-page-header {
-  padding: .5rem 0 1.75rem;
-  border-bottom: 1px solid var(--agenda-border);
-}
-
-.cadastro-agendas-page-header > .mantine-Group-root:first-child {
-  min-width: 0;
-}
-
-.cadastro-agendas-page-header .mantine-ActionIcon-root {
-  flex: 0 0 auto;
-  width: 3rem;
-  height: 3rem;
-  border-color: color-mix(in srgb, var(--mantine-primary-color-6) 28%, var(--agenda-border));
-  background: var(--agenda-surface);
-}
-
-.cadastro-agendas-eyebrow {
-  margin-bottom: .4rem;
-  color: var(--mantine-primary-color-6);
-  font-size: .7rem;
-  font-weight: 800;
-  letter-spacing: .14em;
-  line-height: 1.3;
-}
-
-.cadastro-agendas-page-title {
-  letter-spacing: -.045em;
-  line-height: 1.08;
-}
-
-.cadastro-agendas-page-subtitle {
-  max-width: 42rem;
-  margin-top: .45rem;
-  line-height: 1.5;
-}
-
-.cadastro-agendas-primary-action {
-  min-height: 2.8rem;
-  box-shadow: 0 .45rem 1.2rem color-mix(in srgb, var(--mantine-primary-color-6) 18%, transparent);
-}
-
-.cadastro-agendas-filters-panel,
-.cadastro-agendas-list-panel {
-  border: 1px solid var(--agenda-border);
-  border-radius: .95rem;
-  background: var(--agenda-surface);
-  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / .08);
-}
-
-.cadastro-agendas-filters-panel {
-  margin-top: 1.5rem;
-  padding: 1.15rem 1.25rem;
-}
-
-.cadastro-agendas-section-heading {
-  margin-bottom: 1rem;
-}
-
-.cadastro-agendas-section-title {
-  color: var(--mantine-color-text);
-  font-size: 1.08rem;
-  letter-spacing: -.02em;
-}
-
-.cadastro-agendas-section-hint {
-  margin-top: .25rem;
-  line-height: 1.45;
-}
-
-.cadastro-agendas-filter-row {
-  display: grid !important;
-  grid-template-columns: minmax(0, .8fr) minmax(0, 1.55fr);
-  align-items: end;
-  gap: 1rem;
-  margin-bottom: 0 !important;
-}
-
-.cadastro-agendas-filter-row > * {
-  min-width: 0;
-}
-
-.cadastro-agendas-filter-row .mantine-InputWrapper-root {
-  width: 100%;
-}
-
-.cadastro-agendas-list-panel {
-  padding: 1.25rem;
-}
-
-.cadastro-agendas-list-heading {
-  padding: 0 .15rem 1rem;
-}
-
-.cadastro-agendas-count {
-  min-height: 1.9rem;
-  padding-inline: .75rem;
-}
-
-.cadastro-agendas-list-panel table {
-  width: 100%;
-}
-
-.cadastro-agendas-list-panel thead th {
-  background: color-mix(in srgb, var(--mantine-primary-color-6) 5%, var(--mantine-color-body));
-  color: var(--mantine-color-dimmed) !important;
-  font-size: .7rem !important;
-  font-weight: 800 !important;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.cadastro-agendas-list-panel tbody td {
-  border-bottom-color: color-mix(in srgb, var(--agenda-border) 78%, transparent);
-}
-
-.cadastro-agendas-list-panel tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.cadastro-agendas-actions-column {
-  width: 5.5rem;
-  text-align: center !important;
-}
-
-.cadastro-agendas-list-panel .mantine-Paper-root {
-  border-color: var(--agenda-border);
-  background: var(--agenda-surface-strong);
-}
-
-.cadastro-agendas-empty {
-  margin-top: 1rem;
-  background: var(--agenda-surface-strong) !important;
-  text-align: center;
-}
-
-.cadastro-agendas-mobile-list {
-  margin-top: 1rem;
-}
-
-.cadastro-agendas-mobile-card {
-  border-color: var(--agenda-border);
-  background: var(--agenda-surface-strong);
-}
-
-.cadastro-agendas-loading {
-  margin-top: 1rem;
-}
-
-.cadastro-agendas-page .mantine-Badge-root {
-  font-weight: 700;
-}
-
-@media (max-width: 799px) {
-  .cadastro-agendas-shell {
-    padding: 1rem !important;
-  }
-
-  .cadastro-agendas-page-header {
-    align-items: flex-start;
-    gap: 1rem;
-    padding-bottom: 1.25rem;
-  }
-
-  .cadastro-agendas-page-header > .mantine-Group-root:first-child {
-    width: 100%;
-  }
-
-  .cadastro-agendas-page-header .mantine-ActionIcon-root {
-    width: 2.75rem;
-    height: 2.75rem;
-  }
-
-  .cadastro-agendas-primary-action {
-    width: 100%;
-  }
-
-  .cadastro-agendas-filters-panel,
-  .cadastro-agendas-list-panel {
-    padding: 1rem;
-  }
-
-  .cadastro-agendas-filter-row {
-    grid-template-columns: 1fr;
-    gap: .85rem;
-  }
-
-  .cadastro-agendas-list-heading {
-    align-items: flex-start;
-    gap: .75rem;
   }
 }

@@ -1,22 +1,18 @@
 ﻿import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Badge, Paper, Skeleton, Textarea, Divider, SimpleGrid, useComputedColorScheme, Menu } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Badge, Paper, Skeleton, Textarea, Divider, SimpleGrid, Menu, TextInput, Select, NumberInput, DateInput, Tooltip } from '@/components/ui';
 import inventoryService from '../../services/inventoryService';
-import { useMediaQuery } from '@mantine/hooks';
-import { Plus, Minus, ChevronLeft, ChevronRight, Pencil, ArrowUpDown, History, Boxes, X, MoreVertical, Package, PackageOpen } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { useMediaQuery } from '@/components/ui';
+import { Plus, Minus, ChevronRight, Pencil, ArrowUpDown, History, Boxes, X, MoreVertical, Package, PackageOpen } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
 import ResultModal from '../common/ResultModal';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingNumberInput } from '../common/FloatingNumberInput';
-import { FloatingDateInput } from '../common/FloatingDateInput';
 import { useInventoryItemsQuery } from '../../hooks/useInventoryItemsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import './Estoque.css';
 
 interface StockItem {
   id: string;
@@ -146,7 +142,6 @@ export function Estoque() {
 
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   // Category options shared between filter and modal
   const categoriesOptions = [
@@ -987,114 +982,79 @@ export function Estoque() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeTab === 'hub' ? navigate('/dashboard?secao=gestao-e-apoio') : setActiveTab('hub')) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 24} justify="space-between" align="flex-start" wrap="wrap">
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Estoque
-              </Text>
-              <Text size="sm" c="dimmed">
-                Cadastrar materiais
-              </Text>
-            </Box>
-          </Group>
-
-          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={() => openCadastrar()} size={isMobile ? 'sm' : 'md'}>
-            Novo item
-          </Button>
-        </Group>
-
         {activeTab === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-            {[
-              {
-                key: 'itens',
-                icon: Package,
-                title: 'Itens',
-                desc: 'Cadastre e gerencie os itens do estoque com controle de validade e movimentação.',
-                onClick: () => setActiveTab('itens'),
-              },
-              {
-                key: 'kits',
-                icon: PackageOpen,
-                title: 'Kits de insumos',
-                desc: 'Monte kits com itens do estoque para uso rápido nos procedimentos.',
-                onClick: () => setActiveTab('kits'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
+          <>
+            <Box className="estoque-hero">
+              <Text className="estoque-eyebrow">GESTÃO E APOIO</Text>
+              <Text className="estoque-title" fw={700} size="2xl">Estoque</Text>
+              <Text className="estoque-subtitle" size="sm">Materiais e insumos com controle de quantidade, validade e movimentação.</Text>
+            </Box>
+
+            <SimpleGrid className="estoque-hub-grid" cols={{ base: 1, sm: 2 }}>
+              {[
+                {
+                  key: 'itens',
+                  icon: Package,
+                  title: 'Itens',
+                  desc: 'Cadastre e gerencie os itens do estoque com controle de validade e movimentação.',
+                  onClick: () => setActiveTab('itens'),
+                },
+                {
+                  key: 'kits',
+                  icon: PackageOpen,
+                  title: 'Kits de insumos',
+                  desc: 'Monte kits com itens do estoque para uso rápido nos procedimentos.',
+                  onClick: () => setActiveTab('kits'),
+                },
+              ].map((card) => (
+                <Paper key={card.key} className="estoque-hub-card" withBorder onClick={card.onClick}>
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="estoque-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="estoque-hub-chevron" style={{ flexShrink: 0 }} />
                   </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveTab('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>{activeTab === 'itens' ? 'Itens de estoque' : 'Kits de insumos'}</Text>
-              </Group>
+              <Text fw={600} size="lg">{activeTab === 'itens' ? 'Itens de estoque' : 'Kits de insumos'}</Text>
             </Group>
 
           {activeTab === 'itens' && (
             <>
-            <Group mb={isMobile ? 20 : 30} align="flex-end" wrap="wrap" grow>
-              <FloatingInput
+            <Group justify="space-between" align="end" wrap="wrap" gap="sm" mb="md">
+              <TextInput
                 label="Buscar itens"
                 placeholder={isMobile ? 'Buscar...' : 'Buscar item por nome ou código...'}
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
-                containerProps={{ style: { flex: isMobile ? '1 1 100%' : '1 1 360px' } }}
+                style={{ flex: '1 1 220px', maxWidth: isMobile ? '100%' : 420 }}
               />
-              <FloatingSelect
+              <Select
                 data={[{ value: 'all', label: 'Todas as categorias' }, ...categoriesOptions]}
                 value={category || 'all'}
                 onChange={(val) => setCategory(val || '')}
                 label="Categoria"
                 placeholder="Todas as categorias"
-                containerProps={{ style: { flex: isMobile ? '1 1 100%' : '0 0 280px' } }}
+                style={{ flex: isMobile ? '1 1 100%' : '0 0 240px' }}
               />
+              <Button leftSection={<Plus size={16} />} onClick={() => openCadastrar()} fullWidth={isMobile}>
+                Novo item
+              </Button>
             </Group>
 
             {itemsLoading ? (
@@ -1121,113 +1081,82 @@ export function Estoque() {
               >
                 <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                   <Table.Thead>
-                    <Table.Tr style={{ borderBottom: 'none' }}>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Código</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Prod.</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Quant.</Table.Th>
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Mín.</Table.Th>}
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Máx.</Table.Th>}
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Preço Unit.</Table.Th>}
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valid.</Table.Th>}
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Categoria</Table.Th>}
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, width: 96, textAlign: 'center' }}>Ações</Table.Th>
+                    <Table.Tr>
+                      <Table.Th>Item</Table.Th>
+                      <Table.Th>Quantidade</Table.Th>
+                      {!isTablet && <Table.Th>Categoria</Table.Th>}
+                      {!isTablet && <Table.Th>Validade</Table.Th>}
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th style={{ width: 72, textAlign: 'center' }}>Ações</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {filtered.length > 0 ? paginatedItems.map((it) => (
-                      <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                    <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.codigo}</Text>
-                    </Table.Td>
-                  <Table.Td>
-                    <Box
-                      bg={DARK_BLUE}
-                      w={32}
-                      h={32}
-                      style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                    >
-                      <Text c="white" fw={600} size="sm">{it.nome.charAt(0).toUpperCase()}</Text>
-                    </Box>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.nome}</Text>
-                  </Table.Td>
-                <Table.Td>
-                  <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{it.quantidade}</Text>
-                </Table.Td>
-
-                {!isTablet && (
-                  <Table.Td>
-                    <Text size="xs">{it.minimo}</Text>
-                  </Table.Td>
-                )}
-
-                {!isTablet && (
-                  <Table.Td>
-                    <Text size="xs">{it.maximo}</Text>
-                  </Table.Td>
-                )}
-
-                {!isTablet && (
-                  <Table.Td>
-                    <Text size="xs">R${it.precoUnitario.toFixed(2)}</Text>
-                  </Table.Td>
-                )}
-
-                {!isTablet && (
-                  <Table.Td>
-                    <Text size="xs">{it.validade || '-'}</Text>
-                  </Table.Td>
-                )}
-
-                {!isTablet && (
-                  <Table.Td>
-                    <Badge variant="light" color="blue" radius="xl">{formatCategory(it.categoria)}</Badge>
-                  </Table.Td>
-                )}
-
-                {!isTablet && (
-                  <Table.Td>
-                    <Group gap={6}>
-                      <Badge variant="light" color={String(it.status).toUpperCase() === 'LOW' ? 'yellow' : String(it.status).toUpperCase() === 'OUT_OF_STOCK' ? 'red' : String(it.status).toUpperCase() === 'EXPIRED' ? 'grape' : 'green'} radius="xl">
-                        {formatStatus(it.status)}
-                      </Badge>
-                      {it.quantidade <= it.minimo ? <Badge variant="outline" color="orange" radius="xl">Baixo estoque</Badge> : null}
-                      {isExpiringSoon(it.validade) ? <Badge variant="outline" color="yellow" radius="xl">Vencendo</Badge> : null}
-                    </Group>
-                  </Table.Td>
-                )}
-                <Table.Td style={{ textAlign: 'center' }}>
-                  <Group justify="center">
-                    <Menu shadow="md" width={220} position="bottom" withArrow>
-                      <Menu.Target>
-                        <ActionIcon variant="light" size="sm" aria-label={`Ações de ${it.nome}`}>
-                          <MoreVertical size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item leftSection={<ArrowUpDown size={14} />} onClick={() => openMovement(it)}>
-                          Movimentar
-                        </Menu.Item>
-                        <Menu.Item leftSection={<Boxes size={14} />} onClick={() => { void openLots(it); }}>
-                          Gerenciar lotes
-                        </Menu.Item>
-                        <Menu.Item leftSection={<History size={14} />} onClick={() => { void openHistory(it); }}>
-                          Ver histórico
-                        </Menu.Item>
-                        <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openCadastrar(it)}>
-                          Editar item
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Group>
-                </Table.Td>
-                  </Table.Tr>
+                      <Table.Tr key={it.id}>
+                        <Table.Td>
+                          <Stack gap={2}>
+                            <Text fw={600} size="sm">{it.nome}</Text>
+                            <Text size="xs" c="dimmed">{it.codigo}</Text>
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>
+                          <Tooltip
+                            label={`Mínimo: ${it.minimo} • Máximo: ${it.maximo} • Preço unitário: R$ ${it.precoUnitario.toFixed(2)}`}
+                            withArrow
+                          >
+                            <Text fw={600} size="sm" style={{ cursor: 'help', width: 'fit-content' }}>
+                              {it.quantidade}{it.unidade ? ` ${it.unidade}` : ''}
+                            </Text>
+                          </Tooltip>
+                        </Table.Td>
+                        {!isTablet && (
+                          <Table.Td>
+                            <Badge variant="light" color="blue" radius="xl">{formatCategory(it.categoria)}</Badge>
+                          </Table.Td>
+                        )}
+                        {!isTablet && (
+                          <Table.Td>
+                            <Text size="sm">{it.validade || '-'}</Text>
+                          </Table.Td>
+                        )}
+                        <Table.Td>
+                          <Group gap={6}>
+                            <Badge variant="light" color={String(it.status).toUpperCase() === 'LOW' ? 'yellow' : String(it.status).toUpperCase() === 'OUT_OF_STOCK' ? 'red' : String(it.status).toUpperCase() === 'EXPIRED' ? 'grape' : 'green'} radius="xl">
+                              {formatStatus(it.status)}
+                            </Badge>
+                            {it.quantidade <= it.minimo ? <Badge variant="outline" color="orange" radius="xl">Baixo</Badge> : null}
+                            {isExpiringSoon(it.validade) ? <Badge variant="outline" color="yellow" radius="xl">Vencendo</Badge> : null}
+                          </Group>
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: 'center' }}>
+                          <Group justify="center">
+                            <Menu shadow="md" width={220} position="bottom-end" withArrow>
+                              <Menu.Target>
+                                <ActionIcon variant="light" size="sm" aria-label={`Ações de ${it.nome}`}>
+                                  <MoreVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<ArrowUpDown size={14} />} onClick={() => openMovement(it)}>
+                                  Movimentar
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Boxes size={14} />} onClick={() => { void openLots(it); }}>
+                                  Gerenciar lotes
+                                </Menu.Item>
+                                <Menu.Item leftSection={<History size={14} />} onClick={() => { void openHistory(it); }}>
+                                  Ver histórico
+                                </Menu.Item>
+                                <Menu.Item leftSection={<Pencil size={14} />} onClick={() => openCadastrar(it)}>
+                                  Editar item
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
                     )) : (
                       <Table.Tr>
-                        <Table.Td colSpan={isTablet ? 5 : 11}>
+                        <Table.Td colSpan={isTablet ? 4 : 6}>
                           <Stack align="center" py="xl" gap={6}>
                             <Text fw={600}>Nenhum item encontrado</Text>
                             <Text c="dimmed" size="sm" ta="center">
@@ -1247,19 +1176,14 @@ export function Estoque() {
           {activeTab === 'kits' && (
             <Stack gap="md">
               <Group justify="space-between" align="flex-end" wrap="wrap">
-                <FloatingInput
+                <TextInput
                   label="Buscar kits"
                   placeholder="Nome ou descrição do kit"
                   value={kitQuery}
                   onChange={(event) => setKitQuery(event.currentTarget.value)}
-                  containerProps={{ style: { flex: isMobile ? '1 1 100%' : '1 1 360px' } }}
+                  style={{ flex: isMobile ? '1 1 100%' : '1 1 360px' }}
                 />
-                <Button
-                  bg={DARK_BLUE}
-                  c="white"
-                  leftSection={<Plus size={16} />}
-                  onClick={openCreateKit}
-                >
+                <Button leftSection={<Plus size={16} />} onClick={openCreateKit} fullWidth={isMobile}>
                   Novo kit
                 </Button>
               </Group>
@@ -1292,20 +1216,18 @@ export function Estoque() {
                 >
                   <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                     <Table.Thead>
-                      <Table.Tr style={{ borderBottom: 'none' }}>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Kit</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Itens</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Kits possíveis</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                        <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center' }}>Ações</Table.Th>
+                      <Table.Tr>
+                        <Table.Th>Kit</Table.Th>
+                        <Table.Th>Itens</Table.Th>
+                        <Table.Th>Kits possíveis</Table.Th>
+                        <Table.Th>Status</Table.Th>
+                        <Table.Th style={{ width: 72, textAlign: 'center' }}>Ações</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                       {filteredKits.length === 0 ? (
                         <Table.Tr>
-                          <Table.Td colSpan={7}>
+                          <Table.Td colSpan={5}>
                             <Stack align="center" py="xl" gap={6}>
                               <Text fw={600}>Nenhum kit encontrado</Text>
                               <Text c="dimmed" size="sm" ta="center">
@@ -1315,12 +1237,12 @@ export function Estoque() {
                           </Table.Td>
                         </Table.Tr>
                       ) : paginatedKits.map((kit) => (
-                        <Table.Tr key={kit.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                        <Table.Tr key={kit.id}>
                           <Table.Td>
-                            <Text size="sm" fw={600}>{kit.name}</Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm">{kit.description || '-'}</Text>
+                            <Stack gap={2}>
+                              <Text size="sm" fw={600}>{kit.name}</Text>
+                              <Text size="xs" c="dimmed">{kit.description || 'Sem descrição'}</Text>
+                            </Stack>
                           </Table.Td>
                           <Table.Td>
                             <Badge variant="light" color="blue" radius="xl">
@@ -1331,9 +1253,6 @@ export function Estoque() {
                             <Badge variant="light" color={getAvailableKitsCount(kit) > 0 ? 'teal' : 'red'} radius="xl">
                               {getAvailableKitsCount(kit)}
                             </Badge>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm" c="dimmed">Definido no procedimento</Text>
                           </Table.Td>
                           <Table.Td>
                             <Badge variant="light" color={kit.isActive ? 'green' : 'gray'} radius="xl">
@@ -1374,8 +1293,8 @@ export function Estoque() {
 
               <Paper withBorder radius="md" p="md">
                 <Stack gap="md">
-                  <Text fw={700} size="sm" c="var(--mantine-color-text)">Dados do kit</Text>
-                  <FloatingInput
+                  <Text fw={700} size="sm">Dados do kit</Text>
+                  <TextInput
                     label="Nome do kit"
                     value={kitForm.name}
                     onChange={(event) => {
@@ -1383,7 +1302,7 @@ export function Estoque() {
                       setKitForm((prev) => ({ ...prev, name: value }));
                     }}
                   />
-                  <FloatingInput
+                  <TextInput
                     label="Descrição"
                     value={kitForm.description}
                     onChange={(event) => {
@@ -1391,22 +1310,22 @@ export function Estoque() {
                       setKitForm((prev) => ({ ...prev, description: value }));
                     }}
                   />
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                <FloatingSelect
-                  label="Item"
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                    <Select
+                      label="Item"
                       data={items.map((item) => ({ value: item.id, label: item.codigo ? `${item.nome} (${item.codigo})` : item.nome }))}
                       value={kitForm.selectedItemId}
                       onChange={(value) => setKitForm((prev) => ({ ...prev, selectedItemId: value }))}
                       searchable
                       clearable
                     />
-                <FloatingNumberInput
-                  label="Qtd por kit"
-                  min={1}
-                  value={kitForm.selectedQuantity}
-                  onChange={(value) => setKitForm((prev) => ({ ...prev, selectedQuantity: typeof value === 'number' ? value : '' }))}
-                />
-              </SimpleGrid>
+                    <NumberInput
+                      label="Qtd por kit"
+                      min={1}
+                      value={kitForm.selectedQuantity}
+                      onChange={(value) => setKitForm((prev) => ({ ...prev, selectedQuantity: typeof value === 'number' ? value : '' }))}
+                    />
+                  </SimpleGrid>
                   <Group justify="flex-end">
                     <Button variant="light" onClick={handleAddItemToKitDraft}>Adicionar item</Button>
                   </Group>
@@ -1417,8 +1336,8 @@ export function Estoque() {
 
           <Paper withBorder radius="md" p="md">
             <Stack gap="sm">
-              <Text fw={700} size="sm" c="var(--mantine-color-text)">Itens do kit</Text>
-              <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+              <Text fw={700} size="sm">Itens do kit</Text>
+              <Box style={{ overflowX: 'auto', border: '1px solid var(--ui-border)', borderRadius: 6 }}>
                 <Table horizontalSpacing="sm" verticalSpacing="sm">
                   <Table.Thead>
                     <Table.Tr>
@@ -1477,7 +1396,6 @@ export function Estoque() {
           <Group justify="flex-end">
             <Button variant="default" onClick={() => { setKitModalOpen(false); resetKitForm(); }}>Cancelar</Button>
             <Button
-              bg={DARK_BLUE}
               loading={kitSaving}
               onClick={() => {
                 void handleSaveKit();
@@ -1506,21 +1424,23 @@ export function Estoque() {
           <Paper withBorder radius="md" p="md">
             <Stack gap="md">
               <Text fw={700} size="sm">Identificação</Text>
-              <FloatingInput
-                label={<><span>Nome do item</span><span style={{ color: '#fa5252' }}> *</span></>}
+              <TextInput
+                label="Nome do item"
+                withAsterisk
                 value={form.nome}
                 onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); setFieldErrors((prev) => { const { name, ...rest } = prev; return rest; }); }}
                 error={fieldErrors.name}
               />
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-                <FloatingInput
-                  label={<><span>Código</span><span style={{ color: '#fa5252' }}> *</span></>}
+                <TextInput
+                  label="Código"
+                  withAsterisk
                   value={form.codigo}
                   onChange={(e) => { setForm({ ...form, codigo: e.currentTarget.value }); setFieldErrors((prev) => { const { code, ...rest } = prev; return rest; }); }}
                   error={fieldErrors.code}
                 />
-                <FloatingSelect data={categoriesOptions} value={form.categoria} onChange={(v) => setForm({ ...form, categoria: v || '' })} label="Categoria" placeholder="Categoria" />
-                <FloatingSelect data={[{ value: 'un', label: 'un' }, { value: 'cx', label: 'cx' }, { value: 'ml', label: 'ml' }]} value={form.unidade} onChange={(v) => setForm({ ...form, unidade: v || '' })} label="Unidade" placeholder="Unidade" />
+                <Select data={categoriesOptions} value={form.categoria} onChange={(v) => setForm({ ...form, categoria: v || '' })} label="Categoria" placeholder="Categoria" />
+                <Select data={[{ value: 'un', label: 'un' }, { value: 'cx', label: 'cx' }, { value: 'ml', label: 'ml' }]} value={form.unidade} onChange={(v) => setForm({ ...form, unidade: v || '' })} label="Unidade" placeholder="Unidade" />
               </SimpleGrid>
             </Stack>
           </Paper>
@@ -1529,19 +1449,19 @@ export function Estoque() {
             <Stack gap="md">
               <Text fw={700} size="sm">Controle de estoque</Text>
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                <FloatingNumberInput
+                <NumberInput
                   value={form.quantidade ?? undefined}
                   onChange={(val) => setForm({ ...form, quantidade: normalizeNumber(val) })}
                   label="Quantidade atual"
                   placeholder="Quantidade atual"
                   min={0}
                 />
-                <FloatingNumberInput value={form.precoUnitario ?? undefined} onChange={(val) => setForm({ ...form, precoUnitario: normalizeNumber(val) })} label="Preço unitário" placeholder="Preço unitário" min={0} step={0.01} />
+                <NumberInput value={form.precoUnitario ?? undefined} onChange={(val) => setForm({ ...form, precoUnitario: normalizeNumber(val) })} label="Preço unitário" placeholder="Preço unitário" min={0} step={0.01} />
               </SimpleGrid>
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-                <FloatingNumberInput value={form.minimo ?? undefined} onChange={(val) => setForm({ ...form, minimo: normalizeNumber(val) })} label="Quant. mínima" placeholder="Quant. mínima" min={0} />
-                <FloatingNumberInput value={form.maximo ?? undefined} onChange={(val) => setForm({ ...form, maximo: normalizeNumber(val) })} label="Quant. máxima" placeholder="Quant. máxima" min={0} />
-                <FloatingDateInput
+                <NumberInput value={form.minimo ?? undefined} onChange={(val) => setForm({ ...form, minimo: normalizeNumber(val) })} label="Quant. mínima" placeholder="Quant. mínima" min={0} />
+                <NumberInput value={form.maximo ?? undefined} onChange={(val) => setForm({ ...form, maximo: normalizeNumber(val) })} label="Quant. máxima" placeholder="Quant. máxima" min={0} />
+                <DateInput
                   label="Validade"
                   value={form.validade}
                   onChange={(val) => {
@@ -1550,8 +1470,6 @@ export function Estoque() {
                     setDateInput(date ? formatDate(date) : '');
                     setFieldErrors((prev) => { const { expiryDate, ...rest } = prev; return rest; });
                   }}
-                  valueFormat="DD/MM/YYYY"
-                  clearable={false}
                 />
               </SimpleGrid>
               {fieldErrors.expiryDate ? <Text size="xs" c="red">{fieldErrors.expiryDate}</Text> : null}
@@ -1569,7 +1487,7 @@ export function Estoque() {
           <Divider />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-            <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingItem} disabled={savingItem || (Boolean(editingId) && inventoryEditUnavailable)}>
+            <Button onClick={handleAddOrUpdate} size="sm" loading={savingItem} disabled={savingItem || (Boolean(editingId) && inventoryEditUnavailable)}>
               {editingId ? 'Atualizar' : 'Cadastrar'}
             </Button>
           </Group>
@@ -1584,7 +1502,7 @@ export function Estoque() {
         size="md"
       >
         <Stack gap="sm">
-          <FloatingSelect
+          <Select
             label="Tipo"
             value={movementForm.type}
             onChange={(value) => setMovementForm((prev) => ({ ...prev, type: (value as any) || 'ENTRY' }))}
@@ -1594,13 +1512,13 @@ export function Estoque() {
               { value: 'ADJUSTMENT', label: 'Ajuste (define saldo)' },
             ]}
           />
-          <FloatingNumberInput
+          <NumberInput
             label={movementForm.type === 'ADJUSTMENT' ? 'Saldo final' : 'Quantidade'}
             value={movementForm.quantity ?? undefined}
             onChange={(value) => setMovementForm((prev) => ({ ...prev, quantity: normalizeNumber(value) }))}
             min={0}
           />
-          <FloatingInput
+          <TextInput
             label="Motivo"
             value={movementForm.reason}
             onChange={(event) => {
@@ -1620,7 +1538,7 @@ export function Estoque() {
           />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setMovementOpen(false)}>Cancelar</Button>
-            <Button bg={DARK_BLUE} loading={movementSaving} onClick={() => { void handleCreateMovement(); }}>
+            <Button loading={movementSaving} onClick={() => { void handleCreateMovement(); }}>
               Registrar movimentação
             </Button>
           </Group>
@@ -1647,7 +1565,7 @@ export function Estoque() {
                   <Table.Th style={{ width: 170 }}>Data</Table.Th>
                   <Table.Th style={{ width: 130 }}>Tipo</Table.Th>
                   <Table.Th style={{ width: 90 }}>Qtd</Table.Th>
-                  <Table.Th style={{ width: 130 }}>De â†’ Para</Table.Th>
+                  <Table.Th style={{ width: 130 }}>De → Para</Table.Th>
                   <Table.Th style={{ width: 340 }}>Motivo</Table.Th>
                   <Table.Th style={{ width: 180 }}>Usuário</Table.Th>
                 </Table.Tr>
@@ -1669,7 +1587,7 @@ export function Estoque() {
                       <Text size="sm">{row.quantity}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{row.previousQty} â†’ {row.resultingQty}</Text>
+                      <Text size="sm">{row.previousQty} → {row.resultingQty}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" style={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
@@ -1702,7 +1620,7 @@ export function Estoque() {
             <Stack gap="sm">
               <Text fw={700} size="sm">Novo lote</Text>
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-                <FloatingInput
+                <TextInput
                   label="Código do lote"
                   value={lotForm.lotCode}
                   onChange={(event) => {
@@ -1711,29 +1629,27 @@ export function Estoque() {
                   }}
                   placeholder="Ex.: LT-2026-001"
                 />
-                <FloatingNumberInput
+                <NumberInput
                   label="Quantidade"
                   value={lotForm.quantity ?? undefined}
                   onChange={(value) => setLotForm((prev) => ({ ...prev, quantity: normalizeNumber(value) }))}
                   min={0}
                 />
-                <FloatingDateInput
+                <DateInput
                   label="Validade"
                   value={lotForm.expiryDate}
                   onChange={(value) => setLotForm((prev) => ({ ...prev, expiryDate: value ?? null }))}
-                  valueFormat="DD/MM/YYYY"
-                  clearable={false}
                 />
               </SimpleGrid>
               <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-                <FloatingNumberInput
+                <NumberInput
                   label="Preço unitário do item"
                   value={lotForm.unitPrice ?? undefined}
                   onChange={(value) => setLotForm((prev) => ({ ...prev, unitPrice: normalizeNumber(value) }))}
                   min={0}
                   step={0.01}
                 />
-                <FloatingInput
+                <TextInput
                   label="Fornecedor"
                   value={lotForm.supplier}
                   onChange={(event) => {
@@ -1742,7 +1658,7 @@ export function Estoque() {
                   }}
                   placeholder="Opcional"
                 />
-                <FloatingInput
+                <TextInput
                   label="Observações"
                   value={lotForm.notes}
                   onChange={(event) => {
@@ -1757,7 +1673,7 @@ export function Estoque() {
               </Text>
               <Group justify="flex-end">
                 <Button variant="default" onClick={() => setLotsOpen(false)}>Fechar</Button>
-                <Button bg={DARK_BLUE} loading={lotSaving} onClick={() => { void handleCreateLot(); }}>
+                <Button loading={lotSaving} onClick={() => { void handleCreateLot(); }}>
                   Cadastrar lote
                 </Button>
               </Group>
@@ -1843,4 +1759,3 @@ export function Estoque() {
     </Box>
   );
 }
-

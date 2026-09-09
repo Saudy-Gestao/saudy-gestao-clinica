@@ -1,4 +1,4 @@
-import { Modal, Stack, Text, Button, List, ThemeIcon, Box, Title, Group, Paper } from '@mantine/core';
+import { Modal, Stack, Text, Button, List, ThemeIcon, Box, Title, Group, Paper } from '@/components/ui';
 import { 
   Camera, 
   Sun, 
@@ -8,8 +8,6 @@ import {
   CheckCircle, 
   X 
 } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
-
 interface FacialInstructionsModalProps {
   opened: boolean;
   onClose: () => void;
@@ -24,16 +22,16 @@ export function FacialInstructionsModal({ opened, onClose, onContinue }: FacialI
       size="lg"
       title={
         <Group gap="sm">
-          <Camera size={24} color={DARK_BLUE} />
+          <Camera size={24} color="var(--ui-primary)" />
           <Title order={3}>Instruções para Captura Facial</Title>
         </Group>
       }
       centered
     >
       <Stack gap="lg">
-        <Paper p="md" withBorder style={{ backgroundColor: 'var(--mantine-color-yellow-light)', borderColor: 'var(--mantine-color-yellow-filled)' }}>
+        <Paper p="md" withBorder style={{ backgroundColor: 'color-mix(in srgb, var(--ui-hue-yellow) 14%, var(--ui-surface))', borderColor: 'color-mix(in srgb, var(--ui-hue-yellow) 45%, var(--ui-border))' }}>
           <Group gap="sm" align="flex-start">
-            <AlertCircle size={24} style={{ color: 'var(--mantine-color-yellow-filled)' }} />
+            <AlertCircle size={24} style={{ color: 'var(--ui-hue-yellow)' }} />
             <Box style={{ flex: 1 }}>
               <Text fw={600} size="sm" mb={4}>Atenção!</Text>
               <Text size="sm">
@@ -128,7 +126,7 @@ export function FacialInstructionsModal({ opened, onClose, onContinue }: FacialI
           </List>
         </Box>
 
-        <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-blue-light)', borderColor: 'var(--mantine-color-blue-filled)' }}>
+        <Paper p="sm" withBorder style={{ backgroundColor: 'color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface))', borderColor: 'color-mix(in srgb, var(--ui-primary) 40%, var(--ui-border))' }}>
           <Text size="xs" ta="center">
             💡 <strong>Dica:</strong> Uma foto de qualidade garante maior precisão no reconhecimento facial
           </Text>
@@ -138,11 +136,9 @@ export function FacialInstructionsModal({ opened, onClose, onContinue }: FacialI
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button 
+          <Button
             leftSection={<Camera size={18} />}
             onClick={onContinue}
-            bg={DARK_BLUE}
-            style={{ background: DARK_BLUE }}
           >
             Entendi, Continuar
           </Button>

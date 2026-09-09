@@ -7,20 +7,16 @@ import {
   Box,
   Button,
   Divider,
-  Group,
   Menu,
   Paper,
-  SimpleGrid,
   Table,
   Text,
-  useComputedColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { AlertTriangle, ChevronLeft, Clock3, Copy, Grid2x2, History, List, MoreVertical, Play, Search, Video } from 'lucide-react';
+  TextInput,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { Activity, AlertTriangle, Clock3, Copy, Grid2x2, History, List, MoreVertical, Play, Search, Users, Video } from 'lucide-react';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
-import { FloatingInput } from '../common/FloatingInput';
 import consultationService from '../../services/consultationService';
 import teleconsultationLinkService from '../../services/teleconsultationLinkService';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
@@ -28,6 +24,7 @@ import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF } from '../../utils/formatters';
+import './Consulta.css';
 
 interface ConsultationRow {
   id: string;
@@ -150,7 +147,6 @@ export function Consulta() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>(FILTER_KEYS.ALL);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const isDark = useComputedColorScheme('light') === 'dark';
   const clinicalQueueQuery = useClinicalQueueQuery();
   const appointmentsQuery = useAppointmentsQuery();
 
@@ -329,127 +325,96 @@ export function Consulta() {
     }
   };
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="consulta-page" bg="var(--mantine-color-body)">
+      <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1500} mx="auto">
-        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Consulta
-              </Text>
-              <Text size="sm" c="dimmed">
-                {loggedDoctorName ? `Consultas e exames do(a) Dr(a). ${loggedDoctorName}` : 'Consultas e exames'}
-              </Text>
-            </Box>
-          </Group>
-          <Button
-            variant="light"
-            color="darkBlue"
-            leftSection={<History size={16} />}
-            onClick={() => navigate('/historico')}
-            size={isMobile ? 'xs' : 'sm'}
-          >
+      <Box className="consulta-container" maw={1500} mx="auto">
+        <Box className="consulta-hero">
+          <Box>
+            <Text className="consulta-eyebrow">OPERAÇÃO CLÍNICA</Text>
+            <Text component="h1" className="consulta-title">Fila de consultas</Text>
+            <Text className="consulta-subtitle">
+              {loggedDoctorName ? `Atendimentos disponíveis para o(a) Dr(a). ${loggedDoctorName}` : 'Acompanhe e inicie os atendimentos da clínica'}
+            </Text>
+          </Box>
+          <Button className="consulta-history-button" variant="outline" leftSection={<History size={17} />} onClick={() => navigate('/historico')}>
             Histórico
           </Button>
-        </Group>
+        </Box>
 
-        <Paper
-          withBorder
-          p={isMobile ? 'sm' : 'md'}
-          radius="md"
-          style={{
-            background: isDark ? 'var(--mantine-color-default)' : '#fff',
-            borderColor: isDark ? 'var(--mantine-color-default-border)' : 'var(--mantine-color-gray-3)',
-          }}
-        >
-          {viewMode === VIEW_MODES.LIST && (
-            <Box mt="sm">
-              <FloatingInput
-                label="Buscar"
-                alwaysFloatLabel
-                placeholder="Buscar"
-                value={query}
-                onChange={(e) => setQuery(e.currentTarget.value)}
-                rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-                containerProps={{ style: { minHeight: 56 } }}
-              />
+        <Box className="consulta-summary" aria-label="Resumo da fila">
+          <Box className="consulta-summary-item">
+            <Box className="consulta-summary-icon"><Users size={18} /></Box>
+            <Box><Text className="consulta-summary-value">{counters[FILTER_KEYS.ALL]}</Text><Text className="consulta-summary-label">Na fila agora</Text></Box>
+          </Box>
+          <Box className="consulta-summary-item">
+            <Box className="consulta-summary-icon consulta-summary-icon--warning"><Clock3 size={18} /></Box>
+            <Box><Text className="consulta-summary-value">{counters[FILTER_KEYS.WAITING]}</Text><Text className="consulta-summary-label">Aguardando</Text></Box>
+          </Box>
+          <Box className="consulta-summary-item">
+            <Box className="consulta-summary-icon consulta-summary-icon--success"><Activity size={18} /></Box>
+            <Box><Text className="consulta-summary-value">{counters[FILTER_KEYS.IN_PROGRESS]}</Text><Text className="consulta-summary-label">Em atendimento</Text></Box>
+          </Box>
+          <Box className="consulta-summary-item">
+            <Box className="consulta-summary-icon consulta-summary-icon--tele"><Video size={18} /></Box>
+            <Box><Text className="consulta-summary-value">{counters[FILTER_KEYS.TELECONSULT]}</Text><Text className="consulta-summary-label">Teleconsultas</Text></Box>
+          </Box>
+        </Box>
+
+        <Paper className="consulta-workspace" withBorder>
+          <Box className="consulta-toolbar">
+            <TextInput
+              className="consulta-search"
+              label="Buscar na fila"
+              placeholder="Paciente, CPF, procedimento ou profissional"
+              value={query}
+              onChange={(e) => setQuery(e.currentTarget.value)}
+              leftSection={<Search size={17} aria-hidden="true" />}
+            />
+            <Box className="consulta-view-control" aria-label="Modo de visualização">
+              <Text className="consulta-control-label">Visualização</Text>
+              <Box className="consulta-view-switcher">
+                <ActionIcon className={viewMode === VIEW_MODES.LIST ? 'consulta-view-button is-active' : 'consulta-view-button'} variant={viewMode === VIEW_MODES.LIST ? 'filled' : 'subtle'} onClick={() => setViewMode(VIEW_MODES.LIST)} aria-label="Visualização em lista">
+                  <List size={17} />
+                </ActionIcon>
+                <ActionIcon className={viewMode === VIEW_MODES.CARDS ? 'consulta-view-button is-active' : 'consulta-view-button'} variant={viewMode === VIEW_MODES.CARDS ? 'filled' : 'subtle'} onClick={() => setViewMode(VIEW_MODES.CARDS)} aria-label="Visualização em cards">
+                  <Grid2x2 size={17} />
+                </ActionIcon>
+              </Box>
             </Box>
-          )}
+          </Box>
 
-          <Group justify="space-between" mt="sm" mb="sm" wrap="wrap" gap="xs">
-            <Group gap="xs" wrap="wrap">
+          <Box className="consulta-filter-row" aria-label="Filtros da fila">
+            <Text className="consulta-control-label">Filtrar por status</Text>
+            <Box className="consulta-filters">
               {(Object.values(FILTER_KEYS) as FilterKey[]).map((chip) => {
                 const isActive = activeFilter === chip;
                 return (
-                  <Button
-                    key={chip}
-                    size="xs"
-                    radius="sm"
-                    variant={isActive ? 'filled' : (isDark ? 'default' : 'light')}
-                    color="darkBlue"
-                    onClick={() => setActiveFilter(chip)}
-                    rightSection={(
-                      <Box
-                        px={6}
-                        py={1}
-                        style={{
-                          borderRadius: 4,
-                          background: isActive ? 'rgba(255,255,255,0.16)' : (isDark ? 'var(--mantine-color-default-hover)' : '#0b1a43'),
-                          color: isActive ? '#fff' : (isDark ? 'var(--mantine-color-text)' : '#fff'),
-                          fontSize: 11,
-                          fontWeight: 700,
-                          lineHeight: 1.2,
-                          minWidth: 18,
-                          textAlign: 'center',
-                        }}
-                      >
-                        {counters[chip]}
-                      </Box>
-                    )}
-                  >
+                  <Button key={chip} className={isActive ? 'consulta-filter-button is-active' : 'consulta-filter-button'} variant={isActive ? 'filled' : 'outline'} onClick={() => setActiveFilter(chip)} rightSection={<Box className="consulta-filter-count">{counters[chip]}</Box>}>
                     {getChipFilterLabel(chip)}
                   </Button>
                 );
               })}
-            </Group>
+            </Box>
+          </Box>
 
-            <Group gap={6}>
-              <ActionIcon
-                variant={viewMode === VIEW_MODES.LIST ? 'filled' : 'light'}
-                color="darkBlue"
-                onClick={() => setViewMode(VIEW_MODES.LIST)}
-                aria-label="Visualização em lista"
-              >
-                <List size={16} />
-              </ActionIcon>
-              <ActionIcon
-                variant={viewMode === VIEW_MODES.CARDS ? 'filled' : 'light'}
-                color="darkBlue"
-                onClick={() => setViewMode(VIEW_MODES.CARDS)}
-                aria-label="Visualização em cards"
-              >
-                <Grid2x2 size={16} />
-              </ActionIcon>
-            </Group>
-          </Group>
+          <Box className="consulta-results-meta">
+            <Text><b>{filtered.length}</b> {filtered.length === 1 ? 'consulta encontrada' : 'consultas encontradas'}</Text>
+            {query.trim() && <Text className="consulta-results-query">Busca por “{query.trim()}”</Text>}
+          </Box>
 
           {viewMode === VIEW_MODES.LIST && (
-            <Box style={{ overflowX: 'auto', border: `1px solid ${isDark ? 'var(--mantine-color-default-border)' : '#e9ecef'}`, borderRadius: 6 }}>
-              <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
+            <Box className="consulta-table-shell">
+              <Table className="consulta-table" horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                 <Table.Thead>
-                  <Table.Tr style={{ borderBottom: 'none' }}>
-                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendado para</Table.Th>
-                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Procedimento</Table.Th>
-                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Profissional</Table.Th>
-                    {!isTablet && <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                    <Table.Th style={{ color: 'var(--mantine-color-dimmed)', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                  <Table.Tr>
+                    <Table.Th>Paciente</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Agendado para</Table.Th>
+                    <Table.Th>Procedimento</Table.Th>
+                    <Table.Th>Profissional</Table.Th>
+                    {!isTablet && <Table.Th>Convênio</Table.Th>}
+                    <Table.Th className="consulta-actions-column">Ações</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -457,99 +422,36 @@ export function Consulta() {
                     const badge = statusBadge(row.statusFluxo);
                     const isFinalized = isFinalizedRow(row);
                     return (
-                      <Table.Tr key={row.id} style={{ borderBottom: `1px solid ${isDark ? 'var(--mantine-color-default-border)' : '#e9ecef'}` }}>
+                      <Table.Tr key={row.id}>
                         <Table.Td>
-                          <Group gap={isMobile ? 'xs' : 'sm'}>
-                            {!isMobile && (
-                              <Box
-                                bg={DARK_BLUE}
-                                w={32}
-                                h={32}
-                                style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                              >
-                                <Text c="white" fw={600} size="sm">
-                                  {row.nomeCompleto.charAt(0).toUpperCase()}
-                                </Text>
-                              </Box>
-                            )}
-                            <Box>
-                              <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>
-                                {row.nomeCompleto}
-                              </Text>
-                              {!isTablet && (
-                                <Text size="xs" c="dimmed">
-                                  CPF: {row.cpf ? formatCPF(row.cpf) : 'Não informado'}
-                                </Text>
-                              )}
+                          <Box className="consulta-patient-cell">
+                            {!isMobile && <Box className="consulta-avatar">{row.nomeCompleto.charAt(0).toUpperCase()}</Box>}
+                            <Box className="consulta-patient-copy">
+                              <Text fw={650}>{row.nomeCompleto}</Text>
+                              {!isTablet && <Text size="xs" c="dimmed">CPF: {row.cpf ? formatCPF(row.cpf) : 'Não informado'}</Text>}
                             </Box>
-                          </Group>
+                          </Box>
                         </Table.Td>
-                        <Table.Td>
-                          <Badge color={badge.color} variant="light">
-                            {badge.label}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{parseAppointmentDateTime(row)}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{row.procedimento || '-'}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{row.doctorName || loggedDoctorName || '-'}</Text>
-                        </Table.Td>
-                        {!isTablet && (
-                          <Table.Td>
-                            <Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>
-                              {row.convenio || 'Particular'}
-                            </Badge>
-                          </Table.Td>
-                        )}
-                        <Table.Td style={{ textAlign: 'center' }}>
-                          <Group justify="center">
+                        <Table.Td><Badge className="consulta-status-badge" color={badge.color} variant="light">{badge.label}</Badge></Table.Td>
+                        <Table.Td><Text className="consulta-date-cell">{parseAppointmentDateTime(row)}</Text></Table.Td>
+                        <Table.Td><Text className="consulta-truncate-cell" title={row.procedimento || '-'}>{row.procedimento || '-'}</Text></Table.Td>
+                        <Table.Td><Text className="consulta-truncate-cell" title={row.doctorName || loggedDoctorName || '-'}>{row.doctorName || loggedDoctorName || '-'}</Text></Table.Td>
+                        {!isTablet && <Table.Td><Badge variant="outline" radius="xl" color={row.convenio ? 'blue' : 'gray'}>{row.convenio || 'Particular'}</Badge></Table.Td>}
+                        <Table.Td className="consulta-actions-column">
+                          <Box className="consulta-menu-anchor">
                             <Menu shadow="md" width={220} position="bottom-end" withArrow>
-                              <Menu.Target>
-                                <ActionIcon variant="light" size="sm" aria-label="Ações da consulta">
-                                  <MoreVertical size={16} />
-                                </ActionIcon>
-                              </Menu.Target>
+                              <Menu.Target><ActionIcon className="consulta-row-action" variant="light" size="sm" aria-label={`Ações da consulta de ${row.nomeCompleto}`}><MoreVertical size={16} /></ActionIcon></Menu.Target>
                               <Menu.Dropdown>
-                                {row.isTeleconsultation && !isFinalized && (
-                                  <Menu.Item
-                                    leftSection={<Copy size={14} />}
-                                    disabled={loadingId === row.id}
-                                    onClick={() => { void copyTeleconsultationLink(row); }}
-                                  >
-                                    Copiar link
-                                  </Menu.Item>
-                                )}
-                                {!isFinalized && (
-                                  <Menu.Item
-                                    leftSection={row.isTeleconsultation ? <Video size={14} /> : <Play size={14} />}
-                                    disabled={loadingId === row.id}
-                                    onClick={() => {
-                                      if (row.isTeleconsultation) {
-                                        void startTeleconsultation(row);
-                                        return;
-                                      }
-                                      void startInPersonConsultation(row);
-                                    }}
-                                  >
-                                    {row.isTeleconsultation ? 'Iniciar teleconsulta' : 'Iniciar consulta'}
-                                  </Menu.Item>
-                                )}
+                                {row.isTeleconsultation && !isFinalized && <Menu.Item leftSection={<Copy size={14} />} disabled={loadingId === row.id} onClick={() => { void copyTeleconsultationLink(row); }}>Copiar link</Menu.Item>}
+                                {!isFinalized && <Menu.Item leftSection={row.isTeleconsultation ? <Video size={14} /> : <Play size={14} />} disabled={loadingId === row.id} onClick={() => { if (row.isTeleconsultation) { void startTeleconsultation(row); return; } void startInPersonConsultation(row); }}>{row.isTeleconsultation ? 'Iniciar teleconsulta' : 'Iniciar consulta'}</Menu.Item>}
                               </Menu.Dropdown>
                             </Menu>
-                          </Group>
+                          </Box>
                         </Table.Td>
                       </Table.Tr>
                     );
                   }) : (
-                    <Table.Tr>
-                      <Table.Td colSpan={isTablet ? 6 : 7}>
-                        <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
-                      </Table.Td>
-                    </Table.Tr>
+                    <Table.Tr><Table.Td colSpan={isTablet ? 6 : 7}><Box className="consulta-empty-state"><Search size={24} /><Text>Nenhuma consulta encontrada</Text><Text size="sm">Ajuste os filtros ou aguarde novos atendimentos.</Text></Box></Table.Td></Table.Tr>
                   )}
                 </Table.Tbody>
               </Table>
@@ -557,127 +459,29 @@ export function Consulta() {
           )}
 
           {viewMode === VIEW_MODES.CARDS && (
-            <Box>
-              {filtered.length > 0 ? (
-                <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
-                  {filtered.map((row) => {
-                    const isFinalized = isFinalizedRow(row);
-                    const dateTimeLabel = parseAppointmentDateTime(row);
-                    const complaint = parseComplaint(row);
-                    const urgent = isUrgentRow(row);
-                    return (
-                      <Paper
-                        key={row.id}
-                        withBorder
-                        p="sm"
-                        radius="md"
-                        style={{
-                          background: isDark ? 'var(--mantine-color-default-hover)' : '#f8f9ff',
-                          borderColor: isDark ? 'var(--mantine-color-default-border)' : 'var(--mantine-color-gray-3)',
-                        }}
-                      >
-                        <Group justify="space-between" align="flex-start" wrap="nowrap">
-                          <Group align="center" wrap="nowrap" gap="sm" style={{ minWidth: 0 }}>
-                            <Box
-                              style={{
-                                minWidth: 36,
-                                width: 36,
-                                height: 36,
-                                borderRadius: 8,
-                                background: isDark ? 'var(--mantine-color-darkBlue-6)' : '#5d78c9',
-                                color: 'white',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 700,
-                                fontSize: 22,
-                              }}
-                            >
-                              {row.nomeCompleto.slice(0, 1).toUpperCase()}
-                            </Box>
-                            <Box style={{ minWidth: 0 }}>
-                              <Text fw={700} lineClamp={1}>{row.nomeCompleto}</Text>
-                              <Text size="sm" c="dimmed" lineClamp={1}>{row.convenio || 'SulAmerica'}</Text>
-                            </Box>
-                          </Group>
-                          <Box>
-                            {row.isTeleconsultation && <Text fw={700} c="blue.3">Teleconsulta</Text>}
-                            {urgent && (
-                              <Group gap={4} justify="flex-end" mt={row.isTeleconsultation ? 2 : 0}>
-                                <AlertTriangle size={14} color="#f76707" />
-                                <Text c="orange.6" fw={700} size="sm">Urgente</Text>
-                              </Group>
-                            )}
-                          </Box>
-                        </Group>
-
-                        <Group gap={8} mt="sm">
-                          <Clock3 size={14} />
-                          <Text size="sm">{dateTimeLabel}</Text>
-                        </Group>
-
-                        <Text size="sm" mt={8} lineClamp={1}>
-                          <Text component="span" fw={700}>Procedimento: </Text>
-                          {row.procedimento || '-'}
-                        </Text>
-
-                        <Text size="sm" mt={8} lineClamp={2}>
-                          <Text component="span" fw={700}>Queixa: </Text>
-                          {complaint}
-                        </Text>
-                        <Text size="sm" mt={2} lineClamp={1}>
-                          <Text component="span" fw={700}>Profissional: </Text>
-                          {row.doctorName || loggedDoctorName || '-'}
-                        </Text>
-
-                        <Divider my="sm" />
-
-                        {!isFinalized && (
-                          row.isTeleconsultation ? (
-                            <Group gap={8} wrap="nowrap">
-                              <Button
-                                size="sm"
-                                variant="default"
-                                leftSection={<Copy size={14} />}
-                                onClick={() => { void copyTeleconsultationLink(row); }}
-                                loading={loadingId === row.id}
-                                style={{ flex: 1 }}
-                              >
-                                Copiar Link
-                              </Button>
-                              <Button
-                                size="sm"
-                                color="darkBlue"
-                                leftSection={<Video size={14} />}
-                                onClick={() => { void startTeleconsultation(row); }}
-                                loading={loadingId === row.id}
-                                style={{ flex: 1 }}
-                              >
-                                Iniciar teleconsulta
-                              </Button>
-                            </Group>
-                          ) : (
-                            <Group gap={8} wrap="nowrap">
-                              <Button
-                                size="sm"
-                                color="darkBlue"
-                                leftSection={<Play size={14} />}
-                                onClick={() => { void startInPersonConsultation(row); }}
-                                loading={loadingId === row.id}
-                                style={{ flex: 1 }}
-                              >
-                                Iniciar consulta
-                              </Button>
-                            </Group>
-                          )
-                        )}
-                      </Paper>
-                    );
-                  })}
-                </SimpleGrid>
-              ) : (
-                <Text ta="center" c="dimmed" py="md">Nenhuma consulta na fila no momento.</Text>
-              )}
+            <Box className="consulta-cards-grid">
+              {filtered.length > 0 ? filtered.map((row) => {
+                const isFinalized = isFinalizedRow(row);
+                const dateTimeLabel = parseAppointmentDateTime(row);
+                const complaint = parseComplaint(row);
+                const urgent = isUrgentRow(row);
+                const badge = statusBadge(row.statusFluxo);
+                return (
+                  <Paper key={row.id} className="consulta-card" withBorder>
+                    <Box className="consulta-card-header">
+                      <Box className="consulta-card-person"><Box className="consulta-avatar consulta-avatar--large">{row.nomeCompleto.slice(0, 1).toUpperCase()}</Box><Box className="consulta-patient-copy"><Text fw={700} lineClamp={1}>{row.nomeCompleto}</Text><Text size="sm" c="dimmed" lineClamp={1}>{row.convenio || 'Particular'}</Text></Box></Box>
+                      <Box className="consulta-card-tags"><Badge className="consulta-status-badge" color={badge.color} variant="light">{badge.label}</Badge>{row.isTeleconsultation && <Badge color="blue" variant="outline">Teleconsulta</Badge>}{urgent && <Badge color="orange" variant="outline"><AlertTriangle size={13} /> Urgente</Badge>}</Box>
+                    </Box>
+                    <Box className="consulta-card-date"><Clock3 size={16} /><Text>{dateTimeLabel}</Text></Box>
+                    <Box className="consulta-card-details">
+                      <Box><Text className="consulta-detail-label">Procedimento</Text><Text lineClamp={1}>{row.procedimento || '-'}</Text></Box>
+                      <Box><Text className="consulta-detail-label">Profissional</Text><Text lineClamp={1}>{row.doctorName || loggedDoctorName || '-'}</Text></Box>
+                      <Box className="consulta-card-note"><Text className="consulta-detail-label">Observação</Text><Text size="sm" c="dimmed" lineClamp={2}>{complaint}</Text></Box>
+                    </Box>
+                    {!isFinalized && <><Divider className="consulta-card-divider" />{row.isTeleconsultation ? <Box className="consulta-card-actions"><Button variant="outline" leftSection={<Copy size={15} />} onClick={() => { void copyTeleconsultationLink(row); }} loading={loadingId === row.id}>Copiar link</Button><Button leftSection={<Video size={15} />} onClick={() => { void startTeleconsultation(row); }} loading={loadingId === row.id}>Iniciar</Button></Box> : <Button fullWidth leftSection={<Play size={15} />} onClick={() => { void startInPersonConsultation(row); }} loading={loadingId === row.id}>Iniciar consulta</Button>}</>}
+                  </Paper>
+                );
+              }) : <Box className="consulta-empty-state"><Search size={24} /><Text>Nenhuma consulta encontrada</Text><Text size="sm">Ajuste os filtros ou aguarde novos atendimentos.</Text></Box>}
             </Box>
           )}
         </Paper>

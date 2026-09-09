@@ -5,10 +5,9 @@ import {
   Button,
   Text,
   Stack,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import AuthService from '../../services/authService';
 import { validateCNPJ } from '../../utils/validations';
@@ -140,7 +139,7 @@ export function Cadastro() {
         minHeight: '100vh',
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
-        backgroundColor: isMobile ? DARK_BLUE : 'white',
+        backgroundColor: isMobile ? '#0A2568' : 'white',
       }}
     >
       {/* Left/Top Side - Blue with Logo */}
@@ -148,7 +147,7 @@ export function Cadastro() {
         style={{
           width: isMobile ? '100%' : '50%',
           height: isMobile ? '35vh' : '100vh',
-          backgroundColor: DARK_BLUE,
+          backgroundColor: '#0A2568',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -242,7 +241,7 @@ export function Cadastro() {
             <Button
               fullWidth
               size="lg"
-              bg={DARK_BLUE}
+              bg={'#0A2568'}
               onClick={handleCadastro}
               loading={loading}
               mt="md"
@@ -260,10 +259,10 @@ export function Cadastro() {
               fullWidth
               size="lg"
               variant="outline"
-              c={DARK_BLUE}
+              c={'#0A2568'}
               styles={{
                 root: {
-                  borderColor: DARK_BLUE,
+                  borderColor: '#0A2568',
                   height: '56px',
                   borderRadius: '8px',
                   borderWidth: '2px',

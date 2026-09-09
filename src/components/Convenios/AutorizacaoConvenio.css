@@ -1,0 +1,151 @@
+.autorizacao-convenio-page {
+  background:
+    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--ui-primary) 10%, transparent), transparent 24rem),
+    var(--ui-background);
+}
+
+.autorizacao-convenio-content {
+  min-height: calc(100vh - 5rem);
+  padding-block: clamp(1.5rem, 4vw, 3.5rem) !important;
+  padding-inline: clamp(1rem, 3vw, 2rem) !important;
+}
+
+.autorizacao-convenio-hero {
+  min-height: 6.5rem;
+  padding: 1.25rem 0 1.75rem;
+}
+
+.autorizacao-convenio-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.autorizacao-convenio-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: clamp(1.75rem, 3vw, 2.7rem) !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+.autorizacao-convenio-subtitle {
+  margin-top: .55rem;
+  color: var(--ui-muted);
+  font-size: .98rem;
+}
+
+.autorizacao-convenio-hero-meta {
+  justify-content: flex-end;
+}
+
+.autorizacao-convenio-panel {
+  border-color: var(--ui-border) !important;
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .75rem 2rem rgb(0 0 0 / .1);
+}
+
+.autorizacao-convenio-search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--ui-background) 82%, var(--ui-surface));
+}
+
+.autorizacao-convenio-search-kicker {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.autorizacao-convenio-search-input {
+  width: min(100%, 26rem);
+}
+
+.autorizacao-convenio-filter-field {
+  width: min(100%, 14rem);
+}
+
+.autorizacao-convenio-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .85rem;
+}
+
+.autorizacao-convenio-table th {
+  padding: .75rem .85rem;
+  background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-surface));
+  color: var(--ui-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.autorizacao-convenio-table td {
+  padding: .85rem;
+  border-bottom-color: color-mix(in srgb, var(--ui-border) 78%, transparent);
+  vertical-align: top;
+}
+
+.autorizacao-convenio-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.autorizacao-convenio-table tbody tr:hover {
+  background: color-mix(in srgb, var(--ui-primary) 6%, var(--ui-background));
+}
+
+.autorizacao-convenio-status-select {
+  min-width: 9.5rem;
+  width: 9.5rem;
+}
+
+.autorizacao-convenio-attach-button {
+  min-width: 6.75rem;
+  width: 6.75rem;
+  padding-inline: .5rem;
+}
+
+.autorizacao-convenio-attach-button span {
+  font-size: .78rem;
+}
+
+.autorizacao-convenio-preview-box {
+  border: 1px solid var(--ui-border);
+  border-radius: .85rem;
+  padding: .75rem;
+  background: var(--ui-background);
+}
+
+@media (max-width: 799px) {
+  .autorizacao-convenio-content {
+    padding-top: 1rem !important;
+  }
+
+  .autorizacao-convenio-hero {
+    min-height: 0;
+    padding-block: .5rem 1.25rem;
+  }
+
+  .autorizacao-convenio-hero-meta {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .autorizacao-convenio-search-input,
+  .autorizacao-convenio-filter-field {
+    width: 100%;
+  }
+}

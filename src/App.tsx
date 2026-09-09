@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { MantineProvider } from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
-import { DatesProvider } from '@mantine/dates';
+import { ThemeProvider } from '@/components/ui';
+import { Notifications } from '@/components/ui';
+import { LocaleProvider } from '@/components/ui';
 import 'dayjs/locale/pt-br';
 import { theme } from './themes/theme';
 import authService from './services/authService';
@@ -168,8 +168,8 @@ function App() {
   }, []);
 
   return (
-    <MantineProvider theme={theme} forceColorScheme={colorScheme}>
-      <DatesProvider settings={{ locale: 'pt-br' }}>
+    <ThemeProvider theme={theme} forceColorScheme={colorScheme}>
+      <LocaleProvider settings={{ locale: 'pt-br' }}>
         <Notifications
           position="top-right"
           autoClose={5000}
@@ -461,8 +461,8 @@ function App() {
           </Routes>
           <TicketFab />
         </BrowserRouter>
-      </DatesProvider>
-    </MantineProvider>
+      </LocaleProvider>
+    </ThemeProvider>
   );
 }
 

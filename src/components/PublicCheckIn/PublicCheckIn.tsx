@@ -19,9 +19,9 @@ import {
   TextInput,
   ThemeIcon,
   Title,
-} from '@mantine/core';
+} from '@/components/ui';
 import { Camera, CircleAlert, ClipboardCheck, LogIn, LogOut, RefreshCcw, ShieldCheck, UserRoundCheck } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
+import { showNotification } from '@/components/ui';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';

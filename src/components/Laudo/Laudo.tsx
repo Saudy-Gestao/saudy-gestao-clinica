@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Tabs, Paper, Title } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { Box, Group, Text, TextInput, Button, Table, Modal, Stack, ActionIcon, Tabs, Paper, Title } from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
 import { Search, Plus, ChevronLeft, Lock, Eye, Pencil, Trash } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { showNotification } from '@/components/ui';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { Header } from '../Header/Header';
 import reportService from '../../services/reportService';
@@ -363,7 +362,7 @@ export function Laudo() {
 
                 <Group justify="flex-end" mt={10}>
                   <Button variant="default" onClick={() => { setActiveTab('cadastrados'); setLaudoData({ nome: '', cpf: '', dataNascimento: '', medicoSolicitante: '', medicoLaudante: '', medicoRevisor: '', descricao: '', conclusao: '', observacoes: '', status: '', exame: '' }); }} size="sm">Cancelar</Button>
-                  <Button bg={DARK_BLUE} onClick={handleSaveLaudo} size="sm">Salvar</Button>
+                  <Button bg="var(--ui-primary)" onClick={handleSaveLaudo} size="sm">Salvar</Button>
                 </Group>
               </Box>
             </Paper>
@@ -382,7 +381,7 @@ export function Laudo() {
                   style={{ flex: 1 }}
                 />
                 <Button
-                  bg={DARK_BLUE}
+                  bg="var(--ui-primary)"
                   c="white"
                   leftSection={isMobile ? undefined : <Plus size={18} />}
                   onClick={() => { setActiveTab('cadastro'); setIsNewPatient(true); setLaudoData({ nome: '', cpf: '', dataNascimento: '', medicoSolicitante: '', medicoLaudante: '', medicoRevisor: '', descricao: '', conclusao: '', observacoes: '', status: '', exame: '' }); }}
@@ -416,7 +415,7 @@ export function Laudo() {
                           <Group gap={isMobile ? "xs" : "sm"}>
                             {!isMobile && (
                               <Box
-                                bg={DARK_BLUE}
+                                bg="var(--ui-primary)"
                                 w={32}
                                 h={32}
                                 style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
@@ -616,7 +615,7 @@ export function Laudo() {
               ) : (
                 <>
                   <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-                  <Button bg={DARK_BLUE} onClick={handleSaveLaudo} size="sm">Salvar</Button>
+                  <Button bg="var(--ui-primary)" onClick={handleSaveLaudo} size="sm">Salvar</Button>
                 </>
               )}
             </Group>

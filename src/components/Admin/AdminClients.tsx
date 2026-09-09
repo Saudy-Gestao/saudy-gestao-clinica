@@ -13,11 +13,10 @@ import {
   Text,
   TextInput,
   Title,
-} from '@mantine/core';
+} from '@/components/ui';
 import { ArrowLeft, Building2, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import companyService from '../../services/companyService';
 import { useSettingsCompaniesQuery } from '../../hooks/useSettingsCompaniesQuery';
 import { queryKeys } from '../../lib/queryKeys';
@@ -143,7 +142,7 @@ export function AdminClients() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1200} mx="auto">
         <Stack gap="lg">
@@ -229,7 +228,7 @@ export function AdminClients() {
                   <Paper p="md" radius="md" withBorder>
                     <Stack gap="xs">
                       <Group gap="xs">
-                        <Building2 size={18} color={DARK_BLUE} />
+                        <Building2 size={18} color="var(--ui-primary)" />
                         <Text fw={600}>Tipo de módulo da empresa</Text>
                       </Group>
                       <Radio.Group
@@ -237,16 +236,16 @@ export function AdminClients() {
                         onChange={(value) => setForm((current) => ({ ...current, module_type: value as CompanyModuleType }))}
                       >
                         <Stack gap="xs">
-                          <Radio value="padrao" label="Padrão" description="Tudo do sistema, exceto a parte TEA." />
-                          <Radio value="tea" label="TEA" description="Tudo do sistema, inclusive a parte TEA." />
-                          <Radio value="apenas-tea" label="Apenas TEA" description="Somente TEA e dependências." />
+                          <Radio value="padrao" label="Padrão" description="Tudo do sistema, exceto a parte de Terapias." />
+                          <Radio value="tea" label="Terapias" description="Tudo do sistema, inclusive a parte de Terapias." />
+                          <Radio value="apenas-tea" label="Apenas Terapias" description="Somente Terapias e dependências." />
                         </Stack>
                       </Radio.Group>
                     </Stack>
                   </Paper>
 
                   <Group justify="flex-end">
-                    <Button leftSection={<Save size={16} />} onClick={handleSave} loading={saving} bg={DARK_BLUE}>
+                    <Button leftSection={<Save size={16} />} onClick={handleSave} loading={saving} bg="var(--ui-primary)">
                       Salvar alterações
                     </Button>
                   </Group>

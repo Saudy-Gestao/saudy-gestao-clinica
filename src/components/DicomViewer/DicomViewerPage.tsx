@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ActionIcon, Box, Button, Flex, Group, Loader, Skeleton, Text, Tooltip } from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
+import { ActionIcon, Box, Button, Flex, Group, Loader, Skeleton, Text, Tooltip } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { ArrowLeft, FileText, ScanLine, Trash2 } from 'lucide-react';
 import { DicomViewer } from './DicomViewer';
 import { SeriesThumbnail } from './SeriesThumbnail';
@@ -113,7 +113,7 @@ function StudyPane({ studyKey, source, title }: StudyPaneProps) {
     >
       {title ? (
         <Box style={{ padding: '8px 12px', borderBottom: '1px solid rgba(44,46,51,0.8)', background: '#101318' }}>
-          <Text size="sm" fw={700} c="gray.1">{title}</Text>
+          <Text size="sm" fw={700} c="#f4f6fb">{title}</Text>
         </Box>
       ) : null}
       <Box style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
@@ -142,7 +142,7 @@ function StudyPane({ studyKey, source, title }: StudyPaneProps) {
                 borderBottom: '1px solid rgba(95,123,255,0.15)',
               }}
             >
-              <Text size="xs" c="gray.5" fw={700} style={{ letterSpacing: '1px', textTransform: 'uppercase' }}>
+              <Text size="xs" c="#8b93a7" fw={700} style={{ letterSpacing: '1px', textTransform: 'uppercase' }}>
                 Series
               </Text>
               <Box
@@ -153,7 +153,7 @@ function StudyPane({ studyKey, source, title }: StudyPaneProps) {
                   padding: '1px 7px',
                 }}
               >
-                <Text size="xs" c="blue.3" fw={600}>
+                <Text size="xs" c="#7dabff" fw={600}>
                   {seriesList.length}
                 </Text>
               </Box>

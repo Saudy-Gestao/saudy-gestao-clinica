@@ -16,7 +16,7 @@ import {
   Center,
   ScrollArea,
   Avatar,
-} from '@mantine/core';
+} from '@/components/ui';
 import {
   User,
   Calendar,
@@ -30,7 +30,6 @@ import {
   Heart,
 } from 'lucide-react';
 import { usePatientSummaryQuery } from '../../hooks/usePatientSummaryQuery';
-import { DARK_BLUE } from '../../themes/theme';
 import { showErrorToast } from '../../lib/toast';
 
 interface PatientInfoModalProps {
@@ -118,7 +117,7 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
       size="xl"
       title={
         <Group gap="sm">
-          <Avatar color={DARK_BLUE} radius="xl">
+          <Avatar color={"var(--ui-primary)"} radius="xl">
             <User size={24} />
           </Avatar>
           <Box>
@@ -137,7 +136,7 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
         <Stack gap="lg">
           <Paper p="md" withBorder radius="md">
             <Group mb="md">
-              <User size={20} color={DARK_BLUE} />
+              <User size={20} color={"var(--ui-primary)"} />
               <Title order={4}>Informações Básicas</Title>
             </Group>
             <Divider mb="md" />
@@ -204,7 +203,7 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
 
           <Paper p="md" withBorder radius="md">
             <Group mb="md">
-              <Calendar size={20} color={DARK_BLUE} />
+              <Calendar size={20} color={"var(--ui-primary)"} />
               <Title order={4}>Agendamentos</Title>
             </Group>
             <Divider mb="md" />
@@ -265,7 +264,7 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
 
           <Paper p="md" withBorder radius="md">
             <Group mb="md">
-              <AlertCircle size={20} color={DARK_BLUE} />
+              <AlertCircle size={20} color={"var(--ui-primary)"} />
               <Title order={4}>Pendências</Title>
             </Group>
             <Divider mb="md" />
@@ -289,9 +288,9 @@ export function PatientInfoModal({ opened, onClose, patientData }: PatientInfoMo
                     <Group justify="space-between" wrap="nowrap">
                       <Group gap="sm" style={{ flex: 1 }}>
                         {item.type === 'report' ? (
-                          <FileText size={20} color={DARK_BLUE} />
+                          <FileText size={20} color={"var(--ui-primary)"} />
                         ) : (
-                          <Package size={20} color={DARK_BLUE} />
+                          <Package size={20} color={"var(--ui-primary)"} />
                         )}
                         <Box style={{ flex: 1 }}>
                           <Text fw={600} size="sm">{item.description}</Text>

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Box, Group, ActionIcon, Text, Modal, Stack, Button } from '@mantine/core';
+import { Box, Group, Text, Modal, Stack, Button } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft } from 'lucide-react';
+import { useMediaQuery } from '@/components/ui';
 import { Header } from '../Header/Header';
 import { WhatsAppConfig } from './WhatsAppConfig';
 import { useWhatsAppConfigQuery } from '../../hooks/useWhatsAppConfigQuery';
+import './WhatsAppPage.css';
 
 const hasDatabaseWhatsAppCredentials = (config: any) => Boolean(
   config?.accountSid?.trim()
@@ -27,20 +27,14 @@ export function WhatsAppPage() {
   }, [hasCredentialsConfigured, isLoading]);
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=comunicacao') }} />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">WhatsApp</Text>
-              <Text size="sm" c="dimmed">Notificações e configurações</Text>
-            </Box>
-          </Group>
-        </Group>
+        <Box className="whatsapp-page-hero">
+          <Text className="whatsapp-page-eyebrow">COMUNICAÇÃO</Text>
+          <Text className="whatsapp-page-title" fw={700} size="2xl">WhatsApp</Text>
+          <Text className="whatsapp-page-subtitle" size="sm">Mensagens, templates e configuração do canal.</Text>
+        </Box>
 
         {hasCredentialsConfigured ? (
           <WhatsAppConfig />

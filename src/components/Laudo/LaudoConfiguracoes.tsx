@@ -5,35 +5,33 @@ import {
   Badge,
   Box,
   Button,
+  ColorInput,
+  FileInput,
   Group,
+  Image,
+  Menu,
   Modal,
+  NumberInput,
   Paper,
-  Skeleton,
+  Select,
   SimpleGrid,
+  Skeleton,
   Stack,
   Switch,
   Table,
   Text,
-  Title,
-  Menu,
-  NumberInput,
-  Select,
-  useMantineColorScheme,
   Textarea,
-  ColorInput,
-  FileInput,
-  Image,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, MoreVertical, FileText, TextQuote, ListTodo, Settings2 } from 'lucide-react';
+  TextInput,
+  Title,
+  useColorScheme,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { ChevronRight, FileText, ListTodo, MoreVertical, Pencil, Plus, Settings2, TextQuote, Trash2 } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
 import reportTemplateService from '../../services/reportTemplateService';
 import reportPhraseService from '../../services/reportPhraseService';
 import reportWorklistService from '../../services/reportWorklistService';
@@ -43,6 +41,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import { normalizeReportLayout } from '../../lib/reportLayout';
 import type { ReportLayoutConfig } from '../../services/reportConfigService';
+import './LaudoConfiguracoes.css';
 
 type WorklistStatus = 'sem_laudo' | 'laudado' | 'revisado' | 'finalizado';
 type WorklistPriority = 'normal' | 'urgente';
@@ -116,7 +115,7 @@ export function LaudoConfiguracoes() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
 
   const [activeTab, setActiveTab] = useState<'hub' | 'templates' | 'phrases' | 'worklist' | 'settings'>('hub');
@@ -606,120 +605,90 @@ export function LaudoConfiguracoes() {
   };
 
   return (
-    <Box style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeTab === 'hub' ? navigate('/dashboard?secao=cadastros-clinicos') : setActiveTab('hub')) }} />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group justify="space-between" mb={isMobile ? 20 : 30} align="center" wrap="wrap">
-          <Group align="center">
-            <ActionIcon variant="default" size="xl" onClick={() => navigate('/laudo-exames')}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Configurações de Laudo</Text>
-              <Text c="dimmed" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM</Text>
-            </Box>
-          </Group>
-        </Group>
-
         {activeTab === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-            {[
-              {
-                key: 'templates',
-                icon: FileText,
-                title: 'Padrões',
-                desc: 'Cadastre e gerencie modelos de laudo por tipo de exame.',
-                onClick: () => setActiveTab('templates'),
-              },
-              {
-                key: 'phrases',
-                icon: TextQuote,
-                title: 'Frases',
-                desc: 'Organize frases frequentes para acelerar o preenchimento de laudos.',
-                onClick: () => setActiveTab('phrases'),
-              },
-              {
-                key: 'worklist',
-                icon: ListTodo,
-                title: 'Fila Manual',
-                desc: 'Gerencie itens da fila de laudo enquanto a integração completa não é usada.',
-                onClick: () => setActiveTab('worklist'),
-              },
-              {
-                key: 'settings',
-                icon: Settings2,
-                title: 'Configurações',
-                desc: 'Defina regras globais para finalização e revisão de laudos.',
-                onClick: () => setActiveTab('settings'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDark ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDark ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
+          <>
+            <Box className="laudo-config-hero">
+              <Text className="laudo-config-eyebrow">CADASTROS CLÍNICOS</Text>
+              <Text className="laudo-config-title" fw={700} size="2xl">Configurações de Laudo</Text>
+              <Text className="laudo-config-subtitle" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM.</Text>
+            </Box>
+
+            <SimpleGrid className="laudo-config-hub-grid" cols={{ base: 1, sm: 2, md: 4 }}>
+              {[
+                {
+                  key: 'templates',
+                  icon: FileText,
+                  title: 'Padrões',
+                  desc: 'Cadastre e gerencie modelos de laudo por tipo de exame.',
+                  onClick: () => setActiveTab('templates'),
+                },
+                {
+                  key: 'phrases',
+                  icon: TextQuote,
+                  title: 'Frases',
+                  desc: 'Organize frases frequentes para acelerar o preenchimento de laudos.',
+                  onClick: () => setActiveTab('phrases'),
+                },
+                {
+                  key: 'worklist',
+                  icon: ListTodo,
+                  title: 'Fila Manual',
+                  desc: 'Gerencie itens da fila de laudo enquanto a integração completa não é usada.',
+                  onClick: () => setActiveTab('worklist'),
+                },
+                {
+                  key: 'settings',
+                  icon: Settings2,
+                  title: 'Configurações',
+                  desc: 'Defina regras globais para finalização e revisão de laudos.',
+                  onClick: () => setActiveTab('settings'),
+                },
+              ].map((card) => (
+                <Paper key={card.key} className="laudo-config-hub-card" withBorder onClick={card.onClick}>
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="laudo-config-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="laudo-config-hub-chevron" style={{ flexShrink: 0 }} />
                   </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveTab('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>
-                  {activeTab === 'templates'
-                    ? 'Padrões de Laudo'
-                    : activeTab === 'phrases'
-                      ? 'Frases de Laudo'
-                      : activeTab === 'worklist'
-                        ? 'Fila Manual'
-                        : 'Configurações'}
-                </Text>
-              </Group>
+              <Text fw={600} size="lg">
+                {activeTab === 'templates'
+                  ? 'Padrões de Laudo'
+                  : activeTab === 'phrases'
+                    ? 'Frases de Laudo'
+                    : activeTab === 'worklist'
+                      ? 'Fila Manual'
+                      : 'Configurações'}
+              </Text>
             </Group>
 
             {activeTab === 'templates' && (
-            <Paper withBorder p="md">
-              <Group justify="space-between" mb="sm">
-                <FloatingInput
+            <Paper className="laudo-config-panel" withBorder p="md">
+              <Group justify="space-between" mb="sm" wrap="wrap" gap="sm">
+                <TextInput
                   label="Buscar padrões"
                   placeholder="Buscar padrão por nome ou exame"
                   value={templateQuery}
                   onChange={(e) => setTemplateQuery(e.currentTarget.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 260px' }}
                 />
-                <Button leftSection={<Plus size={16} />} onClick={openTemplateCreate}>Novo padrão</Button>
+                <Button leftSection={<Plus size={16} />} onClick={openTemplateCreate} fullWidth={isMobile}>Novo padrão</Button>
               </Group>
               <PaginatedGrid
                 totalItems={filteredTemplates.length}
@@ -757,7 +726,7 @@ export function LaudoConfiguracoes() {
                         <Table.Td>{item.group || '-'}</Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
-                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                            <Menu shadow="md" width={210} position="bottom-end" withArrow>
                               <Menu.Target>
                                 <ActionIcon variant="light" size="sm" aria-label="Ações do padrão">
                                   <MoreVertical size={16} />
@@ -790,16 +759,16 @@ export function LaudoConfiguracoes() {
             )}
 
             {activeTab === 'phrases' && (
-            <Paper withBorder p="md">
-              <Group justify="space-between" mb="sm">
-                <FloatingInput
+            <Paper className="laudo-config-panel" withBorder p="md">
+              <Group justify="space-between" mb="sm" wrap="wrap" gap="sm">
+                <TextInput
                   label="Buscar frases"
                   placeholder="Buscar frase por rótulo, exame ou conteúdo"
                   value={phraseQuery}
                   onChange={(e) => setPhraseQuery(e.currentTarget.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 260px' }}
                 />
-                <Button leftSection={<Plus size={16} />} onClick={openPhraseCreate}>Nova frase</Button>
+                <Button leftSection={<Plus size={16} />} onClick={openPhraseCreate} fullWidth={isMobile}>Nova frase</Button>
               </Group>
               <PaginatedGrid
                 totalItems={filteredPhrases.length}
@@ -839,7 +808,7 @@ export function LaudoConfiguracoes() {
                         <Table.Td><Text lineClamp={2}>{decodeHtmlEntities(stripHtml(item.text))}</Text></Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
-                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                            <Menu shadow="md" width={210} position="bottom-end" withArrow>
                               <Menu.Target>
                                 <ActionIcon variant="light" size="sm" aria-label="Ações da frase">
                                   <MoreVertical size={16} />
@@ -872,16 +841,16 @@ export function LaudoConfiguracoes() {
             )}
 
             {activeTab === 'worklist' && (
-            <Paper withBorder p="md">
-              <Group justify="space-between" mb="sm">
-                <FloatingInput
+            <Paper className="laudo-config-panel" withBorder p="md">
+              <Group justify="space-between" mb="sm" wrap="wrap" gap="sm">
+                <TextInput
                   label="Buscar fila de laudo"
                   placeholder="Buscar paciente, exame ou item da fila"
                   value={worklistQuery}
                   onChange={(e) => setWorklistQuery(e.currentTarget.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 260px' }}
                 />
-                <Button leftSection={<Plus size={16} />} onClick={openWorklistCreate}>Novo item de fila</Button>
+                <Button leftSection={<Plus size={16} />} onClick={openWorklistCreate} fullWidth={isMobile}>Novo item de fila</Button>
               </Group>
               <PaginatedGrid
                 totalItems={filteredWorklist.length}
@@ -941,7 +910,7 @@ export function LaudoConfiguracoes() {
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
-                            <Menu shadow="md" width={210} position="bottom" withArrow>
+                            <Menu shadow="md" width={210} position="bottom-end" withArrow>
                               <Menu.Target>
                                 <ActionIcon variant="light" size="sm" aria-label="Ações da fila">
                                   <MoreVertical size={16} />
@@ -984,35 +953,42 @@ export function LaudoConfiguracoes() {
             )}
 
             {activeTab === 'settings' && (
-            <Paper withBorder p="md">
+            <Paper className="laudo-config-panel" withBorder p="md">
               <Stack gap="lg">
                 <Title order={5}>Regras de Finalização</Title>
-                <Switch
-                  label="Exigir assinatura de revisor na finalização"
-                  checked={requiresReviewer}
-                  onChange={(event) => handleRequiresReviewerChange(event.currentTarget.checked)}
-                  disabled={savingConfig}
-                />
-                <Text size="sm" c="dimmed">
-                  Quando habilitado, o laudo só pode ser finalizado após assinatura do emissor e do revisor.
-                </Text>
+                <Box p="md" className="ui-toggle-card">
+                  <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                    <Box>
+                      <Text fw={600} size="sm">Assinatura de revisor obrigatória</Text>
+                      <Text size="xs" c="dimmed">
+                        Quando habilitado, o laudo só pode ser finalizado após assinatura do emissor e do revisor.
+                      </Text>
+                    </Box>
+                    <Switch
+                      label={requiresReviewer ? 'Ativo' : 'Inativo'}
+                      checked={requiresReviewer}
+                      onChange={(event) => handleRequiresReviewerChange(event.currentTarget.checked)}
+                      disabled={savingConfig}
+                    />
+                  </Group>
+                </Box>
 
-                <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)', paddingTop: 18 }}>
+                <Box className="laudo-config-layout-section">
                   <Group justify="space-between" align="center" mb="md" wrap="wrap">
                     <Box>
                       <Title order={5}>Layout da Prévia</Title>
                       <Text size="sm" c="dimmed">Estas opções controlam o documento exibido em Prévia no editor de laudo.</Text>
                     </Box>
-                    <Button bg={DARK_BLUE} c="white" onClick={saveReportLayout} loading={savingConfig}>
+                    <Button onClick={saveReportLayout} loading={savingConfig}>
                       Salvar layout
                     </Button>
                   </Group>
 
                   <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    <FloatingInput label="Nome da clínica" value={reportLayout.clinicName} onChange={(event) => updateReportLayout('clinicName', event.currentTarget.value)} />
-                    <FloatingInput label="Título do laudo" value={reportLayout.title} onChange={(event) => updateReportLayout('title', event.currentTarget.value)} />
-                    <FloatingInput label="Subtítulo" value={reportLayout.subtitle} onChange={(event) => updateReportLayout('subtitle', event.currentTarget.value)} />
-                    <FloatingInput label="URL do logo" value={reportLayout.logoUrl} onChange={(event) => updateReportLayout('logoUrl', event.currentTarget.value)} />
+                    <TextInput label="Nome da clínica" value={reportLayout.clinicName} onChange={(event) => updateReportLayout('clinicName', event.currentTarget.value)} />
+                    <TextInput label="Título do laudo" value={reportLayout.title} onChange={(event) => updateReportLayout('title', event.currentTarget.value)} />
+                    <TextInput label="Subtítulo" value={reportLayout.subtitle} onChange={(event) => updateReportLayout('subtitle', event.currentTarget.value)} />
+                    <TextInput label="URL do logo" value={reportLayout.logoUrl} onChange={(event) => updateReportLayout('logoUrl', event.currentTarget.value)} />
                     <FileInput label="Carregar logo" accept="image/*" clearable onChange={handleLogoImageUpload} />
                     <Group align="flex-end" gap="sm">
                       {reportLayout.logoImageDataUrl ? (
@@ -1062,7 +1038,7 @@ export function LaudoConfiguracoes() {
 
       <Modal opened={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateEditingId ? 'Editar padrão' : 'Novo padrão'} centered size="xl">
         <Stack>
-          <FloatingInput
+          <TextInput
             label="Nome"
             value={templateForm.name}
             onChange={(e) => {
@@ -1071,7 +1047,7 @@ export function LaudoConfiguracoes() {
             }}
             required
           />
-          <FloatingSelect
+          <Select
             label="Tipo de exame"
             data={examTypeOptions}
             searchable
@@ -1079,7 +1055,7 @@ export function LaudoConfiguracoes() {
             onChange={(value) => setTemplateForm((prev) => ({ ...prev, examType: value || '' }))}
             required
           />
-          <FloatingSelect
+          <Select
             label="Grupo"
             data={templateGroupOptions}
             searchable
@@ -1106,14 +1082,14 @@ export function LaudoConfiguracoes() {
           </Box>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setTemplateModalOpen(false)}>Cancelar</Button>
-            <Button bg={DARK_BLUE} c="white" onClick={saveTemplate}>Salvar</Button>
+            <Button onClick={saveTemplate}>Salvar</Button>
           </Group>
         </Stack>
       </Modal>
 
       <Modal opened={phraseModalOpen} onClose={() => setPhraseModalOpen(false)} title={phraseEditingId ? 'Editar frase' : 'Nova frase'} centered size="lg">
         <Stack>
-          <FloatingSelect
+          <Select
             label="Tipo de exame"
             data={examTypeOptions}
             searchable
@@ -1121,7 +1097,7 @@ export function LaudoConfiguracoes() {
             onChange={(value) => setPhraseForm((prev) => ({ ...prev, examType: value || '' }))}
             required
           />
-          <FloatingInput
+          <TextInput
             label="Rótulo"
             value={phraseForm.label}
             onChange={(e) => {
@@ -1130,7 +1106,7 @@ export function LaudoConfiguracoes() {
             }}
             required
           />
-          <FloatingInput
+          <TextInput
             label="Atalho (ex: Ctrl+1)"
             value={phraseForm.shortcut}
             placeholder="Pressione a combinação"
@@ -1170,14 +1146,14 @@ export function LaudoConfiguracoes() {
           </Box>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setPhraseModalOpen(false)}>Cancelar</Button>
-            <Button bg={DARK_BLUE} c="white" onClick={savePhrase}>Salvar</Button>
+            <Button onClick={savePhrase}>Salvar</Button>
           </Group>
         </Stack>
       </Modal>
 
       <Modal opened={worklistModalOpen} onClose={() => setWorklistModalOpen(false)} title={worklistEditingId ? 'Editar item da fila' : 'Novo item da fila'} centered size="lg">
         <Stack>
-          <FloatingInput
+          <TextInput
             label="Paciente"
             value={worklistForm.patientName}
             onChange={(e) => {
@@ -1186,7 +1162,7 @@ export function LaudoConfiguracoes() {
             }}
             required
           />
-          <FloatingInput
+          <TextInput
             label="CPF"
             value={worklistForm.patientCpf}
             onChange={(e) => {
@@ -1194,7 +1170,7 @@ export function LaudoConfiguracoes() {
               setWorklistForm((prev) => ({ ...prev, patientCpf: value }));
             }}
           />
-          <FloatingSelect
+          <Select
             label="Tipo de exame"
             data={examTypeOptions}
             searchable
@@ -1202,7 +1178,7 @@ export function LaudoConfiguracoes() {
             onChange={(value) => setWorklistForm((prev) => ({ ...prev, examType: value || '' }))}
             required
           />
-          <FloatingSelect
+          <Select
             label="Convênio"
             data={convenioOptions}
             searchable
@@ -1210,7 +1186,7 @@ export function LaudoConfiguracoes() {
             value={worklistForm.convenio || null}
             onChange={(value) => setWorklistForm((prev) => ({ ...prev, convenio: value || '' }))}
           />
-          <FloatingInput
+          <TextInput
             label="Data/Hora agendada"
             value={worklistForm.scheduledAt}
             onChange={(e) => {
@@ -1219,7 +1195,7 @@ export function LaudoConfiguracoes() {
             }}
             placeholder="dd/mm/aaaa hh:mm"
           />
-          <FloatingInput
+          <TextInput
             label="Solicitante"
             value={worklistForm.requestingDoctor}
             onChange={(e) => {
@@ -1227,7 +1203,7 @@ export function LaudoConfiguracoes() {
               setWorklistForm((prev) => ({ ...prev, requestingDoctor: value }));
             }}
           />
-          <FloatingInput
+          <TextInput
             label="Laudante"
             value={worklistForm.assignedTo}
             onChange={(e) => {
@@ -1235,13 +1211,13 @@ export function LaudoConfiguracoes() {
               setWorklistForm((prev) => ({ ...prev, assignedTo: value }));
             }}
           />
-          <FloatingSelect
+          <Select
             label="Prioridade"
             data={[{ value: 'normal', label: 'Normal' }, { value: 'urgente', label: 'Urgente' }]}
             value={worklistForm.priority}
             onChange={(value) => setWorklistForm((prev) => ({ ...prev, priority: (value as WorklistPriority) || 'normal' }))}
           />
-          <FloatingSelect
+          <Select
             label="Status"
             data={[
               { value: 'sem_laudo', label: 'Sem laudo' },
@@ -1254,7 +1230,7 @@ export function LaudoConfiguracoes() {
           />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setWorklistModalOpen(false)}>Cancelar</Button>
-            <Button bg={DARK_BLUE} c="white" onClick={saveWorklist}>Salvar</Button>
+            <Button onClick={saveWorklist}>Salvar</Button>
           </Group>
         </Stack>
       </Modal>

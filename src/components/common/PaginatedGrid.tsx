@@ -1,4 +1,4 @@
-import { Box, Group, Pagination, Select, Stack, Text, useComputedColorScheme } from '@mantine/core';
+import { Box, Group, Pagination, Select, Stack, Text, useColorSchemeValue } from '@/components/ui';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 
@@ -27,7 +27,7 @@ export function PaginatedGrid({
   isMobile = false,
   showFooter = true,
 }: PaginatedGridProps) {
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
+  const isDarkMode = useColorSchemeValue('light') === 'dark';
   const totalPages = useMemo(() => {
     if (totalItems <= 0) return 1;
     return Math.max(1, Math.ceil(totalItems / pageSize));

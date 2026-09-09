@@ -9,7 +9,7 @@ import {
 describe('appColorScheme', () => {
   beforeEach(() => {
     localStorage.clear();
-    document.documentElement.removeAttribute('data-mantine-color-scheme');
+    document.documentElement.removeAttribute('data-color-scheme');
   });
 
   describe('getAppColorScheme', () => {
@@ -34,9 +34,9 @@ describe('appColorScheme', () => {
       expect(localStorage.getItem(APP_COLOR_SCHEME_STORAGE_KEY)).toBe('dark');
     });
 
-    it('sets data-mantine-color-scheme on html element', () => {
+    it('sets data-color-scheme on html element', () => {
       applyAppColorScheme('dark');
-      expect(document.documentElement.getAttribute('data-mantine-color-scheme')).toBe('dark');
+      expect(document.documentElement.getAttribute('data-color-scheme')).toBe('dark');
     });
 
     it('applies light scheme', () => {

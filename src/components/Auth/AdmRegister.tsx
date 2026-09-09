@@ -1,11 +1,9 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Stack, Text, Group } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { Box, Button, Stack, Text, Group, TextInput } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import authService from '../../services/authService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
 
 export function AdmRegister() {
   const navigate = useNavigate();
@@ -19,13 +17,13 @@ export function AdmRegister() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const previousScheme = root.getAttribute('data-mantine-color-scheme') || 'light';
+    const previousScheme = root.getAttribute('data-color-scheme');
 
-    root.setAttribute('data-mantine-color-scheme', 'light');
+    root.setAttribute('data-color-scheme', 'light');
 
     return () => {
-      const persistedScheme = localStorage.getItem('mantine-color-scheme') || previousScheme;
-      root.setAttribute('data-mantine-color-scheme', persistedScheme);
+      if (previousScheme) root.setAttribute('data-color-scheme', previousScheme);
+      else root.removeAttribute('data-color-scheme');
     };
   }, []);
 
@@ -111,7 +109,7 @@ export function AdmRegister() {
         style={{
           width: '40%',
           minWidth: 320,
-          backgroundColor: DARK_BLUE,
+          backgroundColor: '#0A2568',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -136,9 +134,9 @@ export function AdmRegister() {
 
             {step === 'form' ? (
               <>
-                <FloatingInput label="Nome" value={name} onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
-                <FloatingInput label="E-mail" value={email} onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} />
-                <FloatingInput label="Senha" type="password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
+                <TextInput label="Nome" value={name} onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
+                <TextInput label="E-mail" value={email} onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} />
+                <TextInput label="Senha" type="password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
                 <Box>
                   <Text size="xs" c="dimmed" mb={6}>A senha deve conter:</Text>
                   <Stack gap={2}>
@@ -153,17 +151,17 @@ export function AdmRegister() {
                     </Text>
                   </Stack>
                 </Box>
-                <FloatingInput label="Confirmar senha" type="password" value={confirmPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)} />
+                <TextInput label="Confirmar senha" type="password" value={confirmPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)} />
 
-                <Button fullWidth size="lg" bg={DARK_BLUE} onClick={handleRequestCode} loading={loading}>
+                <Button fullWidth size="lg" bg={'#0A2568'} onClick={handleRequestCode} loading={loading}>
                   Enviar código de validação
                 </Button>
               </>
             ) : (
               <>
-                <FloatingInput label="Código do e-mail" value={code} onChange={(e: ChangeEvent<HTMLInputElement>) => setCode(e.target.value)} />
+                <TextInput label="Código do e-mail" value={code} onChange={(e: ChangeEvent<HTMLInputElement>) => setCode(e.target.value)} />
 
-                <Button fullWidth size="lg" bg={DARK_BLUE} onClick={handleVerifyCode} loading={loading}>
+                <Button fullWidth size="lg" bg={'#0A2568'} onClick={handleVerifyCode} loading={loading}>
                   Confirmar código e entrar
                 </Button>
 

@@ -5,32 +5,40 @@ import {
   Box,
   Group,
   Text,
+  Title,
   Button,
+  TextInput,
+  Textarea,
+  SimpleGrid,
   Stack,
   ActionIcon,
   Switch,
   Tabs,
   Table,
-
   Paper,
   NumberInput,
   Select,
   Skeleton,
   Menu,
-
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
-import { ChevronLeft, Plus, Trash2, MoreVertical, Pencil } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { notifications } from '@/components/ui';
+import { Plus, Trash2, MoreVertical, Pencil, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingTextarea } from '../common/FloatingTextarea';
 import insuranceService from '../../services/insuranceService';
 import procedureService from '../../services/procedureService';
 import { useInsuranceDetailQuery } from '../../hooks/useInsuranceDetailQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import './ConvenioForm.css';
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <Title order={5} fw={600} className="convenio-form-section-title" mb="sm" mt="md">
+      {children}
+    </Title>
+  );
+}
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -81,108 +89,128 @@ function InfoTab({
   };
 
   return (
-    <Stack gap="sm" pt="md">
-      <FloatingInput
-        label="Nome do convênio"
-        required
-        placeholder="Ex: Unimed"
-        value={form.name}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, name: v })); }}
-      />
+    <Stack gap="md" pt="md">
+      <Paper className="convenio-form-panel" p="md" withBorder radius="md">
+        <SectionTitle>Dados do convênio</SectionTitle>
+        <Stack gap="md">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <TextInput
+              label="Nome do convênio"
+              required
+              placeholder="Ex: Unimed"
+              value={form.name}
+              onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, name: v })); }}
+            />
 
-      <FloatingInput
-        label="Código"
-        placeholder="Opcional"
-        value={form.code}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, code: v })); }}
-      />
+            <TextInput
+              label="Código"
+              placeholder="Opcional"
+              value={form.code}
+              onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, code: v })); }}
+            />
+          </SimpleGrid>
 
-      <FloatingTextarea
-        label="Descrição"
-        placeholder="Detalhes do convênio"
-        minRows={3}
-        value={form.description}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, description: v })); }}
-      />
+          <Textarea
+            label="Descrição"
+            placeholder="Detalhes do convênio"
+            minRows={3}
+            value={form.description}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, description: v })); }}
+          />
 
-      <Text fw={600} size="sm" mt="xs">Configuração TISS</Text>
-      <Text size="xs" c="dimmed" mt={-8}>
-        Esses dados são usados na geração do XML TISS.
-      </Text>
+          <Box className="ui-toggle-card">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Box>
+                <Text fw={600} size="sm">Convênio ativo</Text>
+                <Text size="xs" c="dimmed">Convênios inativos deixam de ficar disponíveis para novos cadastros.</Text>
+              </Box>
+              <Switch
+                label={form.isActive ? 'Ativo' : 'Inativo'}
+                checked={form.isActive}
+                onChange={(e) => { const checked = e.currentTarget.checked; setForm((p: any) => ({ ...p, isActive: checked })); }}
+              />
+            </Group>
+          </Box>
 
-      <FloatingInput
-        label="Registro ANS da operadora"
-        placeholder="Ex: 123456"
-        value={form.tissRegistroAns}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissRegistroAns: v })); }}
-      />
-      <FloatingInput
-        label="CNPJ da operadora"
-        placeholder="Somente números"
-        value={form.tissOperadoraCnpj}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissOperadoraCnpj: v })); }}
-      />
-      <FloatingInput
-        label="Versão TISS"
-        placeholder="Ex: 3.05.00"
-        value={form.tissVersao}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissVersao: v })); }}
-      />
-      <FloatingInput
-        label="CNPJ do prestador executante"
-        placeholder="Somente números"
-        value={form.tissPrestadorCnpj}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissPrestadorCnpj: v })); }}
-      />
-      <FloatingInput
-        label="CNES do prestador executante"
-        placeholder="Ex: 1234567"
-        value={form.tissPrestadorCnes}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissPrestadorCnes: v })); }}
-      />
-      <FloatingInput
-        label="Código do prestador na operadora"
-        placeholder="Código contratado"
-        value={form.tissCodigoPrestadorOperadora}
-        onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissCodigoPrestadorOperadora: v })); }}
-      />
+          <Box>
+            <TextInput
+              label="Subconvênio"
+              placeholder="Digite e pressione Enter"
+              value={subInsuranceInput}
+              onChange={(e) => setSubInsuranceInput(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddSubInsurance();
+                }
+              }}
+            />
+            {form.subInsurances.length > 0 && (
+              <Group gap="xs" mt="xs">
+                {form.subInsurances.map((sub: string) => (
+                  <Button
+                    key={sub}
+                    size="compact-xs"
+                    variant="light"
+                    color="blue"
+                    onClick={() => setForm((p: any) => ({ ...p, subInsurances: p.subInsurances.filter((s: string) => s !== sub) }))}
+                  >
+                    {sub} ×
+                  </Button>
+                ))}
+              </Group>
+            )}
+          </Box>
+        </Stack>
+      </Paper>
 
-      <Switch
-        label="Convênio ativo"
-        checked={form.isActive}
-        onChange={(e) => { const checked = e.currentTarget.checked; setForm((p: any) => ({ ...p, isActive: checked })); }}
-      />
+      <Paper className="convenio-form-panel" p="md" withBorder radius="md">
+        <SectionTitle>Configuração TISS</SectionTitle>
+        <Text size="xs" c="dimmed" mb="md">
+          Esses dados são usados na geração do XML TISS.
+        </Text>
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+          <TextInput
+            label="Registro ANS da operadora"
+            placeholder="Ex: 123456"
+            value={form.tissRegistroAns}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissRegistroAns: v })); }}
+          />
+          <TextInput
+            label="CNPJ da operadora"
+            placeholder="Somente números"
+            value={form.tissOperadoraCnpj}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissOperadoraCnpj: v })); }}
+          />
+          <TextInput
+            label="Versão TISS"
+            placeholder="Ex: 3.05.00"
+            value={form.tissVersao}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissVersao: v })); }}
+          />
+          <TextInput
+            label="CNPJ do prestador executante"
+            placeholder="Somente números"
+            value={form.tissPrestadorCnpj}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissPrestadorCnpj: v })); }}
+          />
+          <TextInput
+            label="CNES do prestador executante"
+            placeholder="Ex: 1234567"
+            value={form.tissPrestadorCnes}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissPrestadorCnes: v })); }}
+          />
+          <TextInput
+            label="Código do prestador na operadora"
+            placeholder="Código contratado"
+            value={form.tissCodigoPrestadorOperadora}
+            onChange={(e) => { const v = e.currentTarget.value; setForm((p: any) => ({ ...p, tissCodigoPrestadorOperadora: v })); }}
+          />
+        </SimpleGrid>
+      </Paper>
 
-      <Box>
-        <FloatingInput
-          label="Subconvênio"
-          placeholder="Digite e pressione Enter"
-          value={subInsuranceInput}
-          onChange={(e) => setSubInsuranceInput(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleAddSubInsurance();
-            }
-          }}
-        />
-      </Box>
-      <Group gap="xs" mt={-4}>
-        {form.subInsurances.map((sub: string) => (
-          <Button
-            key={sub}
-            size="compact-xs"
-            variant="light"
-            color="blue"
-            onClick={() => setForm((p: any) => ({ ...p, subInsurances: p.subInsurances.filter((s: string) => s !== sub) }))}
-          >
-            {sub} ×
-          </Button>
-        ))}
-      </Group>
-
-      <Group justify="flex-end" mt="md">
-        <Button bg={DARK_BLUE} onClick={onSave} loading={saving} disabled={saving}>
+      <Group justify="flex-end">
+        <Button onClick={onSave} loading={saving} disabled={saving}>
           {isNew ? 'Cadastrar' : 'Salvar alterações'}
         </Button>
       </Group>
@@ -331,7 +359,6 @@ function ProceduresTab({
           {linked.length} procedimento(s) vinculado(s)
         </Text>
         <Button
-          bg={DARK_BLUE}
           leftSection={<Plus size={16} />}
           size="sm"
           onClick={() => setAdding((v) => !v)}
@@ -341,14 +368,34 @@ function ProceduresTab({
       </Group>
 
       {adding && (
-        <Paper withBorder radius="md" p="md">
+        <Paper className="convenio-form-card" withBorder radius="md" p="md" style={{ maxWidth: 640 }}>
           <Stack gap="sm">
             <Text fw={600} size="sm">Vincular procedimento</Text>
 
+            <TextInput
+              label="Buscar procedimento"
+              placeholder="Digite o nome do procedimento"
+              leftSection={<Search size={16} aria-hidden="true" />}
+              value={searchAdd}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setSearchAdd(v);
+                setSelectedProcedureId(null);
+                setSelectedProcedureOption(null);
+              }}
+            />
+
             <Select
               label="Procedimento"
-              placeholder="Buscar por nome..."
-              searchable
+              placeholder={
+                loadingOptions
+                  ? 'Buscando...'
+                  : !searchAdd.trim()
+                    ? 'Digite para buscar acima'
+                    : procedureOptions.length
+                      ? 'Selecione um procedimento'
+                      : 'Nenhum procedimento encontrado'
+              }
               data={(() => {
                 const opts = procedureOptions.map((opt) => ({
                   value: opt.id,
@@ -370,10 +417,7 @@ function ProceduresTab({
                 const opt = procedureOptions.find((o) => o.id === v) ?? null;
                 setSelectedProcedureOption(opt);
               }}
-              searchValue={searchAdd}
-              onSearchChange={setSearchAdd}
-              nothingFoundMessage={loadingOptions ? 'Buscando...' : searchAdd.trim() ? 'Nenhum procedimento encontrado' : 'Digite para buscar'}
-              filter={({ options }) => options}
+              disabled={!searchAdd.trim() || (procedureOptions.length === 0 && !loadingOptions)}
             />
 
             {subInsurances.length > 0 && (
@@ -414,7 +458,6 @@ function ProceduresTab({
                 Cancelar
               </Button>
               <Button
-                bg={DARK_BLUE}
                 size="sm"
                 loading={saving === 'new'}
                 disabled={!selectedProcedureId}
@@ -432,7 +475,7 @@ function ProceduresTab({
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={44} radius="sm" />)}
         </Stack>
       ) : linked.length === 0 ? (
-        <Paper withBorder radius="md" p="xl">
+        <Paper className="convenio-form-empty" withBorder radius="md" p="xl">
           <Text size="sm" c="dimmed" ta="center">
             Nenhum procedimento vinculado. Clique em "Adicionar procedimento" para começar.
           </Text>
@@ -440,7 +483,7 @@ function ProceduresTab({
       ) : isMobile ? (
         <Stack gap="xs">
           {linked.map((item) => (
-            <Paper key={item.id} withBorder radius="md" p="md">
+            <Paper key={item.id} className="convenio-form-card" withBorder radius="md" p="md">
               <Group justify="space-between" wrap="nowrap">
                 <Stack gap={2} style={{ flex: 1 }}>
                   <Text size="sm" fw={600}>{item.procedure.name}</Text>
@@ -468,7 +511,7 @@ function ProceduresTab({
                         onChange={setEditAuthDays}
                         style={{ width: 80 }}
                       />
-                      <Button size="compact-xs" bg={DARK_BLUE} loading={saving === item.id} onClick={() => handleSaveEdit(item.id)}>Salvar</Button>
+                      <Button size="compact-xs" loading={saving === item.id} onClick={() => handleSaveEdit(item.id)}>Salvar</Button>
                       <Button size="compact-xs" variant="default" onClick={() => setEditingId(null)}>Cancelar</Button>
                     </Group>
                   ) : (
@@ -502,19 +545,19 @@ function ProceduresTab({
           ))}
         </Stack>
       ) : (
-        <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+        <Box className="convenio-form-table-wrap">
           <Table horizontalSpacing="md" verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Procedimento</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Sub-convênio</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Valor / Prazo autorização</Table.Th>
-                <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 90 }}>Ações</Table.Th>
+                <Table.Th className="convenio-form-th">Procedimento</Table.Th>
+                <Table.Th className="convenio-form-th">Sub-convênio</Table.Th>
+                <Table.Th className="convenio-form-th">Valor / Prazo autorização</Table.Th>
+                <Table.Th className="convenio-form-th" style={{ textAlign: 'center', width: 90 }}>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {linked.map((item) => (
-                <Table.Tr key={item.id} style={{ borderBottom: '1px solid #f1f3f5' }}>
+                <Table.Tr key={item.id} className="convenio-form-row">
                   <Table.Td>
                     <Text size="sm" fw={500}>{item.procedure.name}</Text>
                   </Table.Td>
@@ -545,7 +588,7 @@ function ProceduresTab({
                           onChange={setEditAuthDays}
                           style={{ width: 70 }}
                         />
-                        <Button size="compact-xs" bg={DARK_BLUE} loading={saving === item.id} onClick={() => handleSaveEdit(item.id)}>
+                        <Button size="compact-xs" loading={saving === item.id} onClick={() => handleSaveEdit(item.id)}>
                           Salvar
                         </Button>
                         <Button size="compact-xs" variant="default" onClick={() => setEditingId(null)}>
@@ -693,22 +736,18 @@ export function ConvenioForm() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/cadastro-convenio') }} />
 
-      <Box p={isMobile ? 'sm' : 'xl'} maw={900} mx="auto">
-        <Group mb={isMobile ? 20 : 30} align="center">
-          <ActionIcon variant="default" size="xl" onClick={() => navigate('/cadastro-convenio')}>
-            <ChevronLeft size={28} />
-          </ActionIcon>
-          <Box>
-            <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-              {isNew ? 'Novo convênio' : (form.name || 'Convênio')}
-            </Text>
-            <Text size="sm" c="dimmed">
-              {isNew ? 'Preencha as informações do convênio' : 'Editar convênio'}
-            </Text>
-          </Box>
-        </Group>
+      <Box p={isMobile ? 'sm' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Box className="convenio-form-hero">
+          <Text className="convenio-form-eyebrow">CADASTROS CLÍNICOS</Text>
+          <Text className="convenio-form-title" fw={700} size="2xl">
+            {isNew ? 'Novo convênio' : (form.name || 'Convênio')}
+          </Text>
+          <Text className="convenio-form-subtitle" size="sm">
+            {isNew ? 'Preencha as informações do convênio' : 'Editar convênio'}
+          </Text>
+        </Box>
 
         {isLoading ? (
           <Stack gap="sm">

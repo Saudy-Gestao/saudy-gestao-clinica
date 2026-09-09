@@ -18,15 +18,14 @@ import {
   MultiSelect,
   Grid,
   Badge,
-  useMantineColorScheme,
+  useColorScheme,
   Switch,
   NumberInput,
   TextInput,
   SimpleGrid,
   Divider,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
+} from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { 
   Building2, 
   GitBranch, 
@@ -49,7 +48,6 @@ import {
 } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { DARK_BLUE } from '../../themes/theme';
 
 // Services
 import companyService from '../../services/companyService';
@@ -59,7 +57,7 @@ import sectorService from '../../services/sectorService';
 import userService from '../../services/userService';
 import accessService from '../../services/accessService';
 import type { Module } from '../../services/moduleService';
-import { FloatingInput } from '../common/FloatingInput';
+import { FloatingDatePicker } from '../common/FloatingDatePicker';
 import {
   filterAccessesForCompanyType,
   filterModulesForCompanyType,
@@ -87,18 +85,19 @@ import {
   validateCNPJ,
 } from '../../utils/validations';
 import { formatCNPJ } from '../../utils/formatters';
+import './SettingsPage.css';
 
 const PageContainer = ({ children }: { children: React.ReactNode }) => (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box className="settings-page">
       <Header />
-      <Box p="xl" maw={1400} mx="auto" w="100%" style={{ flex: 1 }}>
+      <main className="settings-container">
         <Stack gap="lg">{children}</Stack>
-      </Box>
+      </main>
     </Box>
-  );
+);
 
 const SectionTitle = ({ title, desc }: { title: string; desc?: string }) => (
-    <Box mb="md">
+    <Box className="settings-section-title" mb="md">
         <Title order={2} size="h3" fw={600} c="var(--mantine-color-text)">{title}</Title>
         {desc && <Text c="dimmed" size="sm">{desc}</Text>}
     </Box>
@@ -205,8 +204,7 @@ const SettingsTableSkeleton = () => (
 export function SettingsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const isMountedRef = useRef(true);
   const [activeTab, setActiveTab] = useState<string | null>('company');
@@ -1327,9 +1325,9 @@ export function SettingsPage() {
 
   // Common UI components (Moved outside to prevent re-renders)
   const renderTabList = () => (
-    <Paper p="md" radius="md" withBorder shadow="sm" h="100%" style={{ minHeight: '400px' }}>
-      <Stack gap={0}>
-        <Text c="dimmed" size="xs" fw={700} tt="uppercase" mb="sm" pl="xs">Menu</Text>
+    <Paper className="settings-nav-card" withBorder shadow="sm">
+      <Text className="settings-nav-card__label">Navegação</Text>
+      <nav className="settings-nav" aria-label="Seções de configurações">
         {[
           { id: 'company', label: 'Empresa', icon: Building2 },
           { id: 'branches', label: 'Filiais', icon: GitBranch },
@@ -1340,68 +1338,56 @@ export function SettingsPage() {
         ].map((item) => {
           const isActive = activeTab === item.id;
           return (
-            <Button
+            <button
               key={item.id}
-              variant="subtle"
-              color={isActive ? undefined : 'gray'}
-              leftSection={<item.icon size={18} />}
-              justify="flex-start"
-              fullWidth
+              type="button"
+              className="settings-nav__item"
+              data-active={isActive || undefined}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => setActiveTab(item.id)}
-              styles={{
-                root: {
-                  color: isActive ? 'var(--mantine-color-text)' : undefined,
-                  fontWeight: isActive ? 600 : 400,
-                  background: isActive
-                    ? (isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,31,84,0.10)')
-                    : 'transparent',
-                  border: isActive
-                    ? (isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,31,84,0.14)')
-                    : '1px solid transparent',
-                },
-                inner: {
-                    justifyContent: 'flex-start'
-                }
-              }}
-              mb={4}
             >
-              {item.label}
-            </Button>
+              <item.icon size={18} strokeWidth={2} aria-hidden="true" />
+              <span>{item.label}</span>
+            </button>
           );
         })}
-      </Stack>
+      </nav>
     </Paper>
   );
 
   return (
     <PageContainer>
-      <Group justify="space-between" align="center" mb="lg">
-        <Group gap="sm" align="center">
-          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
+      <header className="settings-page-header">
+        <Group gap="sm" align="center" wrap="nowrap">
+          <ActionIcon className="settings-back-button" variant="default" size="xl" onClick={() => navigate(-1)} aria-label="Voltar">
             <ChevronLeft size={28} />
           </ActionIcon>
-          <Title order={1} fw={600} style={{ fontSize: '1.8rem' }}>Configurações</Title>
+          <Box className="settings-page-header__copy">
+            <Text className="settings-eyebrow">PAINEL DE GESTÃO · ADMINISTRAÇÃO</Text>
+            <Title order={1}>Configurações</Title>
+            <Text>Gerencie a estrutura e as preferências da sua operação.</Text>
+          </Box>
         </Group>
-        <Text c="dimmed">{selectedCompany?.legalName}</Text>
-      </Group>
+        <Text className="settings-page-header__company" title={selectedCompany?.legalName || undefined}>{selectedCompany?.legalName || 'Organização não selecionada'}</Text>
+      </header>
 
-      <Grid gutter="xl">
-        <Grid.Col span={isMobile ? 12 : 3}>
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
           {renderTabList()}
-        </Grid.Col>
+        </aside>
 
-        <Grid.Col span={isMobile ? 12 : 9}>
-            <Paper p="xl" radius="md" withBorder shadow="sm" style={{ minHeight: '400px' }}>
+        <section className="settings-content">
+            <Paper className="settings-content-panel" withBorder shadow="sm">
                 {activeTab === 'company' && (
-                    <Box>
+                    <Box className="settings-company-panel">
                         <SectionTitle title="Dados da Empresa" desc="Gerencie as informações principais da sua organização." />
                         
                         {loadingCompanies ? <SettingsPanelSkeleton /> : (
-                            <Stack gap="lg" w="100%">
+                            <Stack className="settings-company-form" gap="lg" w="100%">
                               <Stack gap="md" w="100%">
                                 <Grid>
                                     <Grid.Col span={6}>
-                                        <FloatingInput 
+                                        <TextInput 
                                           label="CNPJ" 
                                           value={companyForm.cnpj} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, cnpj: e.currentTarget.value })} 
@@ -1410,7 +1396,7 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                     <Grid.Col span={6}>
-                                        <FloatingInput 
+                                        <TextInput 
                                           label="Telefone" 
                                           value={companyForm.phone} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, phone: e.currentTarget.value })} 
@@ -1418,7 +1404,7 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                     <Grid.Col span={12}>
-                                        <FloatingInput 
+                                        <TextInput 
                                           label="Razão Social" 
                                           value={companyForm.legalName} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, legalName: e.currentTarget.value })} 
@@ -1427,7 +1413,7 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                     <Grid.Col span={12}>
-                                        <FloatingInput 
+                                        <TextInput 
                                           label="Nome Fantasia" 
                                           value={companyForm.tradeName} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, tradeName: e.currentTarget.value })} 
@@ -1436,7 +1422,7 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                     <Grid.Col span={12}>
-                                        <FloatingInput 
+                                        <TextInput 
                                           label="Endereço" 
                                           value={companyForm.address} 
                                           onChange={(e: any) => setCompanyForm({ ...companyForm, address: e.currentTarget.value })} 
@@ -1444,8 +1430,8 @@ export function SettingsPage() {
                                         />
                                     </Grid.Col>
                                 </Grid>
-                                <Group justify="flex-end" mt="xs">
-                                    <Button leftSection={<Save size={16} />} onClick={handleSaveCompany} loading={savingCompany} bg={DARK_BLUE}>
+                                <Group className="settings-company-save" justify="flex-end" mt="xs">
+                                    <Button leftSection={<Save size={16} />} onClick={handleSaveCompany} loading={savingCompany} bg={"var(--ui-primary)"}>
                                       Salvar Dados da Empresa
                                     </Button>
                                 </Group>
@@ -1454,6 +1440,7 @@ export function SettingsPage() {
                               <Divider />
 
                               <Paper
+                                className="settings-whatsapp-card"
                                 p="lg"
                                 radius="md"
                                 withBorder
@@ -1462,7 +1449,7 @@ export function SettingsPage() {
                                   background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
                                 }}
                               >
-                                <Group mb="md" gap="xs">
+                                <Group className="settings-whatsapp-card__heading" mb="md" gap="xs">
                                   <MessageCircle size={20} />
                                   <Text fw={600} size="md">
                                     Configuração WhatsApp (Padrão da Empresa)
@@ -1476,32 +1463,32 @@ export function SettingsPage() {
                 )}
 
                 {activeTab === 'branches' && (
-                    <Box>
-                        <Group justify="space-between" mb="md">
+                    <Box className="settings-branches-panel">
+                        <Group className="settings-tab-header" justify="space-between" mb="md">
                             <SectionTitle title="Filiais" desc="Gerencie as unidades da empresa." />
-                            <Button leftSection={<Plus size={16} />} onClick={openBranchModalForCreate} bg={DARK_BLUE} disabled={!selectedCompanyId || reachedBranchLimit}>Nova Filial</Button>
+                            <Button className="settings-tab-action" leftSection={<Plus size={16} />} onClick={openBranchModalForCreate} bg={"var(--ui-primary)"} disabled={!selectedCompanyId || reachedBranchLimit}>Nova Filial</Button>
                         </Group>
 
                         {maxBranchesAllowed !== null && (
-                          <Text size="sm" c={reachedBranchLimit ? 'red' : 'dimmed'} mb="md">
+                          <Text className={`settings-branch-limit${reachedBranchLimit ? ' settings-branch-limit--reached' : ''}`} size="sm" c={reachedBranchLimit ? 'red' : 'dimmed'} mb="md">
                             Limite de filiais: {branches.length}/{maxBranchesAllowed}
                           </Text>
                         )}
 
                         {loadingBranches ? <SettingsTableSkeleton /> : (
-                            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                                <Table horizontalSpacing="md" verticalSpacing="md">
+                            <Box className="settings-table-wrap">
+                                <Table className="settings-table" horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
-                                        <Table.Tr style={{ borderBottom: 'none' }}>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome Fantasia</Table.Th>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Telefone</Table.Th>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>
+                                        <Table.Tr>
+                                            <Table.Th>Nome fantasia</Table.Th>
+                                            <Table.Th>Telefone</Table.Th>
+                                            <Table.Th>Tipo</Table.Th>
                                             <Table.Th style={{ width: '100px' }}></Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
                                         {(branches || []).map(branch => (
-                                            <Table.Tr key={branch.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                                            <Table.Tr key={branch.id}>
                                                 <Table.Td><Text size="sm" fw={500}>{branch.tradeName}</Text></Table.Td>
                                                 <Table.Td><Text size="sm">{branch.phone}</Text></Table.Td>
                                                 <Table.Td>
@@ -1529,9 +1516,9 @@ export function SettingsPage() {
                                 </Table>
                             </Box>
                         )}
-                        <Modal opened={branchModalOpen} onClose={() => setBranchModalOpen(false)} title={editingBranch ? 'Editar Filial' : 'Nova Filial'} centered>
-                             <Stack pt="lg">
-                                    <FloatingInput 
+                        <Modal className="settings-branch-modal" opened={branchModalOpen} onClose={() => setBranchModalOpen(false)} title={editingBranch ? 'Editar filial' : 'Nova filial'} centered>
+                             <Stack className="settings-branch-form">
+                                    <TextInput 
                                       label="Nome Fantasia" 
                                       value={branchForm.tradeName} 
                                       onChange={(e: any) => setBranchForm({ ...branchForm, tradeName: e.currentTarget.value })} 
@@ -1540,13 +1527,13 @@ export function SettingsPage() {
                                     />
                                 {(!editingBranch || (editingBranch && !isBranchMatriz(editingBranch))) && (
                                   <>
-                                    <FloatingInput
+                                    <TextInput
                                       label="Telefone"
                                       value={branchForm.phone}
                                       onChange={(e: any) => setBranchForm({ ...branchForm, phone: e.currentTarget.value })}
                                       error={branchErrors.phone}
                                     />
-                                    <FloatingInput
+                                    <TextInput
                                       label="Endereço"
                                       value={branchForm.address}
                                       onChange={(e: any) => setBranchForm({ ...branchForm, address: e.currentTarget.value })}
@@ -1559,7 +1546,7 @@ export function SettingsPage() {
                                 {branchForm.cnpjs.length > 0 ? (
                                   <Stack gap={6}>
                                     {branchForm.cnpjs.map((entry) => (
-                                      <Group key={entry.cnpj} justify="space-between" wrap="nowrap" p={8} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                                      <Group className="settings-branch-cnpj-row" key={entry.cnpj} justify="space-between" wrap="nowrap" p={8}>
                                         <Box style={{ minWidth: 0 }}>
                                           <Text size="sm" fw={600}>{formatCNPJ(entry.cnpj)}</Text>
                                           <Text size="xs" c="dimmed">{entry.label || 'Sem apelido'}</Text>
@@ -1582,17 +1569,17 @@ export function SettingsPage() {
                                 ) : (
                                   <Text size="sm" c="dimmed">Nenhum CNPJ cadastrado ainda.</Text>
                                 )}
-                                <Group align="flex-end" gap="xs" wrap="nowrap">
-                                  <Box style={{ flex: 1 }}>
-                                    <FloatingInput
+                                <Group className="settings-branch-cnpj-draft" align="flex-end" gap="xs" wrap="nowrap">
+                                  <Box>
+                                    <TextInput
                                       label="CNPJ"
                                       value={branchCnpjDraft.cnpj}
                                       onChange={(e: any) => { const value = e.currentTarget.value; setBranchCnpjDraft((prev) => ({ ...prev, cnpj: value })); setBranchCnpjError(null); }}
                                       error={branchCnpjError || undefined}
                                     />
                                   </Box>
-                                  <Box style={{ flex: 1 }}>
-                                    <FloatingInput
+                                  <Box>
+                                    <TextInput
                                       label="Apelido (opcional)"
                                       placeholder="Ex: Exames"
                                       value={branchCnpjDraft.label}
@@ -1602,18 +1589,22 @@ export function SettingsPage() {
                                   <Button variant="light" onClick={handleAddBranchCnpj}>Adicionar</Button>
                                 </Group>
 
-                                <Button fullWidth mt="md" onClick={handleSaveBranch} loading={savingBranch} bg={DARK_BLUE}>{editingBranch ? 'Salvar' : 'Criar'}</Button>
+                                <Group className="settings-modal-actions" justify="flex-end">
+                                  <Button variant="default" onClick={() => setBranchModalOpen(false)}>Cancelar</Button>
+                                  <Button className="settings-modal-submit" onClick={handleSaveBranch} loading={savingBranch} bg={"var(--ui-primary)"}>{editingBranch ? 'Salvar alterações' : 'Criar filial'}</Button>
+                                </Group>
                             </Stack>
                         </Modal>
                     </Box>
                 )}
 
                 {activeTab === 'sectors' && (
-                     <Box>
-                        <Group justify="space-between" mb="md">
+                     <Box className="settings-sectors-panel">
+                        <Group className="settings-tab-header" justify="space-between" mb="md">
                             <SectionTitle title="Setores" desc="Organize os setores por filial." />
-                            <Group gap="xs">
+                            <Group className="settings-tab-actions" gap="xs">
                                 <Button
+                                  className="settings-secondary-action"
                                   variant="light"
                                   leftSection={<Copy size={16} />}
                                   onClick={handleCreateDefaultSectors}
@@ -1622,11 +1613,12 @@ export function SettingsPage() {
                                 >
                                   Setores Padrão
                                 </Button>
-                                <Button leftSection={<Plus size={16} />} onClick={openSectorModalForCreate} bg={DARK_BLUE} disabled={!selectedBranchForSectors}>Novo Setor</Button>
+                                <Button className="settings-tab-action" leftSection={<Plus size={16} />} onClick={openSectorModalForCreate} bg={"var(--ui-primary)"} disabled={!selectedBranchForSectors}>Novo Setor</Button>
                             </Group>
                         </Group>
 
                         <Select 
+                            className="settings-branch-select"
                             label="Filial"
                             placeholder="Selecione uma filial" 
                             data={(branches || []).map(b => ({ value: b.id, label: b.tradeName }))}
@@ -1637,18 +1629,18 @@ export function SettingsPage() {
                         />
 
                         {loadingSectors ? <SettingsTableSkeleton /> : (
-                            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                                <Table horizontalSpacing="md" verticalSpacing="md">
+                            <Box className="settings-table-wrap">
+                                <Table className="settings-table" horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
-                                        <Table.Tr style={{ borderBottom: 'none' }}>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Descrição</Table.Th>
+                                        <Table.Tr>
+                                            <Table.Th>Nome</Table.Th>
+                                            <Table.Th>Descrição</Table.Th>
                                             <Table.Th style={{ width: '100px' }}></Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
                                         {(sectors || []).map(sector => (
-                                            <Table.Tr key={sector.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                                            <Table.Tr key={sector.id}>
                                                 <Table.Td><Text size="sm" fw={500}>{sector.name}</Text></Table.Td>
                                                 <Table.Td><Text size="sm">{sector.description}</Text></Table.Td>
                                                 <Table.Td>
@@ -1664,8 +1656,8 @@ export function SettingsPage() {
                                 </Table>
                             </Box>
                         )}
-                         <Modal opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar Setor' : 'Novo Setor'} centered>
-                             <Stack pt="lg">
+                         <Modal className="settings-sector-modal" opened={sectorModalOpen} onClose={() => setSectorModalOpen(false)} title={editingSector ? 'Editar setor' : 'Novo setor'} centered>
+                             <Stack className="settings-sector-form">
                                 <Select 
                                   label="Filial" 
                                   data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
@@ -1675,49 +1667,54 @@ export function SettingsPage() {
                                   searchable
                                   withAsterisk
                                 />
-                                <FloatingInput 
+                                <TextInput 
                                   label="Nome" 
                                   value={sectorForm.name} 
                                   onChange={(e: any) => setSectorForm({ ...sectorForm, name: e.currentTarget.value })} 
                                   required
                                   error={sectorErrors.name}
                                 />
-                                <FloatingInput 
+                                <TextInput 
                                   label="Descrição" 
                                   value={sectorForm.description} 
                                   onChange={(e: any) => setSectorForm({ ...sectorForm, description: e.currentTarget.value })} 
                                   error={sectorErrors.description}
                                 />
-                                <Button fullWidth mt="md" onClick={handleSaveSector} loading={savingSector} bg={DARK_BLUE}>{editingSector ? 'Salvar' : 'Criar'}</Button>
+                                <Group className="settings-modal-actions" justify="flex-end">
+                                  <Button variant="default" onClick={() => setSectorModalOpen(false)}>Cancelar</Button>
+                                  <Button className="settings-modal-submit" onClick={handleSaveSector} loading={savingSector} bg={"var(--ui-primary)"}>{editingSector ? 'Salvar alterações' : 'Criar setor'}</Button>
+                                </Group>
                             </Stack>
                         </Modal>
                     </Box>
                 )}
 
                 {activeTab === 'users' && (
-                    <Box>
-                        <Group justify="space-between" mb="md">
+                    <Box className="settings-users-panel">
+                        <Group className="settings-tab-header" justify="space-between" mb="md">
                             <SectionTitle title="Usuários" desc="Gerencie acesso e permissões." />
                             <Button
+                              className="settings-tab-action"
                               leftSection={<UserPlus size={16} />}
                               onClick={openUserModalForCreate}
-                              bg={DARK_BLUE}
+                              bg={"var(--ui-primary)"}
                               disabled={branches.length === 0}
                             >
                               Novo Usuário
                             </Button>
                         </Group>
 
-                         <Group mb="lg">
+                         <Group className="settings-users-filters" mb="lg" wrap="wrap">
                             <Select 
+                                className="settings-users-filter"
                                 label="Filial"
                                 placeholder="Selecione..." 
                                 data={(branches || []).map((b: any) => ({ value: b.id, label: b.tradeName }))}
                                 value={selectedBranchForSectors}
                                 onChange={setSelectedBranchForSectors}
-                                style={{ flex: 1 }}
                             />
                             <Select 
+                                className="settings-users-filter"
                                 label="Setor"
                                 placeholder="Todos os setores" 
                                 data={[
@@ -1726,29 +1723,29 @@ export function SettingsPage() {
                                 ]}
                                 value={selectedSectorForUsers || '__ALL__'}
                                 onChange={(value) => setSelectedSectorForUsers(value === '__ALL__' ? null : value)}
-                                style={{ flex: 1 }}
                                 disabled={!selectedBranchForSectors}
                             />
                         </Group>
 
                         {loadingUsers ? <SettingsTableSkeleton /> : (
-                            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                                <Table horizontalSpacing="md" verticalSpacing="md">
+                            <Box className="settings-table-wrap">
+                                <Table className="settings-table settings-users-table" horizontalSpacing="md" verticalSpacing="md">
                                     <Table.Thead>
-                                        <Table.Tr style={{ borderBottom: 'none' }}>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Email</Table.Th>
-                                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Telefone</Table.Th>
+                                        <Table.Tr>
+                                            <Table.Th>Nome</Table.Th>
+                                            <Table.Th>Email</Table.Th>
+                                            <Table.Th>Telefone</Table.Th>
                                             <Table.Th style={{ width: '100px' }}></Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
                                         {(users || []).map(user => (
-                                            <Table.Tr key={user.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                                            <Table.Tr key={user.id}>
                                                 <Table.Td>
                                                     <Group gap="sm">
                                                         <Box
-                                                            bg={DARK_BLUE}
+                                                            className="settings-user-avatar"
+                                                            bg={"var(--ui-primary)"}
                                                             w={32}
                                                             h={32}
                                                             style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
@@ -1757,9 +1754,9 @@ export function SettingsPage() {
                                                                 {user.name ? user.name.charAt(0).toUpperCase() : '?'}
                                                             </Text>
                                                         </Box>
-                                                        <Box>
+                                                        <Box className="settings-user-identity">
                                                             <Text size="sm" fw={500}>{user.name}</Text>
-                                                            <Text size="xs" c="dimmed">{(user.accesses || []).map((a:any) => a.description).join(', ') || 'Sem acessos'}</Text>
+                                                            <Text className="settings-user-access-summary" size="xs" c="dimmed">{(user.accesses || []).map((a:any) => a.description).join(', ') || 'Sem acessos'}</Text>
                                                         </Box>
                                                     </Group>
                                                 </Table.Td>
@@ -1778,8 +1775,8 @@ export function SettingsPage() {
                                 </Table>
                             </Box>
                         )}
-                        <Modal opened={userModalOpen} onClose={() => setUserModalOpen(false)} title={editingUser ? 'Editar Usuário' : 'Novo Usuário'} size="lg" centered>
-                            <Grid pt="lg">
+                        <Modal className="settings-user-modal" opened={userModalOpen} onClose={() => setUserModalOpen(false)} title={editingUser ? 'Editar usuário' : 'Novo usuário'} size="lg" centered>
+                            <Grid className="settings-user-form">
                                 <Grid.Col span={12}>
                                     <Select
                                         label="Filial"
@@ -1831,7 +1828,7 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput 
+                                    <TextInput 
                                       label="Nome" 
                                       value={userForm.name} 
                                       onChange={(e: any) => setUserForm({...userForm, name: e.currentTarget.value})} 
@@ -1840,7 +1837,7 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput 
+                                    <TextInput 
                                       label="Email" 
                                       value={userForm.email} 
                                       onChange={(e: any) => setUserForm({...userForm, email: e.currentTarget.value})} 
@@ -1849,7 +1846,7 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput 
+                                    <TextInput 
                                         label={editingUser ? "Senha (vazio para manter)" : "Senha (opcional)"}
                                         type="password" 
                                         value={userForm.password} 
@@ -1870,7 +1867,7 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput 
+                                    <TextInput 
                                       label="Telefone" 
                                       value={userForm.phone} 
                                       onChange={(e: any) => setUserForm({...userForm, phone: e.currentTarget.value})} 
@@ -1878,8 +1875,7 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={6}>
-                                    <FloatingInput 
-                                      type="date" 
+                                    <FloatingDatePicker
                                       label="Data de Nascimento" 
                                       value={userForm.birthDate} 
                                       onChange={(e: any) => setUserForm({...userForm, birthDate: e.currentTarget.value})} 
@@ -1888,7 +1884,7 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                                 <Grid.Col span={12}>
-                                    <FloatingInput 
+                                    <TextInput 
                                       label="Endereço" 
                                       value={userForm.address} 
                                       onChange={(e: any) => setUserForm({...userForm, address: e.currentTarget.value})} 
@@ -1896,63 +1892,59 @@ export function SettingsPage() {
                                     />
                                 </Grid.Col>
                             </Grid>
-                            <Button fullWidth mt="md" onClick={handleSaveUser} loading={savingUser} bg={DARK_BLUE}>{editingUser ? 'Salvar' : 'Criar'}</Button>
+                            <Group className="settings-modal-actions" justify="flex-end">
+                              <Button variant="default" onClick={() => setUserModalOpen(false)}>Cancelar</Button>
+                              <Button className="settings-modal-submit" onClick={handleSaveUser} loading={savingUser} bg={"var(--ui-primary)"}>{editingUser ? 'Salvar alterações' : 'Criar usuário'}</Button>
+                            </Group>
                         </Modal>
                     </Box>
                 )}
 
                 {activeTab === 'accesses' && (
-                    <Box>
-                        <Group justify="space-between" mb="md">
+                    <Box className="settings-accesses-panel">
+                        <Group className="settings-tab-header" justify="space-between" mb="md">
                             <SectionTitle title="Acessos e Permissões" desc="Defina papéis e permissões do sistema." />
-                            <Button leftSection={<Plus size={16} />} onClick={openAccessModalForCreate} bg={DARK_BLUE}>Novo Acesso</Button>
+                            <Button className="settings-tab-action" leftSection={<Plus size={16} />} onClick={openAccessModalForCreate} bg={"var(--ui-primary)"}>Novo acesso</Button>
                         </Group>
 
                         {/* Perfis padrão */}
                         {(accessesList || []).some((a: any) => a.isTemplate) && (
-                          <Box mb="lg">
-                            <Text size="sm" fw={600} c="dimmed" mb="xs" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perfis Padrão</Text>
-                            <Box style={{ overflowX: 'hidden', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                              <Table horizontalSpacing="md" verticalSpacing="md" style={{ tableLayout: 'fixed', width: '100%' }}>
+                          <Box className="settings-accesses-section" mb="lg">
+                            <Text className="settings-accesses-section-label" size="sm" fw={600} c="dimmed" mb="xs" tt="uppercase">Perfis padrão</Text>
+                            <Box className="settings-table-wrap">
+                              <Table className="settings-table settings-accesses-table" horizontalSpacing="md" verticalSpacing="md">
                                 <Table.Thead>
-                                  <Table.Tr style={{ borderBottom: 'none' }}>
-                                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: '240px' }}>Descrição</Table.Th>
-                                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
-                                    <Table.Th style={{ width: '120px' }}></Table.Th>
+                                  <Table.Tr>
+                                    <Table.Th className="settings-accesses-description-col">Descrição</Table.Th>
+                                    <Table.Th>Módulos</Table.Th>
+                                    <Table.Th className="settings-table-actions-col"></Table.Th>
                                   </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
                                   {(accessesList || []).filter((a: any) => a.isTemplate).map((access: any) => (
-                                    <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                                      <Table.Td style={{ width: '240px' }}>
-                                        <Group gap={6}>
+                                    <Table.Tr key={access.id}>
+                                      <Table.Td className="settings-accesses-description-cell">
+                                        <Group className="settings-access-description" gap={6}>
                                           <Text size="sm" fw={500}>{access.description}</Text>
                                           <Badge size="xs" variant="light" color="blue">Padrão</Badge>
                                         </Group>
                                       </Table.Td>
                                       <Table.Td>
-                                        <Box style={{ overflowX: 'auto' }}>
-                                          <Group gap={4} wrap="nowrap">
-                                            {(access.modules || []).map((module: any) => (
+                                        <Box className="settings-module-list">
+                                          {(access.modules || []).length > 0 ? (access.modules || []).map((module: any) => (
                                               <Text
                                                 key={module.id}
+                                                className="settings-module-chip"
                                                 size="xs"
                                                 c="dimmed"
-                                                style={{
-                                                  padding: '2px 8px',
-                                                  background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff',
-                                                  borderRadius: 4,
-                                                  whiteSpace: 'nowrap',
-                                                  flexShrink: 0,
-                                                }}
+                                                title={module.label}
                                               >
                                                 {module.label}
                                               </Text>
-                                            ))}
-                                          </Group>
+                                            )) : <Text className="settings-module-empty" size="xs" c="dimmed">Nenhum módulo</Text>}
                                         </Box>
                                       </Table.Td>
-                                      <Table.Td>
+                                      <Table.Td className="settings-table-actions-cell">
                                         <Group gap={4} justify="flex-end">
                                           <ActionIcon variant="subtle" color="blue" title="Usar como base" onClick={() => handleCloneTemplate(access)}>
                                             <Copy size={16} />
@@ -1970,44 +1962,37 @@ export function SettingsPage() {
                         {/* Perfis personalizados */}
                         <Box>
                           {(accessesList || []).some((a: any) => !a.isTemplate) && (
-                            <Text size="sm" fw={600} c="dimmed" mb="xs" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perfis Personalizados</Text>
+                            <Text className="settings-accesses-section-label" size="sm" fw={600} c="dimmed" mb="xs" tt="uppercase">Perfis personalizados</Text>
                           )}
-                          <Box style={{ overflowX: 'hidden', border: '1px solid #e9ecef', borderRadius: 6 }}>
-                            <Table horizontalSpacing="md" verticalSpacing="md" style={{ tableLayout: 'fixed', width: '100%' }}>
+                          <Box className="settings-table-wrap">
+                            <Table className="settings-table settings-accesses-table" horizontalSpacing="md" verticalSpacing="md">
                               <Table.Thead>
-                                <Table.Tr style={{ borderBottom: 'none' }}>
-                                  <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, width: '220px' }}>Descrição</Table.Th>
-                                  <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Módulos</Table.Th>
-                                  <Table.Th style={{ width: '100px' }}></Table.Th>
+                                <Table.Tr>
+                                  <Table.Th className="settings-accesses-description-col">Descrição</Table.Th>
+                                  <Table.Th>Módulos</Table.Th>
+                                  <Table.Th className="settings-table-actions-col"></Table.Th>
                                 </Table.Tr>
                               </Table.Thead>
                               <Table.Tbody>
                                 {(accessesList || []).filter((a: any) => !a.isTemplate).map((access: any) => (
-                                  <Table.Tr key={access.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                                    <Table.Td style={{ width: '220px' }}><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
+                                  <Table.Tr key={access.id}>
+                                    <Table.Td className="settings-accesses-description-cell"><Text size="sm" fw={500}>{access.description}</Text></Table.Td>
                                     <Table.Td>
-                                      <Box style={{ overflowX: 'auto' }}>
-                                        <Group gap={4} wrap="nowrap">
-                                          {(access.modules || []).map((module: any) => (
+                                      <Box className="settings-module-list">
+                                        {(access.modules || []).length > 0 ? (access.modules || []).map((module: any) => (
                                             <Text
                                               key={module.id}
+                                              className="settings-module-chip"
                                               size="xs"
                                               c="dimmed"
-                                              style={{
-                                                padding: '2px 8px',
-                                                background: isDark ? 'rgba(255,255,255,0.08)' : '#e7f5ff',
-                                                borderRadius: 4,
-                                                whiteSpace: 'nowrap',
-                                                flexShrink: 0,
-                                              }}
+                                              title={module.label}
                                             >
                                               {module.label}
                                             </Text>
-                                          )) || <Text size="xs" c="dimmed">Nenhum módulo</Text>}
-                                        </Group>
+                                          )) : <Text className="settings-module-empty" size="xs" c="dimmed">Nenhum módulo</Text>}
                                       </Box>
                                     </Table.Td>
-                                    <Table.Td>
+                                    <Table.Td className="settings-table-actions-cell">
                                       <Group gap={4} justify="flex-end">
                                         <ActionIcon variant="subtle" color="blue" onClick={() => openAccessModalForEdit(access)}><Edit size={16} /></ActionIcon>
                                         <ActionIcon variant="subtle" color="red" onClick={() => openDeleteConfirm('Excluir acesso', 'Deseja realmente excluir este acesso?', () => handleDeleteAccess(access.id))}><Trash size={16} /></ActionIcon>
@@ -2023,29 +2008,14 @@ export function SettingsPage() {
                           </Box>
                         </Box>
                         <Modal
+                          className="settings-access-modal"
                           opened={accessModalOpen}
                           onClose={() => setAccessModalOpen(false)}
                           title={editingAccess ? 'Editar Acesso' : 'Novo Acesso'}
                           centered
-                          styles={{
-                            content: {
-                              background: isDark ? 'var(--mantine-color-body)' : undefined,
-                              border: isDark ? '1px solid var(--mantine-color-default-border)' : undefined,
-                            },
-                            header: {
-                              background: isDark ? 'var(--mantine-color-body)' : undefined,
-                              borderBottom: isDark ? '1px solid var(--mantine-color-default-border)' : undefined,
-                            },
-                            body: {
-                              background: isDark ? 'var(--mantine-color-body)' : undefined,
-                            },
-                            title: {
-                              color: isDark ? 'var(--mantine-color-text)' : undefined,
-                            },
-                          }}
                         >
-                             <Stack pt="lg">
-                                <FloatingInput 
+                             <Stack className="settings-access-form" pt="lg">
+                                <TextInput 
                                   label="Descrição" 
                                   value={accessForm.description} 
                                   onChange={(e: any) => setAccessForm({ ...accessForm, description: e.currentTarget.value })} 
@@ -2078,48 +2048,34 @@ export function SettingsPage() {
                                     disabled={!availableModules || availableModules.length === 0}
                                     error={accessErrors.moduleIds}
                                     withAsterisk
-                                    styles={{
-                                      label: { marginBottom: 8, fontWeight: 500 },
-                                      input: isDark ? {
-                                        background: 'var(--mantine-color-default)',
-                                        borderColor: 'var(--mantine-color-default-border)',
-                                        color: 'var(--mantine-color-text)',
-                                      } : undefined,
-                                      pill: isDark ? {
-                                        background: 'rgba(255,255,255,0.08)',
-                                        color: 'var(--mantine-color-text)',
-                                      } : undefined,
-                                      pillsList: {
-                                        flexWrap: 'nowrap',
-                                        overflowX: 'auto',
-                                      },
-                                    }}
                                     nothingFoundMessage="Nenhum módulo encontrado"
                                   />
                                 )}
-                                <Button 
-                                  fullWidth 
-                                  mt="md" 
-                                  onClick={handleSaveAccess} 
-                                  loading={savingAccess}
-                                  disabled={loadingModules}
-                                  bg={DARK_BLUE}
-                                >
-                                  {editingAccess ? 'Salvar' : 'Criar'}
-                                </Button>
+                                <Group className="settings-modal-actions" justify="flex-end">
+                                  <Button
+                                    className="settings-modal-submit"
+                                    onClick={handleSaveAccess}
+                                    loading={savingAccess}
+                                    disabled={loadingModules}
+                                    bg={"var(--ui-primary)"}
+                                  >
+                                    {editingAccess ? 'Salvar' : 'Criar'}
+                                  </Button>
+                                </Group>
                             </Stack>
                         </Modal>
                     </Box>
                 )}
 
                 {activeTab === 'branchSettings' && (
-                    <Box>
+                    <Box className="settings-branch-settings-panel">
                         <SectionTitle 
                             title="Configurações Gerais por Filial" 
                             desc="Configure comportamentos específicos de cada filial do sistema." 
                         />
 
                         <Select 
+                            className="settings-branch-settings-select"
                             label="Filial"
                             placeholder="Selecione uma filial" 
                             data={(branches || []).map(b => ({ value: b.id, label: b.tradeName }))}
@@ -2127,14 +2083,6 @@ export function SettingsPage() {
                             onChange={setSelectedBranchForSettings}
                             mb="xl"
                             searchable
-                            styles={{
-                                label: { marginBottom: 8, fontWeight: 500 },
-                                input: isDark ? {
-                                    background: 'var(--mantine-color-default)',
-                                    borderColor: 'var(--mantine-color-default-border)',
-                                    color: 'var(--mantine-color-text)',
-                                } : undefined,
-                            }}
                         />
 
                         {selectedBranchForSettings && (
@@ -2146,8 +2094,9 @@ export function SettingsPage() {
                                         <Skeleton height={82} radius="md" />
                                     </Stack>
                                 ) : (
-                                    <Stack gap="lg">
+                                    <Stack className="settings-branch-settings-content" gap="lg">
                                         <Paper 
+                                            className="settings-setting-card"
                                             p="lg" 
                                             radius="md" 
                                             withBorder 
@@ -2156,23 +2105,24 @@ export function SettingsPage() {
                                                 background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
                                             }}
                                         >
-                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                                <Box style={{ flex: 1 }}>
-                                                    <Text fw={600} size="sm" mb={4}>
+                                            <Group className="settings-setting-card__header" justify="space-between" align="flex-start" wrap="nowrap">
+                                                <Box className="settings-setting-card__copy" style={{ flex: 1 }}>
+                                                    <Text className="settings-setting-card__title" fw={600} size="sm" mb={4}>
                                                         Reconhecimento Facial para Entrega de Laudos
                                                     </Text>
-                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                    <Text className="settings-setting-card__description" size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
                                                         Quando ativado, será obrigatório realizar o reconhecimento facial do paciente 
                                                         antes de permitir a retirada de laudos médicos. Esta configuração se aplica 
                                                         apenas aos pacientes cadastrados nesta filial.
                                                     </Text>
                                                 </Box>
                                                 <Switch
+                                                    className="settings-setting-card__switch"
                                                     checked={branchSettings?.requireFacialForReportDelivery || false}
                                                     onChange={(event) => handleToggleFacialRecognition(event.currentTarget.checked)}
                                                     disabled={savingBranchSettings}
                                                     size="lg"
-                                                    color={DARK_BLUE}
+                                                    color={"var(--ui-primary)"}
                                                     styles={{
                                                         track: {
                                                             cursor: savingBranchSettings ? 'not-allowed' : 'pointer',
@@ -2189,6 +2139,7 @@ export function SettingsPage() {
                                         </Paper>
 
                                         <Paper
+                                            className="settings-setting-card"
                                             p="lg"
                                             radius="md"
                                             withBorder
@@ -2197,23 +2148,24 @@ export function SettingsPage() {
                                                 background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
                                             }}
                                         >
-                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                                <Box style={{ flex: 1 }}>
-                                                    <Text fw={600} size="sm" mb={4}>
+                                            <Group className="settings-setting-card__header" justify="space-between" align="flex-start" wrap="nowrap">
+                                                <Box className="settings-setting-card__copy" style={{ flex: 1 }}>
+                                                    <Text className="settings-setting-card__title" fw={600} size="sm" mb={4}>
                                                         Reconhecimento Facial no Cadastro de Paciente
                                                     </Text>
-                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                    <Text className="settings-setting-card__description" size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
                                                         Quando ativado, será obrigatório capturar a foto facial durante o cadastro
                                                         de pacientes desta filial. Quando desativado, o cadastro pode ser concluído
                                                         sem a captura facial.
                                                     </Text>
                                                 </Box>
                                                 <Switch
+                                                    className="settings-setting-card__switch"
                                                     checked={branchSettings?.requireFacialForPatientRegistration ?? true}
                                                     onChange={(event) => handleToggleFacialRecognitionForPatientRegistration(event.currentTarget.checked)}
                                                     disabled={savingBranchSettings}
                                                     size="lg"
-                                                    color={DARK_BLUE}
+                                                    color={"var(--ui-primary)"}
                                                     styles={{
                                                         track: {
                                                             cursor: savingBranchSettings ? 'not-allowed' : 'pointer',
@@ -2224,6 +2176,7 @@ export function SettingsPage() {
                                         </Paper>
 
                                         <Paper
+                                            className="settings-setting-card"
                                             p="lg"
                                             radius="md"
                                             withBorder
@@ -2232,28 +2185,30 @@ export function SettingsPage() {
                                                 background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
                                             }}
                                         >
-                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                                <Box style={{ flex: 1 }}>
-                                                    <Text fw={600} size="sm" mb={4}>
+                                            <Group className="settings-setting-card__header" justify="space-between" align="flex-start" wrap="nowrap">
+                                                <Box className="settings-setting-card__copy" style={{ flex: 1 }}>
+                                                    <Text className="settings-setting-card__title" fw={600} size="sm" mb={4}>
                                                         Agendamento Médico de Exame na Consulta
                                                     </Text>
-                                                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                    <Text className="settings-setting-card__description" size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
                                                         Quando ativado, o médico pode sair da consulta com o exame já agendado
                                                         (com sugestão de horários livres). Quando desativado, o médico apenas
                                                         emite o pedido e o agendamento ocorre na recepção.
                                                     </Text>
                                                 </Box>
                                                 <Switch
+                                                    className="settings-setting-card__switch"
                                                     checked={branchSettings?.doctorCanScheduleExamFromConsultation || false}
                                                     onChange={(event) => handleToggleDoctorExamScheduling(event.currentTarget.checked)}
                                                     disabled={savingBranchSettings}
                                                     size="lg"
-                                                    color={DARK_BLUE}
+                                                    color={"var(--ui-primary)"}
                                                 />
                                             </Group>
                                         </Paper>
 
                                         <Paper
+                                            className="settings-setting-card settings-setting-card--compact"
                                             p="lg"
                                             radius="md"
                                             withBorder
@@ -2292,7 +2247,7 @@ export function SettingsPage() {
                                                         style={{ maxWidth: 260 }}
                                                     />
                                                     <Button
-                                                        bg={DARK_BLUE}
+                                                        bg={"var(--ui-primary)"}
                                                         c="white"
                                                         onClick={() => handleSaveNoShowTolerance(branchSettings?.noShowToleranceMinutes ?? 30)}
                                                         loading={savingBranchSettings}
@@ -2304,6 +2259,7 @@ export function SettingsPage() {
                                         </Paper>
 
                                         <Paper
+                                            className="settings-setting-card settings-setting-card--checkin"
                                             p="lg"
                                             radius="md"
                                             withBorder
@@ -2313,21 +2269,22 @@ export function SettingsPage() {
                                             }}
                                         >
                                             <Stack gap="md">
-                                                <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                                    <Box style={{ flex: 1 }}>
-                                                        <Text fw={600} size="sm" mb={4}>
+                                                <Group className="settings-setting-card__header" justify="space-between" align="flex-start" wrap="nowrap">
+                                                    <Box className="settings-setting-card__copy" style={{ flex: 1 }}>
+                                                        <Text className="settings-setting-card__title" fw={600} size="sm" mb={4}>
                                                             Check-in da Filial
                                                         </Text>
-                                                        <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                                        <Text className="settings-setting-card__description" size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
                                                             Controle se o totem desta filial está ligado, audite quem ativou ou desligou e copie a URL pronta para uso.
                                                         </Text>
                                                     </Box>
                                                     <Switch
+                                                        className="settings-setting-card__switch"
                                                         checked={branchSettings?.publicCheckInEnabled || false}
                                                         onChange={(event) => handleTogglePublicCheckIn(event.currentTarget.checked)}
                                                         disabled={savingBranchSettings}
                                                         size="lg"
-                                                        color={DARK_BLUE}
+                                                        color={"var(--ui-primary)"}
                                                         onLabel={<Power size={14} />}
                                                         offLabel={<PowerOff size={14} />}
                                                     />
@@ -2356,7 +2313,7 @@ export function SettingsPage() {
                                                 </Group>
 
                                                 <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                                                    <Paper p="md" withBorder radius="md" bg={isDark ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-gray-0)'}>
+                                                    <Paper p="md" withBorder radius="md" bg={'color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-surface))'}>
                                                         <Stack gap={4}>
                                                             <Text size="xs" c="dimmed">Última ativação</Text>
                                                             <Text fw={600} size="sm">
@@ -2368,7 +2325,7 @@ export function SettingsPage() {
                                                         </Stack>
                                                     </Paper>
 
-                                                    <Paper p="md" withBorder radius="md" bg={isDark ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-gray-0)'}>
+                                                    <Paper p="md" withBorder radius="md" bg={'color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-surface))'}>
                                                         <Stack gap={4}>
                                                             <Text size="xs" c="dimmed">Último desligamento</Text>
                                                             <Text fw={600} size="sm">
@@ -2438,7 +2395,7 @@ export function SettingsPage() {
                                                             p="sm"
                                                             withBorder
                                                             radius="md"
-                                                            bg={isDark ? 'rgba(255,255,255,0.02)' : 'var(--mantine-color-gray-0)'}
+                                                            bg={'color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-surface))'}
                                                         >
                                                             <Group justify="space-between" align="flex-start" wrap="nowrap">
                                                                 <Group gap="xs" wrap="nowrap">
@@ -2463,7 +2420,7 @@ export function SettingsPage() {
                                             </Stack>
                                         </Modal>
 
-                                        <Paper
+                                        <Paper className="settings-setting-card settings-setting-card--whatsapp"
                                             p="lg"
                                             radius="md"
                                             withBorder
@@ -2472,7 +2429,7 @@ export function SettingsPage() {
                                                 background: isDark ? 'rgba(255,255,255,0.02)' : undefined,
                                             }}
                                         >
-                                            <Group mb="md" gap="xs">
+                                            <Group className="settings-setting-card__section-heading" mb="md" gap="xs">
                                                 <MessageCircle size={20} />
                                                 <Text fw={600} size="md">
                                                     Configuração WhatsApp
@@ -2490,9 +2447,15 @@ export function SettingsPage() {
                         )}
 
                         {!selectedBranchForSettings && (
-                            <Box style={{ textAlign: 'center', padding: '60px 20px' }}>
+                            <Box className="settings-branch-settings-empty">
+                                <span className="settings-branch-settings-empty__icon" aria-hidden="true">
+                                    <Building2 size={24} />
+                                </span>
+                                <Text className="settings-branch-settings-empty__title" size="sm" fw={700}>
+                                    Selecione uma filial
+                                </Text>
                                 <Text size="sm" c="dimmed">
-                                    Selecione uma filial para visualizar e configurar suas opções específicas.
+                                    Escolha uma unidade acima para visualizar e configurar suas opções específicas.
                                 </Text>
                             </Box>
                         )}
@@ -2514,8 +2477,8 @@ export function SettingsPage() {
                 </Group>
               </Stack>
             </Modal>
-        </Grid.Col>
-      </Grid>
+        </section>
+      </div>
     </PageContainer>
   );
 }

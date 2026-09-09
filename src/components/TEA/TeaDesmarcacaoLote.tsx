@@ -6,18 +6,19 @@ import {
   Group,
   Text,
   Button,
-  ActionIcon,
   Paper,
   Stack,
   Badge,
   Modal,
   Divider,
   Skeleton,
-  useMantineColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, CalendarX2, X } from 'lucide-react';
+  Select,
+  Textarea,
+  ActionIcon,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { CalendarX2, X } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
 import teaPreReservationService from '../../services/teaPreReservationService';
@@ -26,8 +27,7 @@ import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaCancellationTherapiesQuery } from '../../hooks/useTeaCancellationTherapiesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
+import './TeaDesmarcacaoLote.css';
 
 type CancellationTherapyItem = {
   pitTherapyId: string;
@@ -66,7 +66,6 @@ export function TeaDesmarcacaoLote() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
   const fromDate = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
 
@@ -114,7 +113,7 @@ export function TeaDesmarcacaoLote() {
     const err: any = teaProfilesError;
     showNotification({
       title: 'Erro',
-      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'),
+      message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes de Terapias'),
       color: 'red',
     });
   }, [teaProfilesError]);
@@ -233,8 +232,8 @@ export function TeaDesmarcacaoLote() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="tea-desmarcacao-page">
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
       <Modal
         opened={confirmModalOpened}
@@ -249,26 +248,26 @@ export function TeaDesmarcacaoLote() {
               <Text size="sm">
                 Você está cancelando a agenda de:
               </Text>
-              <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Paper p="xs" withBorder className="tea-desmarcacao-modal-card">
                 <Text fw={700}>{selectedTherapy?.procedureName || 'Terapia'}</Text>
                 <Text size="sm" c="dimmed">{selectedTherapy?.professionalName || 'Profissional'}</Text>
               </Paper>
               <Text size="sm">
-                Total de sessões que serão canceladas: <b>{selectedTherapy?.totalSessions || 0}</b>
+                Total de sessões que serão canceladas: <Text span fw={700} inherit>{selectedTherapy?.totalSessions || 0}</Text>
               </Text>
             </>
           ) : (
             <>
               <Text size="sm">
-                Você está cancelando <b>todas as terapias</b> futuras deste paciente.
+                Você está cancelando <Text span fw={700} inherit>todas as terapias</Text> futuras deste paciente.
               </Text>
-              <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Paper p="xs" withBorder className="tea-desmarcacao-modal-card">
                 <Text fw={700}>Terapias afetadas: {therapies.length}</Text>
                 <Text size="sm" c="dimmed">Sessões totais previstas: {totalSessionsAllTherapies}</Text>
               </Paper>
             </>
           )}
-          <FloatingTextarea
+          <Textarea
             label="Motivo (opcional)"
             placeholder="Informe o motivo do cancelamento em lote"
             value={cancelReason}
@@ -299,7 +298,7 @@ export function TeaDesmarcacaoLote() {
       >
         <Stack gap="sm">
           <Text size="sm">Deseja excluir os horários desse dia?</Text>
-          <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+          <Paper p="xs" withBorder className="tea-desmarcacao-modal-card">
             <Text size="sm" fw={700}>
               Deseja excluir os horários da {weekdayCancelTarget?.weekdayLabel || '-'} • {weekdayCancelTarget?.timesLabel || '-'}?
             </Text>
@@ -325,32 +324,22 @@ export function TeaDesmarcacaoLote() {
         </Stack>
       </Modal>
 
-      <Box p={isMobile ? 'sm' : 'xl'} w="100%">
-        <Group mb={14} gap="md" align="flex-start">
-          <ActionIcon
-            variant="default"
-            size={isMobile ? 44 : 52}
-            radius="md"
-            onClick={() => navigate('/tea')}
-            aria-label="Voltar"
-          >
-            <ChevronLeft size={22} />
-          </ActionIcon>
-          <Box>
-            <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Desmarcação em lote</Text>
-            <Text size="sm" c="dimmed">Cancelar terapias recorrentes de um paciente TEA</Text>
-          </Box>
-        </Group>
+      <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-desmarcacao-shell">
+        <Box className="tea-desmarcacao-hero">
+          <Text className="tea-desmarcacao-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
+          <Text className="tea-desmarcacao-title" fw={700} size="2xl">Desmarcação em lote</Text>
+          <Text className="tea-desmarcacao-subtitle" size="sm">Cancelar terapias recorrentes de um paciente de Terapias</Text>
+        </Box>
 
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-          <Stack gap="md">
-            <Group gap="xs">
-              <CalendarX2 size={18} />
-              <Text fw={700}>Seleção de paciente</Text>
+        <Paper p={isMobile ? 'sm' : 'md'} className="tea-desmarcacao-panel">
+          <Stack gap="lg">
+            <Group gap="sm">
+              <Box className="tea-desmarcacao-panel-icon"><CalendarX2 size={18} /></Box>
+              <Text fw={700} className="tea-desmarcacao-panel-title">Seleção de paciente</Text>
             </Group>
 
-            <FloatingSelect
-              label="Paciente TEA"
+            <Select
+              label="Paciente de Terapias"
               placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
               data={teaProfileOptions}
               value={selectedTeaProfileId}
@@ -360,9 +349,9 @@ export function TeaDesmarcacaoLote() {
             />
 
             {selectedProfile && (
-              <Paper p="xs" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Paper p="sm" withBorder className="tea-desmarcacao-card">
                 <Group justify="space-between" align="center" wrap="wrap">
-                  <Text size="sm" fw={600}>Paciente: {selectedProfile?.patient?.name || 'N/D'}</Text>
+                  <Text size="sm" fw={700}>Paciente: {selectedProfile?.patient?.name || 'N/D'}</Text>
                   {therapies.length > 0 && (
                     <Button size="xs" color="red" variant="outline" onClick={openCancelAllModal}>
                       Desmarcar todas as terapias
@@ -373,9 +362,9 @@ export function TeaDesmarcacaoLote() {
             )}
 
             {(loadingTherapies || fetchingTherapies) ? (
-              <Stack gap="xs">
+              <Stack gap="sm">
                 {Array.from({ length: 3 }).map((_, index) => (
-                  <Paper key={index} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                  <Paper key={index} p="sm" withBorder className="tea-desmarcacao-card">
                     <Group justify="space-between" align="center" wrap="wrap">
                       <Box style={{ flex: 1 }}>
                         <Skeleton height={16} width="34%" mb={8} radius="xl" />
@@ -393,11 +382,11 @@ export function TeaDesmarcacaoLote() {
                 ))}
               </Stack>
             ) : !selectedTeaProfileId ? (
-              <Text size="sm" c="dimmed">Selecione um paciente para listar terapias agendadas.</Text>
+              <Text size="sm" c="dimmed" className="tea-desmarcacao-empty">Selecione um paciente para listar terapias agendadas.</Text>
             ) : therapies.length === 0 ? (
-              <Text size="sm" c="dimmed">Nenhuma terapia com sessões futuras encontrada para esse paciente.</Text>
+              <Text size="sm" c="dimmed" className="tea-desmarcacao-empty">Nenhuma terapia com sessões futuras encontrada para esse paciente.</Text>
             ) : (
-              <Stack gap="xs">
+              <Stack gap="sm">
                 {therapies.map((therapy: CancellationTherapyItem) => {
                   const weeklyPatternByWeekdayMap = therapy.slots
                     .map((slot: { date: string; time: string }) => ({
@@ -433,11 +422,11 @@ export function TeaDesmarcacaoLote() {
                       return (a.times[0] || '').localeCompare(b.times[0] || '');
                     });
                   return (
-                    <Paper key={therapy.pitTherapyId} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                      <Stack gap={6}>
+                    <Paper key={therapy.pitTherapyId} p="md" withBorder className="tea-desmarcacao-card">
+                      <Stack gap="sm">
                         <Group justify="space-between" align="center" wrap="wrap">
                           <Box>
-                            <Text fw={600}>{therapy.procedureName}</Text>
+                            <Text fw={700}>{therapy.procedureName}</Text>
                             <Text size="sm" c="dimmed">{therapy.professionalName}</Text>
                           </Box>
                           <Badge color="indigo" variant="light">{therapy.totalSessions} sessão(ões)</Badge>
@@ -453,32 +442,13 @@ export function TeaDesmarcacaoLote() {
 
                         <Divider />
 
-                        <Stack gap={3}>
-                          <Text size="xs" fw={600}>sessões</Text>
+                        <Stack gap={6}>
+                          <Text size="xs" fw={700} className="tea-desmarcacao-sessions-title">Sessões</Text>
                           {weeklyPatternByDay.length > 0 ? (
                             <Group gap={6} wrap="wrap">
                               {weeklyPatternByDay.map((slot) => (
-                                <Group
-                                  key={`${slot.weekdayIndex}`}
-                                  gap={4}
-                                  wrap="nowrap"
-                                  style={{
-                                    display: 'inline-flex',
-                                    borderRadius: 999,
-                                    padding: '2px 6px 2px 10px',
-                                    backgroundColor: colorScheme === 'dark'
-                                      ? 'rgba(96, 165, 250, 0.18)'
-                                      : 'var(--mantine-color-gray-2)',
-                                    border: colorScheme === 'dark'
-                                      ? '1px solid rgba(96, 165, 250, 0.45)'
-                                      : '1px solid var(--mantine-color-gray-4)',
-                                  }}
-                                >
-                                  <Text
-                                    size="xs"
-                                    fw={700}
-                                    c={colorScheme === 'dark' ? 'var(--mantine-color-blue-1)' : 'var(--mantine-color-dark-7)'}
-                                  >
+                                <Group key={`${slot.weekdayIndex}`} gap={4} wrap="nowrap" className="tea-desmarcacao-slot-pill">
+                                  <Text size="xs" fw={700}>
                                     {slot.weekdayLabel} • {slot.times.join(', ')}
                                   </Text>
                                   <ActionIcon

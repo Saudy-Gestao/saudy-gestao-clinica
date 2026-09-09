@@ -15,10 +15,9 @@ import {
   SimpleGrid,
   ThemeIcon,
   Radio,
-} from '@mantine/core';
+} from '@/components/ui';
 import { ArrowLeft, Building2, ShieldCheck, Waypoints } from 'lucide-react';
-import { notifications, showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { notifications, showNotification } from '@/components/ui';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import companyService from '../../services/companyService';
 import { formatCNPJ, formatPhone, isValidEmail, normalizeEmail, onlyDigits } from '../../utils/formatters';
@@ -215,8 +214,8 @@ export function CadastroCliente() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ mdminHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate(isFromAdmHub ? '/adm-hub' : '/dashboard') }} />
       <Box p="xl" mx="auto" maw={1180}>
         <Stack gap="lg">
           <Group justify="space-between" align="flex-start">
@@ -228,7 +227,7 @@ export function CadastroCliente() {
                   </Button>
                 )}
               </Group>
-              <Title order={2} fw={600} style={{ color: 'var(--mantine-color-text)' }}>
+              <Title order={2} fw={600}>
                 Módulo de Cadastro de Cliente
               </Title>
               <Text c="dimmed" maw={720}>
@@ -311,9 +310,9 @@ export function CadastroCliente() {
                   onChange={(value) => setModulo(value as 'padrao' | 'tea' | 'apenas-tea')}
                   mt="md"
                 >
-                  <Radio mt="md" value="padrao" label="Sistema padrão" description="Tudo do sistema, exceto parte TEA." />
-                  <Radio mt="xs" value="tea" label="Módulo TEA" description="Tudo do sistema, inclusive a parte TEA." />
-                  <Radio mt="xs" value="apenas-tea" label="Apenas módulo TEA" description="Somente a parte TEA." />
+                  <Radio mt="md" value="padrao" label="Sistema padrão" description="Tudo do sistema, exceto parte de Terapias." />
+                  <Radio mt="xs" value="tea" label="Módulo Terapias" description="Tudo do sistema, inclusive a parte de Terapias." />
+                  <Radio mt="xs" value="apenas-tea" label="Apenas módulo Terapias" description="Somente a parte de Terapias." />
                 </Radio.Group>
               </Stack>
             </Stepper.Step>
@@ -349,11 +348,11 @@ export function CadastroCliente() {
                     Voltar
                   </Button>
                 {active < 2 ? (
-                  <Button onClick={handleNext} bg={DARK_BLUE} disabled={submitting}>
+                  <Button onClick={handleNext} bg="var(--ui-primary)" disabled={submitting}>
                     Próximo
                   </Button>
                 ) : (
-                  <Button onClick={handleSubmit} bg={DARK_BLUE} loading={submitting} disabled={submitting}>
+                  <Button onClick={handleSubmit} bg="var(--ui-primary)" loading={submitting} disabled={submitting}>
                     {submitting ? 'Cadastrando...' : 'Cadastrar'}
                   </Button>
                 )}

@@ -1,0 +1,56 @@
+.cadastro-convenio-list-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-convenio-list-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.cadastro-convenio-list-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .cadastro-convenio-list-actions,
+  .cadastro-convenio-list-actions .cadastro-convenio-list-search,
+  .cadastro-convenio-list-actions .ui-button {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+}
+
+.cadastro-convenio-list-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.cadastro-convenio-list-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-convenio-list-th-actions {
+  text-align: center !important;
+}
+
+.cadastro-convenio-list-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.cadastro-convenio-list-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-convenio-list-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

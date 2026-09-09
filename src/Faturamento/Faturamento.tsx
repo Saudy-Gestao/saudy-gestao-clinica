@@ -1,26 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Popover, Grid, Badge, Skeleton, Checkbox, SimpleGrid, Menu, useMantineColorScheme } from '@mantine/core';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Grid, Badge, Skeleton, Checkbox, SimpleGrid, Menu, TextInput, Select, Textarea, NumberInput, DateInput, Tooltip } from '@/components/ui';
 import invoiceService from '../services/invoiceService';
-import { useMediaQuery } from '@mantine/hooks';
-import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil, FileCode2, MoreVertical } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../themes/theme';
-import { DatePicker } from '@mantine/dates';
-import { formatDateInput } from '../utils/formatters';
+import { useMediaQuery } from '@/components/ui';
+import { Plus, ChevronRight, Pencil, FileCode2, MoreVertical } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import ResultModal from '../components/common/ResultModal';
 import { Header } from '../components/Header/Header';
 import { useInvoicesQuery } from '../hooks/useInvoicesQuery';
 import { queryKeys } from '../lib/queryKeys';
-import { FloatingInput } from '../components/common/FloatingInput';
-import { FloatingSelect } from '../components/common/FloatingSelect';
-import { FloatingTextarea } from '../components/common/FloatingTextarea';
-import { FloatingNumberInput } from '../components/common/FloatingNumberInput';
 import { resolveApiErrorMessage } from '../lib/apiError';
 import tissBatchService from '../services/tissBatchService';
 import { useTissBatchesQuery } from '../hooks/useTissBatchesQuery';
 import { PaginatedGrid } from '../components/common/PaginatedGrid';
+import './Faturamento.css';
 
 interface InvoiceRow {
   id: string | number;
@@ -42,8 +36,6 @@ interface InvoiceRow {
 export function Faturamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { colorScheme } = useMantineColorScheme();
-  const isDarkMode = colorScheme === 'dark';
   const [query, setQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const {
@@ -109,8 +101,6 @@ export function Faturamento() {
   const [showInvoiceError, setShowInvoiceError] = useState(false);
   const [invoiceErrorMessage, setInvoiceErrorMessage] = useState<string | null>(null);
   const [invoiceErrorTitle, setInvoiceErrorTitle] = useState<string | null>(null);
-  const [dateInput, setDateInput] = useState('');
-  const [popoverOpened, setPopoverOpened] = useState(false);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<string>('hub');
   const [invoicePage, setInvoicePage] = useState(1);
@@ -214,6 +204,22 @@ export function Faturamento() {
     const yyyy = parsed.getFullYear();
     const mm = String(parsed.getMonth() + 1).padStart(2, '0');
     const dd = String(parsed.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const parseIsoInputToDate = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  };
+
+  const formatDateToIsoInput = (date: Date | null): string => {
+    if (!date) return '';
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
 
@@ -503,7 +509,6 @@ export function Faturamento() {
           expectedGlosaValue: Number(rawInvoice.expectedGlosaValue || 0),
         }));
       }
-      setDateInput(parsed ? formatDate(parsed) : '');
       setEditingId(r.id);
     } else {
       setInvoiceData({
@@ -529,7 +534,6 @@ export function Faturamento() {
         expectedDiscountValue: 0,
         expectedGlosaValue: 0,
       });
-      setDateInput('');
       setEditingId(null);
     }
     setModalOpen(true);
@@ -644,124 +648,80 @@ export function Faturamento() {
   };  
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeWorkspace === 'hub' ? navigate('/dashboard?secao=gestao-e-apoio') : setActiveWorkspace('hub')) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Faturamento
-              </Text>
-              <Text size="sm" c="dimmed">
-                Cobranças e notas fiscais
-              </Text>
-            </Box>
-          </Group>
-        </Group>
-
         {activeWorkspace === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-            {[
-              {
-                key: 'invoices',
-                icon: FileCode2,
-                title: 'Faturas',
-                desc: 'Emissão e gestão de faturas, com filtros e ações por registro.',
-                onClick: () => setActiveWorkspace('invoices'),
-              },
-              {
-                key: 'tiss',
-                icon: FileCode2,
-                title: 'Lotes TISS',
-                desc: 'Gere e acompanhe lotes TISS para envio e retorno de operadoras.',
-                onClick: () => setActiveWorkspace('tiss'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
+          <>
+            <Box className="faturamento-hero">
+              <Text className="faturamento-eyebrow">GESTÃO E APOIO</Text>
+              <Text className="faturamento-title" fw={700} size="2xl">Faturamento</Text>
+              <Text className="faturamento-subtitle" size="sm">Cobranças, notas fiscais e lotes TISS para envio às operadoras.</Text>
+            </Box>
+
+            <SimpleGrid className="faturamento-hub-grid" cols={{ base: 1, sm: 2 }}>
+              {[
+                {
+                  key: 'invoices',
+                  icon: FileCode2,
+                  title: 'Faturas',
+                  desc: 'Emissão e gestão de faturas, com filtros e ações por registro.',
+                  onClick: () => setActiveWorkspace('invoices'),
+                },
+                {
+                  key: 'tiss',
+                  icon: FileCode2,
+                  title: 'Lotes TISS',
+                  desc: 'Gere e acompanhe lotes TISS para envio e retorno de operadoras.',
+                  onClick: () => setActiveWorkspace('tiss'),
+                },
+              ].map((card) => (
+                <Paper key={card.key} className="faturamento-hub-card" withBorder onClick={card.onClick}>
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="faturamento-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="faturamento-hub-chevron" style={{ flexShrink: 0 }} />
                   </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveWorkspace('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>{activeWorkspace === 'invoices' ? 'Faturas' : 'Lotes TISS'}</Text>
-              </Group>
+              <Text fw={600} size="lg">{activeWorkspace === 'invoices' ? 'Faturas' : 'Lotes TISS'}</Text>
             </Group>
 
           {activeWorkspace === 'invoices' && (
             <>
             <Box mb={isMobile ? 20 : 30}>
-              <Group gap="md" align="flex-end">
-                <FloatingInput
+              <Group gap="md" align="flex-end" wrap="wrap">
+                <TextInput
                   label="Buscar faturas"
                   placeholder={isMobile ? 'Buscar...' : 'Buscar paciente por nome ou número...'}
                   value={query}
                   onChange={(e) => setQuery(e.currentTarget.value)}
-                  containerProps={{ style: { flex: 1 } }}
+                  style={{ flex: '1 1 220px', maxWidth: isMobile ? '100%' : 420 }}
                 />
-                <Button
-                  bg={DARK_BLUE}
-                  c="white"
-                  leftSection={isMobile ? undefined : <Plus size={18} />}
-                  onClick={() => openInvoice()}
-                  size={isMobile ? 'sm' : 'md'}
-                  fw={600}
-                  px={isMobile ? 'sm' : 'xl'}
-                >
-                  {isMobile ? <Plus size={16} /> : 'Nova fatura'}
+                <Button leftSection={<Plus size={16} />} onClick={() => openInvoice()} fullWidth={isMobile}>
+                  Nova fatura
                 </Button>
                 <Button
                   variant="light"
-                  color="blue"
-                  leftSection={isMobile ? undefined : <FileCode2 size={18} />}
+                  leftSection={<FileCode2 size={16} />}
                   onClick={openTissBatchModal}
-                  size={isMobile ? 'sm' : 'md'}
-                  fw={600}
                   disabled={!canCreateTissBatch}
+                  fullWidth={isMobile}
                 >
-                  {isMobile ? 'TISS' : 'Criar lote TISS'}
+                  Criar lote TISS
                 </Button>
               </Group>
               {selectedRows.length > 0 && (
@@ -784,7 +744,7 @@ export function Faturamento() {
               showFooter
             >
               {invoicesLoading ? (
-                <Paper style={{ padding: 24, border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <Paper withBorder radius="md" p="lg">
                   <Stack gap="sm">
                     {Array.from({ length: 4 }).map((_, index) => (
                       <Stack key={index} gap="sm">
@@ -795,9 +755,9 @@ export function Faturamento() {
                   </Stack>
                 </Paper>
               ) : (
-                <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'} style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                   <Table.Thead>
-                    <Table.Tr style={{ borderBottom: 'none' }}>
+                    <Table.Tr>
                       <Table.Th style={{ width: 32 }}>
                         <Checkbox
                           checked={allFilteredSelected}
@@ -806,20 +766,18 @@ export function Faturamento() {
                           aria-label="Selecionar todas"
                         />
                       </Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Data/Hora Emissão</Table.Th>
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Data/Hora Vencimento</Table.Th>}
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                      {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convenio</Table.Th>}
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Desconto</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Valor Total</Table.Th>
-                      <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                      <Table.Th>Fatura</Table.Th>
+                      <Table.Th>Emissão</Table.Th>
+                      {!isTablet && <Table.Th>Vencimento</Table.Th>}
+                      <Table.Th>Status</Table.Th>
+                      {!isTablet && <Table.Th>Convênio</Table.Th>}
+                      <Table.Th>Valor Total</Table.Th>
+                      <Table.Th style={{ textAlign: 'center', width: 72 }}>Ações</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {paginatedFiltered.length > 0 ? paginatedFiltered.map((r) => (
-                      <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                      <Table.Tr key={r.id}>
                         <Table.Td>
                           <Checkbox
                             checked={selectedInvoiceIds.includes(String(r.id))}
@@ -828,31 +786,19 @@ export function Faturamento() {
                           />
                         </Table.Td>
                         <Table.Td>
-                          <Group gap={isMobile ? 'xs' : 'sm'}>
-                            {!isMobile && (
-                              <Box
-                                bg={DARK_BLUE}
-                                w={32}
-                                h={32}
-                                style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                              >
-                                <Text c="white" fw={600} size="sm">{r.codigo.charAt(0).toUpperCase()}</Text>
-                              </Box>
-                            )}
-                            <Box>
-                              <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.codigo}</Text>
-                              {isMobile && <Text size="xs" c="dimmed">Status: {r.status}</Text>}
-                            </Box>
-                          </Group>
+                          <Stack gap={2}>
+                            <Text fw={600} size="sm">{r.nome || r.codigo}</Text>
+                            <Text size="xs" c="dimmed">Fatura {r.codigo}</Text>
+                          </Stack>
                         </Table.Td>
 
                         <Table.Td>
-                          <Text size="xs">{r.emissao}</Text>
+                          <Text size="sm">{r.emissao}</Text>
                         </Table.Td>
 
                         {!isTablet && (
                           <Table.Td>
-                            <Text size="xs">{r.vencimento}</Text>
+                            <Text size="sm">{r.vencimento}</Text>
                           </Table.Td>
                         )}
 
@@ -864,27 +810,21 @@ export function Faturamento() {
 
                         {!isTablet && (
                           <Table.Td>
-                            <Text size="xs">{r.convenio}</Text>
+                            <Text size="sm">{r.convenio}</Text>
                           </Table.Td>
                         )}
 
                         <Table.Td>
-                          <Text size="xs">R${r.valor.toFixed(2)}</Text>
-                        </Table.Td>
-
-                        <Table.Td>
-                          <Text size="xs">{r.descontoPercent ? `${r.descontoPercent}%` : '-'}</Text>
-                        </Table.Td>
-
-                        <Table.Td>
-                          <Text size="xs">R${r.valorTotal.toFixed(2)}</Text>
+                          <Tooltip label={`Valor: R$ ${r.valor.toFixed(2)} • Desconto: ${r.descontoPercent ? `${r.descontoPercent}%` : 'nenhum'}`} withArrow>
+                            <Text fw={600} size="sm" style={{ cursor: 'help', width: 'fit-content' }}>R$ {r.valorTotal.toFixed(2)}</Text>
+                          </Tooltip>
                         </Table.Td>
 
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
                             <Menu shadow="md" width={220} position="bottom-end" withArrow>
                               <Menu.Target>
-                                <ActionIcon variant="subtle" color="blue" aria-label="Ações da fatura">
+                                <ActionIcon variant="subtle" color="gray" aria-label="Ações da fatura">
                                   <MoreVertical size={16} />
                                 </ActionIcon>
                               </Menu.Target>
@@ -899,7 +839,7 @@ export function Faturamento() {
                       </Table.Tr>
                     )) : (
                       <Table.Tr>
-                        <Table.Td colSpan={isTablet ? 8 : 10}>
+                        <Table.Td colSpan={isTablet ? 6 : 8}>
                           <Stack align="center" py="xl" gap={6}>
                             <Text fw={600}>Nenhuma fatura encontrada</Text>
                             <Text c="dimmed" size="sm" ta="center">
@@ -918,13 +858,13 @@ export function Faturamento() {
 
           {activeWorkspace === 'tiss' && (
             <Paper withBorder p="md" radius="md">
-              <Group justify="space-between" mb="md" align="flex-end">
-                <FloatingInput
+              <Group justify="space-between" mb="md" align="flex-end" wrap="wrap">
+                <TextInput
                   label="Buscar lotes TISS"
                   placeholder="Número, convênio, competência ou status"
                   value={tissQuery}
                   onChange={(event) => setTissQuery(event.currentTarget.value)}
-                  containerProps={{ style: { flex: 1, maxWidth: 420 } }}
+                  style={{ flex: '1 1 220px', maxWidth: 420 }}
                 />
                 <Button
                   variant="subtle"
@@ -1011,281 +951,229 @@ export function Faturamento() {
       <Modal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={null}
-        size={420}
+        title={editingId ? 'Editar fatura' : 'Novo lançamento'}
+        size={isMobile ? '100%' : 520}
         centered
-        overlayProps={{ opacity: 0.3, blur: 1 }}
-        styles={{
-          body: { padding: 0 },
-          content: { borderRadius: '8px' },
-          header: { display: 'none' },
-        }}
+        fullScreen={isMobile}
       >
-        <Box p="lg">
-          <Group justify="space-between" align="center" mb="lg">
-            <Text fw={600} size="lg" c="var(--mantine-color-text)">{editingId ? 'Editar fatura' : 'Novo lançamento'}</Text>
-            <ActionIcon 
-              variant="subtle" 
-              color="gray" 
-              onClick={() => setModalOpen(false)}
-              size="sm"
-            >
-              <Text size="lg">×</Text>
-            </ActionIcon>
-          </Group>
-          <Stack gap="md">
-            {/* Tipo e Categoria */}
-            <Group grow>
-              <FloatingSelect 
+        <Stack gap="md">
+          <Grid grow>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <Select
                 label="Tipo"
-                data={[{ value: 'lancamento', label: 'Lançamento' }, { value: 'nota', label: 'Nota Fiscal' }]} 
-                placeholder="Tipo" 
-                value={invoiceData.tipo} 
-                onChange={(val) => setInvoiceData({ ...invoiceData, tipo: val || '' })} 
-                styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
+                data={[{ value: 'lancamento', label: 'Lançamento' }, { value: 'nota', label: 'Nota Fiscal' }]}
+                placeholder="Tipo"
+                value={invoiceData.tipo}
+                onChange={(val) => setInvoiceData({ ...invoiceData, tipo: val || '' })}
               />
-              <FloatingSelect 
+            </Grid.Col>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <Select
                 label="Categoria"
-                data={[{ value: 'consulta', label: 'Consulta' }, { value: 'exame', label: 'Exame' }, { value: 'outro', label: 'Outro' }]} 
-                placeholder="Categoria" 
-                value={invoiceData.categoria} 
-                onChange={(val) => setInvoiceData({ ...invoiceData, categoria: val || '' })} 
-                styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
+                data={[{ value: 'consulta', label: 'Consulta' }, { value: 'exame', label: 'Exame' }, { value: 'outro', label: 'Outro' }]}
+                placeholder="Categoria"
+                value={invoiceData.categoria}
+                onChange={(val) => setInvoiceData({ ...invoiceData, categoria: val || '' })}
               />
-            </Group>
+            </Grid.Col>
+          </Grid>
 
-            {/* Descrição */}
-            <FloatingTextarea 
-              label="Descrição"
-              placeholder="Descrição" 
-              value={invoiceData.descricao} 
-              onChange={(e) => setInvoiceData({ ...invoiceData, descricao: e.currentTarget.value })} 
-              minRows={2} 
-              styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
-            />
+          <Textarea
+            label="Descrição"
+            placeholder="Descrição"
+            value={invoiceData.descricao}
+            onChange={(e) => setInvoiceData({ ...invoiceData, descricao: e.currentTarget.value })}
+            minRows={2}
+          />
 
-            {/* Valor e Vencimento */}
-            <Group grow>
-              <FloatingNumberInput 
+          <Grid grow>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <NumberInput
                 label="Valor (R$)"
-                placeholder="Valor (R$)" 
-                value={invoiceData.valor || ''} 
-                min={0} 
-                step={0.01} 
+                placeholder="Valor (R$)"
+                value={invoiceData.valor || ''}
+                min={0}
+                step={0.01}
                 hideControls
-                onChange={(val) => setInvoiceData({ ...invoiceData, valor: typeof val === 'number' ? val : Number(val) || 0 })} 
-                styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
+                onChange={(val) => setInvoiceData({ ...invoiceData, valor: typeof val === 'number' ? val : Number(val) || 0 })}
               />
-              <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
-                <Popover.Target>
-                  <FloatingInput
-                    label="Vencimento"
-                    placeholder="dd/mm/yyyy"
-                    value={dateInput}
-                    onChange={(e) => setDateInput(formatDateInput(e.currentTarget.value))}
-                    onBlur={() => {
-                      if (!dateInput) {
-                        setInvoiceData({ ...invoiceData, vencimento: null });
-                        return;
-                      }
-                      const parsed = parseDate(dateInput);
-                      if (!parsed) setInvoiceData({ ...invoiceData, vencimento: null });
-                      else setInvoiceData({ ...invoiceData, vencimento: parsed });
-                    }}
-                    rightSection={
-                      <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
-                        <CalendarIcon size={16} />
-                      </ActionIcon>
-                    }
-                  />
-                </Popover.Target>
-                <Popover.Dropdown style={{ padding: 8 }}>
-                  <DatePicker 
-                    value={invoiceData.vencimento}
-                    onChange={(d) => {
-                      setInvoiceData({ ...invoiceData, vencimento: d });
-                      setDateInput(formatDate(d));
-                      setPopoverOpened(false);
-                    }}
-                  />
-                </Popover.Dropdown>
-              </Popover>
-            </Group>
+            </Grid.Col>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <DateInput
+                label="Vencimento"
+                value={invoiceData.vencimento}
+                onChange={(d) => setInvoiceData({ ...invoiceData, vencimento: d ?? null })}
+              />
+            </Grid.Col>
+          </Grid>
 
-            <Grid grow>
-              <Grid.Col span={isMobile ? 12 : 6}>
-                <Box>
-                  <Text size="sm" fw={500} mb={4}>Desconto (%)</Text>
-                  <FloatingNumberInput
-                    label="Desconto (%)"
-                    placeholder="Desconto (%)"
-                    value={invoiceData.desconto ?? 0}
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    hideControls
-                    onChange={(val) => setInvoiceData({ ...invoiceData, desconto: typeof val === 'number' ? val : Number(val) || 0 })}
-                    styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }}
-                  />
-                </Box>
-              </Grid.Col>
+          <Grid grow>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <NumberInput
+                label="Desconto (%)"
+                placeholder="Desconto (%)"
+                value={invoiceData.desconto ?? 0}
+                min={0}
+                max={100}
+                step={0.01}
+                hideControls
+                onChange={(val) => setInvoiceData({ ...invoiceData, desconto: typeof val === 'number' ? val : Number(val) || 0 })}
+              />
+            </Grid.Col>
 
-              <Grid.Col span={isMobile ? 12 : 6}>
-                <Box>
-                  <Text size="sm" fw={500} mb={4}>Forma de pagamento</Text>
-                  <FloatingSelect 
-                    label="Forma de pagamento"
-                    data={[{ value: 'dinheiro', label: 'Dinheiro' }, { value: 'cartao', label: 'Cartão' }, { value: 'boleto', label: 'Boleto' }]} 
-                    placeholder="Forma de pagamento" 
-                    value={invoiceData.formaPagamento} 
-                    onChange={(val) => setInvoiceData({ ...invoiceData, formaPagamento: val || '' })} 
-                    styles={{ input: { fontSize: '14px', borderColor: '#dee2e6' } }} 
-                  />
-                </Box>
-              </Grid.Col>
-            </Grid>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <Select
+                label="Forma de pagamento"
+                data={[{ value: 'dinheiro', label: 'Dinheiro' }, { value: 'cartao', label: 'Cartão' }, { value: 'boleto', label: 'Boleto' }]}
+                placeholder="Forma de pagamento"
+                value={invoiceData.formaPagamento}
+                onChange={(val) => setInvoiceData({ ...invoiceData, formaPagamento: val || '' })}
+              />
+            </Grid.Col>
+          </Grid>
 
-            {/* Nome */}
-            <FloatingInput 
+          <Stack gap={4}>
+            <TextInput
               label="Nome"
-              placeholder="Nome" 
+              placeholder="Nome"
               value={invoiceData.nome}
               onChange={(e) => setInvoiceData({ ...invoiceData, nome: e.currentTarget.value })}
               disabled={!invoiceData.tipo}
             />
-            
-            <Text size="xs" c="dimmed" mt="xs">
+            <Text size="xs" c="dimmed">
               * só liberado após o Tipo selecionado
             </Text>
-
-            <Text size="sm" fw={600} c="dimmed" mt="sm">
-              Autorização do convênio (TISS)
-            </Text>
-
-            <FloatingInput
-              label="Número da guia da operadora"
-              placeholder="Ex: 123456789"
-              value={invoiceData.operatorGuideNumber}
-              onChange={(e) => setInvoiceData({ ...invoiceData, operatorGuideNumber: e.currentTarget.value })}
-            />
-
-            <FloatingInput
-              label="Senha de autorização"
-              placeholder="Ex: ABC123"
-              value={invoiceData.authorizationPassword}
-              onChange={(e) => setInvoiceData({ ...invoiceData, authorizationPassword: e.currentTarget.value })}
-            />
-
-            <Group grow>
-              <FloatingInput
-                label="Data de autorização"
-                placeholder="YYYY-MM-DD"
-                value={invoiceData.authorizationDate}
-                onChange={(e) => setInvoiceData({ ...invoiceData, authorizationDate: e.currentTarget.value })}
-              />
-              <FloatingInput
-                label="Validade da autorização"
-                placeholder="YYYY-MM-DD"
-                value={invoiceData.authorizationExpiryDate}
-                onChange={(e) => setInvoiceData({ ...invoiceData, authorizationExpiryDate: e.currentTarget.value })}
-              />
-            </Group>
-
-            <FloatingSelect
-              label="Tipo de atendimento autorizado"
-              data={[
-                { value: 'CONSULTA', label: 'Consulta' },
-                { value: 'SP_SADT', label: 'SP-SADT' },
-                { value: 'EXAME', label: 'Exame' },
-                { value: 'INTERNACAO', label: 'Internação' },
-                { value: 'OUTRO', label: 'Outro' },
-              ]}
-              value={invoiceData.authorizedAttendanceType || null}
-              onChange={(value) => setInvoiceData({ ...invoiceData, authorizedAttendanceType: value || '' })}
-              clearable
-            />
-
-            <Text size="sm" fw={600} c="dimmed" mt="sm">
-              Composição financeira da guia
-            </Text>
-
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <FloatingNumberInput
-                label="Pacotes"
-                value={invoiceData.packageValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, packageValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="Materiais"
-                value={invoiceData.materialsValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, materialsValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="Taxas"
-                value={invoiceData.feesValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, feesValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="Diárias"
-                value={invoiceData.dailyValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, dailyValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="Gases"
-                value={invoiceData.gasesValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, gasesValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="OPME"
-                value={invoiceData.opmeValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, opmeValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="Desconto previsto"
-                value={invoiceData.expectedDiscountValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, expectedDiscountValue: typeof value === 'number' ? value : 0 })}
-              />
-              <FloatingNumberInput
-                label="Glosa prevista"
-                value={invoiceData.expectedGlosaValue}
-                min={0}
-                step={0.01}
-                hideControls
-                onChange={(value) => setInvoiceData({ ...invoiceData, expectedGlosaValue: typeof value === 'number' ? value : 0 })}
-              />
-            </SimpleGrid>
-
-            <Group justify="flex-end" mt="lg">
-              <Button variant="default" onClick={() => setModalOpen(false)} size="sm">
-                Cancelar
-              </Button>
-              <Button bg={DARK_BLUE} onClick={handleAddOrUpdate} size="sm" loading={savingInvoice} disabled={savingInvoice}>
-                {editingId ? 'Salvar alterações' : 'Salvar'}
-              </Button>
-            </Group>
           </Stack>
-        </Box>
+
+          <Text size="sm" fw={600} c="dimmed" mt="sm">
+            Autorização do convênio (TISS)
+          </Text>
+
+          <TextInput
+            label="Número da guia da operadora"
+            placeholder="Ex: 123456789"
+            value={invoiceData.operatorGuideNumber}
+            onChange={(e) => setInvoiceData({ ...invoiceData, operatorGuideNumber: e.currentTarget.value })}
+          />
+
+          <TextInput
+            label="Senha de autorização"
+            placeholder="Ex: ABC123"
+            value={invoiceData.authorizationPassword}
+            onChange={(e) => setInvoiceData({ ...invoiceData, authorizationPassword: e.currentTarget.value })}
+          />
+
+          <Grid grow>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <DateInput
+                label="Data de autorização"
+                value={parseIsoInputToDate(invoiceData.authorizationDate)}
+                onChange={(d) => setInvoiceData({ ...invoiceData, authorizationDate: formatDateToIsoInput(d) })}
+              />
+            </Grid.Col>
+            <Grid.Col span={isMobile ? 12 : 6}>
+              <DateInput
+                label="Validade da autorização"
+                value={parseIsoInputToDate(invoiceData.authorizationExpiryDate)}
+                onChange={(d) => setInvoiceData({ ...invoiceData, authorizationExpiryDate: formatDateToIsoInput(d) })}
+              />
+            </Grid.Col>
+          </Grid>
+
+          <Select
+            label="Tipo de atendimento autorizado"
+            data={[
+              { value: 'CONSULTA', label: 'Consulta' },
+              { value: 'SP_SADT', label: 'SP-SADT' },
+              { value: 'EXAME', label: 'Exame' },
+              { value: 'INTERNACAO', label: 'Internação' },
+              { value: 'OUTRO', label: 'Outro' },
+            ]}
+            value={invoiceData.authorizedAttendanceType || null}
+            onChange={(value) => setInvoiceData({ ...invoiceData, authorizedAttendanceType: value || '' })}
+            clearable
+          />
+
+          <Text size="sm" fw={600} c="dimmed" mt="sm">
+            Composição financeira da guia
+          </Text>
+
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <NumberInput
+              label="Pacotes"
+              value={invoiceData.packageValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, packageValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="Materiais"
+              value={invoiceData.materialsValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, materialsValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="Taxas"
+              value={invoiceData.feesValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, feesValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="Diárias"
+              value={invoiceData.dailyValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, dailyValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="Gases"
+              value={invoiceData.gasesValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, gasesValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="OPME"
+              value={invoiceData.opmeValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, opmeValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="Desconto previsto"
+              value={invoiceData.expectedDiscountValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, expectedDiscountValue: typeof value === 'number' ? value : 0 })}
+            />
+            <NumberInput
+              label="Glosa prevista"
+              value={invoiceData.expectedGlosaValue}
+              min={0}
+              step={0.01}
+              hideControls
+              onChange={(value) => setInvoiceData({ ...invoiceData, expectedGlosaValue: typeof value === 'number' ? value : 0 })}
+            />
+          </SimpleGrid>
+
+          <Group justify="flex-end" mt="lg">
+            <Button variant="default" onClick={() => setModalOpen(false)} size="sm">
+              Cancelar
+            </Button>
+            <Button onClick={handleAddOrUpdate} size="sm" loading={savingInvoice} disabled={savingInvoice}>
+              {editingId ? 'Salvar alterações' : 'Salvar'}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       <Modal
@@ -1295,13 +1183,13 @@ export function Faturamento() {
         centered
       >
         <Stack gap="md">
-          <FloatingInput
+          <TextInput
             label="Competência (YYYY-MM)"
             placeholder="2026-03"
             value={tissCompetenceMonth}
             onChange={(event) => setTissCompetenceMonth(event.currentTarget.value)}
           />
-          <FloatingInput
+          <TextInput
             label="Convênio"
             value={selectedConventions[0] || ''}
             readOnly
@@ -1312,7 +1200,6 @@ export function Faturamento() {
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setTissModalOpen(false)}>Cancelar</Button>
             <Button
-              bg={DARK_BLUE}
               onClick={handleCreateTissBatch}
               loading={creatingTissBatch}
               disabled={!canCreateTissBatch || creatingTissBatch}
@@ -1330,7 +1217,7 @@ export function Faturamento() {
         centered
       >
         <Stack gap="md">
-          <FloatingInput
+          <TextInput
             label="Protocolo da operadora"
             placeholder="Ex: PROT-2026-000123"
             value={protocolNumberInput}
@@ -1338,7 +1225,7 @@ export function Faturamento() {
           />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setProtocolModalOpen(false)}>Cancelar</Button>
-            <Button bg={DARK_BLUE} onClick={handleRegisterProtocol} loading={savingProtocol}>
+            <Button onClick={handleRegisterProtocol} loading={savingProtocol}>
               Confirmar envio
             </Button>
           </Group>
@@ -1363,7 +1250,7 @@ export function Faturamento() {
                     Guia {row.guideNumber} • Fatura {row.invoiceNumber}
                   </Text>
                   <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-                    <FloatingSelect
+                    <Select
                       label="Status retorno"
                       data={[
                         { value: 'ACCEPTED', label: 'Aceita' },
@@ -1376,7 +1263,7 @@ export function Faturamento() {
                         setReturnRows((current) => current.map((item, idx) => idx === index ? { ...item, status: next } : item));
                       }}
                     />
-                    <FloatingNumberInput
+                    <NumberInput
                       label="Glosa (R$)"
                       value={row.glosaValue}
                       min={0}
@@ -1387,7 +1274,7 @@ export function Faturamento() {
                         setReturnRows((current) => current.map((item, idx) => idx === index ? { ...item, glosaValue: next } : item));
                       }}
                     />
-                    <FloatingInput
+                    <TextInput
                       label="Código retorno"
                       value={row.returnCode}
                       onChange={(event) => {
@@ -1396,7 +1283,7 @@ export function Faturamento() {
                       }}
                     />
                   </SimpleGrid>
-                  <FloatingTextarea
+                  <Textarea
                     label="Motivo/observação"
                     minRows={2}
                     value={row.returnMessage}
@@ -1412,7 +1299,6 @@ export function Faturamento() {
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setReturnModalOpen(false)}>Cancelar</Button>
             <Button
-              bg={DARK_BLUE}
               onClick={handleRegisterReturn}
               loading={savingReturn}
               disabled={returnRows.length === 0 || savingReturn}

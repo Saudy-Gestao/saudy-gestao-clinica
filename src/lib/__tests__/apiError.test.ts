@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { notifications } from '@mantine/notifications';
+import { notifications } from '@/components/ui';
 import { resolveApiErrorMessage, showApiErrorToast } from '../apiError';
 
-vi.mock('@mantine/notifications', () => ({
+vi.mock('@/components/ui', () => ({
   notifications: {
     show: vi.fn(),
   },

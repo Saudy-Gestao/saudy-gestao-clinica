@@ -1,4 +1,4 @@
-import { notifications } from '@mantine/notifications';
+import { notifications } from '@/components/ui';
 import { resolveApiErrorMessage } from './apiError';
 
 export const showSuccessToast = (params: { title: string; message: string }) => {
@@ -33,4 +33,3 @@ export const showInfoToast = (params: { title: string; message: string }) => {
     className: 'saudy-toast',
   });
 };
-

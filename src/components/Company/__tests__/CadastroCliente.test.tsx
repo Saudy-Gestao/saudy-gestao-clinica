@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
-import { MantineProvider } from '@mantine/core';
+import { ThemeProvider } from '@/components/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CadastroCliente } from '../CadastroCliente';
 import companyService from '../../../services/companyService';
@@ -37,9 +37,9 @@ describe('CadastroCliente component integration', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <MantineProvider>
+          <ThemeProvider>
             <CadastroCliente />
-          </MantineProvider>
+          </ThemeProvider>
         </BrowserRouter>
       </QueryClientProvider>
     );

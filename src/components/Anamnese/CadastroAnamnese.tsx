@@ -6,27 +6,26 @@ import {
   Box,
   Button,
   Group,
+  Menu,
   Modal,
   Paper,
+  Select,
   Skeleton,
   SimpleGrid,
   Stack,
   Switch,
   Table,
   Text,
-  useMantineColorScheme,
-  Menu,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ClipboardPenLine, Pencil, Plus, Power, Trash2, MoreVertical } from 'lucide-react';
+  TextInput,
+  Textarea,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { ClipboardPenLine, MoreVertical, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
+import './CadastroAnamnese.css';
 import procedureAnamnesisTemplateService, {
   type AnamnesisQuestionPayload,
   type ProcedureAnamnesisTemplateItem,
@@ -117,7 +116,6 @@ export function CadastroAnamnese() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const { colorScheme } = useMantineColorScheme();
   const queryClient = useQueryClient();
 
   const [saving, setSaving] = useState(false);
@@ -348,41 +346,29 @@ export function CadastroAnamnese() {
   };
 
   return (
-    <Box>
-      <Header />
+    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group justify="space-between" align="center" mb={isMobile ? 20 : 30}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)} aria-label="Voltar">
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">Cadastro de Anamnese</Text>
-              <Text size="sm" c="dimmed">Perguntas estruturadas por procedimento</Text>
-            </Box>
-          </Group>
+        <Box className="cadastro-anamnese-hero">
+          <Text className="cadastro-anamnese-eyebrow">CADASTROS CLÍNICOS</Text>
+          <Text className="cadastro-anamnese-title" fw={700} size="2xl">Cadastro de Anamnese</Text>
+          <Text className="cadastro-anamnese-subtitle" size="sm">Perguntas estruturadas por procedimento</Text>
+        </Box>
 
-          <Button leftSection={<Plus size={18} />} bg={DARK_BLUE} onClick={openCreate}>
-            Nova anamnese
-          </Button>
-        </Group>
-
-        <Paper
-          p="lg"
-          radius="lg"
-          withBorder
-          style={colorScheme === 'dark' ? {
-            backgroundColor: 'transparent',
-            borderColor: 'var(--mantine-color-default-border)',
-          } : undefined}
-        >
+        <Paper className="cadastro-anamnese-panel" p="lg" radius="lg" withBorder>
           <Stack gap="md">
-            <FloatingInput
-              label="Buscar anamneses"
-              value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder="Nome da anamnese, procedimento ou pergunta..."
-            />
+            <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+              <TextInput
+                label="Buscar anamneses"
+                value={query}
+                onChange={(event) => setQuery(event.currentTarget.value)}
+                placeholder="Nome da anamnese, procedimento ou pergunta..."
+                style={{ flex: '1 1 260px', maxWidth: isMobile ? '100%' : 420 }}
+              />
+              <Button leftSection={<Plus size={18} />} onClick={openCreate} fullWidth={isMobile}>
+                Nova anamnese
+              </Button>
+            </Group>
 
             {loading ? (
               <Stack gap="sm">
@@ -465,7 +451,7 @@ export function CadastroAnamnese() {
                               </Table.Td>
                               <Table.Td style={{ textAlign: 'center' }}>
                                 <Group justify="center">
-                                  <Menu shadow="md" width={210} position="bottom" withArrow>
+                                  <Menu shadow="md" width={210} position="bottom-end" withArrow>
                                     <Menu.Target>
                                       <ActionIcon variant="light" size="sm" aria-label="Ações da anamnese">
                                         <MoreVertical size={16} />
@@ -533,24 +519,18 @@ export function CadastroAnamnese() {
         title={editingId ? 'Editar anamnese' : 'Nova anamnese'}
         centered
         size="xl"
-        styles={{
-          body: {
-            paddingTop: 28,
-          },
-        }}
       >
         <Stack gap="md">
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-            <FloatingSelect
+            <Select
               label="Procedimento"
               data={procedures}
               value={form.procedureId}
               onChange={(value) => setForm((prev) => ({ ...prev, procedureId: value || '' }))}
               searchable
               required
-              alwaysFloatLabel
             />
-            <FloatingInput
+            <TextInput
               label="Nome da anamnese"
               placeholder="Ex.: Anamnese de ultrassom abdominal"
               value={form.name}
@@ -559,11 +539,10 @@ export function CadastroAnamnese() {
                 setForm((prev) => ({ ...prev, name: value }));
               }}
               required
-              alwaysFloatLabel
             />
           </SimpleGrid>
 
-          <FloatingTextarea
+          <Textarea
             label="Descrição"
             placeholder="Contexto, observações ou instruções de uso da anamnese"
             value={form.description}
@@ -574,14 +553,22 @@ export function CadastroAnamnese() {
             minRows={2}
           />
 
-          <Switch
-            label="Anamnese ativa"
-            checked={form.isActive}
-            onChange={(event) => {
-              const checked = event.currentTarget.checked;
-              setForm((prev) => ({ ...prev, isActive: checked }));
-            }}
-          />
+          <Box p="md" className="ui-toggle-card">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Box>
+                <Text fw={600} size="sm">Anamnese ativa</Text>
+                <Text size="xs" c="dimmed">Anamneses inativas deixam de ficar disponíveis para novos atendimentos.</Text>
+              </Box>
+              <Switch
+                label={form.isActive ? 'Ativa' : 'Inativa'}
+                checked={form.isActive}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setForm((prev) => ({ ...prev, isActive: checked }));
+                }}
+              />
+            </Group>
+          </Box>
 
           <Group justify="space-between" align="center" mt="sm">
             <Group gap="xs">
@@ -610,7 +597,7 @@ export function CadastroAnamnese() {
                     </ActionIcon>
                   </Group>
 
-                  <FloatingInput
+                  <TextInput
                     label="Pergunta"
                     placeholder="Digite a pergunta"
                     value={question.label}
@@ -622,7 +609,7 @@ export function CadastroAnamnese() {
                   />
 
                   <SimpleGrid cols={{ base: 1, md: 2 }}>
-                    <FloatingSelect
+                    <Select
                       label="Tipo de resposta"
                       data={RESPONSE_TYPE_OPTIONS}
                       value={question.responseType}
@@ -631,7 +618,7 @@ export function CadastroAnamnese() {
                         optionsText: shouldShowOptions(value || 'TEXT') ? question.optionsText : '',
                       })}
                     />
-                    <FloatingInput
+                    <TextInput
                       label="Placeholder"
                       placeholder="Texto de apoio da resposta"
                       value={question.placeholder || ''}
@@ -642,7 +629,7 @@ export function CadastroAnamnese() {
                     />
                   </SimpleGrid>
 
-                  <FloatingTextarea
+                  <Textarea
                     label="Texto de ajuda"
                     placeholder="Orientação adicional para quem vai responder"
                     value={question.helpText || ''}
@@ -663,7 +650,7 @@ export function CadastroAnamnese() {
                   />
 
                   {shouldShowOptions(question.responseType) && (
-                    <FloatingTextarea
+                    <Textarea
                       label="Opções"
                       description="Uma opção por linha"
                       placeholder={'Sim\nNão\nNão sei informar'}
@@ -688,7 +675,7 @@ export function CadastroAnamnese() {
             <Button variant="default" onClick={() => { setModalOpen(false); resetForm(); }}>
               Cancelar
             </Button>
-            <Button bg={DARK_BLUE} onClick={handleSave} loading={saving}>
+            <Button onClick={handleSave} loading={saving}>
               {editingId ? 'Salvar alterações' : 'Cadastrar anamnese'}
             </Button>
           </Group>

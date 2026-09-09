@@ -6,6 +6,8 @@ export interface TeaManualGridSlot {
   time: string;
   occupied: boolean;
   selectable: boolean;
+  roomId?: string | null;
+  roomName?: string | null;
 }
 
 export interface TeaManualGridDay {
@@ -42,6 +44,8 @@ const normalizeManualGridResponse = (grid?: TeaManualGridResponse): TeaManualGri
             time,
             occupied: Boolean(slot?.occupied),
             selectable: Boolean(slot?.selectable),
+            roomId: slot?.roomId || null,
+            roomName: slot?.roomName || null,
           });
           return;
         }
@@ -50,6 +54,8 @@ const normalizeManualGridResponse = (grid?: TeaManualGridResponse): TeaManualGri
           time,
           occupied: existing.occupied || Boolean(slot?.occupied),
           selectable: existing.selectable || Boolean(slot?.selectable),
+          roomId: existing.roomId || slot?.roomId || null,
+          roomName: existing.roomName || slot?.roomName || null,
         });
       });
 

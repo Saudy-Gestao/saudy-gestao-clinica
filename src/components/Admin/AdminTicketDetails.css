@@ -1,0 +1,16 @@
+.admin-ticket-details-hero {
+  background: linear-gradient(135deg, var(--ui-primary) 0%, #16357f 100%) !important;
+  color: #fff;
+}
+
+.admin-ticket-details-subtle-surface {
+  background: color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface)) !important;
+}
+
+.admin-ticket-details-nested-surface {
+  background: color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface)) !important;
+}
+
+.admin-ticket-details-timeline-line {
+  border-left: 1px solid var(--ui-border);
+}

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Menu, Avatar, Group, UnstyledButton, Switch, Badge, Modal, Stack, Text, PasswordInput, Button, Alert, Box } from '@mantine/core';
+import { Menu, Avatar, Group, UnstyledButton, Switch, Badge, Modal, Stack, Text, PasswordInput, Button, Alert, Box } from '@/components/ui';
 import { User, Settings, Moon, Sun, LifeBuoy, Trash2, AlertTriangle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { notifications } from '@mantine/notifications';
+import { notifications } from '@/components/ui';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 import authService from '../../services/authService';
@@ -28,6 +28,8 @@ export function UserMenu() {
   const currentUser = authService.getCurrentUser() as any;
   const effectiveUser = profileUser || currentUser;
   const adminView = isAdminUser(effectiveUser) || hasModuleAccess(effectiveUser, 'configuracoes');
+  const accountName = String(effectiveUser?.name || effectiveUser?.email?.split('@')[0] || 'Usuário').trim();
+  const accountEmail = String(effectiveUser?.email || 'Acesso interno').trim();
 
   useEffect(() => {
     const syncColorScheme = () => {
@@ -74,7 +76,7 @@ export function UserMenu() {
       onClose={() => { setDeleteModalOpen(false); setDeletePassword(''); }}
       title={
         <Group gap="xs">
-          <AlertTriangle size={18} color="var(--mantine-color-red-6)" />
+          <AlertTriangle size={18} color="var(--ui-hue-red)" />
           <Text fw={700} c="red">Excluir minha conta permanentemente</Text>
         </Group>
       }
@@ -88,8 +90,8 @@ export function UserMenu() {
             Ao confirmar, sua conta será excluída permanentemente e não haverá como recuperá-la.
           </Text>
         </Alert>
-        <Box style={{ background: 'var(--mantine-color-red-0)', borderRadius: 8, padding: '12px 14px' }}>
-          <Text size="sm" fw={600} c="red.8" mb={4}>O que será excluído:</Text>
+        <Box style={{ background: 'color-mix(in srgb, var(--ui-hue-red) 12%, var(--ui-surface))', borderRadius: 8, padding: '12px 14px' }}>
+          <Text size="sm" fw={600} c="var(--ui-hue-red)" mb={4}>O que será excluído:</Text>
           <Stack gap={2}>
             <Text size="sm">• Seu acesso ao sistema</Text>
             <Text size="sm">• Todas as suas informações de perfil</Text>
@@ -114,25 +116,37 @@ export function UserMenu() {
       </Stack>
     </Modal>
     <Menu shadow="md" position="bottom-end" opened={opened} onChange={setOpened}>
-      <Menu.Target>
-        <UnstyledButton>
-          <Group>
-            <Avatar color="blue" radius="xl">
-              <User size={16} />
-            </Avatar>
-          </Group>
-        </UnstyledButton>
-      </Menu.Target>
+      <div className="saudy-account-menu-anchor">
+        <Menu.Target>
+          <UnstyledButton aria-label="Abrir menu da conta">
+            <Group>
+              <Avatar color="blue" radius="xl" size={38}>
+                <User size={16} />
+              </Avatar>
+            </Group>
+          </UnstyledButton>
+        </Menu.Target>
 
-      <Menu.Dropdown>
+        <Menu.Dropdown className="saudy-account-menu">
+        <div className="saudy-account-menu__identity">
+          <Avatar className="saudy-account-menu__avatar" color="blue" radius="xl" size={42}>
+            <User size={18} />
+          </Avatar>
+          <div className="saudy-account-menu__identity-copy">
+            <span className="saudy-account-menu__identity-kicker">Conta ativa</span>
+            <strong title={accountName}>{accountName}</strong>
+            <small title={accountEmail}>{accountEmail}</small>
+          </div>
+        </div>
+        <Menu.Label className="saudy-account-menu__label">Acesso e preferências</Menu.Label>
         {!isAdmHubScreen && adminView && (
-          <Menu.Item icon={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
+          <Menu.Item leftSection={<Settings size={16} />} onClick={() => navigateAfterMenuClose('/settings')}>
             Configurações
           </Menu.Item>
         )}
         {!isAdmHubScreen && (
           <Menu.Item
-            icon={<LifeBuoy size={16} />}
+            leftSection={<LifeBuoy size={16} />}
             onClick={() => navigateAfterMenuClose('/meus-chamados')}
             rightSection={unreadCount > 0 ? <Badge color="red" size="xs">{unreadCount}</Badge> : null}
           >
@@ -140,11 +154,13 @@ export function UserMenu() {
           </Menu.Item>
         )}
         <Menu.Item
-          icon={isDark ? <Moon size={16} /> : <Sun size={16} />}
+          className="saudy-account-menu__theme-item"
+          leftSection={isDark ? <Moon size={16} /> : <Sun size={16} />}
           closeMenuOnClick={false}
           rightSection={
             <Switch
-              size="sm"
+              className="saudy-account-menu__switch"
+              size="xs"
               checked={isDark}
               onLabel={<Moon size={12} />}
               offLabel={<Sun size={12} />}
@@ -156,15 +172,17 @@ export function UserMenu() {
         >
           Modo escuro
         </Menu.Item>
-        <Menu.Divider />
+        <Menu.Divider className="saudy-account-menu__divider" />
         <Menu.Item
-          icon={<Trash2 size={16} />}
+          className="saudy-account-menu__danger"
+          leftSection={<Trash2 size={16} />}
           color="red"
           onClick={() => { setOpened(false); setDeleteModalOpen(true); }}
         >
           Excluir minha conta
         </Menu.Item>
-      </Menu.Dropdown>
+        </Menu.Dropdown>
+      </div>
     </Menu>
     </>
   );

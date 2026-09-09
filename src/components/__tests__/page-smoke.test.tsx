@@ -4,164 +4,6 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-vi.mock('@mantine/core', () => {
-  const cleanProps = ({ children, onClick, checked, value, onChange, placeholder, label, title, type, disabled, ...rest }: any) => ({
-    children,
-    onClick,
-    checked,
-    value,
-    onChange,
-    placeholder,
-    label,
-    title,
-    type,
-    disabled,
-    'data-testid': rest['data-testid'],
-  });
-  const Wrap = (props: any) => <div {...cleanProps(props)}>{props.children}</div>;
-  const Text = (props: any) => <span {...cleanProps(props)}>{props.children}</span>;
-  const Title = (props: any) => <h2 {...cleanProps(props)}>{props.children}</h2>;
-  const Button = (props: any) => <button {...cleanProps(props)}>{props.children || props.label}</button>;
-  const Input = (props: any) => <input aria-label={props.label} {...cleanProps(props)} />;
-  const Textarea = (props: any) => <textarea aria-label={props.label} {...cleanProps(props)} />;
-  const Select = (props: any) => (
-    <select aria-label={props.label} value={Array.isArray(props.value) ? '' : props.value ?? ''} onChange={(event) => props.onChange?.(event.target.value)}>
-      <option value="">{props.placeholder || props.label || 'Selecione'}</option>
-      {(props.data || []).map((item: any) => (
-        <option key={typeof item === 'string' ? item : item.value} value={typeof item === 'string' ? item : item.value}>
-          {typeof item === 'string' ? item : item.label}
-        </option>
-      ))}
-    </select>
-  );
-  const Checkbox = (props: any) => <input aria-label={props.label} type="checkbox" checked={Boolean(props.checked)} onChange={props.onChange} />;
-  const Modal = ({ opened, children, title }: any) => (opened ? <div role="dialog">{title && <h2>{title}</h2>}{children}</div> : null);
-  const Table: any = ({ children }: any) => <table>{children}</table>;
-  Table.Thead = ({ children }: any) => <thead>{children}</thead>;
-  Table.Tbody = ({ children }: any) => <tbody>{children}</tbody>;
-  Table.Tr = ({ children }: any) => <tr>{children}</tr>;
-  Table.Th = ({ children }: any) => <th>{children}</th>;
-  Table.Td = ({ children }: any) => <td>{children}</td>;
-  Table.ScrollContainer = ({ children }: any) => <div>{children}</div>;
-
-  const Tabs: any = ({ children }: any) => <div>{children}</div>;
-  Tabs.List = Wrap;
-  Tabs.Tab = Button;
-  Tabs.Panel = Wrap;
-
-  const Menu: any = ({ children }: any) => <div>{children}</div>;
-  Menu.Target = Wrap;
-  Menu.Dropdown = Wrap;
-  Menu.Item = Button;
-  Menu.Label = Text;
-  Menu.Divider = () => <hr />;
-
-  const Popover: any = ({ children }: any) => <div>{children}</div>;
-  Popover.Target = Wrap;
-  Popover.Dropdown = Wrap;
-  const Grid: any = Wrap;
-  Grid.Col = Wrap;
-
-  const components = {
-    Accordion: Wrap,
-    ActionIcon: Button,
-    Alert: Wrap,
-    Anchor: Text,
-    Avatar: Wrap,
-    Badge: Text,
-    Box: Wrap,
-    Breadcrumbs: Wrap,
-    Button,
-    Card: Wrap,
-    Center: Wrap,
-    Checkbox,
-    Collapse: Wrap,
-    Code: Text,
-    ColorInput: Input,
-    Container: Wrap,
-    Divider: () => <hr />,
-    Drawer: Modal,
-    FileInput: Input,
-    Flex: Wrap,
-    Grid,
-    Group: Wrap,
-    Image: (props: any) => <img alt={props.alt || ''} src={props.src || ''} />,
-    Indicator: Wrap,
-    Kbd: Text,
-    Loader: () => <div>loading</div>,
-    LoadingOverlay: () => null,
-    MantineProvider: Wrap,
-    Menu,
-    Modal,
-    MultiSelect: Select,
-    NativeSelect: Select,
-    NumberInput: Input,
-    Pagination: Wrap,
-    Paper: Wrap,
-    PasswordInput: Input,
-    PinInput: Input,
-    Popover,
-    Progress: Wrap,
-    Radio: Checkbox,
-    RingProgress: Wrap,
-    ScrollArea: Wrap,
-    SegmentedControl: Select,
-    Select,
-    SimpleGrid: Wrap,
-    Skeleton: () => <div>loading</div>,
-    Slider: Input,
-    Stack: Wrap,
-    Stepper: Wrap,
-    Switch: Checkbox,
-    Table,
-    Tabs,
-    Text,
-    Textarea,
-    TextInput: Input,
-    ThemeIcon: Wrap,
-    Timeline: Wrap,
-    Title,
-    Tooltip: ({ children }: any) => <>{children}</>,
-    Transition: ({ children, mounted = true }: any) => (mounted ? <>{typeof children === 'function' ? children({}) : children}</> : null),
-    TagsInput: Select,
-    List: Wrap,
-    UnstyledButton: Button,
-    createTheme: (config: any) => config,
-    rem: (value: number) => `${value}px`,
-    useMantineColorScheme: () => ({ colorScheme: 'light', setColorScheme: vi.fn() }),
-    useComputedColorScheme: () => 'light',
-    useMantineTheme: () => ({ colors: {}, primaryColor: 'blue' }),
-  };
-
-  return components;
-});
-
-vi.mock('@mantine/dates', () => ({
-  Calendar: (props: any) => <div data-testid="calendar" onClick={() => props.onChange?.(new Date())} />,
-  DatePicker: (props: any) => <div data-testid="date-picker" onClick={() => props.onChange?.(new Date())} />,
-  DateInput: (props: any) => <input aria-label={props.label} value={props.value || ''} onChange={props.onChange} />,
-  DatePickerInput: (props: any) => <input aria-label={props.label} value={props.value || ''} onChange={props.onChange} />,
-  DatesProvider: ({ children }: any) => <>{children}</>,
-  TimeInput: (props: any) => <input aria-label={props.label} value={props.value || ''} onChange={props.onChange} />,
-}));
-
-vi.mock('@mantine/notifications', () => ({
-  Notifications: () => null,
-  showNotification: vi.fn(),
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-  },
-}));
-
-vi.mock('@mantine/hooks', () => ({
-  useDebouncedValue: (value: any) => [value],
-  useDisclosure: (initial = false) => [initial, { open: vi.fn(), close: vi.fn(), toggle: vi.fn() }],
-  useLocalStorage: ({ defaultValue }: any) => [defaultValue, vi.fn()],
-  useMediaQuery: () => false,
-  useElementSize: () => ({ ref: vi.fn(), width: 1024, height: 0, x: 0, y: 0 }),
-}));
-
 const iconMock = (props: any) => <span aria-hidden="true" {...props} />;
 const makeIconModule = (names: string[]) =>
   names.reduce<Record<string, any>>((module, name) => {
@@ -201,65 +43,92 @@ vi.mock('lucide-react', () => {
     'AlertTriangle',
     'ArrowLeft',
     'ArrowRight',
+    'ArrowUpDown',
     'BarChart3',
+    'Bell',
     'BellRing',
     'BookOpen',
+    'Boxes',
     'Brain',
+    'BriefcaseBusiness',
     'BriefcaseMedical',
+    'Bug',
     'Building2',
     'Calendar',
     'CalendarCheck',
     'CalendarClock',
     'CalendarDays',
     'CalendarIcon',
+    'CalendarPlus',
     'CalendarX2',
     'Camera',
     'Check',
     'CheckCheck',
     'CheckCircle',
     'CheckCircle2',
-    'CircleCheck',
     'ChevronDown',
     'ChevronLeft',
     'ChevronRight',
+    'ChevronUp',
+    'ChevronsLeft',
+    'ChevronsRight',
     'CircleAlert',
+    'CircleCheck',
+    'CircleDollarSign',
     'CircleHelp',
+    'CircleX',
+    'Clipboard',
     'ClipboardCheck',
     'ClipboardList',
     'ClipboardPenLine',
     'Clock',
     'Clock3',
-    'CreditCard',
     'Copy',
+    'CreditCard',
     'DollarSign',
     'Download',
     'Edit',
+    'Eraser',
     'Eye',
     'EyeOff',
     'FileArchive',
-    'FilePlus',
+    'FileCheck2',
     'FileClock',
     'FileCode2',
+    'FilePlus',
     'FileSearch',
     'FileSpreadsheet',
     'FileText',
+    'Filter',
+    'FlaskConical',
     'FlipHorizontal',
     'FlipVertical',
     'FolderOpen',
     'GitBranch',
     'Glasses',
     'Globe',
+    'GraduationCap',
     'Grid2x2',
+    'GripVertical',
+    'Hand',
+    'Heart',
+    'HeartPulse',
     'History',
+    'Image',
     'Images',
+    'Info',
+    'Keyboard',
     'LampDesk',
-    'Layers3',
     'Layers',
     'Layers3',
     'LayoutDashboard',
     'LayoutGrid',
     'LayoutTemplate',
     'LifeBuoy',
+    'Lightbulb',
+    'LineChart',
+    'Link',
+    'Link2',
     'LinkIcon',
     'List',
     'ListTodo',
@@ -270,23 +139,29 @@ vi.mock('lucide-react', () => {
     'LogOut',
     'Mail',
     'MailCheck',
+    'Map',
+    'MapPin',
     'Maximize2',
-    'MessageCircleMore',
+    'Menu',
     'MessageCircle',
+    'MessageCircleMore',
+    'MessageSquare',
     'MessageSquarePlus',
     'MessageSquareText',
     'Mic',
     'MicOff',
     'Minimize2',
+    'Minus',
     'Moon',
     'MoreVertical',
     'Move',
     'NotebookPen',
+    'Package',
+    'PackageCheck',
+    'PackageOpen',
     'PanelLeftClose',
     'PanelLeftOpen',
     'Paperclip',
-    'Package',
-    'PackageOpen',
     'Pause',
     'PenTool',
     'Pencil',
@@ -295,9 +170,12 @@ vi.mock('lucide-react', () => {
     'PhoneOff',
     'Play',
     'Plus',
+    'PlusCircle',
     'Power',
     'PowerOff',
+    'Printer',
     'QrCode',
+    'Radio',
     'RefreshCcw',
     'RefreshCw',
     'RotateCcw',
@@ -314,20 +192,29 @@ vi.mock('lucide-react', () => {
     'ShieldCheck',
     'ShieldOff',
     'SignalHigh',
+    'Sparkles',
     'SpellCheck',
     'SquarePen',
+    'Star',
     'Stethoscope',
     'Sun',
+    'Sunrise',
     'Tag',
     'TextQuote',
+    'Ticket',
     'Trash',
     'Trash2',
+    'TrendingDown',
+    'TrendingUp',
     'Upload',
     'User',
+    'UserCheck',
     'UserPlus',
     'UserRoundCheck',
     'UserRoundPlus',
     'Users',
+    'Video',
+    'VideoOff',
     'Wallet',
     'WandSparkles',
     'Warehouse',
@@ -336,7 +223,8 @@ vi.mock('lucide-react', () => {
     'WifiOff',
     'Wrench',
     'X',
-    'ZoomIn',
+    'XCircle',
+    'ZoomIn'
   ]);
 
   return new Proxy(icons, {

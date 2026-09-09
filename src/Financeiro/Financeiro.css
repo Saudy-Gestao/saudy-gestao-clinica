@@ -1,0 +1,63 @@
+.financeiro-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.financeiro-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.financeiro-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.financeiro-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.financeiro-hub-grid {
+  gap: 1rem !important;
+}
+
+.financeiro-hub-card {
+  position: relative;
+  padding: 1.15rem !important;
+  min-height: 6rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.financeiro-hub-card:hover,
+.financeiro-hub-card:focus-within {
+  border-color: var(--ui-primary);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / .14);
+  transform: translateY(-2px);
+}
+
+.financeiro-hub-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 42%, var(--ui-border));
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--ui-primary) 12%, var(--ui-background));
+  color: var(--ui-primary);
+}
+
+.financeiro-hub-chevron {
+  color: var(--ui-muted);
+}

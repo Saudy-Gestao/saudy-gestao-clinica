@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '../../lib/utils';
 import {
   Box,
   Group,
   Text,
   Button,
+  TextInput,
+  Select,
+  MultiSelect,
+  Textarea,
+  DateInput,
   SimpleGrid,
   Stack,
   Paper,
   Title,
-  Popover,
   ActionIcon,
   Menu,
   Modal,
@@ -21,19 +26,15 @@ import {
   Badge,
   Switch,
   FileInput,
-  useComputedColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar as CalendarIcon, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Pencil, Trash, Power, MoreVertical, UserPlus, Users, Search } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
-import { DatePicker } from '@mantine/dates';
-import { onlyDigits, formatCPF, formatCEP, formatPhone, formatDateInput, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
+import './CadastroMedicoHub.css';
+import './CadastroMedicoForm.css';
+import './CadastroMedicoList.css';
+import { onlyDigits, formatCPF, formatCEP, formatPhone, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import doctorService from '../../services/doctorService';
 import cepService from '../../services/cepService';
@@ -187,7 +188,7 @@ type WorkingSchedule = {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Title order={5} fw={600} c="var(--mantine-color-text)" mb="sm" mt="md">
+    <Title order={5} fw={600} className="cadastro-medico-form-section-title" mb="sm" mt="md">
       {children}
     </Title>
   );
@@ -271,20 +272,11 @@ export function CadastroMedico() {
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   // Ensure the page starts at the top (header) when this route/component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
-
-  const formatDate = (d: Date | null) => {
-    if (!d) return '';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
 
   const formatDateForApi = (d: Date | null) => {
     if (!d) return undefined;
@@ -292,18 +284,6 @@ export function CadastroMedico() {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  };
-
-  const parseDate = (s: string) => {
-    if (!s) return null;
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (!m) return null;
-    const day = Number(m[1]);
-    const month = Number(m[2]) - 1;
-    const year = Number(m[3]);
-    const date = new Date(year, month, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
-    return date;
   };
 
   const handleSignatureFileChange = (file: File | null) => {
@@ -343,9 +323,6 @@ export function CadastroMedico() {
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorListItem | null>(null);
   const [editingDoctorId, setEditingDoctorId] = useState<string | null>(null);
 
-  const [datePopoverOpened, setDatePopoverOpened] = useState(false);
-  const [birthDateInput, setBirthDateInput] = useState('');
-  useEffect(() => setBirthDateInput(formatDate(form.birthDate)), [form.birthDate]);
   const [saving, setSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastCreatedName, setLastCreatedName] = useState<string | null>(null);
@@ -1124,102 +1101,77 @@ export function CadastroMedico() {
     setActiveTab('cadastro');
   };
 
+  const handleNewDoctor = () => {
+    setEditingDoctorId(null);
+    setForm({ ...INITIAL_DOCTOR_FORM });
+    setActiveTab('cadastro');
+  };
+
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="cadastro-medico-hub-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeTab === 'hub' ? navigate('/dashboard?secao=cadastros-clinicos') : setActiveTab('hub')) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        {/* Header da página */}
-        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Cadastro de Profissional
-              </Text>
-              <Text size="sm" c="dimmed">
-                Registro de profissionais
-              </Text>
-            </Box>
-          </Group>
-
-        </Group>
         {activeTab === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-            {[
-              {
-                key: 'cadastro',
-                icon: UserPlus,
-                title: 'Cadastrar profissional',
-                desc: 'Registrar profissional com dados profissionais, contatos e turnos de atendimento.',
-                onClick: () => setActiveTab('cadastro'),
-              },
-              {
-                key: 'lista',
-                icon: Users,
-                title: 'Profissionais',
-                desc: 'Visualize, edite e gerencie o status dos profissionais registrados no sistema.',
-                onClick: () => setActiveTab('lista'),
-              },
-              {
-                key: 'estagiarios',
-                icon: UserPlus,
-                title: 'Estagiários',
-                desc: 'Cadastre estagiários e vincule um ou mais profissionais responsáveis.',
-                onClick: () => navigate('/cadastro-estagiario'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
+          <>
+            <Box className="cadastro-medico-hub-hero">
+              <Text className="cadastro-medico-hub-eyebrow">CADASTROS CLÍNICOS</Text>
+              <Text className="cadastro-medico-hub-title" fw={700} size="2xl">Cadastro de Profissional</Text>
+              <Text className="cadastro-medico-hub-subtitle" size="sm">Registro de profissionais</Text>
+            </Box>
+
+            <SimpleGrid className="cadastro-medico-hub-grid" cols={{ base: 1, sm: 2, md: 3 }}>
+              {[
+                {
+                  key: 'cadastro',
+                  icon: UserPlus,
+                  title: 'Cadastrar profissional',
+                  desc: 'Registrar profissional com dados profissionais, contatos e turnos de atendimento.',
+                  onClick: () => setActiveTab('cadastro'),
+                },
+                {
+                  key: 'lista',
+                  icon: Users,
+                  title: 'Profissionais',
+                  desc: 'Visualize, edite e gerencie o status dos profissionais registrados no sistema.',
+                  onClick: () => setActiveTab('lista'),
+                },
+                {
+                  key: 'estagiarios',
+                  icon: UserPlus,
+                  title: 'Estagiários',
+                  desc: 'Cadastre estagiários e vincule um ou mais profissionais responsáveis.',
+                  onClick: () => navigate('/cadastro-estagiario'),
+                },
+              ].map((card) => (
+                <Paper
+                  key={card.key}
+                  className="cadastro-medico-hub-card"
+                  withBorder
+                  onClick={card.onClick}
+                >
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="cadastro-medico-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="cadastro-medico-hub-chevron" style={{ flexShrink: 0 }} />
                   </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveTab('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>
-                  {activeTab === 'cadastro' ? 'Cadastrar profissional' : 'Profissionais cadastrados'}
-                </Text>
-              </Group>
+              <Text fw={600} size="lg">
+                {activeTab === 'cadastro' ? 'Cadastrar profissional' : 'Profissionais cadastrados'}
+              </Text>
             </Group>
 
         <Tabs value={activeTab} onChange={(value) => setActiveTab((value as 'cadastro' | 'lista') || 'cadastro')} keepMounted={false}>
@@ -1231,11 +1183,11 @@ export function CadastroMedico() {
                 </Text>
               )}
               {/* Dados Pessoais */}
-              <Paper p="md" withBorder radius="md">
+              <Paper className="cadastro-medico-form-panel" p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <FloatingInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); clearFieldError('nome'); }} error={fieldErrors.nome} required />
-                  <FloatingInput
+                  <TextInput label="Nome completo" value={form.nome} onChange={(e) => { setForm({ ...form, nome: e.currentTarget.value }); clearFieldError('nome'); }} error={fieldErrors.nome} required />
+                  <TextInput
                     label="CPF"
                     value={formatCPF(form.cpf)}
                     onChange={(e) => {
@@ -1258,59 +1210,18 @@ export function CadastroMedico() {
                     error={fieldErrors.cpf}
                     required
                   />
-                  <FloatingInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
+                  <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
-                  <Popover opened={datePopoverOpened} onClose={() => setDatePopoverOpened(false)} position="bottom-start" withArrow>
-                    <Popover.Target>
-                      <FloatingInput
-                        label="Data de nascimento"
-                        placeholder="dd/mm/aaaa"
-                        value={birthDateInput}
-                        maxLength={10}
-                        required
-                        error={fieldErrors.birthDate}
-                        rightSection={
-                          <ActionIcon size="sm" variant="subtle" onClick={() => setDatePopoverOpened((o) => !o)}>
-                            <CalendarIcon size={16} />
-                          </ActionIcon>
-                        }
-                        onChange={(e) => {
-                          const formatted = formatDateInput(e.currentTarget.value);
-                          setBirthDateInput(formatted);
-                          clearFieldError('birthDate');
-                          const d = parseDate(formatted);
-                          setForm({ ...form, birthDate: d });
-                        }}
-                        onBlur={() => {
-                          if (!birthDateInput) {
-                            setForm({ ...form, birthDate: null });
-                            return;
-                          }
-                          const d = parseDate(birthDateInput);
-                          if (!d) {
-                            setFieldErrors((p) => ({ ...p, birthDate: 'Data de nascimento inválida' }));
-                            setForm({ ...form, birthDate: null });
-                          } else {
-                            clearFieldError('birthDate');
-                            setForm({ ...form, birthDate: d });
-                          }
-                        }}
-                      />
-                    </Popover.Target>
-                    <Popover.Dropdown>
-                      <DatePicker
-                        value={form.birthDate}
-                        onChange={(d) => {
-                          setForm({ ...form, birthDate: d });
-                          setBirthDateInput(formatDate(d));
-                          setDatePopoverOpened(false);
-                        }}
-                        maxDate={new Date()}
-                      />
-                    </Popover.Dropdown>
-                  </Popover>
+                  <DateInput
+                    label="Data de nascimento"
+                    value={form.birthDate}
+                    onChange={(value) => { setForm({ ...form, birthDate: value || null }); clearFieldError('birthDate'); }}
+                    required
+                    error={fieldErrors.birthDate}
+                    maxDate={new Date()}
+                  />
 
-                  <FloatingSelect
+                  <Select
                     label="Gênero"
                     data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
                     value={form.gender}
@@ -1319,25 +1230,25 @@ export function CadastroMedico() {
                     required
                   />
 
-                  <FloatingInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
-                  <FloatingInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
-                  <FloatingInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} required error={fieldErrors.cellphone} />
+                  <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} required error={fieldErrors.email} />
+                  <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
+                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} required error={fieldErrors.cellphone} />
                 </SimpleGrid>
               </Paper>
 
               {/* Dados Profissionais */}
-              <Paper p="md" withBorder radius="md">
+              <Paper className="cadastro-medico-form-panel" p="md" withBorder radius="md">
                 <SectionTitle>Dados Profissionais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <FloatingSelect
+                  <Select
                     label="Tipo de registro"
                     data={crmTypeOptions}
                     value={form.crmType}
                     onChange={(v) => { setForm({ ...form, crmType: v || 'CRM' }); }}
                     required
                   />
-                  <FloatingInput label={`Número do ${form.crmType || 'registro'}`} value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
-                  <FloatingSelect
+                  <TextInput label={`Número do ${form.crmType || 'registro'}`} value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
+                  <Select
                     label="UF do registro"
                     data={statesOptions}
                     value={form.crmState}
@@ -1348,7 +1259,7 @@ export function CadastroMedico() {
                 </SimpleGrid>
 
                 <Stack gap="sm" mt="md">
-                  <Group justify="space-between" align="center">
+                  <Group justify="space-between" align="center" wrap="wrap" gap="xs">
                     <Text size="sm" fw={600}>Modalidades, especialidades e procedimentos</Text>
                     <Button variant="light" size="xs" onClick={openAddGroupModal}>
                       + Adicionar conjunto
@@ -1360,7 +1271,7 @@ export function CadastroMedico() {
                       <Text size="sm" c="dimmed" ta="center">Nenhum conjunto cadastrado ainda.</Text>
                     </Paper>
                   ) : (
-                    <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                    <Box className="cadastro-medico-form-table-wrap">
                       <Table horizontalSpacing="sm" verticalSpacing="sm">
                         <Table.Thead>
                           <Table.Tr>
@@ -1426,7 +1337,7 @@ export function CadastroMedico() {
                   fullScreen={isMobile}
                 >
                   <Stack gap={10}>
-                    <FloatingSelect
+                    <Select
                       label="Modalidade"
                       required
                       placeholder="Selecione a modalidade"
@@ -1439,7 +1350,7 @@ export function CadastroMedico() {
                       onChange={handleGroupDraftModalidadeChange}
                     />
                     <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-                      <FloatingSelect
+                      <Select
                         label="Tipo do registro"
                         required
                         data={crmTypeOptions}
@@ -1447,7 +1358,7 @@ export function CadastroMedico() {
                         onChange={(value) => setGroupDraft((prev) => ({ ...prev, registrationType: value || '' }))}
                         searchable
                       />
-                      <FloatingInput
+                      <TextInput
                         label="Número do registro"
                         required
                         value={groupDraft.registrationNumber}
@@ -1456,7 +1367,7 @@ export function CadastroMedico() {
                           setGroupDraft((prev) => ({ ...prev, registrationNumber }));
                         }}
                       />
-                      <FloatingSelect
+                      <Select
                         label="UF do registro"
                         required
                         data={statesOptions}
@@ -1465,7 +1376,7 @@ export function CadastroMedico() {
                         searchable
                       />
                     </SimpleGrid>
-                    <FloatingMultiSelect
+                    <MultiSelect
                       label="Especialidades"
                       placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione as especialidades'}
                       data={(groupDraft.modalidadeId ? especialidadesByModalidadeId.get(groupDraft.modalidadeId) || [] : []).map((especialidade: any) => ({
@@ -1476,24 +1387,6 @@ export function CadastroMedico() {
                       disabled={!groupDraft.modalidadeId}
                       searchable
                       clearable
-                      styles={{
-                        input: {
-                          minHeight: 52,
-                          maxHeight: 84,
-                          alignItems: 'flex-start',
-                          overflowY: 'auto',
-                          paddingTop: 24,
-                          paddingBottom: 6,
-                        },
-                        pillsList: {
-                          maxHeight: 48,
-                          overflowY: 'auto',
-                          paddingRight: 24,
-                        },
-                        inputField: {
-                          minWidth: 90,
-                        },
-                      }}
                       nothingFoundMessage="Nenhuma especialidade disponível"
                       onChange={(values) => setGroupDraft((prev) => ({
                         ...prev,
@@ -1501,7 +1394,7 @@ export function CadastroMedico() {
                         especialidadeId: values[0] || null,
                       }))}
                     />
-                    <FloatingMultiSelect
+                    <MultiSelect
                       label="Métodos"
                       placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione os métodos'}
                       data={metodoOptionsForModalidade(groupDraft.modalidadeId)}
@@ -1512,7 +1405,7 @@ export function CadastroMedico() {
                       nothingFoundMessage="Nenhum método disponível"
                       onChange={(values) => setGroupDraft((prev) => ({ ...prev, metodos: values }))}
                     />
-                    <FloatingMultiSelect
+                    <MultiSelect
                       label="Unidades atendidas"
                       placeholder="Selecione as unidades"
                       data={branchOptionsWithAll}
@@ -1529,15 +1422,15 @@ export function CadastroMedico() {
                       <Button variant="default" onClick={() => setGroupModalOpen(false)} size="sm">
                         Cancelar
                       </Button>
-                      <Button bg={DARK_BLUE} onClick={handleSaveGroup} size="sm">
+                      <Button onClick={handleSaveGroup} size="sm">
                         {editingGroupIndex === null ? 'Cadastrar' : 'Salvar'}
                       </Button>
                     </Group>
                   </Stack>
                 </Modal>
 
-                <Paper withBorder radius="md" p="md" mt="md">
-                  <Group justify="space-between" align="flex-start" mb="md">
+                <Paper className="cadastro-medico-form-subbox" withBorder radius="md" p="md" mt="md">
+                  <Group justify="space-between" align="flex-start" wrap="wrap" gap="xs" mb="md">
                     <Box>
                       <Text size="sm" fw={600}>Procedimentos do profissional</Text>
                       <Text size="xs" c="dimmed">Defina o tempo específico de atendimento para cada procedimento.</Text>
@@ -1548,7 +1441,7 @@ export function CadastroMedico() {
                   </Group>
 
                   {selectedModalidadeIds.size === 0 ? (
-                    <Paper withBorder radius="sm" p="md" mt="md" bg="var(--mantine-color-gray-light)">
+                    <Paper className="cadastro-medico-form-subbox" withBorder radius="sm" p="md" mt="md">
                       <Text size="sm" c="dimmed" ta="center">Adicione uma modalidade nos conjuntos acima para listar os procedimentos disponíveis.</Text>
                     </Paper>
                   ) : (
@@ -1566,12 +1459,13 @@ export function CadastroMedico() {
                           <Text size="sm" fw={600}>Disponíveis</Text>
                           <Badge variant="light" color="gray">{availableProcedureOptions.length}</Badge>
                         </Group>
-                        <FloatingInput
-                          label="Buscar procedimento"
-                          value={availableProcedureSearch}
-                          onChange={(event) => setAvailableProcedureSearch(event.currentTarget.value)}
-                          containerProps={{ mb: 'sm' }}
-                        />
+                        <Box mb="sm">
+                          <TextInput
+                            label="Buscar procedimento"
+                            value={availableProcedureSearch}
+                            onChange={(event) => setAvailableProcedureSearch(event.currentTarget.value)}
+                          />
+                        </Box>
                         <Box style={{ height: 'min(420px, 45vh)', minHeight: 260, overflowY: 'auto' }}>
                           {filteredAvailableProcedures.length === 0 ? (
                             <Text size="sm" c="dimmed" ta="center" py="xl">Nenhum procedimento disponível.</Text>
@@ -1581,16 +1475,12 @@ export function CadastroMedico() {
                             return (
                               <Paper
                                 key={option.value}
+                                className={cn('cadastro-medico-form-pick-item', selected && 'cadastro-medico-form-pick-item-selected')}
                                 withBorder
                                 radius="sm"
                                 p="xs"
                                 mb={6}
                                 onClick={() => setSelectedAvailableProcedureIds((prev) => selected ? prev.filter((id) => id !== option.value) : [...prev, option.value])}
-                                style={{
-                                  cursor: 'pointer',
-                                  borderColor: selected ? 'var(--mantine-color-blue-6)' : undefined,
-                                  background: selected ? 'var(--mantine-color-blue-light)' : undefined,
-                                }}
                               >
                                 <Text size="sm" fw={500}>{option.label}</Text>
                                 <Text size="xs" c="dimmed">
@@ -1667,12 +1557,13 @@ export function CadastroMedico() {
                           <Text size="sm" fw={600}>Vinculados</Text>
                           <Badge variant="light" color="blue">{form.procedureDurations.length}</Badge>
                         </Group>
-                        <FloatingInput
-                          label="Buscar vinculados"
-                          value={linkedProcedureSearch}
-                          onChange={(event) => setLinkedProcedureSearch(event.currentTarget.value)}
-                          containerProps={{ mb: 'sm' }}
-                        />
+                        <Box mb="sm">
+                          <TextInput
+                            label="Buscar vinculados"
+                            value={linkedProcedureSearch}
+                            onChange={(event) => setLinkedProcedureSearch(event.currentTarget.value)}
+                          />
+                        </Box>
                         <Box style={{ height: 'min(420px, 45vh)', minHeight: 260, overflowY: 'auto' }}>
                           {filteredLinkedProcedures.length === 0 ? (
                             <Text size="sm" c="dimmed" ta="center" py="xl">Nenhum procedimento vinculado.</Text>
@@ -1683,16 +1574,12 @@ export function CadastroMedico() {
                             return (
                               <Paper
                                 key={item.procedureId}
+                                className={cn('cadastro-medico-form-pick-item', selected && 'cadastro-medico-form-pick-item-selected')}
                                 withBorder
                                 radius="sm"
                                 p="xs"
                                 mb={6}
                                 onClick={() => setSelectedLinkedProcedureIds((prev) => selected ? prev.filter((id) => id !== item.procedureId) : [...prev, item.procedureId])}
-                                style={{
-                                  cursor: 'pointer',
-                                  borderColor: selected ? 'var(--mantine-color-blue-6)' : undefined,
-                                  background: selected ? 'var(--mantine-color-blue-light)' : undefined,
-                                }}
                               >
                                 <Group justify="space-between" align="center" wrap={isMobile ? 'wrap' : 'nowrap'} gap="sm">
                                   <Box style={{ minWidth: 0, flex: '1 1 140px' }}>
@@ -1700,14 +1587,9 @@ export function CadastroMedico() {
                                     <Text size="xs" c="dimmed">{procedure?.modalidade?.name || 'Modalidade não informada'}</Text>
                                   </Box>
                                     <Box
+                                      className={cn('cadastro-medico-form-duration-box', invalidDuration && 'cadastro-medico-form-duration-box-invalid')}
                                       onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
-                                      style={{
-                                        width: 112,
-                                        padding: '5px 9px 6px',
-                                        borderRadius: 8,
-                                        border: `1px solid ${invalidDuration ? 'var(--mantine-color-red-5)' : 'var(--mantine-color-default-border)'}`,
-                                        background: isDarkMode ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
-                                      }}
+                                      style={{ width: 112, padding: '5px 9px 6px' }}
                                     >
                                       <Text size="xs" c={invalidDuration ? 'red' : 'dimmed'} mb={2}>Duração</Text>
                                       <Group gap={5} wrap="nowrap" align="center">
@@ -1725,12 +1607,12 @@ export function CadastroMedico() {
                                             )),
                                           }));
                                         }}
+                                        className="cadastro-medico-form-duration-input"
                                         style={{
                                           width: 55,
                                           border: 0,
                                           outline: 0,
                                           background: 'transparent',
-                                          color: 'var(--mantine-color-text)',
                                           fontSize: 15,
                                           fontWeight: 600,
                                           textAlign: 'right',
@@ -1750,16 +1632,23 @@ export function CadastroMedico() {
                   )}
                 </Paper>
 
-                <Switch
-                  mt="md"
-                  label="Profissional habilitado para teleconsulta"
-                  checked={form.teleconsultationEnabled}
-                  onChange={(event) => {
-                    const checked = event.currentTarget.checked;
-                    setForm((prev) => ({ ...prev, teleconsultationEnabled: checked }));
-                  }}
-                />
-                <FloatingTextarea
+                <Box mt="md" p="md" className="ui-toggle-card ui-toggle-card--dashed">
+                  <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                    <Box>
+                      <Text fw={600} size="sm">Teleconsulta</Text>
+                      <Text size="xs" c="dimmed">Permite que este profissional realize atendimentos por videochamada.</Text>
+                    </Box>
+                    <Switch
+                      label={form.teleconsultationEnabled ? 'Ativo' : 'Inativo'}
+                      checked={form.teleconsultationEnabled}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        setForm((prev) => ({ ...prev, teleconsultationEnabled: checked }));
+                      }}
+                    />
+                  </Group>
+                </Box>
+                <Textarea
                   label="Biografia"
                   placeholder="Breve descrição profissional"
                   value={form.biography}
@@ -1792,7 +1681,7 @@ export function CadastroMedico() {
                     </Group>
                   ) : null}
                   {form.signatureImageBase64 ? (
-                    <Paper withBorder radius="sm" p="xs" bg={isDarkMode ? 'dark.6' : 'gray.0'}>
+                    <Paper className="cadastro-medico-form-signature-preview" withBorder radius="sm" p="xs">
                       <Text size="xs" c="dimmed" mb={6}>Pré-visualização da assinatura</Text>
                       <Box
                         style={{
@@ -1819,10 +1708,10 @@ export function CadastroMedico() {
               </Paper>
 
               {/* Endereço */}
-              <Paper p="md" withBorder radius="md">
+              <Paper className="cadastro-medico-form-panel" p="md" withBorder radius="md">
                 <SectionTitle>Endereço</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
-                  <FloatingInput
+                  <TextInput
                     label="CEP"
                     value={formatCEP(form.zipCode)}
                     onChange={(e) => {
@@ -1835,14 +1724,14 @@ export function CadastroMedico() {
                     style={{ gridColumn: 'span 1' }}
                     rightSection={zipLoading ? <Loader size={16} /> : undefined}
                   />
-                  <FloatingInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
-                  <FloatingInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
+                  <TextInput label="Endereço" value={form.address} onChange={(e) => setForm({ ...form, address: e.currentTarget.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }} />
+                  <TextInput label="Número" value={form.addressNumber} onChange={(e) => setForm({ ...form, addressNumber: e.currentTarget.value })} />
                 </SimpleGrid>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" mt="md">
-                  <FloatingInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
-                  <FloatingInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
-                  <FloatingInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
-                  <FloatingSelect
+                  <TextInput label="Complemento" value={form.addressComplement} onChange={(e) => setForm({ ...form, addressComplement: e.currentTarget.value })} />
+                  <TextInput label="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.currentTarget.value })} />
+                  <TextInput label="Cidade" value={form.city} onChange={(e) => setForm({ ...form, city: e.currentTarget.value })} />
+                  <Select
                     label="Estado"
                     data={statesOptions}
                     value={form.state}
@@ -1852,11 +1741,11 @@ export function CadastroMedico() {
               </Paper>
 
               {/* Horário de Trabalho */}
-              <Paper p="md" withBorder radius="md">
+              <Paper className="cadastro-medico-form-panel" p="md" withBorder radius="md">
                 <SectionTitle>Horário de Trabalho</SectionTitle>
                 <Stack gap="md">
                   {form.workingSchedules.map((schedule, idx) => (
-                    <Paper key={idx} p="md" bg="rgba(0,0,0,0.02)" withBorder radius="md">
+                    <Paper key={idx} className="cadastro-medico-form-shift-card" p="md" withBorder radius="md">
                       <Group justify="space-between" mb="md">
                         <Text size="sm" fw={500}>Turno {idx + 1}</Text>
                         <ActionIcon
@@ -1873,7 +1762,7 @@ export function CadastroMedico() {
                         </ActionIcon>
                       </Group>
                       <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" mb="md">
-                        <FloatingMultiSelect
+                        <MultiSelect
                           label="Dias de trabalho"
                           data={daysOptions}
                           value={schedule.days}
@@ -1883,7 +1772,7 @@ export function CadastroMedico() {
                             setForm({ ...form, workingSchedules: updated });
                           }}
                         />
-                        <FloatingInput
+                        <TextInput
                           label="Horário início"
                           placeholder="08:00"
                           value={schedule.hoursStart}
@@ -1893,7 +1782,7 @@ export function CadastroMedico() {
                             setForm({ ...form, workingSchedules: updated });
                           }}
                         />
-                        <FloatingInput
+                        <TextInput
                           label="Horário fim"
                           placeholder="18:00"
                           value={schedule.hoursEnd}
@@ -1926,7 +1815,7 @@ export function CadastroMedico() {
               {/* Botões finais */}
               <Group justify="flex-end" mt="md">
                 <Button variant="default" onClick={handleCancel}>Cancelar</Button>
-                <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving} size="md" c="white">
+                <Button onClick={handleSave} loading={saving} disabled={saving} size="md">
                   {isEditing ? 'Salvar alterações' : 'Salvar'}
                 </Button>
               </Group>
@@ -1934,22 +1823,28 @@ export function CadastroMedico() {
           </Tabs.Panel>
 
           <Tabs.Panel value="lista" pt={0}>
-            <Paper p="md" withBorder radius="md">
-              <Group justify="space-between" mb="md" wrap="wrap">
+            <Paper className="cadastro-medico-list-panel" p="md" withBorder radius="md">
+              <Group justify="space-between" mb="md" wrap="wrap" gap="sm">
                 <SectionTitle>Profissionais cadastrados</SectionTitle>
-                <FloatingInput
-                  label="Buscar profissionais"
-                  value={doctorQuery}
-                  onChange={(e) => setDoctorQuery(e.currentTarget.value)}
-                  containerProps={{ w: isMobile ? '100%' : 320 }}
-                />
+                <Group gap="sm" wrap={isMobile ? 'wrap' : 'nowrap'} align="center" className="cadastro-medico-list-actions">
+                  <TextInput
+                    className="cadastro-medico-list-search"
+                    placeholder="Buscar por nome"
+                    value={doctorQuery}
+                    onChange={(e) => setDoctorQuery(e.currentTarget.value)}
+                    leftSection={<Search size={16} aria-hidden="true" />}
+                  />
+                  <Button leftSection={<UserPlus size={16} />} onClick={handleNewDoctor}>
+                    Cadastrar profissional
+                  </Button>
+                </Group>
               </Group>
 
               {doctorsLoading ? (
                 isMobile ? (
                   <Stack gap="sm">
                     {Array.from({ length: 4 }).map((_, idx) => (
-                      <Paper key={idx} withBorder radius="md" p="md">
+                      <Paper key={idx} className="cadastro-medico-list-card" withBorder radius="md" p="md">
                         <Group justify="space-between" align="flex-start" wrap="nowrap">
                           <Stack gap={8} style={{ flex: 1 }}>
                             <Skeleton height={18} width="52%" radius="sm" />
@@ -1969,20 +1864,20 @@ export function CadastroMedico() {
                     ))}
                   </Stack>
                 ) : (
-                  <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+                  <Box className="cadastro-medico-list-table-wrap">
                     <Table horizontalSpacing="md" verticalSpacing="md">
                       <Table.Thead>
                         <Table.Tr>
-                          <Table.Th>Nome</Table.Th>
-                          <Table.Th>CRM</Table.Th>
-                          <Table.Th>Especialidade</Table.Th>
-                          <Table.Th>Status</Table.Th>
-                          <Table.Th style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                          <Table.Th className="cadastro-medico-list-th">Nome</Table.Th>
+                          <Table.Th className="cadastro-medico-list-th">CRM</Table.Th>
+                          <Table.Th className="cadastro-medico-list-th">Especialidade</Table.Th>
+                          <Table.Th className="cadastro-medico-list-th">Status</Table.Th>
+                          <Table.Th className="cadastro-medico-list-th cadastro-medico-list-th-actions">Ações</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
                         {Array.from({ length: 5 }).map((_, idx) => (
-                          <Table.Tr key={idx}>
+                          <Table.Tr key={idx} className="cadastro-medico-list-row">
                             <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
                             <Table.Td><Skeleton height={16} width="60%" radius="sm" /></Table.Td>
                             <Table.Td><Skeleton height={16} width="72%" radius="sm" /></Table.Td>
@@ -2004,7 +1899,7 @@ export function CadastroMedico() {
               ) : (
                 isMobile ? (
                   filteredDoctors.length === 0 ? (
-                    <Paper withBorder radius="md" p="xl">
+                    <Paper className="cadastro-medico-list-empty" withBorder radius="md" p="xl">
                       <Text size="sm" c="dimmed" ta="center">
                         Nenhum profissional encontrado. Ajuste a busca ou cadastre um novo profissional.
                       </Text>
@@ -2012,7 +1907,7 @@ export function CadastroMedico() {
                   ) : (
                     <Stack gap="sm">
                       {filteredDoctors.map((item) => (
-                        <Paper key={item.id} withBorder radius="md" p="md">
+                        <Paper key={item.id} className="cadastro-medico-list-card" withBorder radius="md" p="md">
                           <Group justify="space-between" align="flex-start" wrap="nowrap">
                             <Stack gap={4} style={{ flex: 1 }}>
                               <Text fw={600} size="sm">{item.name}</Text>
@@ -2077,11 +1972,11 @@ export function CadastroMedico() {
                     <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
                       <Table.Thead>
                         <Table.Tr style={{ borderBottom: 'none' }}>
-                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>CRM</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Especialidade</Table.Th>}
-                          {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>}
-                          <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                          <Table.Th className="cadastro-medico-list-th">Nome</Table.Th>
+                          {!isTablet && <Table.Th className="cadastro-medico-list-th">CRM</Table.Th>}
+                          {!isTablet && <Table.Th className="cadastro-medico-list-th">Especialidade</Table.Th>}
+                          {!isTablet && <Table.Th className="cadastro-medico-list-th">Status</Table.Th>}
+                          <Table.Th className="cadastro-medico-list-th cadastro-medico-list-th-actions">Ações</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -2095,7 +1990,7 @@ export function CadastroMedico() {
                           </Table.Tr>
                         ) : (
                           paginatedDoctors.map((item) => (
-                            <Table.Tr key={item.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                            <Table.Tr key={item.id} className="cadastro-medico-list-row">
                               <Table.Td>
                                 <Stack gap={2}>
                                   <Text fw={600} size="sm">{item.name}</Text>
@@ -2111,7 +2006,7 @@ export function CadastroMedico() {
                               )}
                               {!isTablet && (
                                 <Table.Td>
-                                  <Text size="sm" c={item.specialty ? 'var(--mantine-color-text)' : 'dimmed'}>
+                                  <Text size="sm" c={item.specialty ? undefined : 'dimmed'}>
                                     {item.specialty || 'Especialidade não informada'}
                                   </Text>
                                 </Table.Td>

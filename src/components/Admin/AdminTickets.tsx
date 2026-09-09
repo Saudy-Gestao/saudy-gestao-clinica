@@ -15,15 +15,15 @@ import {
   TextInput,
   ThemeIcon,
   Title,
-} from '@mantine/core';
+} from '@/components/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { LifeBuoy, MessageCircleMore, RefreshCw, Search } from 'lucide-react';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import { queryKeys } from '../../lib/queryKeys';
 import { useAdminTicketsQuery } from '../../hooks/useAdminTicketsQuery';
 import ticketService, { type TicketStatus, type TicketType, type TicketPriority, type TicketSort } from '../../services/ticketService';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
+import './AdminTickets.css';
 
 const statusOptions: Array<{ value: TicketStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'Todos os status' },
@@ -186,18 +186,15 @@ export function AdminTickets() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         <Stack gap="xl">
           <Paper
             p="xl"
             radius="lg"
-            style={{
-              background: `linear-gradient(135deg, ${DARK_BLUE} 0%, #16357f 100%)`,
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}
+            className="admin-tickets-hero"
+            style={{ color: 'white', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <Group justify="space-between" align="flex-start" gap="xl">
               <Stack gap="sm" maw={760}>

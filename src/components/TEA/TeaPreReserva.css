@@ -1,0 +1,1050 @@
+.tea-pre-reserva-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--ui-primary) 10%, transparent), transparent 24rem),
+    var(--ui-background);
+}
+
+.tea-pre-reserva-shell {
+  width: min(1400px, 100%);
+  margin-inline: auto;
+}
+
+.tea-pre-reserva-hero {
+  min-height: 6.5rem;
+  padding: 1.25rem 0 1.75rem;
+}
+
+.tea-pre-reserva-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.tea-pre-reserva-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: clamp(1.75rem, 3vw, 2.7rem) !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+.tea-pre-reserva-subtitle {
+  margin-top: .55rem;
+  color: var(--ui-muted);
+  font-size: .98rem;
+}
+
+.tea-pre-reserva-tabs {
+  gap: .5rem;
+}
+
+.tea-pre-reserva-tab-button {
+  height: 2.5rem;
+  padding-inline: 1rem;
+  border-radius: .625rem;
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-muted) !important;
+  font-weight: 600;
+}
+
+.tea-pre-reserva-tab-button:hover {
+  background: color-mix(in srgb, var(--ui-primary) 6%, var(--ui-surface)) !important;
+  color: var(--ui-foreground) !important;
+}
+
+.tea-pre-reserva-tab-button[data-active='true'] {
+  background: var(--ui-primary) !important;
+  border-color: var(--ui-primary);
+  color: var(--ui-primary-foreground) !important;
+}
+
+.tea-pre-reserva-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding-inline: .35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.tea-pre-reserva-search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--ui-background) 82%, var(--ui-surface));
+}
+
+.tea-pre-reserva-search-kicker {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.tea-pre-reserva-search-input {
+  width: min(100%, 26rem);
+}
+
+.tea-pre-reserva-section-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.tea-pre-reserva-filter-row {
+  padding: .6rem;
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--ui-foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent);
+}
+
+.tea-pre-reserva-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .5rem .9rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-background);
+  color: var(--ui-foreground);
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 .15rem .5rem rgb(0 0 0 / .18);
+  transition: border-color .15s ease, color .15s ease, background .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+
+.tea-pre-reserva-filter-chip:hover {
+  border-color: color-mix(in srgb, var(--ui-primary) 55%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-background));
+  color: var(--ui-foreground);
+  transform: translateY(-1px);
+  box-shadow: 0 .3rem .7rem rgb(0 0 0 / .22);
+}
+
+.tea-pre-reserva-filter-chip[data-active='true'] {
+  border-color: var(--ui-primary);
+  background: var(--ui-primary);
+  color: var(--ui-primary-foreground);
+}
+
+.tea-pre-reserva-filter-chip:focus-visible,
+.tea-pre-reserva-tab-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ui-primary) 32%, transparent);
+  outline-offset: 2px;
+}
+
+.tea-pre-reserva-filter-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding-inline: .3rem;
+  margin-left: .4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.tea-pre-reserva-panel {
+  border-color: var(--ui-border) !important;
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .75rem 2rem rgb(0 0 0 / .1);
+}
+
+/* PIT cards */
+
+.tea-pre-reserva-card {
+  position: relative;
+  border-color: var(--ui-border) !important;
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .6rem 1.75rem rgb(0 0 0 / .08);
+  overflow: hidden;
+  padding-left: calc(1rem + .35rem) !important;
+}
+
+.tea-pre-reserva-card::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: .3rem;
+  background: var(--ui-hue-gray);
+}
+
+.tea-pre-reserva-card[data-status-color='gray']::before { background: var(--ui-hue-gray); }
+.tea-pre-reserva-card[data-status-color='blue']::before { background: var(--ui-hue-blue); }
+.tea-pre-reserva-card[data-status-color='violet']::before { background: var(--ui-hue-violet); }
+.tea-pre-reserva-card[data-status-color='yellow']::before { background: var(--ui-hue-yellow); }
+.tea-pre-reserva-card[data-status-color='teal']::before { background: var(--ui-hue-teal); }
+
+.tea-pre-reserva-subcard {
+  border-color: var(--ui-border) !important;
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--ui-background) 55%, var(--ui-surface));
+}
+
+.tea-pre-reserva-muted {
+  color: var(--ui-muted);
+}
+
+/* Progress trail */
+
+.tea-pre-reserva-progress {
+  padding: 1.5rem 1.5rem 1.35rem;
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+  border: 1px solid var(--ui-border);
+}
+
+.tea-pre-reserva-progress-track {
+  position: relative;
+  height: .3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-border) 70%, transparent);
+  margin-inline: .8rem;
+}
+
+.tea-pre-reserva-progress-fill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--ui-primary);
+  transition: width .2s ease;
+}
+
+.tea-pre-reserva-progress-nodes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tea-pre-reserva-progress-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--ui-surface);
+  border: 2px solid color-mix(in srgb, var(--ui-border) 85%, transparent);
+  color: var(--ui-muted);
+}
+
+.tea-pre-reserva-progress-node-index {
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.tea-pre-reserva-progress-node[data-active='true'] {
+  background: var(--ui-primary);
+  border-color: var(--ui-primary);
+  color: var(--ui-primary-foreground);
+}
+
+.tea-pre-reserva-progress-node[data-current='true'] {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-primary) 22%, transparent);
+}
+
+.tea-pre-reserva-progress-labels {
+  position: relative;
+  height: 1.1rem;
+  margin-top: .8rem;
+  padding-inline: .8rem;
+}
+
+.tea-pre-reserva-progress-label {
+  position: absolute;
+  top: 0;
+  color: var(--ui-muted);
+  font-size: .74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-progress-label[data-align='left'] { transform: none; }
+.tea-pre-reserva-progress-label[data-align='center'] { transform: translateX(-50%); }
+.tea-pre-reserva-progress-label[data-align='right'] { transform: translateX(-100%); }
+
+.tea-pre-reserva-progress-label[data-active='true'] {
+  color: var(--ui-foreground);
+  font-weight: 700;
+}
+
+/* Inline status pills (per-therapy) */
+
+.tea-pre-reserva-inline-status {
+  display: inline-flex;
+  align-items: center;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.tea-pre-reserva-inline-status--approval {
+  background: color-mix(in srgb, var(--ui-hue-violet) 16%, var(--ui-surface));
+  color: var(--ui-hue-violet);
+}
+
+.tea-pre-reserva-inline-status--authorization {
+  background: color-mix(in srgb, var(--ui-hue-yellow) 20%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-yellow) 65%, black);
+}
+
+.tea-pre-reserva-inline-status--authorized {
+  background: color-mix(in srgb, var(--ui-hue-teal) 16%, var(--ui-surface));
+  color: var(--ui-hue-teal);
+}
+
+.tea-pre-reserva-inline-status--scheduled {
+  background: color-mix(in srgb, var(--ui-hue-blue) 16%, var(--ui-surface));
+  color: var(--ui-hue-blue);
+}
+
+/* Action button grid */
+
+.tea-pre-reserva-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .625rem;
+}
+
+.tea-pre-reserva-actions-grid--approval {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tea-pre-reserva-actions-grid--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .625rem;
+}
+
+.tea-pre-reserva-actions-grid--compact > * {
+  flex: 0 0 auto;
+}
+
+.tea-pre-reserva-action-btn {
+  min-height: 2.75rem;
+  font-weight: 600;
+  font-size: .85rem;
+  box-shadow: none !important;
+}
+
+.tea-pre-reserva-action-btn--primary,
+.tea-pre-reserva-action-btn--neutral {
+  background: var(--ui-primary) !important;
+  color: var(--ui-primary-foreground) !important;
+  border-color: transparent !important;
+  box-shadow: 0 .35rem 1rem color-mix(in srgb, var(--ui-primary) 35%, transparent) !important;
+}
+
+.tea-pre-reserva-action-btn--secondary {
+  background: transparent !important;
+  color: var(--ui-muted) !important;
+  border-color: transparent !important;
+}
+
+.tea-pre-reserva-action-btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-primary) 6%, transparent) !important;
+  color: var(--ui-foreground) !important;
+}
+
+.tea-pre-reserva-action-btn--success {
+  background: var(--ui-success) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.tea-pre-reserva-action-btn--danger {
+  background: transparent !important;
+  color: var(--ui-danger) !important;
+  border-color: transparent !important;
+  font-weight: 500;
+}
+
+.tea-pre-reserva-action-btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-danger) 8%, transparent) !important;
+}
+
+@media (max-width: 980px) {
+  .tea-pre-reserva-actions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 799px) {
+  .tea-pre-reserva-hero {
+    min-height: 0;
+    padding-block: .5rem 1.25rem;
+  }
+
+  .tea-pre-reserva-search-input {
+    width: 100%;
+  }
+
+  .tea-pre-reserva-actions-grid,
+  .tea-pre-reserva-actions-grid--approval {
+    grid-template-columns: 1fr;
+  }
+
+  .tea-pre-reserva-progress-label {
+    font-size: .65rem;
+  }
+}
+
+/* Reserva manual modal */
+
+.tea-pre-reserva-manual-modal .ui-modal-body {
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+  padding: 1.5rem 1.75rem 2rem;
+}
+
+.tea-pre-reserva-manual-modal .ui-modal-footer {
+  padding: 1rem 1.75rem;
+}
+
+.tea-pre-reserva-manual-shell {
+  width: min(1400px, 100%);
+  margin-inline: auto;
+}
+
+.tea-pre-reserva-manual-hero {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-manual-hero__eyebrow {
+  color: var(--ui-primary);
+  letter-spacing: .05em;
+}
+
+.tea-pre-reserva-manual-hero__meta {
+  min-width: 12rem;
+  padding: .6rem .9rem;
+  border-radius: .7rem;
+  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  text-align: right;
+}
+
+.tea-pre-reserva-manual-label {
+  color: var(--ui-muted);
+  letter-spacing: .05em;
+}
+
+.tea-pre-reserva-manual-toolbar {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-manual-select {
+  max-width: 26rem;
+}
+
+.tea-pre-reserva-manual-empty {
+  border: 1px dashed var(--ui-border);
+  background: color-mix(in srgb, var(--ui-background) 82%, var(--ui-surface));
+  border-radius: .9rem;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.tea-pre-reserva-manual-grid-card {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+  padding: 1rem;
+}
+
+.tea-pre-reserva-manual-grid-scroll {
+  overflow-x: auto;
+  padding-bottom: .25rem;
+}
+
+.tea-pre-reserva-manual-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.tea-pre-reserva-manual-grid__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: .5rem .25rem;
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-color: var(--ui-border) !important;
+  text-align: center;
+}
+
+.tea-pre-reserva-manual-grid__time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: .4rem .25rem;
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-color: var(--ui-border) !important;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-manual-grid__slot {
+  width: 100%;
+  min-height: 2.1rem;
+  border-radius: .5rem !important;
+  font-weight: 700;
+  border: 1px solid transparent !important;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.tea-pre-reserva-manual-grid__slot[data-state='free'] {
+  background: color-mix(in srgb, var(--ui-hue-green) 14%, var(--ui-surface)) !important;
+  color: color-mix(in srgb, var(--ui-hue-green) 70%, black) !important;
+  border-color: color-mix(in srgb, var(--ui-hue-green) 45%, transparent) !important;
+}
+
+.tea-pre-reserva-manual-grid__slot[data-state='free']:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ui-hue-green) 25%, transparent);
+}
+
+.tea-pre-reserva-manual-grid__slot[data-state='selected'] {
+  background: var(--ui-primary) !important;
+  color: #fff !important;
+  border-color: var(--ui-primary) !important;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ui-primary) 35%, transparent);
+}
+
+.tea-pre-reserva-manual-grid__slot[data-state='occupied'] {
+  background: color-mix(in srgb, var(--ui-hue-red) 12%, var(--ui-surface)) !important;
+  color: color-mix(in srgb, var(--ui-hue-red) 65%, black) !important;
+  border-color: color-mix(in srgb, var(--ui-hue-red) 35%, transparent) !important;
+  opacity: .85;
+}
+
+.tea-pre-reserva-manual-grid__slot[data-state='blocked'] {
+  background: color-mix(in srgb, var(--ui-hue-yellow) 16%, var(--ui-surface)) !important;
+  color: color-mix(in srgb, var(--ui-hue-yellow) 60%, black) !important;
+  border-color: color-mix(in srgb, var(--ui-hue-yellow) 40%, transparent) !important;
+}
+
+.tea-pre-reserva-manual-grid__slot[data-state='unavailable'] {
+  background: color-mix(in srgb, var(--ui-background) 75%, var(--ui-surface)) !important;
+  color: var(--ui-muted) !important;
+  border-color: color-mix(in srgb, var(--ui-border) 70%, transparent) !important;
+  opacity: .55;
+}
+
+.tea-pre-reserva-manual-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.tea-pre-reserva-manual-pill::before {
+  content: '';
+  width: .55rem;
+  height: .55rem;
+  border-radius: 999px;
+}
+
+.tea-pre-reserva-manual-pill--occupied::before {
+  background: var(--ui-hue-red);
+}
+
+.tea-pre-reserva-manual-pill--free::before {
+  background: var(--ui-hue-green);
+}
+
+.tea-pre-reserva-manual-pill--selected::before {
+  background: var(--ui-primary);
+}
+
+.tea-pre-reserva-manual-pill--success-soft {
+  background: color-mix(in srgb, var(--ui-hue-green) 14%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-green) 65%, black);
+  border-color: color-mix(in srgb, var(--ui-hue-green) 40%, transparent);
+}
+
+.tea-pre-reserva-manual-pill--success-soft::before {
+  background: var(--ui-hue-green);
+}
+
+.tea-pre-reserva-manual-pill--warning {
+  background: color-mix(in srgb, var(--ui-hue-yellow) 18%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-yellow) 55%, black);
+  border-color: color-mix(in srgb, var(--ui-hue-yellow) 45%, transparent);
+}
+
+.tea-pre-reserva-manual-pill--warning::before {
+  background: var(--ui-hue-yellow);
+}
+
+@media (max-width: 799px) {
+  .tea-pre-reserva-manual-modal .ui-modal-body {
+    padding: 1rem 1.1rem 1.5rem;
+  }
+
+  .tea-pre-reserva-manual-hero__meta {
+    min-width: 100%;
+    text-align: left;
+  }
+
+  .tea-pre-reserva-manual-select {
+    max-width: 100%;
+  }
+}
+
+/* Calendário da sugestão automática modal */
+
+.tea-pre-reserva-suggestion-modal .ui-modal-body {
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+  padding: 1.5rem 1.75rem 2rem;
+}
+
+.tea-pre-reserva-suggestion-modal .ui-modal-footer {
+  padding: 1rem 1.75rem;
+}
+
+.tea-pre-reserva-suggestion-shell {
+  width: min(1400px, 100%);
+  margin-inline: auto;
+}
+
+.tea-pre-reserva-suggestion-hero,
+.tea-pre-reserva-suggestion-panel,
+.tea-pre-reserva-suggestion-empty {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-suggestion-hero__eyebrow {
+  color: var(--ui-primary);
+  letter-spacing: .05em;
+}
+
+.tea-pre-reserva-suggestion-hero__meta {
+  min-width: 12rem;
+  padding: .6rem .9rem;
+  border-radius: .7rem;
+  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  text-align: right;
+}
+
+.tea-pre-reserva-suggestion-label {
+  color: var(--ui-muted);
+  letter-spacing: .05em;
+}
+
+.tea-pre-reserva-suggestion-empty {
+  border-style: dashed;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.tea-pre-reserva-suggestion-calendar-scroll {
+  overflow-x: auto;
+  padding-bottom: .25rem;
+}
+
+.tea-pre-reserva-suggestion-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  gap: .6rem;
+}
+
+.tea-pre-reserva-suggestion-day {
+  min-height: 9.5rem;
+  border: 1px solid var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-radius: .7rem;
+}
+
+.tea-pre-reserva-suggestion-slot {
+  border-radius: .55rem;
+}
+
+.tea-pre-reserva-suggestion-therapy {
+  border-radius: .7rem;
+}
+
+.tea-pre-reserva-suggestion-therapy__meta {
+  align-items: center;
+}
+
+.tea-pre-reserva-suggestion-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.9rem;
+  padding: .35rem .75rem;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-suggestion-pill--success {
+  background: color-mix(in srgb, var(--ui-hue-green) 14%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-green) 65%, black);
+}
+
+.tea-pre-reserva-suggestion-pill--warning {
+  background: color-mix(in srgb, var(--ui-hue-yellow) 18%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-yellow) 55%, black);
+}
+
+.tea-pre-reserva-suggestion-pill--neutral {
+  background: color-mix(in srgb, var(--ui-border) 40%, var(--ui-surface));
+  color: var(--ui-muted);
+}
+
+.tea-pre-reserva-suggestion-regenerate {
+  background: color-mix(in srgb, var(--ui-hue-orange) 12%, var(--ui-surface)) !important;
+  color: color-mix(in srgb, var(--ui-hue-orange) 60%, black) !important;
+  border: 1px solid color-mix(in srgb, var(--ui-hue-orange) 30%, transparent) !important;
+  border-radius: 999px !important;
+}
+
+@media (max-width: 799px) {
+  .tea-pre-reserva-suggestion-modal .ui-modal-body {
+    padding: 1rem 1.1rem 1.5rem;
+  }
+
+  .tea-pre-reserva-suggestion-hero__meta {
+    min-width: 100%;
+    text-align: left;
+  }
+
+  .tea-pre-reserva-suggestion-therapy__meta {
+    width: 100%;
+  }
+
+  .tea-pre-reserva-suggestion-calendar-grid {
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+  }
+}
+
+/* Aprovar reserva / ação em lote modal */
+
+.tea-pre-reserva-bulk-modal .ui-modal-body {
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+}
+
+.tea-pre-reserva-bulk-shell {
+  padding-block: .25rem;
+}
+
+.tea-pre-reserva-bulk-hero {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-bulk-hero__eyebrow {
+  color: var(--ui-primary);
+  letter-spacing: .06em;
+}
+
+.tea-pre-reserva-bulk-option {
+  display: block;
+  width: 100%;
+  padding: 1.1rem 1.25rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: .9rem;
+  transition: border-color .14s ease, box-shadow .14s ease, transform .14s ease, background-color .14s ease;
+  cursor: pointer;
+}
+
+.tea-pre-reserva-bulk-option:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--ui-primary) 40%, var(--ui-border));
+}
+
+.tea-pre-reserva-bulk-option[data-selected='true'] {
+  border-color: var(--ui-primary);
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ui-primary) 22%, transparent);
+}
+
+.tea-pre-reserva-bulk-option__check {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: .55rem;
+  border: 2px solid var(--ui-border);
+  background: var(--ui-background);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.tea-pre-reserva-bulk-option__check[data-selected='true'] {
+  border-color: var(--ui-primary);
+  background: var(--ui-primary);
+}
+
+.tea-pre-reserva-bulk-toolbar {
+  padding-top: .1rem;
+}
+
+/* Checklist pré-conversão modal */
+
+.tea-pre-reserva-checklist-modal .ui-modal-body {
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+  padding: 1.5rem 1.75rem 2rem;
+}
+
+.tea-pre-reserva-checklist-modal .ui-modal-footer {
+  padding: 1rem 1.75rem;
+}
+
+.tea-pre-reserva-checklist-shell {
+  width: min(1100px, 100%);
+  margin-inline: auto;
+}
+
+.tea-pre-reserva-checklist-patient {
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-checklist-patient__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+
+.tea-pre-reserva-checklist-patient__field {
+  padding-bottom: .6rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.tea-pre-reserva-checklist-patient__field--full {
+  grid-column: 1 / -1;
+}
+
+.tea-pre-reserva-checklist-patient__label {
+  color: var(--ui-muted);
+}
+
+.tea-pre-reserva-checklist-patient__value {
+  color: var(--ui-foreground);
+}
+
+.tea-pre-reserva-checklist-group__header {
+  border: 1px solid var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-radius: .7rem;
+}
+
+.tea-pre-reserva-checklist-item {
+  border: 1px solid var(--ui-border) !important;
+  background: var(--ui-surface);
+  border-radius: .7rem;
+}
+
+.tea-pre-reserva-checklist-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-width: 7rem;
+  min-height: 2.5rem;
+  padding: .5rem .9rem;
+  border-radius: .7rem;
+  font-size: 1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.tea-pre-reserva-checklist-badge.is-valid {
+  background: color-mix(in srgb, var(--ui-hue-green) 16%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-green) 70%, black);
+}
+
+.tea-pre-reserva-checklist-badge.is-invalid {
+  background: color-mix(in srgb, var(--ui-hue-red) 16%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-red) 70%, black);
+}
+
+@media (max-width: 799px) {
+  .tea-pre-reserva-checklist-modal .ui-modal-body {
+    padding: 1rem 1.1rem 1.5rem;
+  }
+
+  .tea-pre-reserva-checklist-patient__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Confirmação de aceitação / Selecione data para agendamento modal */
+
+.tea-pre-reserva-accept-modal .ui-modal-body {
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+  padding: 1.5rem 1.75rem 2rem;
+}
+
+.tea-pre-reserva-accept-modal .ui-modal-footer {
+  padding: 1rem 1.75rem;
+}
+
+.tea-pre-reserva-accept-shell {
+  width: min(1100px, 100%);
+  margin-inline: auto;
+}
+
+.tea-pre-reserva-accept-hero {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-accept-hero__counter {
+  min-width: 7rem;
+  padding: .6rem .9rem;
+  border-radius: .7rem;
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 24%, transparent);
+  text-align: center;
+}
+
+.tea-pre-reserva-accept-eyebrow {
+  letter-spacing: .06em;
+  color: var(--ui-primary) !important;
+}
+
+.tea-pre-reserva-accept-card {
+  border: 1px solid var(--ui-border) !important;
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-accept-card__icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: .6rem;
+  background: color-mix(in srgb, var(--ui-primary) 14%, var(--ui-surface));
+  color: var(--ui-primary);
+  flex-shrink: 0;
+}
+
+.tea-pre-reserva-accept-card__body {
+  margin-top: 1rem;
+  padding: .9rem;
+  border-radius: .7rem;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border: 1px solid var(--ui-border);
+}
+
+.tea-pre-reserva-accept-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: .4rem .75rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tea-pre-reserva-accept-pill--primary {
+  background: color-mix(in srgb, var(--ui-hue-blue) 14%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-blue) 70%, black);
+}
+
+.tea-pre-reserva-accept-pill--success {
+  background: color-mix(in srgb, var(--ui-hue-green) 14%, var(--ui-surface));
+  color: color-mix(in srgb, var(--ui-hue-green) 65%, black);
+}
+
+.tea-pre-reserva-accept-summary {
+  border-radius: .7rem;
+  border: 1px solid var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 82%, var(--ui-surface));
+}
+
+.tea-pre-reserva-accept-summary__text {
+  color: var(--ui-muted);
+}
+
+@media (max-width: 799px) {
+  .tea-pre-reserva-accept-modal .ui-modal-body {
+    padding: 1rem 1.1rem 1.5rem;
+  }
+
+  .tea-pre-reserva-accept-hero__counter {
+    min-width: 100%;
+  }
+
+  .tea-pre-reserva-accept-stats {
+    width: 100%;
+  }
+
+  .tea-pre-reserva-accept-pill {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Aceitar sugestão de reserva (decision modal) */
+
+.tea-pre-reserva-decision-shell {
+  gap: 1rem;
+}
+
+.tea-pre-reserva-decision-hero,
+.tea-pre-reserva-decision-footer {
+  border: 1px solid var(--ui-border) !important;
+  background: var(--ui-surface);
+  border-radius: .9rem;
+}
+
+.tea-pre-reserva-decision-hero__eyebrow {
+  letter-spacing: .06em;
+  color: var(--ui-primary);
+}

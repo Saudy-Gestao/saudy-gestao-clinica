@@ -1,9 +1,9 @@
-import { Box, Stack, Text, Group, Paper, SimpleGrid, Title, ThemeIcon } from '@mantine/core';
+import { Box, Stack, Text, Group, Paper, SimpleGrid, Title, ThemeIcon } from '@/components/ui';
 import { BookOpen, Building2, ChevronRight, LayoutGrid, LifeBuoy, MessageSquareText, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StatsCards } from '../StatsCards/StatsCards';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
+import './AdminHub.css';
 
 const adminModules = [
   {
@@ -51,7 +51,7 @@ export function AdminHub() {
   const isAdmHubOnly = Boolean(currentUser?.isAdmHubOnly);
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
       <Header />
       <Box p="xl" maw={1400} mx="auto">
         <Group mb={30} justify="space-between" align="center">
@@ -69,11 +69,8 @@ export function AdminHub() {
           p="xl"
           radius="lg"
           mb="xl"
-          style={{
-            background: `linear-gradient(135deg, ${DARK_BLUE} 0%, #16357f 100%)`,
-            color: 'white',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}
+          className="admin-hub-hero"
+          style={{ color: 'white', border: '1px solid rgba(255,255,255,0.08)' }}
         >
           <Group justify="space-between" align="flex-start" gap="xl">
             <Stack gap={8} maw={720}>
@@ -167,8 +164,8 @@ export function AdminHub() {
 
                   <Group justify="space-between" align="center">
                     <Group gap={8}>
-                      <UserPlus size={16} color={DARK_BLUE} />
-                      <Text fw={500} size="sm" c={DARK_BLUE}>
+                      <UserPlus size={16} color="var(--ui-primary)" />
+                      <Text fw={500} size="sm" c="var(--ui-primary)">
                         Abrir módulo
                       </Text>
                     </Group>

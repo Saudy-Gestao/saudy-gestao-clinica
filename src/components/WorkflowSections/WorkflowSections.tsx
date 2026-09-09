@@ -1,10 +1,10 @@
-import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useMantineColorScheme, Skeleton, Stack, Badge } from '@mantine/core';
+import { Box, Text, SimpleGrid, Paper, Group, ThemeIcon, useColorScheme, Skeleton, Stack, Badge } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
 import { useVisibleSections, type ModuleItem } from '../../lib/moduleCatalog';
+import './WorkflowSections.css';
 
 type WorkflowSectionsProps = {
   /**
@@ -17,8 +17,8 @@ type WorkflowSectionsProps = {
 
 export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
   const navigate = useNavigate();
-  const { colorScheme } = useMantineColorScheme();
-  const accentColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
+  const { colorScheme } = useColorScheme();
+  const accentColor = 'var(--ui-primary)';
   const {
     sections,
     currentUser,
@@ -66,7 +66,7 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
       key={i}
       p={blocksMode ? 'lg' : 'xs'}
       withBorder
-      className={colorScheme === 'dark' ? 'module-card-dark' : undefined}
+      className={`workflow-card${colorScheme === 'dark' ? ' module-card-dark' : ''}`}
       style={{
         cursor: item.route ? 'pointer' : 'default',
         borderColor: 'var(--mantine-color-default-border)',
@@ -78,6 +78,7 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
       <Group justify="space-between" align={blocksMode ? 'center' : 'flex-start'} wrap="nowrap" h={blocksMode ? '100%' : undefined}>
         <Group gap={blocksMode ? 'md' : 'xs'} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
           <ThemeIcon
+            className="workflow-card__icon"
             size={blocksMode ? 44 : 'md'}
             variant="transparent"
             color="darkBlue"
@@ -86,14 +87,14 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
           >
             <item.icon size={blocksMode ? 22 : 18} color={accentColor} />
           </ThemeIcon>
-          <Box style={{ minWidth: 0 }}>
+          <Box className="workflow-card__content" style={{ minWidth: 0 }}>
             <Group gap={6} wrap="nowrap">
-              <Text fw={blocksMode ? 600 : 500} size={blocksMode ? 'md' : 'sm'} lineClamp={1}>{item.label}</Text>
+              <Text className="workflow-card__title" fw={blocksMode ? 600 : 500} size={blocksMode ? 'md' : 'sm'} lineClamp={1}>{item.label}</Text>
               {item.moduleName === 'meus-chamados' && unreadMyTickets > 0 ? (
                 <Badge color="red" size="xs">{unreadMyTickets}</Badge>
               ) : null}
             </Group>
-            <Text size={blocksMode ? 'sm' : 'xs'} c="dimmed" lineClamp={blocksMode ? 2 : 1}>{item.desc}</Text>
+            <Text className="workflow-card__description" size={blocksMode ? 'sm' : 'xs'} c="dimmed" lineClamp={blocksMode ? 2 : 1}>{item.desc}</Text>
           </Box>
         </Group>
         {item.route && <ChevronRight size={blocksMode ? 18 : 16} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />}
@@ -103,10 +104,10 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
 
   if ((isLoading && !currentUser) || (isFetching && !hasResolvedAccessData)) {
     return (
-      <Box py="xl">
+      <Box className="workflow-sections workflow-sections--loading" py="xl">
         <Stack gap="xl">
           {Array.from({ length: blocksMode ? 1 : 3 }).map((_, sectionIndex) => (
-            <Box key={sectionIndex}>
+            <Box className="workflow-section" key={sectionIndex}>
               {!blocksMode && <Skeleton height={22} width={180} radius="xl" mb="md" />}
               <SimpleGrid cols={{ base: 1, sm: 2, md: blocksMode ? 3 : 4 }} spacing="md">
                 {Array.from({ length: 4 }).map((__, cardIndex) => (
@@ -141,7 +142,7 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
 
   if (visibleAllowedModules.length === 0 && !doctorView) {
     return (
-      <Box p="xl" style={{ textAlign: 'center' }}>
+      <Box className="workflow-empty-state" p="xl" style={{ textAlign: 'center' }}>
         <Text size="lg" c="dimmed" mb="xs">
           🔒 Você ainda não possui acessos configurados
         </Text>
@@ -154,7 +155,7 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
 
   if (filteredSections.length === 0) {
     return (
-      <Box p="xl" style={{ textAlign: 'center' }}>
+      <Box className="workflow-empty-state" p="xl" style={{ textAlign: 'center' }}>
         <Text size="lg" c="dimmed" mb="xs">
           🔒 Nenhum módulo disponível
         </Text>
@@ -166,15 +167,15 @@ export function WorkflowSections({ sectionKey }: WorkflowSectionsProps) {
   }
 
   return (
-    <>
+    <Box className={`workflow-sections${blocksMode ? ' workflow-sections--blocks' : ''}`}>
       {filteredSections.map((section) => (
-        <Box key={section.key} mb={30}>
+        <Box className="workflow-section" key={section.key} mb={30}>
           {!blocksMode && <Text fw={600} size="lg" c="dimmed" mb="md">{section.title}</Text>}
-          <SimpleGrid cols={{ base: 1, sm: 2, md: blocksMode ? 3 : 4 }} spacing="md">
+          <SimpleGrid className="workflow-section__grid" cols={{ base: 1, sm: 2, md: blocksMode ? 3 : 4 }} spacing="md">
             {section.items.map(renderCard)}
           </SimpleGrid>
         </Box>
       ))}
-    </>
+    </Box>
   );
 }

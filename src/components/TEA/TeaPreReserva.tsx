@@ -17,9 +17,9 @@ import {
   Divider,
   Modal,
   UnstyledButton,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import {
   CalendarClock,
   CalendarX2,
@@ -27,7 +27,6 @@ import {
   CircleX,
   Check,
   ChevronDown,
-  ChevronLeft,
   Clock3,
   Paperclip,
   ShieldCheck,
@@ -40,10 +39,13 @@ import {
   ClipboardList,
   Sparkles,
   Trash2,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
+
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
+import './TeaPreReserva.css';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import teaPreReservationService from '../../services/teaPreReservationService';
 import teaProfileService from '../../services/teaProfileService';
@@ -169,6 +171,8 @@ type SuggestedSlot = {
   time: string;
   professionalDoctorId?: string | null;
   professionalName?: string | null;
+  roomId?: string | null;
+  roomName?: string | null;
 };
 
 type SuggestionFallbackLevel =
@@ -353,6 +357,16 @@ type PitProgressStage =
   | 'EM_AUTORIZACAO'
   | 'AGENDADO_PARCIAL'
   | 'AGENDADO_COMPLETO';
+
+const PIT_STATUS_META: Record<PitProgressStage, { label: string; color: string }> = {
+  PIT_GERADO: { label: 'Pendente de marcação', color: 'gray' },
+  RESERVADO_PARCIAL: { label: 'Reserva parcial', color: 'gray' },
+  RESERVADO_COMPLETO: { label: 'Reservado', color: 'blue' },
+  AGUARDANDO_APROVACAO: { label: 'Aguardando aprovação', color: 'violet' },
+  EM_AUTORIZACAO: { label: 'Em autorização', color: 'yellow' },
+  AGENDADO_PARCIAL: { label: 'Agendamento parcial', color: 'teal' },
+  AGENDADO_COMPLETO: { label: 'Agendado', color: 'teal' },
+};
 
 type PitProgressInfo = {
   stage: PitProgressStage;
@@ -940,12 +954,12 @@ export function TeaPreReserva() {
     icon?: LucideIcon;
   }> = [
     { key: 'all', label: 'Todas', count: summary.total, color: 'dark' },
-    { key: 'pending-scheduling', label: 'Pend. Marcação', count: summary.pendingScheduling, color: 'gray', icon: SquarePen, iconColor: '#3f2f2f' },
-    { key: 'pending-approval', label: 'Aguard. Aprov.', count: summary.pendingApproval, color: 'violet', icon: CircleCheck, iconColor: '#5ca34a' },
-    { key: 'pending-authorization', label: 'Pend. Autoriz.', count: summary.pendingAuthorization, color: 'yellow', icon: Clock3, iconColor: '#f0b400' },
-    { key: 'authorized', label: 'Autorizado', count: summary.authorized, color: 'teal', icon: ShieldCheck, iconColor: '#6488ff' },
-    { key: 'expiring-soon', label: 'Venc. em 48h', count: summary.expiringSoon, color: 'orange', icon: AlarmClock, iconColor: '#f08a00' },
-    { key: 'expired', label: 'Expirados', count: summary.expired, color: 'red', icon: CalendarX2, iconColor: '#ff2a1f' },
+    { key: 'pending-scheduling', label: 'Pend. Marcação', count: summary.pendingScheduling, color: 'gray', icon: SquarePen, iconColor: 'var(--ui-hue-gray)' },
+    { key: 'pending-approval', label: 'Aguard. Aprov.', count: summary.pendingApproval, color: 'violet', icon: CircleCheck, iconColor: 'var(--ui-hue-violet)' },
+    { key: 'pending-authorization', label: 'Pend. Autoriz.', count: summary.pendingAuthorization, color: 'yellow', icon: Clock3, iconColor: 'var(--ui-hue-yellow)' },
+    { key: 'authorized', label: 'Autorizado', count: summary.authorized, color: 'teal', icon: ShieldCheck, iconColor: 'var(--ui-hue-teal)' },
+    { key: 'expiring-soon', label: 'Venc. em 48h', count: summary.expiringSoon, color: 'orange', icon: AlarmClock, iconColor: 'var(--ui-hue-orange)' },
+    { key: 'expired', label: 'Expirados', count: summary.expired, color: 'red', icon: CalendarX2, iconColor: 'var(--ui-hue-red)' },
   ];
 
   const handleBadgeClick = (pillKey: string) => {
@@ -1107,21 +1121,28 @@ export function TeaPreReserva() {
       { label: 'Agendado', active: fillPercent >= 100, align: 'right' as const },
     ];
     const labelPositions = ['0%', '33.333%', '66.666%', '100%'];
+    const activeCount = milestones.filter((milestone) => milestone.active).length;
 
     return (
-      <Stack gap={6} className="tea-pre-reserva-progress">
+      <Box className="tea-pre-reserva-progress">
         <Box className="tea-pre-reserva-progress-track">
           <Box className="tea-pre-reserva-progress-fill" style={{ width: `${fillPercent}%` }} />
           <Box className="tea-pre-reserva-progress-nodes">
-            {milestones.map((milestone) => (
-              <Box
-                key={`${keyPrefix}-${milestone.label}`}
-                className="tea-pre-reserva-progress-node"
-                data-active={milestone.active ? 'true' : undefined}
-              >
-                {milestone.active ? <Check size={11} strokeWidth={3} /> : null}
-              </Box>
-            ))}
+            {milestones.map((milestone, index) => {
+              const isCurrent = milestone.active && index === activeCount - 1;
+              return (
+                <Box
+                  key={`${keyPrefix}-${milestone.label}`}
+                  className="tea-pre-reserva-progress-node"
+                  data-active={milestone.active ? 'true' : undefined}
+                  data-current={isCurrent ? 'true' : undefined}
+                >
+                  {milestone.active
+                    ? <Check size={13} strokeWidth={3} />
+                    : <Text component="span" className="tea-pre-reserva-progress-node-index">{index + 1}</Text>}
+                </Box>
+              );
+            })}
           </Box>
         </Box>
 
@@ -1138,7 +1159,7 @@ export function TeaPreReserva() {
             </Text>
           ))}
         </Box>
-      </Stack>
+      </Box>
     );
   };
 
@@ -1599,16 +1620,20 @@ export function TeaPreReserva() {
       await handleDeletePitByTeaProfileId(teaProfileId, group.groupKey, group.pitId);
     }
     return (
-      <Paper key={group.groupKey} p="sm" withBorder className="tea-pre-reserva-card" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-        <Stack gap={8}>
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Text fw={600}>{group.patientName}</Text>
-            <Text fw={500}>PIT Reserva</Text>
-          </Group>
+      <Paper key={group.groupKey} p="md" withBorder className="tea-pre-reserva-card" data-status-color={PIT_STATUS_META[pitProgress.stage].color} style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+        <Stack gap="md">
+          <Stack gap={4}>
+            <Group justify="space-between" align="flex-start" wrap="wrap">
+              <Text size="lg" fw={700}>{group.patientName}</Text>
+              <Badge variant="light" color={PIT_STATUS_META[pitProgress.stage].color}>
+                {PIT_STATUS_META[pitProgress.stage].label}
+              </Badge>
+            </Group>
 
-          <Text size="xs" c="dimmed">
-            {group.patientCpf ? `CPF: ${formatCPF(group.patientCpf)}` : 'CPF: Nao informado'}
-          </Text>
+            <Text size="xs" c="dimmed">
+              {group.patientCpf ? `CPF: ${formatCPF(group.patientCpf)}` : 'CPF: Nao informado'}
+            </Text>
+          </Stack>
 
           <Box>
             {renderProgressTrail(pitProgress, `pit-${group.groupKey}`)}
@@ -1672,6 +1697,11 @@ export function TeaPreReserva() {
                     {item.status === 'CONVERTED' && (
                       <Text size="xs" mt={6} c="teal">
                         Procedimento convertido em agendamento.
+                      </Text>
+                    )}
+                    {item.room?.name && (
+                      <Text size="xs" c="dimmed" mt={4}>
+                        Sala: {item.room.name}
                       </Text>
                     )}
                   </Box>
@@ -1883,7 +1913,7 @@ export function TeaPreReserva() {
 
   const modalSuggestions = useMemo(() => {
     if (!suggestionModalContext) {
-      return [] as Array<{ date: string; time: string; pitTherapyId: string; procedureName: string; professionalName: string }>;
+      return [] as Array<{ date: string; time: string; pitTherapyId: string; procedureName: string; professionalName: string; roomName: string | null }>;
     }
 
     return suggestionModalContext.therapies.flatMap((therapy) => {
@@ -1894,6 +1924,7 @@ export function TeaPreReserva() {
         pitTherapyId: therapy.pitTherapyId,
         procedureName: therapy.procedureName,
         professionalName: slot.professionalName || therapy.professionalName || 'Profissional conforme disponibilidade',
+        roomName: slot.roomName || null,
       }));
     });
   }, [suggestionsByTherapyId, suggestionModalContext]);
@@ -1914,7 +1945,7 @@ export function TeaPreReserva() {
     const mondayDate = firstDate.subtract(daysFromMonday, 'day').startOf('day');
     const mondayWeekday = mondayDate.day();
 
-    const entriesByWeekday: Record<number, Array<{ date: string; time: string; pitTherapyId: string; procedureName: string; professionalName: string }>> = {};
+    const entriesByWeekday: Record<number, Array<{ date: string; time: string; pitTherapyId: string; procedureName: string; professionalName: string; roomName: string | null }>> = {};
     const seenSlots = new Set<string>();
 
     modalSuggestions.forEach((slot) => {
@@ -2101,7 +2132,7 @@ export function TeaPreReserva() {
     if (!teaProfileId) {
       showNotification({
         title: 'PIT inválido',
-        message: 'Não foi possível identificar o perfil TEA para excluir este PIT.',
+        message: 'Não foi possível identificar o perfil de Terapias para excluir este PIT.',
         color: 'yellow',
       });
       return;
@@ -2739,6 +2770,8 @@ export function TeaPreReserva() {
               time: String(item?.time || ''),
               professionalDoctorId: item?.doctorId ? String(item.doctorId) : null,
               professionalName: item?.doctorName ? String(item.doctorName) : null,
+              roomId: item?.roomId ? String(item.roomId) : null,
+              roomName: item?.roomName ? String(item.roomName) : null,
             }))
             : [];
           const sortedList: SuggestedSlot[] = rawList
@@ -3165,8 +3198,8 @@ export function TeaPreReserva() {
 
   
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }} className="tea-pre-reserva-page">
-      <Header />
+    <Box style={{ minHeight: '100vh' }} className="tea-pre-reserva-page">
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
       {/* Conteúdo principal e modais */}
       <Modal
         opened={suggestionModalOpened}
@@ -3177,27 +3210,33 @@ export function TeaPreReserva() {
           setSuggestionModalContext(null);
         }}
         title="Calendário da sugestão automática"
-        centered
-        size="92vw"
-        zIndex={400}
-        withinPortal
-        classNames={{
-          content: 'tea-pre-reserva-suggestion-modal',
-          header: 'tea-pre-reserva-suggestion-modal__header',
-          title: 'tea-pre-reserva-suggestion-modal__title',
-          body: 'tea-pre-reserva-suggestion-modal__body',
-          close: 'tea-pre-reserva-suggestion-modal__close',
-        }}
-        styles={{
-          content: {
-            minHeight: '82vh',
-            maxHeight: '92vh',
-          },
-          body: {
-            maxHeight: 'calc(92vh - 70px)',
-            overflowY: 'auto',
-          },
-        }}
+        fullScreen
+        className="tea-pre-reserva-suggestion-modal"
+        footer={(
+          <Group justify="flex-end" gap="sm">
+            <Button
+              className={getTeaActionButtonClass('secondary')}
+              onClick={() => {
+                if (!suggestionModalContext) return;
+                setRejectDecisionOpened(true);
+              }}
+              disabled={!suggestionModalContext?.groupKey || updatingId === suggestionModalContext?.groupKey}
+            >
+              Recusar sugestão
+            </Button>
+            <Button
+              className={getTeaActionButtonClass('success')}
+              onClick={() => {
+                if (!suggestionModalContext) return;
+                setAcceptSuggestionDecisionOpened(true);
+              }}
+              loading={!!suggestionModalContext?.groupKey && updatingId === suggestionModalContext.groupKey}
+              disabled={!suggestionModalContext?.groupKey || modalSuggestions.length === 0 || !autoSuggestionWholePitReady}
+            >
+              Aceitar sugestão
+            </Button>
+          </Group>
+        )}
       >
         <Stack gap="md" className="tea-pre-reserva-suggestion-shell">
           <Paper p="md" withBorder className="tea-pre-reserva-suggestion-hero">
@@ -3266,6 +3305,9 @@ export function TeaPreReserva() {
                                     <Text size="xs" fw={700}>{entry.time}</Text>
                                   </Group>
                                   <Text size="xs" c="dimmed" lineClamp={2}>{entry.procedureName}</Text>
+                                  {entry.roomName && (
+                                    <Text size="xs" c="dimmed" lineClamp={1}>{entry.roomName}</Text>
+                                  )}
                                 </Paper>
                               );
                             })}
@@ -3302,7 +3344,7 @@ export function TeaPreReserva() {
                         className="tea-pre-reserva-suggestion-therapy"
                         style={{
                           borderColor: validation && !validation.valid
-                            ? 'var(--mantine-color-yellow-5)'
+                            ? 'var(--ui-hue-yellow)'
                             : colorToken.borderColor,
                           backgroundColor: colorToken.backgroundColor,
                         }}
@@ -3316,7 +3358,7 @@ export function TeaPreReserva() {
                                     width: 10,
                                     height: 10,
                                     borderRadius: 999,
-                                    backgroundColor: isTherapyReady ? colorToken.accentColor : 'var(--mantine-color-yellow-5)',
+                                    backgroundColor: isTherapyReady ? colorToken.accentColor : 'var(--ui-hue-yellow)',
                                     flexShrink: 0,
                                   }}
                                 />
@@ -3379,32 +3421,6 @@ export function TeaPreReserva() {
             </>
           )}
           </Stack>
-
-          <Paper p="md" withBorder className="tea-pre-reserva-suggestion-footer">
-            <Group justify="flex-end" gap="sm">
-              <Button
-                className={getTeaActionButtonClass('secondary')}
-                onClick={() => {
-                  if (!suggestionModalContext) return;
-                  setRejectDecisionOpened(true);
-                }}
-                disabled={!suggestionModalContext?.groupKey || updatingId === suggestionModalContext?.groupKey}
-              >
-                Recusar sugestão
-              </Button>
-              <Button
-                className={getTeaActionButtonClass('success')}
-                onClick={() => {
-                  if (!suggestionModalContext) return;
-                  setAcceptSuggestionDecisionOpened(true);
-                }}
-                loading={!!suggestionModalContext?.groupKey && updatingId === suggestionModalContext.groupKey}
-                disabled={!suggestionModalContext?.groupKey || modalSuggestions.length === 0 || !autoSuggestionWholePitReady}
-              >
-                Aceitar sugestão
-              </Button>
-            </Group>
-          </Paper>
         </Stack>
       </Modal>
 
@@ -3416,13 +3432,7 @@ export function TeaPreReserva() {
         size="md"
         zIndex={455}
         withinPortal
-        classNames={{
-          content: 'tea-pre-reserva-decision-modal',
-          header: 'tea-pre-reserva-decision-modal__header',
-          title: 'tea-pre-reserva-decision-modal__title',
-          body: 'tea-pre-reserva-decision-modal__body',
-          close: 'tea-pre-reserva-decision-modal__close',
-        }}
+        className="tea-pre-reserva-decision-modal"
       >
         <Stack gap="md" className="tea-pre-reserva-decision-shell">
           <Paper p="md" withBorder className="tea-pre-reserva-decision-hero">
@@ -3541,21 +3551,47 @@ export function TeaPreReserva() {
         closeOnEscape={!updatingId}
         withCloseButton={!updatingId}
         title={acceptModalMode === 'suggestion' ? 'Confirmação de aceitação' : 'Selecione data para agendamento'}
-        centered
-        size="xl"
-        classNames={{
-          content: 'tea-pre-reserva-accept-modal',
-          header: 'tea-pre-reserva-accept-modal__header',
-          title: 'tea-pre-reserva-accept-modal__title',
-          body: 'tea-pre-reserva-accept-modal__body',
-          close: 'tea-pre-reserva-accept-modal__close',
-        }}
-        styles={{
-          content: {
-            width: 'min(96vw, 980px)',
-            maxWidth: '980px',
-          },
-        }}
+        fullScreen
+        className="tea-pre-reserva-accept-modal"
+        footer={(
+          <Group justify="flex-end" gap="sm">
+            <Button
+              className={getTeaActionButtonClass('secondary')}
+              disabled={!!updatingId}
+              onClick={() => setAcceptModalOpened(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className={getTeaActionButtonClass('primary')}
+              disabled={acceptConversionHasMissingStartDate}
+              onClick={async () => {
+                if (acceptModalMode === 'suggestion') {
+                  setAcceptModalOpened(false);
+                  if (!suggestionModalContext) return;
+                  setAcceptSuggestionDecisionOpened(true);
+                } else if (acceptModalMode === 'conversion') {
+                  if (conversionReservationIds.length === 0 || checklistItems.length === 0) {
+                    showNotification({
+                      title: 'Checklist pendente',
+                      message: 'O PIT não possui terapias elegíveis para conversão.',
+                      color: 'yellow',
+                    });
+                    return;
+                  }
+                  // Keep the modal open (with a loading button) until the batch conversion
+                  // actually finishes — closing it immediately left the user staring at
+                  // nothing for the ~15s a full PIT (many sessions) takes to convert.
+                  setUpdatingId(checklistGroupKey || conversionReservationIds[0]);
+                  await handleConvertGroupToAppointment();
+                }
+              }}
+              loading={!!updatingId}
+            >
+              {acceptModalMode === 'suggestion' ? 'Aceitar sugestão' : 'Converter em agendamento'}
+            </Button>
+          </Group>
+        )}
       >
         <Stack gap="md" className="tea-pre-reserva-accept-shell">
           <Paper p="md" withBorder className="tea-pre-reserva-accept-hero">
@@ -3721,46 +3757,6 @@ export function TeaPreReserva() {
               );
             })}
           </Stack>
-
-          <Paper p="md" withBorder className="tea-pre-reserva-accept-footer">
-            <Group justify="flex-end" gap="sm">
-              <Button
-                className={getTeaActionButtonClass('secondary')}
-                disabled={!!updatingId}
-                onClick={() => setAcceptModalOpened(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className={getTeaActionButtonClass('primary')}
-                disabled={acceptConversionHasMissingStartDate}
-                onClick={async () => {
-                  if (acceptModalMode === 'suggestion') {
-                    setAcceptModalOpened(false);
-                    if (!suggestionModalContext) return;
-                    setAcceptSuggestionDecisionOpened(true);
-                  } else if (acceptModalMode === 'conversion') {
-                    if (conversionReservationIds.length === 0 || checklistItems.length === 0) {
-                      showNotification({
-                        title: 'Checklist pendente',
-                        message: 'O PIT não possui terapias elegíveis para conversão.',
-                        color: 'yellow',
-                      });
-                      return;
-                    }
-                    // Keep the modal open (with a loading button) until the batch conversion
-                    // actually finishes — closing it immediately left the user staring at
-                    // nothing for the ~15s a full PIT (many sessions) takes to convert.
-                    setUpdatingId(checklistGroupKey || conversionReservationIds[0]);
-                    await handleConvertGroupToAppointment();
-                  }
-                }}
-                loading={!!updatingId}
-              >
-                {acceptModalMode === 'suggestion' ? 'Aceitar sugestão' : 'Converter em agendamento'}
-              </Button>
-            </Group>
-          </Paper>
         </Stack>
       </Modal>
 
@@ -3771,27 +3767,44 @@ export function TeaPreReserva() {
           setManualAcceptDecisionOpened(false);
           setManualReservationDecisionState(null);
         }}
-        title="Proposta manual em calendário"
-        centered
-        size="96vw"
-        withinPortal
-        classNames={{
-          content: 'tea-pre-reserva-manual-modal',
-          header: 'tea-pre-reserva-manual-modal__header',
-          title: 'tea-pre-reserva-manual-modal__title',
-          body: 'tea-pre-reserva-manual-modal__body',
-          close: 'tea-pre-reserva-manual-modal__close',
-        }}
-        styles={{
-          content: {
-            minHeight: '84vh',
-            maxHeight: '94vh',
-          },
-          body: {
-            maxHeight: 'calc(94vh - 70px)',
-            overflowY: 'auto',
-          },
-        }}
+        title="Reserva manual"
+        fullScreen
+        className="tea-pre-reserva-manual-modal"
+        footer={(
+          <Group justify="space-between" wrap="wrap" gap="sm">
+            <Group gap="xs" wrap="wrap">
+              <Box className="tea-pre-reserva-manual-pill tea-pre-reserva-manual-pill--occupied">Ocupado</Box>
+              <Box className="tea-pre-reserva-manual-pill tea-pre-reserva-manual-pill--free">Livre</Box>
+              <Box className="tea-pre-reserva-manual-pill tea-pre-reserva-manual-pill--selected">Selecionado</Box>
+              <Box className={`tea-pre-reserva-manual-pill ${manualSelectionComplete ? 'tea-pre-reserva-manual-pill--success-soft' : 'tea-pre-reserva-manual-pill--warning'}`}>
+                Selecionado: {manualSelectedSessionCount}/{manualWeeklyLimit} por semana
+              </Box>
+            </Group>
+            <Group gap="xs">
+              <Button
+                className={getTeaActionButtonClass('secondary')}
+                onClick={() => {
+                  if (!manualSelectedTherapyId) return;
+                  setManualSelectedSlotsByTherapyId((prev) => ({
+                    ...prev,
+                    [manualSelectedTherapyId]: [],
+                  }));
+                }}
+                disabled={manualSelectedSlots.length === 0 || manualSaving}
+              >
+                Limpar seleção
+              </Button>
+              <Button
+                className={getTeaActionButtonClass('success')}
+                onClick={handleManualConfirmReservation}
+                loading={manualSaving}
+                disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || manualSaving}
+              >
+                Confirmar reserva manual
+              </Button>
+            </Group>
+          </Group>
+        )}
       >
         <Stack gap="md" className="tea-pre-reserva-manual-shell">
           <Paper p="md" withBorder className="tea-pre-reserva-manual-hero">
@@ -3894,7 +3907,6 @@ export function TeaPreReserva() {
                       const reachedWeeklyLimit = manualSelectedSessionCount >= manualWeeklyLimit;
                       const canAddNewSelection = !reachedWeeklyLimit || isSelected;
                       const isFree = !isOccupied && effectiveSelectable && day.enabled;
-                      const isUnavailable = !isOccupied && !isSelectable;
                       const isBlocked = !isOccupied && (isBlockedBySelectedSession || isBlockedByOtherTherapySelection);
                       const stateLabel = isSelected
                         ? 'Selecionado'
@@ -3906,6 +3918,18 @@ export function TeaPreReserva() {
                             ? 'Livre'
                             : 'Indisponível';
                       const dayLabel = day.weekday || formatWeekdayPt(day.date) || dayjs(day.date).format('ddd');
+                      const slotTooltip = slot?.roomName
+                        ? `${dayLabel} ${time} • ${stateLabel} • ${slot.roomName}`
+                        : `${dayLabel} ${time} • ${stateLabel}`;
+                      const slotState = isSelected
+                        ? 'selected'
+                        : isOccupied
+                          ? 'occupied'
+                          : isBlocked
+                            ? 'blocked'
+                            : isFree
+                              ? 'free'
+                              : 'unavailable';
 
                       return (
                         <Button
@@ -3913,9 +3937,10 @@ export function TeaPreReserva() {
                           size="compact-xs"
                           variant="filled"
                           className="tea-pre-reserva-manual-grid__slot"
+                          data-state={slotState}
                           disabled={isOccupied || !effectiveSelectable || !manualSelectedTherapyId || !canAddNewSelection}
-                          title={`${dayLabel} ${time} • ${stateLabel}`}
-                          aria-label={`${dayLabel} ${time} • ${stateLabel}`}
+                          title={slotTooltip}
+                          aria-label={slotTooltip}
                           onClick={() => {
                             if (isOccupied && !canToggleExistingSlot) {
                               showNotification({
@@ -4046,31 +4071,8 @@ export function TeaPreReserva() {
                               };
                             });
                           }}
-                          style={{
-                            width: '100%',
-                            justifyContent: 'center',
-                            height: 28,
-                            minHeight: 28,
-                            paddingInline: 4,
-                            border: isUnavailable
-                                ? '1px dashed var(--mantine-color-default-border)'
-                                : '1px solid transparent',
-                            backgroundColor: isSelected
-                              ? 'var(--mantine-color-green-6)'
-                              : isOccupied
-                                ? 'var(--mantine-color-gray-7)'
-                                : isFree
-                                  ? 'rgba(74, 104, 255, 0.30)'
-                                  : 'transparent',
-                            color: isSelected
-                              ? 'var(--mantine-color-white)'
-                              : isOccupied
-                                ? 'var(--mantine-color-gray-4)'
-                                : 'var(--mantine-color-blue-2)',
-                            opacity: isOccupied ? 0.85 : 1,
-                          }}
                         >
-                          {isSelected ? '●' : isFree ? '•' : isOccupied ? '•' : ''}
+                          {isSelected ? <Check size={12} strokeWidth={3} /> : isFree ? '•' : ''}
                         </Button>
                       );
                     })}
@@ -4080,42 +4082,6 @@ export function TeaPreReserva() {
               </Box>
             </Paper>
           )}
-
-          <Paper p="md" withBorder className="tea-pre-reserva-manual-footer">
-            <Group justify="space-between" wrap="wrap" gap="sm">
-              <Group gap="xs">
-                <Box className="tea-pre-reserva-manual-pill tea-pre-reserva-manual-pill--neutral">Ocupado</Box>
-                <Box className="tea-pre-reserva-manual-pill tea-pre-reserva-manual-pill--primary">Livre</Box>
-                <Box className="tea-pre-reserva-manual-pill tea-pre-reserva-manual-pill--success">Selecionado</Box>
-                <Box className={`tea-pre-reserva-manual-pill ${manualSelectionComplete ? 'tea-pre-reserva-manual-pill--success-soft' : 'tea-pre-reserva-manual-pill--warning'}`}>
-                  Selecionado: {manualSelectedSessionCount}/{manualWeeklyLimit} por semana
-                </Box>
-              </Group>
-              <Group gap="xs">
-                <Button
-                  className={getTeaActionButtonClass('secondary')}
-                  onClick={() => {
-                    if (!manualSelectedTherapyId) return;
-                    setManualSelectedSlotsByTherapyId((prev) => ({
-                      ...prev,
-                      [manualSelectedTherapyId]: [],
-                    }));
-                  }}
-                  disabled={manualSelectedSlots.length === 0 || manualSaving}
-                >
-                  Limpar seleção
-                </Button>
-                <Button
-                  className={getTeaActionButtonClass('success')}
-                  onClick={handleManualConfirmReservation}
-                  loading={manualSaving}
-                  disabled={!manualSelectedTherapyId || manualSelectedSlots.length === 0 || manualSaving}
-                >
-                  Confirmar reserva manual
-                </Button>
-              </Group>
-            </Group>
-          </Paper>
         </Stack>
       </Modal>
 
@@ -4275,13 +4241,56 @@ export function TeaPreReserva() {
         title={bulkStatusActionState?.title || 'Selecionar terapias'}
         centered
         size="lg"
-        classNames={{
-          content: 'tea-pre-reserva-bulk-modal',
-          header: 'tea-pre-reserva-bulk-modal__header',
-          title: 'tea-pre-reserva-bulk-modal__title',
-          body: 'tea-pre-reserva-bulk-modal__body',
-          close: 'tea-pre-reserva-bulk-modal__close',
-        }}
+        className="tea-pre-reserva-bulk-modal"
+        footer={(
+          <Stack gap="md">
+            <Group justify="space-between" wrap="wrap" className="tea-pre-reserva-bulk-toolbar">
+              <Group gap="xs">
+                <Button
+                  size="sm"
+                  className={getTeaActionButtonClass('secondary')}
+                  onClick={() => setBulkStatusSelectedReservationIds(bulkStatusActionState?.options.map((option) => option.reservationId) || [])}
+                  disabled={!bulkStatusActionState?.options.length || !!updatingId}
+                >
+                  Selecionar todas
+                </Button>
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  color="blue"
+                  onClick={() => setBulkStatusSelectedReservationIds([])}
+                  disabled={bulkStatusSelectedReservationIds.length === 0 || !!updatingId}
+                >
+                  Limpar
+                </Button>
+              </Group>
+              <Text size="sm" className="tea-pre-reserva-muted">
+                Selecionadas: {bulkStatusSelectedReservationIds.length}
+              </Text>
+            </Group>
+
+            <Group justify="flex-end" gap="sm">
+              <Button
+                className={getTeaActionButtonClass('secondary')}
+                onClick={() => {
+                  setBulkStatusActionState(null);
+                  setBulkStatusSelectedReservationIds([]);
+                }}
+                disabled={!!updatingId}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className={getTeaActionButtonClass('primary')}
+                onClick={confirmBulkStatusAction}
+                loading={!!bulkStatusActionState?.groupKey && updatingId === bulkStatusActionState.groupKey}
+                disabled={bulkStatusSelectedReservationIds.length === 0}
+              >
+                Confirmar ação
+              </Button>
+            </Group>
+          </Stack>
+        )}
       >
         <Stack gap="md" className="tea-pre-reserva-bulk-shell">
           <Paper p="md" withBorder className="tea-pre-reserva-bulk-hero">
@@ -4327,56 +4336,6 @@ export function TeaPreReserva() {
               );
             })}
           </Stack>
-
-          <Paper p="md" withBorder className="tea-pre-reserva-bulk-footer">
-            <Stack gap="md">
-              <Group justify="space-between" wrap="wrap" className="tea-pre-reserva-bulk-toolbar">
-                <Group gap="xs">
-                  <Button
-                    size="sm"
-                    className={getTeaActionButtonClass('secondary')}
-                    onClick={() => setBulkStatusSelectedReservationIds(bulkStatusActionState?.options.map((option) => option.reservationId) || [])}
-                    disabled={!bulkStatusActionState?.options.length || !!updatingId}
-                  >
-                    Selecionar todas
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="subtle"
-                    color="blue"
-                    onClick={() => setBulkStatusSelectedReservationIds([])}
-                    disabled={bulkStatusSelectedReservationIds.length === 0 || !!updatingId}
-                  >
-                    Limpar
-                  </Button>
-                </Group>
-                <Text size="sm" className="tea-pre-reserva-muted">
-                  Selecionadas: {bulkStatusSelectedReservationIds.length}
-                </Text>
-              </Group>
-
-              <Group justify="flex-end" gap="sm">
-                <Button
-                  className={getTeaActionButtonClass('secondary')}
-                  onClick={() => {
-                    setBulkStatusActionState(null);
-                    setBulkStatusSelectedReservationIds([]);
-                  }}
-                  disabled={!!updatingId}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  className={getTeaActionButtonClass('primary')}
-                  onClick={confirmBulkStatusAction}
-                  loading={!!bulkStatusActionState?.groupKey && updatingId === bulkStatusActionState.groupKey}
-                  disabled={bulkStatusSelectedReservationIds.length === 0}
-                >
-                  Confirmar ação
-                </Button>
-              </Group>
-            </Stack>
-          </Paper>
         </Stack>
       </Modal>
 
@@ -4384,17 +4343,25 @@ export function TeaPreReserva() {
         opened={checklistModalOpened}
         onClose={() => setChecklistModalOpened(false)}
         title={`Checklist pré-conversão • ${checklistGroupLabel || 'PIT'}`}
-        centered
-        size="lg"
-        classNames={{
-          content: 'tea-pre-reserva-checklist-modal',
-          header: 'tea-pre-reserva-checklist-modal__header',
-          title: 'tea-pre-reserva-checklist-modal__title',
-          body: 'tea-pre-reserva-checklist-modal__body',
-          close: 'tea-pre-reserva-checklist-modal__close',
-        }}
+        fullScreen
+        className="tea-pre-reserva-checklist-modal"
+        footer={checklistLoading ? undefined : (
+          <Group justify="flex-end" gap="sm">
+            <Button className={getTeaActionButtonClass('secondary')} onClick={() => setChecklistModalOpened(false)}>
+              Fechar
+            </Button>
+            <Button
+              className={getTeaActionButtonClass('primary')}
+              disabled={!checklistCanConvertWholePit}
+              loading={!!checklistGroupKey && updatingId === checklistGroupKey}
+              onClick={() => openConversionConfirmationModal(checklistConvertiblePitReservations)}
+            >
+              Finalizar
+            </Button>
+          </Group>
+        )}
       >
-        <Stack gap="md">
+        <Stack gap="md" className="tea-pre-reserva-checklist-shell">
           {checklistLoading ? (
             <Group justify="center"><Loader size="sm" /></Group>
           ) : (
@@ -4460,7 +4427,6 @@ export function TeaPreReserva() {
                               p="sm"
                               withBorder
                               className="tea-pre-reserva-checklist-item"
-                              style={{ borderColor: 'var(--mantine-color-default-border)' }}
                             >
                               <Group justify="space-between" align="center" wrap="wrap">
                                 <Box style={{ flex: 1, minWidth: 0 }}>
@@ -4482,36 +4448,19 @@ export function TeaPreReserva() {
                   </Stack>
                 );
               })()}
-              <Group justify="flex-end">
-                <Button className={getTeaActionButtonClass('secondary')} onClick={() => setChecklistModalOpened(false)}>
-                  Fechar
-                </Button>
-                <Button
-                  className={getTeaActionButtonClass('primary')}
-                  disabled={!checklistCanConvertWholePit}
-                  loading={!!checklistGroupKey && updatingId === checklistGroupKey}
-                  onClick={() => openConversionConfirmationModal(checklistConvertiblePitReservations)}
-                >
-                  Finalizar
-                </Button>
-              </Group>
             </>
           )}
         </Stack>
       </Modal>
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-pre-reserva-shell">
-        <Group mb={18} align="center" wrap="nowrap">
-          <Button className="tea-pre-reserva-back-button" onClick={() => navigate('/tea')} aria-label="Voltar">
-            <ChevronLeft size={18} />
-          </Button>
-          <Box>
-            <Text fw={700} size="lg" style={{ color: 'var(--mantine-color-text)' }}>Pré-reserva TEA</Text>
-            <Text size="sm" c="dimmed">Pendências de marcação com base no PIT</Text>
-          </Box>
-        </Group>
+        <Box className="tea-pre-reserva-hero">
+          <Text className="tea-pre-reserva-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
+          <Text className="tea-pre-reserva-title" fw={700} size="2xl">Pré-reserva de Terapias</Text>
+          <Text className="tea-pre-reserva-subtitle" size="sm">Pendências de marcação com base no PIT</Text>
+        </Box>
 
-        <Group gap="xs" mb="md">
+        <Group className="tea-pre-reserva-tabs" mb="md" wrap="wrap">
           <Button
             size="xs"
             className="tea-pre-reserva-tab-button"
@@ -4540,46 +4489,45 @@ export function TeaPreReserva() {
           </Button>
         </Group>
 
-        <Group grow className="tea-pre-reserva-search" mb="md">
-          <TextInput
-            placeholder="Buscar paciente por nome ou CPF.."
-            value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
-          />
-        </Group>
+        <Box className="tea-pre-reserva-search-panel">
+          <Text className="tea-pre-reserva-search-kicker">BUSCAR E FILTRAR</Text>
+          <Box className="tea-pre-reserva-search-input">
+            <TextInput
+              placeholder="Buscar paciente por nome ou CPF..."
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+              leftSection={<Search size={16} aria-hidden="true" />}
+            />
+          </Box>
 
-        <Paper p="md" withBorder className="tea-pre-reserva-panel" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+          <Text className="tea-pre-reserva-section-title">Filtrar PITs</Text>
+          <Group gap="xs" wrap="wrap" className="tea-pre-reserva-filter-row">
+            {summaryBadgeDefinitions.map((badge) => {
+              const isActive = badgeFilter === badge.key;
+              const Icon = badge.icon;
+              return (
+                <UnstyledButton
+                  key={badge.key}
+                  type="button"
+                  className="tea-pre-reserva-filter-chip"
+                  data-active={isActive ? 'true' : undefined}
+                  onClick={() => handleBadgeClick(badge.key)}
+                >
+                  <Group gap={8} wrap="nowrap">
+                    {Icon ? <Icon size={16} color={badge.iconColor} /> : null}
+                    <Text span inherit>{badge.label}</Text>
+                    <Box component="span" className="tea-pre-reserva-filter-chip-count">
+                      {badge.count}
+                    </Box>
+                  </Group>
+                </UnstyledButton>
+              );
+            })}
+          </Group>
+        </Box>
+
+        <Paper p="md" withBorder className="tea-pre-reserva-panel">
           <Stack gap="md">
-            <Group align="center" wrap="wrap">
-              <Text fw={700} className="tea-pre-reserva-section-title">Filtrar PITs</Text>
-            </Group>
-
-            <Group gap="xs">
-              {summaryBadgeDefinitions.map((badge) => {
-                const isActive = badgeFilter === badge.key;
-                const Icon = badge.icon;
-                return (
-                  <UnstyledButton
-                    key={badge.key}
-                    type="button"
-                    className="tea-pre-reserva-filter-chip"
-                    data-active={isActive ? 'true' : undefined}
-                    onClick={() => handleBadgeClick(badge.key)}
-                  >
-                    <Group gap={8} wrap="nowrap">
-                      {Icon ? <Icon size={16} color={badge.iconColor} /> : null}
-                      <Text span inherit>{badge.label}</Text>
-                      <Box component="span" className="tea-pre-reserva-filter-chip-count">
-                        {badge.count}
-                      </Box>
-                    </Group>
-                  </UnstyledButton>
-                );
-              })}
-            </Group>
-
-            <Divider />
-
             {loading ? (
               <Group justify="center"><Loader size="sm" /></Group>
             ) : activeTab === 'pendencias' ? (
@@ -4590,7 +4538,7 @@ export function TeaPreReserva() {
                 }
 
                 return (
-                  <Stack gap="xs">
+                  <Stack gap="lg">
                     {pendingGroups.map((group) => {
                       const existingGroupForSamePit = actionableReservationsByGroupKey.get(group.groupKey);
                       const completedGroupForSamePit = completedReservationsByGroupKey.get(group.groupKey);
@@ -4729,21 +4677,25 @@ export function TeaPreReserva() {
                       };
 
                       return (
-                        <Paper key={group.groupKey} p="sm" withBorder className="tea-pre-reserva-card" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                          <Stack gap={8}>
-                            <Group justify="space-between" align="center" wrap="wrap">
-                              <Text fw={600}>{group.patientName}</Text>
-                              <Group gap="xs">
-                                <Text fw={500}>PIT Reserva</Text>
-                                {hasFrequencyChangeAlert && (
-                                  <Badge variant="light" color="blue">Frequência alterada</Badge>
-                                )}
+                        <Paper key={group.groupKey} p="md" withBorder className="tea-pre-reserva-card" data-status-color={PIT_STATUS_META[pitProgress.stage].color} style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                          <Stack gap="md">
+                            <Stack gap={4}>
+                              <Group justify="space-between" align="flex-start" wrap="wrap">
+                                <Text size="lg" fw={700}>{group.patientName}</Text>
+                                <Group gap="xs">
+                                  <Badge variant="light" color={PIT_STATUS_META[pitProgress.stage].color}>
+                                    {PIT_STATUS_META[pitProgress.stage].label}
+                                  </Badge>
+                                  {hasFrequencyChangeAlert && (
+                                    <Badge variant="light" color="blue">Frequência alterada</Badge>
+                                  )}
+                                </Group>
                               </Group>
-                            </Group>
 
-                            <Text size="xs" c="dimmed">
-                              {group.patientCpf ? `CPF: ${formatCPF(group.patientCpf)}` : 'CPF: Nao informado'}
-                            </Text>
+                              <Text size="xs" c="dimmed">
+                                {group.patientCpf ? `CPF: ${formatCPF(group.patientCpf)}` : 'CPF: Nao informado'}
+                              </Text>
+                            </Stack>
 
                             <Box>
                               {renderProgressTrail(pitProgress, `pit-pending-${group.groupKey}`)}
@@ -4891,6 +4843,11 @@ export function TeaPreReserva() {
                                       {item.status === 'CONVERTED' && (
                                         <Text size="xs" mt={6} c="teal">
                                           Procedimento convertido em agendamento.
+                                        </Text>
+                                      )}
+                                      {item.room?.name && (
+                                        <Text size="xs" c="dimmed" mt={4}>
+                                          Sala: {item.room.name}
                                         </Text>
                                       )}
                                     </Box>
@@ -5058,7 +5015,7 @@ export function TeaPreReserva() {
                 }
 
                 return (
-                  <Stack gap="xs">
+                  <Stack gap="lg">
                     <Group gap="xs" align="center">
                       <ClipboardList size={16} />
                       <Text size="sm" fw={600}>Pré-reservas concluídas</Text>

@@ -2,33 +2,33 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Group,
-  Text,
-  Button,
-  Table,
-  Modal,
-  Stack,
   ActionIcon,
-  Switch,
   Badge,
-  Paper,
-  Skeleton,
+  Box,
+  Button,
+  Group,
   Menu,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Plus, Pencil, Trash2, MoreVertical, History } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+  Modal,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Switch,
+  Table,
+  Text,
+  TextInput,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { History, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import especialidadeService, { type Especialidade, type EspecialidadeAuditLogEntry } from '../../services/especialidadeService';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import './CadastroEspecialidades.css';
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: 'Criada',
@@ -69,7 +69,7 @@ function TagInput({
 
   return (
     <Box>
-      <FloatingInput
+      <TextInput
         label={label}
         placeholder={placeholder}
         value={input}
@@ -385,37 +385,29 @@ export function CadastroEspecialidades() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Especialidades
-              </Text>
-              <Text size="sm" c="dimmed">
-                Especialidades e métodos por modalidade
-              </Text>
-            </Box>
-          </Group>
-
-          <Button bg={DARK_BLUE} c="white" leftSection={<Plus size={16} />} onClick={openCreateModal} size={isMobile ? 'sm' : 'md'}>
-            Nova especialidade
-          </Button>
-        </Group>
-
-        <Box mb={isMobile ? 20 : 30}>
-          <FloatingInput
-            label="Buscar especialidades"
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            placeholder={isMobile ? 'Buscar...' : 'Buscar especialidade por nome ou modalidade...'}
-          />
+        <Box className="cadastro-especialidades-hero">
+          <Text className="cadastro-especialidades-eyebrow">CADASTROS CLÍNICOS</Text>
+          <Text className="cadastro-especialidades-title" fw={700} size="2xl">Especialidades</Text>
+          <Text className="cadastro-especialidades-subtitle" size="sm">Especialidades e métodos por modalidade</Text>
         </Box>
+
+        <Paper className="cadastro-especialidades-panel" p={isMobile ? 'sm' : 'lg'} withBorder radius="md" mb={isMobile ? 'md' : 'lg'}>
+          <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+            <TextInput
+              label="Buscar especialidades"
+              value={query}
+              onChange={(e) => setQuery(e.currentTarget.value)}
+              placeholder={isMobile ? 'Buscar...' : 'Buscar especialidade por nome ou modalidade...'}
+              style={{ flex: '1 1 260px', maxWidth: isMobile ? '100%' : 420 }}
+            />
+            <Button leftSection={<Plus size={16} />} onClick={openCreateModal} fullWidth={isMobile}>
+              Nova especialidade
+            </Button>
+          </Group>
+        </Paper>
 
         {itemsLoading ? (
           isMobile ? (
@@ -433,14 +425,15 @@ export function CadastroEspecialidades() {
               ))}
             </Stack>
           ) : (
-            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
+            <Box className="cadastro-especialidades-table-wrap">
               <Table horizontalSpacing="md" verticalSpacing="md">
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Nome</Table.Th>
                     <Table.Th>Modalidade</Table.Th>
-                    <Table.Th>Métodos</Table.Th>
+                    {!isTablet && <Table.Th>Métodos</Table.Th>}
                     <Table.Th>Status</Table.Th>
+                    {!isTablet && <Table.Th>Última alteração</Table.Th>}
                     <Table.Th>Ações</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
@@ -449,8 +442,9 @@ export function CadastroEspecialidades() {
                     <Table.Tr key={idx}>
                       <Table.Td><Skeleton height={16} width="70%" radius="sm" /></Table.Td>
                       <Table.Td><Skeleton height={16} width="50%" radius="sm" /></Table.Td>
-                      <Table.Td><Skeleton height={16} width="40%" radius="sm" /></Table.Td>
+                      {!isTablet && <Table.Td><Skeleton height={16} width="40%" radius="sm" /></Table.Td>}
                       <Table.Td><Skeleton height={24} width={78} radius="xl" /></Table.Td>
+                      {!isTablet && <Table.Td><Skeleton height={14} width="60%" radius="sm" /></Table.Td>}
                       <Table.Td><Skeleton height={28} width={28} radius="xl" /></Table.Td>
                     </Table.Tr>
                   ))}
@@ -514,13 +508,13 @@ export function CadastroEspecialidades() {
             >
               <Table horizontalSpacing="md" verticalSpacing="md">
                 <Table.Thead>
-                  <Table.Tr style={{ borderBottom: 'none' }}>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Modalidade</Table.Th>
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Métodos</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                    {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Última alteração</Table.Th>}
-                    <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', width: 96 }}>
+                  <Table.Tr>
+                    <Table.Th className="cadastro-especialidades-th">Nome</Table.Th>
+                    <Table.Th className="cadastro-especialidades-th">Modalidade</Table.Th>
+                    {!isTablet && <Table.Th className="cadastro-especialidades-th">Métodos</Table.Th>}
+                    <Table.Th className="cadastro-especialidades-th">Status</Table.Th>
+                    {!isTablet && <Table.Th className="cadastro-especialidades-th">Última alteração</Table.Th>}
+                    <Table.Th className="cadastro-especialidades-th" style={{ textAlign: 'center', width: 96 }}>
                       Ações
                     </Table.Th>
                   </Table.Tr>
@@ -528,7 +522,7 @@ export function CadastroEspecialidades() {
                 <Table.Tbody>
                   {filtered.length === 0 ? (
                     <Table.Tr>
-                      <Table.Td colSpan={isTablet ? 4 : 7}>
+                      <Table.Td colSpan={isTablet ? 4 : 6}>
                         <Text size="sm" c="dimmed" ta="center">
                           Nenhuma especialidade encontrada. Ajuste a busca ou cadastre uma nova especialidade.
                         </Text>
@@ -536,7 +530,7 @@ export function CadastroEspecialidades() {
                     </Table.Tr>
                   ) : (
                     paginatedItems.map((it) => (
-                      <Table.Tr key={it.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                      <Table.Tr key={it.id} className="cadastro-especialidades-row">
                         <Table.Td>
                           <Text fw={600} size="sm">{it.name}</Text>
                         </Table.Td>
@@ -548,7 +542,7 @@ export function CadastroEspecialidades() {
                         {!isTablet && <Table.Td>{renderAuditInfo(it)}</Table.Td>}
                         <Table.Td style={{ textAlign: 'center' }}>
                           <Group justify="center">
-                            <Menu shadow="md" width={200} position="bottom" withArrow>
+                            <Menu shadow="md" width={200} position="bottom-end" withArrow>
                               <Menu.Target>
                                 <ActionIcon variant="light" size="sm" aria-label="Ações da especialidade">
                                   <MoreVertical size={16} />
@@ -595,7 +589,7 @@ export function CadastroEspecialidades() {
         fullScreen={isMobile}
       >
         <Stack gap={10}>
-          <FloatingSelect
+          <Select
             label="Modalidade"
             required
             placeholder="Selecione a modalidade"
@@ -610,7 +604,7 @@ export function CadastroEspecialidades() {
             }}
           />
 
-          <FloatingInput
+          <TextInput
             label="Nome da especialidade"
             required
             value={createName}
@@ -632,7 +626,7 @@ export function CadastroEspecialidades() {
           />
 
           {createSimilarWarning && createSimilarWarning.length > 0 ? (
-            <Paper withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-yellow-6)' }}>
+            <Paper withBorder p="sm" radius="md" className="cadastro-especialidades-warning">
               <Text size="sm" fw={600} mb={4}>Especialidade parecida encontrada</Text>
               <Text size="sm" c="dimmed" mb="sm">
                 {`Já existe: ${createSimilarWarning.map((s) => `"${s.name}"`).join(', ')}. Deseja cadastrar mesmo assim?`}
@@ -652,7 +646,7 @@ export function CadastroEspecialidades() {
             <Button variant="default" onClick={() => setCreateModalOpen(false)} size="sm" disabled={creating}>
               Cancelar
             </Button>
-            <Button bg={DARK_BLUE} onClick={handleCreateSubmit} size="sm" loading={creating} disabled={creating}>
+            <Button onClick={handleCreateSubmit} size="sm" loading={creating} disabled={creating}>
               Cadastrar
             </Button>
           </Group>
@@ -669,14 +663,14 @@ export function CadastroEspecialidades() {
         fullScreen={isMobile}
       >
         <Stack gap={10}>
-          <FloatingInput
+          <TextInput
             label="Modalidade"
             value={editingItem?.modalidade?.name || ''}
             disabled
-            containerProps={{ opacity: 0.7 }}
+            style={{ opacity: 0.7 }}
           />
 
-          <FloatingInput
+          <TextInput
             label="Nome da especialidade"
             required
             value={editForm.name}
@@ -697,17 +691,25 @@ export function CadastroEspecialidades() {
             onRemove={(value) => setEditForm((prev) => ({ ...prev, metodos: prev.metodos.filter((m) => m !== value) }))}
           />
 
-          <Switch
-            label="Especialidade ativa"
-            checked={editForm.isActive}
-            onChange={(e) => {
-              const checked = e?.currentTarget?.checked ?? !editForm.isActive;
-              setEditForm((prev) => ({ ...prev, isActive: checked }));
-            }}
-          />
+          <Box p="md" className="ui-toggle-card">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Box>
+                <Text fw={600} size="sm">Especialidade ativa</Text>
+                <Text size="xs" c="dimmed">Especialidades inativas deixam de aparecer para novos cadastros.</Text>
+              </Box>
+              <Switch
+                label={editForm.isActive ? 'Ativa' : 'Inativa'}
+                checked={editForm.isActive}
+                onChange={(e) => {
+                  const checked = e?.currentTarget?.checked ?? !editForm.isActive;
+                  setEditForm((prev) => ({ ...prev, isActive: checked }));
+                }}
+              />
+            </Group>
+          </Box>
 
           {editSimilarWarning && editSimilarWarning.length > 0 ? (
-            <Paper withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-yellow-6)' }}>
+            <Paper withBorder p="sm" radius="md" className="cadastro-especialidades-warning">
               <Text size="sm" fw={600} mb={4}>Especialidade parecida encontrada</Text>
               <Text size="sm" c="dimmed" mb="sm">
                 {`Já existe: ${editSimilarWarning.map((s) => `"${s.name}"`).join(', ')}. Deseja atualizar mesmo assim?`}
@@ -727,7 +729,7 @@ export function CadastroEspecialidades() {
             <Button variant="default" onClick={() => setEditModalOpen(false)} size="sm" disabled={saving}>
               Cancelar
             </Button>
-            <Button bg={DARK_BLUE} onClick={() => submitEdit(false)} size="sm" loading={saving} disabled={saving}>
+            <Button onClick={() => submitEdit(false)} size="sm" loading={saving} disabled={saving}>
               Atualizar
             </Button>
           </Group>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActionIcon,
   Box,
@@ -7,28 +7,28 @@ import {
   Modal,
   Paper,
   ScrollArea,
+  Select,
   SimpleGrid,
   Stack,
   Text,
+  Textarea,
   ThemeIcon,
-  useComputedColorScheme,
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
+} from '@/components/ui';
+import { useDisclosure } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { AlertTriangle, Bug, CircleHelp, Lightbulb, LoaderCircle, MapPin, Send, Ticket } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import ticketService, { type TicketType } from '../../services/ticketService';
 import aiHelpService, { type ChatMessage } from '../../services/aiHelpService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingSelect } from './FloatingSelect';
-import { FloatingTextarea } from './FloatingTextarea';
+import './TicketFab.css';
 
 const FLOW_OPTIONS = [
   { value: 'ATENDIMENTO_AGENDA', label: 'Atendimento e Agenda' },
   { value: 'EXAMES_LAUDO', label: 'Exames e Laudo' },
   { value: 'CADASTROS', label: 'Cadastros' },
   { value: 'FINANCEIRO_FATURAMENTO', label: 'Financeiro e Faturamento' },
-  { value: 'TEA', label: 'Módulo TEA' },
+  { value: 'TEA', label: 'Módulo Terapias' },
   { value: 'OUTRO', label: 'Outro fluxo' },
 ];
 
@@ -44,7 +44,7 @@ const MODULE_OPTIONS = [
   { value: 'FINANCEIRO', label: 'Financeiro' },
   { value: 'FATURAMENTO', label: 'Faturamento' },
   { value: 'SETTINGS', label: 'Configurações' },
-  { value: 'MODULO_TEA', label: 'Módulo TEA' },
+  { value: 'MODULO_TEA', label: 'Módulo Terapias' },
   { value: 'OUTRO', label: 'Outro módulo' },
 ];
 
@@ -98,36 +98,25 @@ const SUGGESTED_QUESTIONS = [
 function formatMessage(content: string) {
   return content
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:.85em;font-family:monospace">$1</code>')
-    .replace(/^(\d+)\. (.+)$/gm, '<div style="display:flex;gap:6px;margin:2px 0"><span style="font-weight:600;color:#2c5be8;flex-shrink:0">$1.</span><span>$2</span></div>')
-    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:6px;margin:2px 0"><span style="color:#4674ff;flex-shrink:0">•</span><span>$1</span></div>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^(\d+)\. (.+)$/gm, '<div style="display:flex;gap:6px;margin:2px 0"><span style="font-weight:600;color:var(--ui-primary);flex-shrink:0">$1.</span><span>$2</span></div>')
+    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:6px;margin:2px 0"><span style="color:var(--ui-primary);flex-shrink:0">•</span><span>$1</span></div>')
     .replace(/\n/g, '<br/>');
 }
 
 function TypingDots() {
   return (
-    <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center', height: 16 }}>
+    <span className="ticket-fab-typing-dots">
       {[0, 150, 300].map((delay) => (
-        <span
-          key={delay}
-          style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: 'var(--mantine-color-gray-5)',
-            display: 'inline-block',
-            animation: 'sau-bounce 1s infinite',
-            animationDelay: `${delay}ms`,
-          }}
-        />
+        <span key={delay} className="ticket-fab-typing-dot" style={{ animationDelay: `${delay}ms` }} />
       ))}
-      <style>{`@keyframes sau-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}`}</style>
     </span>
   );
 }
 
 // ── AI Chat Tab ──────────────────────────────────────────────────────────────
 
-function AiChatTab({ isDark, messages, setMessages }: {
-  isDark: boolean;
+function AiChatTab({ messages, setMessages }: {
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }) {
@@ -185,40 +174,22 @@ function AiChatTab({ isDark, messages, setMessages }: {
   };
 
   const isEmpty = messages.length === 0;
-  const bubbleBg = isDark ? 'var(--mantine-color-dark-5)' : 'var(--mantine-color-gray-1)';
-  const bubbleColor = isDark ? 'var(--mantine-color-gray-2)' : 'var(--mantine-color-gray-8)';
 
   return (
-    <Box style={{ display: 'flex', flexDirection: 'column', height: 440 }}>
-
+    <Box className="ticket-fab-chat">
       {/* Messages */}
-      <ScrollArea style={{ flex: 1, padding: '12px 16px' }} scrollbarSize={4}>
+      <ScrollArea className="ticket-fab-chat-scroll" scrollbarSize={4}>
         {isEmpty ? (
           <Stack gap="sm">
-            <Box style={{ background: isDark ? 'rgba(31,73,191,.15)' : '#eff6ff', borderRadius: 12, padding: '12px 14px' }}>
-              <Text size="sm" lh={1.65} c={isDark ? 'gray.3' : 'gray.7'}>
+            <Box className="ticket-fab-intro-bubble">
+              <Text size="sm" lh={1.65}>
                 Oi! Sou a <strong>Saú</strong>, assistente do Saudy. Pode me perguntar qualquer coisa sobre o sistema — estou aqui pra ajudar!
               </Text>
             </Box>
-            <Text size="xs" c="dimmed">Perguntas frequentes:</Text>
+            <Text size="xs" className="ticket-fab-suggested-label">Perguntas frequentes:</Text>
             <Stack gap={6}>
               {SUGGESTED_QUESTIONS.map((q) => (
-                <Box
-                  key={q}
-                  onClick={() => send(q)}
-                  style={{
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    border: `1px solid ${isDark ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)'}`,
-                    background: isDark ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
-                    color: isDark ? 'var(--mantine-color-gray-3)' : 'var(--mantine-color-gray-7)',
-                    transition: 'all 100ms',
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.background = isDark ? 'var(--mantine-color-dark-5)' : '#eff6ff'; e.currentTarget.style.color = '#2c5be8'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.background = isDark ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)'; e.currentTarget.style.color = isDark ? 'var(--mantine-color-gray-3)' : 'var(--mantine-color-gray-7)'; e.currentTarget.style.borderColor = isDark ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)'; }}
-                >
+                <Box key={q} className="ticket-fab-suggestion" onClick={() => send(q)}>
                   {q}
                 </Box>
               ))}
@@ -227,20 +198,11 @@ function AiChatTab({ isDark, messages, setMessages }: {
         ) : (
           <Stack gap={10} pb={4}>
             {messages.map((msg, i) => (
-              <Box key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 8 }}>
+              <Box key={i} className={`ticket-fab-msg-row ticket-fab-msg-row--${msg.role}`}>
                 {msg.role === 'assistant' && (
-                  <img src="/sau.png" alt="Saú" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #bfdbfe' }} />
+                  <img className="ticket-fab-msg-avatar" src="/sau.png" alt="Saú" />
                 )}
-                <Box style={{
-                  maxWidth: '80%',
-                  padding: '9px 13px',
-                  borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                  background: msg.role === 'user' ? '#1f49bf' : bubbleBg,
-                  color: msg.role === 'user' ? '#fff' : bubbleColor,
-                  fontSize: 13,
-                  lineHeight: 1.65,
-                  wordBreak: 'break-word',
-                }}>
+                <Box className={`ticket-fab-bubble ticket-fab-bubble--${msg.role}`}>
                   {msg.role === 'assistant' && msg.content === '' && streaming && i === messages.length - 1
                     ? <TypingDots />
                     : msg.role === 'assistant'
@@ -256,32 +218,17 @@ function AiChatTab({ isDark, messages, setMessages }: {
       </ScrollArea>
 
       {/* Input */}
-      <Box style={{
-        padding: '10px 12px',
-        borderTop: `1px solid ${isDark ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-2)'}`,
-        flexShrink: 0,
-      }}>
-        <Box style={{
-          display: 'flex', alignItems: 'flex-end', gap: 8,
-          background: isDark ? 'var(--mantine-color-dark-6)' : 'var(--mantine-color-gray-0)',
-          borderRadius: 12,
-          border: `1px solid ${isDark ? 'var(--mantine-color-dark-4)' : 'var(--mantine-color-gray-3)'}`,
-          padding: '8px 10px 8px 14px',
-        }}>
+      <Box className="ticket-fab-chat-input-wrap">
+        <Box className="ticket-fab-chat-input-box">
           <textarea
             ref={textareaRef}
+            className="ticket-fab-chat-textarea"
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
             onKeyDown={handleKeyDown}
             placeholder="Escreva sua dúvida para a Saú..."
             rows={1}
             disabled={streaming}
-            style={{
-              flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none',
-              fontSize: 13, lineHeight: 1.5, minHeight: 36, maxHeight: 100,
-              color: isDark ? 'var(--mantine-color-gray-2)' : 'var(--mantine-color-gray-8)',
-              fontFamily: 'inherit',
-            }}
           />
           <ActionIcon
             size={32} radius="md" color="darkBlue" variant="filled"
@@ -291,7 +238,7 @@ function AiChatTab({ isDark, messages, setMessages }: {
             {streaming ? <LoaderCircle size={14} className="animate-spin" /> : <Send size={14} />}
           </ActionIcon>
         </Box>
-        <Text size="xs" c="dimmed" ta="center" mt={6}>Enter para enviar · Shift+Enter para nova linha</Text>
+        <Text size="xs" ta="center" mt={6} className="ticket-fab-chat-hint">Enter para enviar · Shift+Enter para nova linha</Text>
       </Box>
     </Box>
   );
@@ -299,7 +246,7 @@ function AiChatTab({ isDark, messages, setMessages }: {
 
 // ── Ticket Form Tab ──────────────────────────────────────────────────────────
 
-function TicketFormTab({ isDark, pathname, onSuccess }: { isDark: boolean; pathname: string; onSuccess: () => void }) {
+function TicketFormTab({ pathname, onSuccess }: { pathname: string; onSuccess: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [flow, setFlow] = useState<string | null>(null);
   const [moduleName, setModuleName] = useState<string | null>(detectModuleFromPath(pathname));
@@ -329,12 +276,12 @@ function TicketFormTab({ isDark, pathname, onSuccess }: { isDark: boolean; pathn
 
   return (
     <Stack gap="lg">
-      <Text size="sm" c={isDark ? 'gray.4' : 'gray.6'} lh={1.6}>
+      <Text size="sm" c="dimmed" lh={1.6}>
         Descreva o problema com detalhes. Nossa equipe analisa e responde em até 24h úteis.
       </Text>
 
       <Stack gap={6}>
-        <Text size="xs" fw={600} c={isDark ? 'gray.4' : 'gray.6'} tt="uppercase" style={{ letterSpacing: '0.06em' }}>
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
           Tipo de chamado *
         </Text>
         <SimpleGrid cols={3} spacing={8}>
@@ -347,24 +294,15 @@ function TicketFormTab({ isDark, pathname, onSuccess }: { isDark: boolean; pathn
                 p="sm"
                 radius="md"
                 onClick={() => setType(t.value)}
-                style={{
-                  cursor: 'pointer',
-                  transition: 'all 120ms ease',
-                  borderWidth: selected ? 2 : 1,
-                  borderColor: selected
-                    ? `var(--mantine-color-${t.color}-${isDark ? '7' : '5'})`
-                    : isDark ? 'var(--mantine-color-dark-4)' : undefined,
-                  background: selected
-                    ? isDark ? `var(--mantine-color-${t.color}-9)` : `var(--mantine-color-${t.color}-0)`
-                    : isDark ? 'var(--mantine-color-dark-6)' : undefined,
-                }}
+                className={`ticket-fab-type-card${selected ? ' ticket-fab-type-card--selected' : ''}`}
+                style={{ '--card-hue': `var(--ui-hue-${t.color})` } as React.CSSProperties}
               >
                 <Stack gap={6} align="center">
                   <ThemeIcon color={t.color} variant={selected ? 'filled' : 'light'} size="lg" radius="md">
                     <t.icon size={16} />
                   </ThemeIcon>
                   <Text size="sm" fw={700} ta="center">{t.label}</Text>
-                  <Text size="xs" c={isDark ? 'gray.5' : 'dimmed'} ta="center" lh={1.4}>{t.desc}</Text>
+                  <Text size="xs" c="dimmed" ta="center" lh={1.4}>{t.desc}</Text>
                 </Stack>
               </Paper>
             );
@@ -373,12 +311,12 @@ function TicketFormTab({ isDark, pathname, onSuccess }: { isDark: boolean; pathn
       </Stack>
 
       <SimpleGrid cols={2} spacing="sm">
-        <FloatingSelect label="Fluxo" placeholder="Selecione o fluxo" data={FLOW_OPTIONS} value={flow} onChange={setFlow} searchable required />
-        <FloatingSelect label="Módulo" placeholder="Selecione o módulo" data={MODULE_OPTIONS} value={moduleName} onChange={setModuleName} searchable required />
+        <Select label="Fluxo" placeholder="Selecione o fluxo" data={FLOW_OPTIONS} value={flow} onChange={setFlow} searchable required />
+        <Select label="Módulo" placeholder="Selecione o módulo" data={MODULE_OPTIONS} value={moduleName} onChange={setModuleName} searchable required />
       </SimpleGrid>
 
       <Box style={{ position: 'relative' }}>
-        <FloatingTextarea
+        <Textarea
           label="Descrição detalhada"
           placeholder="Explique o que aconteceu, onde ocorreu e qual comportamento era esperado..."
           minRows={4}
@@ -391,17 +329,17 @@ function TicketFormTab({ isDark, pathname, onSuccess }: { isDark: boolean; pathn
         <Text
           size="xs"
           c={description.length > MAX_DESC * 0.9 ? 'orange' : 'dimmed'}
-          style={{ position: 'absolute', bottom: 10, right: 12, pointerEvents: 'none' }}
+          className="ticket-fab-char-count"
         >
           {description.length}/{MAX_DESC}
         </Text>
       </Box>
 
       <Group gap={6}>
-        <MapPin size={12} style={{ color: 'var(--mantine-color-gray-5)', flexShrink: 0 }} />
-        <Text size="xs" c={isDark ? 'gray.5' : 'gray.5'}>
+        <MapPin size={12} className="ticket-fab-context-note" />
+        <Text size="xs" className="ticket-fab-context-note">
           Contexto capturado:{' '}
-          <Text span fw={600} c={isDark ? 'gray.3' : 'gray.7'}>{readablePathname(pathname)}</Text>
+          <Text span fw={600} c="dimmed">{readablePathname(pathname)}</Text>
         </Text>
       </Group>
 
@@ -420,8 +358,7 @@ function TicketFormTab({ isDark, pathname, onSuccess }: { isDark: boolean; pathn
 
 // ── Tab switcher + container ─────────────────────────────────────────────────
 
-function HelpModal({ isDark, pathname, onClose, messages, setMessages }: {
-  isDark: boolean;
+function HelpModal({ pathname, onClose, messages, setMessages }: {
   pathname: string;
   onClose: () => void;
   messages: ChatMessage[];
@@ -430,19 +367,14 @@ function HelpModal({ isDark, pathname, onClose, messages, setMessages }: {
   const [tab, setTab] = useState<'ai' | 'ticket'>('ai');
 
   return (
-    <Box style={{ display: 'flex', flexDirection: 'column', borderRadius: 12, overflow: 'hidden' }}>
+    <Box className="ticket-fab-modal">
       {/* Unified header — gradient with Saú + tabs + close */}
-      <Box style={{
-        background: 'linear-gradient(90deg, #1a2f6e 0%, #1565c0 60%, #0ea5e9 100%)',
-        padding: '14px 16px',
-        display: 'flex', alignItems: 'center', gap: 12,
-        flexShrink: 0,
-      }}>
+      <Box className="ticket-fab-modal-header">
         {/* Saú identity */}
-        <img src="/sau.png" alt="Saú" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.35)', flexShrink: 0 }} />
+        <img className="ticket-fab-avatar" src="/sau.png" alt="Saú" />
         <Box style={{ flex: 1 }}>
-          <Text fw={700} size="sm" style={{ color: '#fff', lineHeight: 1.2 }}>Saú</Text>
-          <Text size="xs" style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.3 }}>Assistente Saudy</Text>
+          <Text fw={700} size="sm" className="ticket-fab-identity-name">Saú</Text>
+          <Text size="xs" className="ticket-fab-identity-subtitle">Assistente Saudy</Text>
         </Box>
 
         {/* Tab pills */}
@@ -453,38 +385,30 @@ function HelpModal({ isDark, pathname, onClose, messages, setMessages }: {
           ] as const).map((t) => {
             const active = tab === t.value;
             return (
-              <Box
+              <button
                 key={t.value}
-                component="button"
+                type="button"
                 onClick={() => setTab(t.value)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '5px 12px', borderRadius: 20,
-                  border: active ? 'none' : '1px solid rgba(255,255,255,.25)',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 600, lineHeight: 1,
-                  transition: 'all 140ms ease',
-                  background: active ? 'rgba(255,255,255,.95)' : 'transparent',
-                  color: active ? '#1a2f6e' : 'rgba(255,255,255,.8)',
-                }}
+                className={`ticket-fab-tab-pill${active ? ' ticket-fab-tab-pill--active' : ''}`}
               >
                 {t.icon}
                 {t.label}
-              </Box>
+              </button>
             );
           })}
         </Group>
 
         {/* Close */}
-        <ActionIcon variant="transparent" color="white" size="sm" onClick={onClose} style={{ opacity: 0.7 }}>
+        <ActionIcon variant="transparent" size="sm" onClick={onClose} className="ticket-fab-close">
           ✕
         </ActionIcon>
       </Box>
 
-      {tab === 'ai' && <AiChatTab isDark={isDark} messages={messages} setMessages={setMessages} />}
+      {tab === 'ai' && <AiChatTab messages={messages} setMessages={setMessages} />}
       {tab === 'ticket' && (
         <ScrollArea style={{ height: 440 }} scrollbarSize={4}>
           <Box p="lg">
-            <TicketFormTab isDark={isDark} pathname={pathname} onSuccess={onClose} />
+            <TicketFormTab pathname={pathname} onSuccess={onClose} />
           </Box>
         </ScrollArea>
       )}
@@ -499,29 +423,15 @@ export function TicketFab() {
   const [opened, { open, close }] = useDisclosure(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  const colorScheme = useComputedColorScheme('light');
-  const isDark = colorScheme === 'dark';
-
-  const hidden = useMemo(
-    () => HIDDEN_PATH_PREFIXES.some((prefix) => location.pathname.startsWith(prefix)),
-    [location.pathname],
-  );
+  const hidden = HIDDEN_PATH_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 
   if (!isAuthenticated() || hidden) return null;
 
   return (
     <>
-      <Box style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 210 }}>
-        <Paper
-          radius="xl"
-          p={6}
-          style={{
-            border: '1px solid rgba(255,255,255,0.24)',
-            background: 'linear-gradient(135deg, #132a63 0%, #1e3f95 100%)',
-            boxShadow: '0 16px 42px rgba(19,42,99,0.38)',
-          }}
-        >
-          <ActionIcon size={56} radius="xl" variant="transparent" color="white" onClick={open} aria-label="Abrir ajuda">
+      <Box className="ticket-fab-container">
+        <Paper radius="xl" p={6} className="ticket-fab-trigger-wrap">
+          <ActionIcon size={56} radius="xl" variant="transparent" onClick={open} aria-label="Abrir ajuda" className="ticket-fab-trigger">
             <CircleHelp size={28} />
           </ActionIcon>
         </Paper>
@@ -536,7 +446,7 @@ export function TicketFab() {
         padding={0}
         radius="md"
       >
-        <HelpModal isDark={isDark} pathname={location.pathname} onClose={close} messages={chatMessages} setMessages={setChatMessages} />
+        <HelpModal pathname={location.pathname} onClose={close} messages={chatMessages} setMessages={setChatMessages} />
       </Modal>
     </>
   );

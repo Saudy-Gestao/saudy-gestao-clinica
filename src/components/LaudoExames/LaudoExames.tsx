@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -21,15 +22,27 @@ import {
   ThemeIcon,
   Tooltip,
   Timeline,
-  useMantineColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
+  useColorScheme,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck, Trash2, ClipboardList, Images, Upload, FileArchive } from 'lucide-react';
+import { Search, Calendar, Stethoscope, FileText, Save, PenTool, CheckCircle, LayoutTemplate, Plus, Maximize2, Minimize2, History, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Settings, Eye, RotateCcw, ShieldCheck, Mic, MicOff, SpellCheck, Trash2, ClipboardList, Images, Upload, FileArchive, ArrowLeft } from 'lucide-react';
 import { Editor } from '@tinymce/tinymce-react';
+import tinymce from 'tinymce/tinymce';
+import 'tinymce/icons/default';
+import 'tinymce/themes/silver';
+import 'tinymce/models/dom';
+import 'tinymce/plugins/lists';
+import 'tinymce/plugins/link';
+import 'tinymce/plugins/table';
+import 'tinymce/plugins/wordcount';
+import 'tinymce/skins/ui/oxide-dark/skin.css';
+
+if (typeof window !== 'undefined') {
+  (window as any).tinymce = tinymce;
+}
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import reportService from '../../services/reportService';
 import authService from '../../services/authService';
 import reportAddendumService from '../../services/reportAddendumService';
@@ -39,7 +52,8 @@ import { useReportPreviousReportsQuery } from '../../hooks/useReportPreviousRepo
 import { useReportAddendumDraftQuery } from '../../hooks/useReportAddendumDraftQuery';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { queryKeys } from '../../lib/queryKeys';
-import { FloatingInput } from '../common/FloatingInput';
+import { formatCPF } from '../../utils/formatters';
+import './LaudoExames.css';
 
 type ExamStatus = 'sem_laudo' | 'em_andamento' | 'laudado' | 'revisado' | 'finalizado';
 type ExamPriority = 'normal' | 'urgente';
@@ -396,18 +410,16 @@ export function LaudoExames() {
   const currentUser = authService.getCurrentUser();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const editorRef = useRef<any>(null);
   const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
   const priorStudyFileInputRef = useRef<HTMLInputElement | null>(null);
   const isDark = colorScheme === 'dark';
   const pageBg = isDark ? 'var(--mantine-color-body)' : '#f8f9fa';
   const panelBg = isDark ? 'transparent' : 'var(--mantine-color-white)';
-  const subtleBg = isDark ? 'rgba(255,255,255,0.03)' : 'var(--mantine-color-gray-0)';
+  const subtleBg = 'color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface))';
   const surfaceBg = isDark ? 'rgba(255,255,255,0.02)' : 'white';
   const borderColor = isDark ? 'var(--mantine-color-default-border)' : '#e9ecef';
-  const titleColor = isDark ? 'var(--mantine-color-text)' : DARK_BLUE;
-  const subtitleColor = isDark ? 'var(--mantine-color-dimmed)' : `${DARK_BLUE}B3`;
   const selectedRowBg = isDark ? 'rgba(255,255,255,0.06)' : '#edf2ff';
 
   const [query, setQuery] = useState('');
@@ -949,6 +961,15 @@ export function LaudoExames() {
     if (!modalOpen) return;
     setEditorInitializing(true);
   }, [modalOpen, selectedExamId]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [modalOpen]);
 
   useEffect(() => {
     if (!selectedExam) {
@@ -1829,47 +1850,61 @@ export function LaudoExames() {
   };
 
   return (
-    <Box bg={pageBg} style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg={pageBg} className="laudo-exames-page" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=operacao-clinica') }} />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 16 : 24} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" color={isDark ? 'gray' : 'black'} size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} style={{ color: titleColor }}>
-                Laudo por Exame
-              </Text>
-              <Text size="sm" style={{ color: subtitleColor }}>
-                Fila de exames para laudar
-              </Text>
-            </Box>
-          </Group>
-          <Button variant="light" color="darkBlue" leftSection={<Settings size={16} />} onClick={() => navigate('/laudo-configuracoes')}>
+      <Box className="laudo-exames-shell" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Group className="laudo-exames-hero" justify="space-between" align="flex-end" wrap="wrap">
+          <Box>
+            <Text className="laudo-exames-eyebrow">OPERAÇÃO CLÍNICA · DIAGNÓSTICO</Text>
+            <Title order={1} className="laudo-exames-page-title">
+              Laudos por exame
+            </Title>
+            <Text className="laudo-exames-page-subtitle">
+              Organize a fila, revise os estudos e finalize laudos com segurança.
+            </Text>
+          </Box>
+          <Button className="laudo-exames-settings-button" variant="light" color="darkBlue" leftSection={<Settings size={16} />} onClick={() => navigate('/laudo-configuracoes')}>
             Configurações de laudo
           </Button>
         </Group>
 
-        <Group gap="md" align="end" mb="md">
-          <FloatingInput
-            label="Buscar exames"
-            placeholder={isMobile ? 'Buscar...' : 'Buscar por paciente, exame ou solicitante'}
-            rightSection={<Search size={16} color={isDark ? '#7d92c6' : '#999'} />}
+        <Box className="laudo-exames-toolbar">
+          <TextInput
+            className="laudo-exames-search-input"
+            label="Buscar na fila"
+            placeholder={isMobile ? 'Paciente, exame ou código' : 'Buscar por paciente, exame ou código'}
+            leftSection={<Search size={17} aria-hidden="true" />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
-            style={{ flex: 1 }}
+            aria-label="Buscar exames na fila de laudos"
           />
-        </Group>
+          <Box className="laudo-exames-toolbar-summary">
+            <Text className="laudo-exames-toolbar-summary-label">Fila atual</Text>
+            <Text className="laudo-exames-toolbar-summary-value">{filteredRows.length} {filteredRows.length === 1 ? 'exame' : 'exames'}</Text>
+          </Box>
+        </Box>
 
-        <Paper withBorder p="sm" style={{ minHeight: 560, borderColor, backgroundColor: panelBg }}>
-            <Title order={5} c={titleColor} mb="sm">
-              Exames para laudar
-            </Title>
+        <Paper className="laudo-exames-queue-panel" withBorder p="sm" style={{ minHeight: 560, borderColor, backgroundColor: panelBg }}>
+            <Group className="laudo-exames-queue-heading" justify="space-between" align="flex-start" wrap="wrap">
+              <Box>
+                <Title order={2} className="laudo-exames-queue-title">
+                  Fila de laudos
+                </Title>
+                <Text className="laudo-exames-queue-description">
+                  Exames aguardando redação, revisão ou finalização.
+                </Text>
+              </Box>
+              <Badge className="laudo-exames-queue-badge" variant="light" color="darkBlue">
+                {filteredRows.length} {filteredRows.length === 1 ? 'registro' : 'registros'}
+              </Badge>
+            </Group>
 
-            <Box style={{ overflowX: 'auto' }}>
-              <Table horizontalSpacing="sm" verticalSpacing="sm" highlightOnHover>
+            <Box
+              className={`laudo-exames-table-container${!listLoading && filteredRows.length === 0 ? ' is-empty' : ''}`}
+              style={{ overflowX: 'auto' }}
+            >
+              <Table className="laudo-exames-table" horizontalSpacing="sm" verticalSpacing="sm" highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Paciente</Table.Th>
@@ -1921,14 +1956,24 @@ export function LaudoExames() {
                     </Table.Tr>
                   )) : filteredRows.length === 0 ? (
                     <Table.Tr>
-                      <Table.Td colSpan={isTablet ? 4 : 7}>
-                        <Stack align="center" py="xl" gap={6}>
-                          <Text fw={600} size="sm">
-                            Nenhum exame encontrado
-                          </Text>
-                          <Text size="sm" c="dimmed">
-                            Ajuste a busca ou aguarde novos exames entrarem na fila de laudo.
-                          </Text>
+                      <Table.Td colSpan={isTablet ? 4 : 7} className="laudo-exames-empty-cell">
+                        <Stack className="laudo-exames-empty-state" align="center" gap="sm">
+                          <ThemeIcon className="laudo-exames-empty-icon" variant="light" color="darkBlue" size={48} radius="xl">
+                            <FileText size={22} aria-hidden="true" />
+                          </ThemeIcon>
+                          <Box className="laudo-exames-empty-copy">
+                            <Text fw={650} size="sm">
+                              {query.trim() ? 'Nenhum exame corresponde à sua busca' : 'A fila está vazia'}
+                            </Text>
+                            <Text size="sm" c="dimmed">
+                              {query.trim() ? 'Tente outro paciente, exame ou código.' : 'Novos exames aparecerão aqui quando estiverem prontos para laudo.'}
+                            </Text>
+                          </Box>
+                          {query.trim() && (
+                            <Button variant="light" color="darkBlue" size="sm" onClick={() => setQuery('')}>
+                              Limpar busca
+                            </Button>
+                          )}
                         </Stack>
                       </Table.Td>
                     </Table.Tr>
@@ -1946,7 +1991,7 @@ export function LaudoExames() {
                             {exam.patientName}
                           </Text>
                           <Text size="xs" c="dimmed">
-                            CPF: {exam.cpf || 'Não informado'}
+                            CPF: {exam.cpf ? formatCPF(exam.cpf) : 'Não informado'}
                           </Text>
                         </Stack>
                       </Table.Td>
@@ -1976,8 +2021,8 @@ export function LaudoExames() {
                       )}
 
                       {!isTablet && (
-                        <Table.Td>
-                          <Group gap={4}>
+                      <Table.Td>
+                        <Group className="laudo-exames-signatures" gap={4}>
                             <Badge variant="light" color={exam.issuerSignedAt ? 'green' : 'gray'}>
                               E
                             </Badge>
@@ -1989,21 +2034,22 @@ export function LaudoExames() {
                       )}
 
                       <Table.Td>
-                        <Badge color={statusColor[exam.status]} variant="light">
+                        <Badge className={`laudo-status-badge laudo-status-${exam.status}`} color={statusColor[exam.status]} variant="light">
                           {statusLabel[exam.status]}
                         </Badge>
                       </Table.Td>
 
                       <Table.Td>
-                        <Badge color={priorityColor[exam.priority]} variant="light">
+                        <Badge className={`laudo-priority-badge laudo-priority-${exam.priority}`} color={priorityColor[exam.priority]} variant="light">
                           {priorityLabel[exam.priority]}
                         </Badge>
                       </Table.Td>
 
                       <Table.Td>
-                        <Group gap={6}>
+                        <Group className="laudo-exames-row-actions" gap={6}>
                           <Tooltip label="Abrir Exame (DICOM)">
                             <ActionIcon
+                              aria-label={`Abrir imagens do exame de ${exam.patientName}`}
                               variant="subtle"
                               color="cyan"
                               onClick={() => {
@@ -2015,12 +2061,13 @@ export function LaudoExames() {
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Abrir Laudo">
-                            <ActionIcon variant="subtle" color="darkBlue" onClick={() => openExam(exam.id)}>
+                            <ActionIcon aria-label={`Abrir laudo de ${exam.patientName}`} variant="subtle" color="darkBlue" onClick={() => openExam(exam.id)}>
                               <FileText size={16} />
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Desfinalizar">
                             <ActionIcon
+                              aria-label={`Desfinalizar laudo de ${exam.patientName}`}
                               variant="subtle"
                               color="orange"
                               disabled={exam.status !== 'finalizado' || Boolean(exam.hasFinalizedAddendum)}
@@ -2031,6 +2078,7 @@ export function LaudoExames() {
                           </Tooltip>
                           <Tooltip label="Remover Adendo">
                             <ActionIcon
+                              aria-label={`Remover adendo de ${exam.patientName}`}
                               variant="subtle"
                               color="red"
                               disabled={!exam.hasFinalizedAddendum || removingAdendo}
@@ -2041,6 +2089,7 @@ export function LaudoExames() {
                           </Tooltip>
                           <Tooltip label="Histórico de Auditoria">
                             <ActionIcon
+                              aria-label={`Abrir histórico de auditoria de ${exam.patientName}`}
                               variant="subtle"
                               color="gray"
                               onClick={() => openAuditLog(exam.id)}
@@ -2058,39 +2107,57 @@ export function LaudoExames() {
             </Box>
         </Paper>
 
-        <Modal
-          opened={modalOpen}
-          onClose={closeModal}
-          title="Editor de laudo"
-          centered
-          size={isMobile ? '100%' : '95%'}
-          fullScreen={true}
-          styles={{
-            header: {
-              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
-              borderBottom: isDark ? `1px solid ${borderColor}` : undefined,
-            },
-            content: {
-              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
-            },
-            body: {
-              backgroundColor: isDark ? 'var(--mantine-color-body)' : undefined,
-              height: isMobile ? 'calc(100vh - 68px)' : 'calc(95vh - 68px)',
-              overflowY: isMobile ? 'auto' : 'hidden',
-              overflowX: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              paddingBottom: 12,
-            },
-          }}
-        >
+        {modalOpen && createPortal(
+        <div className="laudo-editor-page" role="dialog" aria-modal="true" aria-label="Editor de laudo">
+          <div className="laudo-editor-page-topbar">
+            <Group gap="sm" wrap="nowrap">
+              <Tooltip label="Voltar para Laudo por Exame">
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  size="lg"
+                  onClick={closeModal}
+                  aria-label="Voltar para Laudo por Exame"
+                >
+                  <ArrowLeft size={20} />
+                </ActionIcon>
+              </Tooltip>
+              <Box style={{ minWidth: 0 }}>
+                <Text className="laudo-editor-page-eyebrow" size="xs" fw={700}>
+                  Editor de laudo
+                </Text>
+                <Text size="sm" fw={600} c={isDark ? 'gray.0' : 'dark.9'} lh={1.2} lineClamp={1}>
+                  {selectedExam ? `${selectedExam.patientName} · ${selectedExam.examType}` : 'Nenhum exame selecionado'}
+                </Text>
+              </Box>
+            </Group>
+            {selectedExam && (
+              <Group className="laudo-editor-page-signatures" gap="xs" wrap="nowrap">
+                {selectedExam.priority === 'urgente' && (
+                  <Badge color="red" variant="filled" size="md" radius="sm">
+                    URGENTE
+                  </Badge>
+                )}
+                <Badge color={statusColor[selectedExam.status]} variant="light" size="md" radius="sm" fw={700}>
+                  {statusLabel[selectedExam.status].toUpperCase()}
+                </Badge>
+                <Badge variant="dot" color={selectedExam.issuerSignedAt ? 'green' : 'gray'} size="sm">
+                  Emissor: {selectedExam.issuerSignedAt ? 'Assinado' : 'Pendente'}
+                </Badge>
+                <Badge variant="dot" color={effectiveReviewerSignedAt ? 'green' : 'gray'} size="sm">
+                  Revisor: {effectiveReviewerSignedAt ? 'Assinado' : 'Pendente'}
+                </Badge>
+              </Group>
+            )}
+          </div>
+          <div className="laudo-editor-page-body">
           {!selectedExam ? (
             <Text size="sm" c="dimmed">
               Nenhum exame selecionado.
             </Text>
           ) : (
-            <Stack gap="sm" style={{ height: '100%', minHeight: 0 }}>
-              <Paper withBorder p="md" radius="md" bg={subtleBg} style={{ display: headerExpanded ? 'block' : 'none', borderColor }}>
+            <Stack className="laudo-editor-layout" gap="sm" style={{ height: '100%', minHeight: 0 }}>
+              <Paper className="laudo-editor-patient-header" withBorder p="md" radius="md" bg={subtleBg} style={{ display: headerExpanded ? 'block' : 'none', borderColor }}>
                 <Group justify="space-between" align="flex-start" wrap="nowrap">
                   <Group wrap="nowrap" gap="lg">
                     {/* <Avatar size="xl" radius="md" color="darkBlue">
@@ -2108,7 +2175,7 @@ export function LaudoExames() {
                       
                       <Group gap="sm" align="center" mb={8}>
                         <Text size="sm" c="dimmed" fw={500}>
-                          CPF: {selectedExam.cpf}
+                          CPF: {selectedExam.cpf ? formatCPF(selectedExam.cpf) : 'Não informado'}
                         </Text>
                         <Text size="sm" c="dimmed"> • </Text>
                         <Badge variant="outline" color="gray" size="sm" radius="sm">
@@ -2162,13 +2229,14 @@ export function LaudoExames() {
               </Paper>
 
               <Group
+                className="laudo-editor-main"
                 align="stretch"
                 gap="sm"
                 wrap={isMobile ? 'wrap' : 'nowrap'}
                 style={{ flex: 1, minHeight: isMobile ? 'auto' : 0 }}
               >
                 {toolsExpanded && (
-                  <Paper
+                  <Paper className="laudo-editor-tools"
                     withBorder
                     p="md"
                     bg={subtleBg}
@@ -2248,7 +2316,7 @@ export function LaudoExames() {
                               shadow={selectedPhraseId === phrase.id ? 'sm' : 'none'}
                               style={{
                                 cursor: 'pointer',
-                                borderColor: selectedPhraseId === phrase.id ? DARK_BLUE : borderColor,
+                                borderColor: selectedPhraseId === phrase.id ? 'var(--ui-primary)' : borderColor,
                                 backgroundColor: selectedPhraseId === phrase.id ? selectedRowBg : surfaceBg,
                                 transition: 'all 0.2s ease',
                               }}
@@ -2307,9 +2375,9 @@ export function LaudoExames() {
                 )}
                 */}
 
-                <Box style={{ flex: '1 1 50%', minWidth: 0, minHeight: isMobile ? 360 : 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                <Box className="laudo-editor-workspace" style={{ flex: '1 1 50%', minWidth: 0, minHeight: isMobile ? 360 : 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
                   {!isMobile && (
-                    <Group 
+                    <Group className="laudo-editor-actions"
                       gap="xs" 
                       style={{
                         position: 'absolute',
@@ -2391,7 +2459,7 @@ export function LaudoExames() {
                     ) : null}
                     <Box style={{ height: '100%', visibility: editorInitializing ? 'hidden' : 'visible' }}>
                     <Editor
-                    apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
+                    licenseKey="gpl"
                     disabled={selectedExam.status === 'finalizado'}
                     onInit={(_event, editor) => {
                       editorRef.current = editor;
@@ -2407,11 +2475,13 @@ export function LaudoExames() {
                       menubar: false,
                       resize: false,
                       plugins: ['lists', 'link', 'table', 'wordcount'],
-                      skin: isDark ? 'oxide-dark' : 'oxide',
-                      content_css: isDark ? 'dark' : 'default',
+                      promotion: false,
+                      branding: false,
+                      skin: false,
+                      content_css: false,
                       toolbar:
                         'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                      content_style: 'body { font-family: Inter, sans-serif; font-size:14px; }',
+                      content_style: `body { font-family: Inter, sans-serif; font-size:14px; color: ${isDark ? '#f4f6fb' : '#182033'}; background: ${isDark ? '#101217' : '#ffffff'}; padding: 1rem; }`,
                     }}
                   />
                     </Box>
@@ -2419,7 +2489,7 @@ export function LaudoExames() {
                 </Box>
               </Group>
 
-              <Group justify="space-between" align="center" wrap="wrap" style={{ borderTop: `1px solid ${borderColor}`, paddingTop: 16, paddingBottom: 4 }}>
+              <Group className="laudo-editor-footer" justify="space-between" align="center" wrap="wrap" style={{ borderTop: `1px solid ${borderColor}`, paddingTop: 16, paddingBottom: 4 }}>
                 <Group gap="xs">
                   <ThemeIcon variant="light" color="gray" size="sm">
                     <Save size={14} />
@@ -2430,9 +2500,6 @@ export function LaudoExames() {
                 </Group>
 
                 <Group wrap="wrap" justify="flex-end" gap="sm">
-                  <Button variant="default" onClick={openExamImages} leftSection={<Images size={16} />}>
-                    Imagens
-                  </Button>
                   <Button variant="default" onClick={closeModal}>
                     Fechar
                   </Button>
@@ -2467,7 +2534,7 @@ export function LaudoExames() {
                     {savingLaudo ? 'Salvando...' : 'Salvar laudo'}
                   </Button>
                   <Button
-                    bg={DARK_BLUE}
+                    bg={'var(--ui-primary)'}
                     c="white"
                     onClick={() => requestFinalize('laudo')}
                     leftSection={<CheckCircle size={16} />}
@@ -2482,7 +2549,10 @@ export function LaudoExames() {
               </Group>
             </Stack>
           )}
-        </Modal>
+          </div>
+        </div>,
+        document.body,
+        )}
 
         <Modal
           opened={priorStudyModalOpen}
@@ -2569,7 +2639,7 @@ export function LaudoExames() {
                 Cancelar
               </Button>
               <Button
-                bg={DARK_BLUE}
+                bg={'var(--ui-primary)'}
                 c="white"
                 leftSection={<Images size={16} />}
                 onClick={uploadTemporaryPriorStudy}
@@ -2655,7 +2725,7 @@ export function LaudoExames() {
                               shadow={selectedTemplateId === template.id ? 'sm' : 'none'}
                               style={{
                                 cursor: 'pointer',
-                                borderColor: selectedTemplateId === template.id ? DARK_BLUE : borderColor,
+                                borderColor: selectedTemplateId === template.id ? 'var(--ui-primary)' : borderColor,
                                 backgroundColor: selectedTemplateId === template.id ? selectedRowBg : surfaceBg,
                                 transition: 'all 0.15s ease',
                               }}
@@ -2707,7 +2777,7 @@ export function LaudoExames() {
             <Button variant="default" onClick={() => setTemplatePickerModalOpen(false)}>
               Fechar
             </Button>
-            <Button bg={DARK_BLUE} c="white" onClick={() => { applyTemplate(); setTemplatePickerModalOpen(false); }} leftSection={<CheckCircle size={16} />}>
+            <Button bg={'var(--ui-primary)'} c="white" onClick={() => { applyTemplate(); setTemplatePickerModalOpen(false); }} leftSection={<CheckCircle size={16} />}>
               Aplicar padrão
             </Button>
           </Group>
@@ -2742,7 +2812,7 @@ export function LaudoExames() {
                   </ThemeIcon>
                   <Box>
                     <Text fw={600} size="sm" c={isDark ? 'gray.0' : 'dark.9'}>{selectedExam.patientName}</Text>
-                    <Text size="xs" c="dimmed">CPF: {selectedExam.cpf}  •  {previousReports.length} laudo(s) anterior(es)</Text>
+                    <Text size="xs" c="dimmed">CPF: {selectedExam.cpf ? formatCPF(selectedExam.cpf) : 'Não informado'}  •  {previousReports.length} laudo(s) anterior(es)</Text>
                   </Box>
                 </Group>
               </Paper>
@@ -2783,7 +2853,7 @@ export function LaudoExames() {
                             shadow={selectedPreviousReport?.id === report.id ? 'sm' : 'none'}
                             style={{
                               cursor: 'pointer',
-                              borderColor: selectedPreviousReport?.id === report.id ? DARK_BLUE : borderColor,
+                              borderColor: selectedPreviousReport?.id === report.id ? 'var(--ui-primary)' : borderColor,
                               backgroundColor: selectedPreviousReport?.id === report.id ? selectedRowBg : surfaceBg,
                               transition: 'all 0.15s ease',
                             }}
@@ -2880,7 +2950,7 @@ export function LaudoExames() {
               <Button variant="default" onClick={() => setPdfPreviewModalOpen(false)}>
                 Fechar
               </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={printPreview} disabled={!pdfPreviewUrl}>
+              <Button bg={'var(--ui-primary)'} c="white" onClick={printPreview} disabled={!pdfPreviewUrl}>
                 Imprimir / Salvar PDF
               </Button>
             </Group>
@@ -2930,7 +3000,7 @@ export function LaudoExames() {
               }} disabled={signLoading}>
                 Cancelar
               </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={confirmSignature} loading={signLoading} leftSection={<ShieldCheck size={16} />}>
+              <Button bg={'var(--ui-primary)'} c="white" onClick={confirmSignature} loading={signLoading} leftSection={<ShieldCheck size={16} />}>
                 Confirmar assinatura
               </Button>
             </Group>
@@ -2977,7 +3047,7 @@ export function LaudoExames() {
             <Box>
               <Text size="sm" fw={500} mb={6}>Texto do adendo</Text>
               <Editor
-                apiKey={import.meta.env.VITE_TINYMCE_API_KEY}
+                licenseKey="gpl"
                 value={addendumText}
                 onEditorChange={(value) => setAddendumText(value)}
                 disabled={addendumLoading || addendumSaving || addendumFinalizing}
@@ -2985,10 +3055,12 @@ export function LaudoExames() {
                   height: 260,
                   menubar: false,
                   plugins: ['lists', 'link', 'table', 'wordcount'],
-                  skin: isDark ? 'oxide-dark' : 'oxide',
-                  content_css: isDark ? 'dark' : 'default',
+                  promotion: false,
+                  branding: false,
+                  skin: false,
+                  content_css: false,
                   toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignright | table | removeformat',
-                  content_style: 'body { font-family: Arial, sans-serif; font-size:14px; }',
+                  content_style: `body { font-family: Inter, sans-serif; font-size:14px; color: ${isDark ? '#f4f6fb' : '#182033'}; background: ${isDark ? '#101217' : '#ffffff'}; padding: 1rem; }`,
                 }}
               />
             </Box>
@@ -3009,7 +3081,7 @@ export function LaudoExames() {
               <Button variant="light" color="darkBlue" onClick={saveAddendum} loading={addendumSaving} disabled={addendumLoading || addendumFinalizing || addendumSaving || !isAddendumDirty}>
                 Salvar adendo
               </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={() => requestFinalize('adendo')} loading={addendumFinalizing} disabled={!addendumIssuerSignedAt || addendumLoading || addendumSaving}>
+              <Button bg={'var(--ui-primary)'} c="white" onClick={() => requestFinalize('adendo')} loading={addendumFinalizing} disabled={!addendumIssuerSignedAt || addendumLoading || addendumSaving}>
                 Finalizar adendo
               </Button>
             </Group>
@@ -3053,7 +3125,7 @@ export function LaudoExames() {
               }} disabled={finalizeLoading}>
                 Cancelar
               </Button>
-              <Button bg={DARK_BLUE} c="white" onClick={confirmFinalizeWithPassword} loading={finalizeLoading} leftSection={<ShieldCheck size={16} />}>
+              <Button bg={'var(--ui-primary)'} c="white" onClick={confirmFinalizeWithPassword} loading={finalizeLoading} leftSection={<ShieldCheck size={16} />}>
                 Confirmar finalização
               </Button>
             </Group>
@@ -3081,7 +3153,7 @@ export function LaudoExames() {
                 Não
               </Button>
               <Button
-                bg={DARK_BLUE}
+                bg={'var(--ui-primary)'}
                 c="white"
                 leftSection={<SpellCheck size={16} />}
                 onClick={handleSpellCheck}

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Text, Stack, Group, Anchor, Image, ActionIcon } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
+import { Box, Button, Text, Stack, Group, Anchor, Image, ActionIcon } from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { Eye, EyeOff } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import authService from '../../services/authService';
 import { isValidEmail, normalizeEmail } from '../../utils/formatters';
@@ -81,7 +80,7 @@ export function Login() {
         <Box
           className="login-left-panel"
           style={{
-            backgroundColor: DARK_BLUE,
+            backgroundColor: '#0A2568',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -119,7 +118,7 @@ export function Login() {
             <Stack gap="lg">
               <Stack align="center" gap={8} mb="md">
                 <Image src="/logo.png" alt="Saudy" fit="contain" style={{ width: 64, height: 64 }} />
-                <Text ta="center" fw={700} c={DARK_BLUE} lh={1} style={{ fontSize: isMobile ? '2.25rem' : '2.75rem' }}>
+                <Text ta="center" fw={700} c={'#0A2568'} lh={1} style={{ fontSize: isMobile ? '2.25rem' : '2.75rem' }}>
                   Saudy
                 </Text>
               </Stack>
@@ -184,7 +183,7 @@ export function Login() {
               <Button
                 fullWidth
                 size="lg"
-                bg={DARK_BLUE}
+                bg={'#0A2568'}
                 onClick={handleLogin}
                 loading={loading}
                 mt="sm"

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ActionIcon, Box, Button, Group, Loader, Stack, Text } from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
+import { ActionIcon, Box, Button, Group, Loader, Stack, Text } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { ArrowLeft } from 'lucide-react';
 import patientPortalService from '../../services/patientPortalService';
 import { DicomViewer } from '../DicomViewer/DicomViewer';

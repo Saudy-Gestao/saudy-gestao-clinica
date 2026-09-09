@@ -1,4 +1,4 @@
-import { Box, NumberInput, Text, type BoxProps, type NumberInputProps } from '@mantine/core';
+import { Box, NumberInput, Text, type BoxProps, type NumberInputProps } from '@/components/ui';
 import type { ReactNode } from 'react';
 
 interface FloatingNumberInputProps extends Omit<NumberInputProps, 'value'> {
@@ -26,7 +26,7 @@ export function FloatingNumberInput({ label, containerProps, value, error, descr
           placeholder=""
           variant="unstyled"
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
+        <span className="floating-field-label" style={{ color: error ? '#fa5252' : undefined }}>{label}</span>
       </Box>
       {description ? (
         <Text size="xs" c="dimmed" mt={4}>

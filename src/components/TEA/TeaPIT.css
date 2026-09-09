@@ -1,0 +1,96 @@
+.tea-pit-content {
+  min-height: calc(100vh - 5rem);
+}
+
+.tea-pit-hero {
+  min-height: 6.5rem;
+  padding: 1.25rem 0 1.75rem;
+}
+
+.tea-pit-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.tea-pit-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: clamp(1.75rem, 3vw, 2.7rem) !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+.tea-pit-subtitle {
+  margin-top: .55rem;
+  color: var(--ui-muted);
+  font-size: .98rem;
+}
+
+.tea-pit-panel {
+  border-color: var(--ui-border) !important;
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .75rem 2rem rgb(0 0 0 / .1);
+}
+
+.tea-pit-panel-title {
+  margin: 0 0 1rem;
+  color: var(--ui-foreground);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.tea-pit-section-header {
+  padding-top: .25rem;
+}
+
+.tea-pit-section-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.tea-pit-section-hint {
+  margin-top: .2rem;
+  color: var(--ui-muted);
+  font-size: .85rem;
+}
+
+.tea-pit-therapy-card {
+  border: 1px solid var(--ui-border);
+  border-radius: .9rem;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--ui-background) 60%, var(--ui-surface));
+}
+
+.tea-pit-therapy-kicker {
+  margin: 0 0 .65rem;
+  color: var(--ui-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.tea-pit-therapy-footer-hint {
+  color: var(--ui-muted);
+  font-size: .78rem;
+}
+
+.tea-pit-therapy-scheduled {
+  color: var(--ui-primary);
+  font-size: .78rem;
+  margin-top: .25rem;
+}
+
+@media (max-width: 799px) {
+  .tea-pit-hero {
+    min-height: 0;
+    padding-block: .5rem 1.25rem;
+  }
+}

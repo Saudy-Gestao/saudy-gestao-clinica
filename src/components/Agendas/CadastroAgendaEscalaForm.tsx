@@ -3,18 +3,19 @@ import {
   Badge,
   Box,
   Button,
+  DateInput,
   Divider,
   Group,
+  MultiSelect,
+  NumberInput,
   Paper,
+  Select,
   Stack,
   Text,
-} from '@mantine/core';
+  TextInput,
+} from '@/components/ui';
 import { Plus, Trash2, X } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
-import { FloatingSelect } from '../common/FloatingSelect';
+import { showNotification } from '@/components/ui';
 import agendaService from '../../services/agendaService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { isRoomSector } from '../../utils/sectorClassification';
@@ -82,6 +83,21 @@ const makeSlot = (especialidadeIds: string[] = []): ScaleSlot => ({
 });
 
 const dayLabel = (value: string) => DAYS.find((day) => day.value === value)?.label || value;
+
+const parseISODate = (value: string): Date | null => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const formatISODate = (date: Date | null): string => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 interface CadastroAgendaEscalaFormProps {
   branchOptions: Option[];
@@ -285,7 +301,7 @@ export function CadastroAgendaEscalaForm({
   const renderSlotFields = (slot: ScaleSlot, onChange: (key: keyof ScaleSlot, value: string | string[]) => void, onRemove?: () => void) => (
     <Box className="cadastro-agenda-slot" key={slot.key}>
       <Group className="cadastro-agenda-slot-heading" justify="space-between" align="center" mb="sm">
-        <Text fw={700} size="sm">Horário {slot.key ? '' : ''}</Text>
+        <Text fw={700} size="sm">Horário</Text>
         {onRemove ? (
           <Button variant="subtle" color="red" size="compact-sm" leftSection={<Trash2 size={14} />} onClick={onRemove}>
             Remover horário
@@ -293,12 +309,12 @@ export function CadastroAgendaEscalaForm({
         ) : null}
       </Group>
       <Box className="cadastro-agenda-slot-grid">
-        <FloatingInput label="Início" type="time" value={slot.shiftStart} onChange={(event) => onChange('shiftStart', event.currentTarget.value)} />
-        <FloatingInput label="Fim" type="time" value={slot.shiftEnd} onChange={(event) => onChange('shiftEnd', event.currentTarget.value)} />
-        <FloatingInput label="Data inicial" type="date" value={slot.startDate} onChange={(event) => onChange('startDate', event.currentTarget.value)} />
-        <FloatingInput label="Data final" type="date" value={slot.endDate} onChange={(event) => onChange('endDate', event.currentTarget.value)} />
-        <FloatingSelect label="Status" data={STATUS_OPTIONS} value={slot.status} onChange={(value) => onChange('status', value || 'ATIVA')} />
-        <FloatingMultiSelect
+        <TextInput label="Início" type="time" value={slot.shiftStart} onChange={(event) => onChange('shiftStart', event.currentTarget.value)} />
+        <TextInput label="Fim" type="time" value={slot.shiftEnd} onChange={(event) => onChange('shiftEnd', event.currentTarget.value)} />
+        <DateInput label="Data inicial" value={parseISODate(slot.startDate)} onChange={(date) => onChange('startDate', formatISODate(date))} />
+        <DateInput label="Data final" value={parseISODate(slot.endDate)} onChange={(date) => onChange('endDate', formatISODate(date))} />
+        <Select label="Status" data={STATUS_OPTIONS} value={slot.status} onChange={(value) => onChange('status', value || 'ATIVA')} />
+        <MultiSelect
           label="Especialidade"
           data={specialtyOptions}
           value={slot.especialidadeIds}
@@ -307,8 +323,8 @@ export function CadastroAgendaEscalaForm({
           searchable
           clearable
         />
-        <FloatingSelect label="Sala" data={roomOptions} value={slot.roomId || null} onChange={(value) => onChange('roomId', value || '')} placeholder="Sem sala" searchable clearable />
-        <FloatingSelect label="Tempo" data={DURATION_OPTIONS} value={slot.durationMinutes} onChange={(value) => onChange('durationMinutes', value || '30')} searchable />
+        <Select label="Sala" data={roomOptions} value={slot.roomId || null} onChange={(value) => onChange('roomId', value || '')} placeholder="Sem sala" searchable clearable />
+        <Select label="Tempo" data={DURATION_OPTIONS} value={slot.durationMinutes} onChange={(value) => onChange('durationMinutes', value || '30')} searchable />
       </Box>
     </Box>
   );
@@ -330,7 +346,7 @@ export function CadastroAgendaEscalaForm({
           <Text size="sm" c="dimmed">Selecione a unidade, o profissional e uma ou mais especialidades.</Text>
         </Box>
         <Box className="cadastro-agenda-filter-grid">
-          <FloatingSelect
+          <Select
             label="Unidade"
             required
             data={branchOptions}
@@ -339,7 +355,7 @@ export function CadastroAgendaEscalaForm({
             placeholder="Selecione"
             searchable
           />
-          <FloatingMultiSelect
+          <MultiSelect
             label="Especialidade"
             data={specialtyOptions}
             value={especialidadeIds}
@@ -349,7 +365,7 @@ export function CadastroAgendaEscalaForm({
             clearable
             disabled={!doctorId}
           />
-          <FloatingSelect
+          <Select
             label="Profissional"
             required
             data={doctorOptions}
@@ -361,7 +377,7 @@ export function CadastroAgendaEscalaForm({
           />
         </Box>
         <Box mt="lg">
-          <FloatingMultiSelect
+          <MultiSelect
             label="Estagiários (opcional)"
             data={internOptions}
             value={internIds}
@@ -380,8 +396,8 @@ export function CadastroAgendaEscalaForm({
           <Text size="sm" c="dimmed">Frequência com que essa escala se repete.</Text>
         </Box>
         <Group className="cadastro-agenda-recurrence-row" align="flex-end" wrap="wrap">
-          <FloatingInput label="Repetir a cada" type="number" min={1} value={repeatEvery} onChange={(event) => setRepeatEvery(event.currentTarget.value)} />
-          <FloatingSelect label="Unidade" data={RECURRENCE_OPTIONS} value={repeatUnit} onChange={(value) => setRepeatUnit(value || 'semana')} />
+          <NumberInput label="Repetir a cada" min={1} value={repeatEvery === '' ? '' : Number(repeatEvery)} onChange={(value) => setRepeatEvery(value === '' ? '' : String(value))} />
+          <Select label="Unidade" data={RECURRENCE_OPTIONS} value={repeatUnit} onChange={(value) => setRepeatUnit(value || 'semana')} />
         </Group>
       </Box>
 
@@ -404,7 +420,7 @@ export function CadastroAgendaEscalaForm({
                 <Box>
                   <Text fw={700}>Bloco {index + 1}</Text>
                   <Group gap={6} mt={6}>
-                    {block.days.map((day) => <Badge key={day} variant="light" color="darkBlue">{dayLabel(day)}</Badge>)}
+                    {block.days.map((day) => <Badge key={day} variant="light" color="blue">{dayLabel(day)}</Badge>)}
                   </Group>
                 </Box>
                 <Group gap="xs">
@@ -432,7 +448,6 @@ export function CadastroAgendaEscalaForm({
                     key={day.value}
                     className={selected ? 'is-selected' : undefined}
                     variant={selected ? 'filled' : 'default'}
-                    color={selected ? 'darkBlue' : 'gray'}
                     size="sm"
                     disabled={disabled}
                     onClick={() => toggleDraftDay(day.value)}
@@ -450,7 +465,7 @@ export function CadastroAgendaEscalaForm({
               <Button variant="default" size="sm" leftSection={<Plus size={15} />} onClick={addSlot}>Adicionar horário</Button>
               <Group gap="xs">
                 <Button variant="subtle" size="sm" onClick={() => setDraft(null)}>Cancelar bloco</Button>
-                <Button bg={DARK_BLUE} size="sm" onClick={saveDraftBlock}>Salvar bloco</Button>
+                <Button size="sm" onClick={saveDraftBlock}>Salvar bloco</Button>
               </Group>
             </Group>
           </Paper>
@@ -492,7 +507,7 @@ export function CadastroAgendaEscalaForm({
 
       <Group className="cadastro-agenda-form-actions" justify="space-between" mt="lg" wrap="wrap">
         <Button variant="default" onClick={onCancel} disabled={saving}>Cancelar</Button>
-        <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>Salvar escala</Button>
+        <Button onClick={handleSave} loading={saving} disabled={saving}>Salvar escala</Button>
       </Group>
     </Box>
   );

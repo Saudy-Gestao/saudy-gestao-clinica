@@ -1,0 +1,8 @@
+.cadastro-procedimento-form-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-procedimento-form-section-title {
+  color: var(--ui-foreground) !important;
+}

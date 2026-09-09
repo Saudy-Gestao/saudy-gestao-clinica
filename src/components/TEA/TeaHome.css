@@ -1,0 +1,134 @@
+.tea-home-page {
+  background:
+    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--ui-primary) 10%, transparent), transparent 24rem),
+    var(--ui-background);
+}
+
+.tea-home-content {
+  min-height: calc(100vh - 5rem);
+  padding-block: clamp(1.5rem, 4vw, 3.5rem) !important;
+  padding-inline: clamp(1rem, 3vw, 2rem) !important;
+}
+
+.tea-home-hero {
+  min-height: 6.5rem;
+  padding: 1.25rem 0 1.75rem;
+}
+
+.tea-home-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.tea-home-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: clamp(1.75rem, 3vw, 2.7rem) !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+.tea-home-subtitle {
+  margin-top: .55rem;
+  color: var(--ui-muted);
+  font-size: .98rem;
+}
+
+.tea-home-stats {
+  gap: 1rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.tea-home-stat-card {
+  padding: 1.1rem !important;
+  border-color: var(--ui-border) !important;
+  border-radius: 1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .5rem 1.5rem rgb(0 0 0 / .08);
+}
+
+.tea-home-stat-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--stat-hue, var(--ui-primary)) 16%, transparent);
+  color: var(--stat-hue, var(--ui-primary));
+}
+
+.tea-home-stat-value {
+  color: var(--ui-foreground);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tea-home-section {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+
+.tea-home-section-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: .8rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.tea-home-section-grid {
+  gap: 1rem !important;
+}
+
+.tea-home-module-card {
+  position: relative;
+  padding: 1.15rem !important;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.tea-home-module-card:hover,
+.tea-home-module-card:focus-within {
+  border-color: var(--ui-primary);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / .14);
+  transform: translateY(-2px);
+}
+
+.tea-home-module-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 42%, var(--ui-border));
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--ui-primary) 12%, var(--ui-background));
+  color: var(--ui-primary);
+}
+
+@media (max-width: 799px) {
+  .tea-home-content {
+    padding-top: 1rem !important;
+  }
+
+  .tea-home-hero {
+    min-height: 0;
+    padding-block: .5rem 1.25rem;
+  }
+}

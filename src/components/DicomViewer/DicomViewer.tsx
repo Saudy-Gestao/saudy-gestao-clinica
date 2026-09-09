@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActionIcon, Box, Button, Group, Loader, Paper, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Box, Button, Group, Loader, Paper, Text, Tooltip } from '@/components/ui';
 import styles from './DicomViewer.module.css';
 import {
   ZoomIn,

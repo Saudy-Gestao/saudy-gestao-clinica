@@ -1,0 +1,93 @@
+.cadastro-estagiario-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.cadastro-estagiario-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cadastro-estagiario-title {
+  margin: 0;
+  color: var(--ui-foreground);
+}
+
+.cadastro-estagiario-subtitle {
+  margin-top: .35rem;
+  color: var(--ui-muted);
+}
+
+.cadastro-estagiario-panel {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-estagiario-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.cadastro-estagiario-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+@media (max-width: 640px) {
+  .cadastro-estagiario-actions,
+  .cadastro-estagiario-actions .cadastro-estagiario-search,
+  .cadastro-estagiario-actions .ui-button {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+}
+
+.cadastro-estagiario-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+}
+
+.cadastro-estagiario-th {
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cadastro-estagiario-row {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.cadastro-estagiario-card {
+  border-color: var(--ui-border) !important;
+  background: var(--ui-surface);
+}
+
+.cadastro-estagiario-empty {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}
+
+.cadastro-estagiario-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 42%, var(--ui-border));
+  border-radius: .65rem;
+  background: color-mix(in srgb, var(--ui-primary) 12%, var(--ui-background));
+  color: var(--ui-primary);
+}
+
+.cadastro-estagiario-shift-card {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+}

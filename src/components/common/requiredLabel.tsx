@@ -11,7 +11,7 @@ export const withRequiredIndicator = (label: ReactNode, required?: boolean) => {
   return (
     <>
       {label}
-      <span style={{ color: 'var(--mantine-color-red-6)', marginLeft: 4 }}>*</span>
+      <span style={{ color: 'var(--ui-hue-red)', marginLeft: 4 }}>*</span>
     </>
   );
 };

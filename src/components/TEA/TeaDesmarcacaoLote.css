@@ -1,0 +1,86 @@
+.tea-desmarcacao-page {
+  min-height: 100vh;
+  background: var(--ui-background);
+}
+
+.tea-desmarcacao-shell {
+  width: min(1100px, 100%);
+  margin-inline: auto;
+}
+
+.tea-desmarcacao-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.tea-desmarcacao-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.tea-desmarcacao-title {
+  color: var(--ui-foreground);
+}
+
+.tea-desmarcacao-subtitle {
+  margin-top: .25rem;
+  color: var(--ui-muted);
+}
+
+.tea-desmarcacao-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .75rem 2rem rgb(0 0 0 / .08);
+}
+
+.tea-desmarcacao-panel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: .6rem;
+  background: color-mix(in srgb, var(--ui-hue-red) 14%, var(--ui-surface));
+  color: var(--ui-hue-red);
+}
+
+.tea-desmarcacao-panel-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: 1.05rem;
+}
+
+.tea-desmarcacao-empty {
+  padding: 1rem 0;
+}
+
+.tea-desmarcacao-card {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-radius: .8rem;
+}
+
+.tea-desmarcacao-sessions-title {
+  color: var(--ui-muted);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.tea-desmarcacao-slot-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: .25rem .3rem .25rem .65rem;
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 30%, var(--ui-border));
+  color: var(--ui-foreground);
+}
+
+.tea-desmarcacao-modal-card {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-radius: .7rem;
+}

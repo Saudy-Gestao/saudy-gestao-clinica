@@ -13,7 +13,7 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
-// ResizeObserver polyfill for Mantine components
+// ResizeObserver polyfill for componentes que medem o layout
 global.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}

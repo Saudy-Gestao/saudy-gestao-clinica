@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ActionIcon, Anchor, Badge, Box, Button, Group, MantineProvider, Paper, PinInput, Stack, Text, Title, UnstyledButton } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+import { ActionIcon, Anchor, Badge, Box, Button, DateInput, Group, ThemeProvider, Paper, PinInput, Stack, Text, Title, UnstyledButton } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import { Building2, CheckCircle2, LockKeyhole, MailCheck, Moon, ShieldCheck, Sun } from 'lucide-react';
 import patientPortalAuthService, { type CompanyOption } from '../../services/patientPortalAuthService';
 import { LGPDConsentBanner } from '../common/LGPDConsentBanner';
@@ -24,6 +24,21 @@ export function PatientPortalLogin() {
   const [loading, setLoading] = useState(false);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
+
+  const parseIsoDate = (value: string): Date | null => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+
+  const formatIsoDate = (date: Date | null): string => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
     if (retryAfterSeconds <= 0) return;
@@ -119,7 +134,7 @@ export function PatientPortalLogin() {
   };
 
   return (
-    <MantineProvider theme={theme} forceColorScheme={portalColorScheme}>
+    <ThemeProvider theme={theme} forceColorScheme={portalColorScheme}>
       <LGPDConsentBanner />
       <Box className="patient-portal-login-page">
         <a href="#patient-portal-login-card" className="patient-portal-skip-link">Ir para formulário de acesso</a>
@@ -186,13 +201,11 @@ export function PatientPortalLogin() {
                     />
                   </Box>
 
-                  <Box className="patient-portal-input-wrap">
-                    <label htmlFor="patient-birth-date">Data de nascimento</label>
-                    <input
-                      id="patient-birth-date"
-                      type="date"
-                      value={birthDate}
-                      onChange={(event) => setBirthDate(event.currentTarget.value)}
+                  <Box className="patient-portal-input-wrap patient-portal-date-wrap">
+                    <DateInput
+                      label="Data de nascimento"
+                      value={parseIsoDate(birthDate)}
+                      onChange={(date) => setBirthDate(formatIsoDate(date ?? null))}
                     />
                   </Box>
 
@@ -212,16 +225,16 @@ export function PatientPortalLogin() {
                         key={company.patientId}
                         onClick={() => handleSelectCompany(company.patientId)}
                         disabled={loading}
-                        style={(t) => ({
+                        style={{
                           padding: '12px 16px',
-                          borderRadius: t.radius.md,
-                          border: `1px solid ${t.colors.blue[4]}`,
+                          borderRadius: '0.75rem',
+                          border: '1px solid var(--ui-primary)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 10,
                           opacity: loading ? 0.6 : 1,
                           transition: 'background 0.15s',
-                        })}
+                        }}
                       >
                         <Building2 size={18} />
                         <Text size="sm" fw={500}>{company.branchName}</Text>
@@ -279,6 +292,6 @@ export function PatientPortalLogin() {
           </Paper>
         </Box>
       </Box>
-    </MantineProvider>
+    </ThemeProvider>
   );
 }

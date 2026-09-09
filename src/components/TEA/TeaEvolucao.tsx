@@ -10,22 +10,23 @@ import {
   Stack,
   Badge,
   ThemeIcon,
-  useMantineColorScheme,
   TagsInput,
+  Select,
+  DateInput,
+  Textarea,
+  NumberInput,
   Divider,
-  ActionIcon,
   Alert,
   Skeleton,
   SimpleGrid,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Activity, Pencil, WandSparkles } from 'lucide-react';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { Activity, Pencil, WandSparkles } from 'lucide-react';
 import dayjs from 'dayjs';
-import { showNotification } from '@mantine/notifications';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
 import teaProfileService from '../../services/teaProfileService';
 import teaEvolutionTemplateService from '../../services/teaEvolutionTemplateService';
-import { DARK_BLUE } from '../../themes/theme';
 import { formatCPF, parseApiDateToLocalDate } from '../../utils/formatters';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
@@ -35,10 +36,7 @@ import { useTeaEvolutionsQuery } from '../../hooks/useTeaEvolutionsQuery';
 import { usePatientAppointmentsQuery } from '../../hooks/usePatientAppointmentsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingDateInput } from '../common/FloatingDateInput';
-import { FloatingTextarea } from '../common/FloatingTextarea';
-import { FloatingNumberInput } from '../common/FloatingNumberInput';
+import './TeaEvolucao.css';
 
 interface EvolutionForm {
   sessionDate: Date | null;
@@ -149,10 +147,6 @@ export function TeaEvolucao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
-  const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
-  const heroBg = colorScheme === 'dark' ? 'var(--mantine-color-body)' : 'var(--mantine-color-gray-0)';
-  const cardBg = colorScheme === 'dark' ? 'var(--mantine-color-default)' : 'var(--mantine-color-white)';
 
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
 
@@ -250,7 +244,7 @@ export function TeaEvolucao() {
   useEffect(() => {
     if (!teaProfilesError) return;
     const err: any = teaProfilesError;
-    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'), color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes de Terapias'), color: 'red' });
   }, [teaProfilesError]);
 
   useEffect(() => {
@@ -292,7 +286,7 @@ export function TeaEvolucao() {
 
   const handleSave = async () => {
     if (!selectedTeaProfileId) {
-      showNotification({ title: 'Atenção', message: 'Selecione um paciente TEA', color: 'yellow' });
+      showNotification({ title: 'Atenção', message: 'Selecione um paciente de Terapias', color: 'yellow' });
       return;
     }
     if (!form.sessionGoal.trim()) {
@@ -436,52 +430,48 @@ export function TeaEvolucao() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="tea-evolucao-page">
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
-      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
-        <Group mb={18} gap="md" align="flex-start">
-          <ActionIcon
-            variant="default"
-            size={isMobile ? 44 : 52}
-            radius="md"
-            onClick={() => navigate('/tea')}
-            aria-label="Voltar"
-          >
-            <ChevronLeft size={22} />
-          </ActionIcon>
-          <Box>
-            <Text fw={800} size="lg" style={{ color: titleColor }}>Evolução</Text>
-            <Text size="sm" c="dimmed">Registro por sessão do paciente TEA</Text>
-          </Box>
-        </Group>
+      <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-evolucao-shell">
+        <Box className="tea-evolucao-hero">
+          <Text className="tea-evolucao-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
+          <Text className="tea-evolucao-title" fw={700} size="2xl">Evolução</Text>
+          <Text className="tea-evolucao-subtitle" size="sm">Registro por sessão do paciente de Terapias</Text>
+        </Box>
 
-        <Paper p="md" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: heroBg }}>
-          <Group gap="sm" mb="sm">
-            <ThemeIcon size="lg" variant="light" color="teal"><Activity size={16} /></ThemeIcon>
-            <Text fw={700}>Acompanhamento clínico</Text>
-          </Group>
-          <Stack gap="md">
-            <FloatingSelect
-              label="Paciente TEA"
-              placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
-              data={teaProfileOptions}
-              value={selectedTeaProfileId}
-              onChange={setSelectedTeaProfileId}
-              searchable
-              clearable={false}
-            />
+        <Paper p={isMobile ? 'sm' : 'md'} className="tea-evolucao-panel">
+          <Stack gap="lg">
+            <Group gap="sm">
+              <ThemeIcon size="lg" variant="light" color="teal"><Activity size={16} /></ThemeIcon>
+              <Text fw={700} className="tea-evolucao-panel-title">Acompanhamento clínico</Text>
+            </Group>
 
-            {selectedProfile && (
-              <Badge variant="light" color="indigo" size="lg">
-                {selectedProfile.patient?.name || 'Paciente'}
-              </Badge>
-            )}
-            {editingEvolutionId && (
-              <Badge variant="light" color="orange" size="lg">
-                Modo retificação ativo
-              </Badge>
-            )}
+            <Stack gap="sm">
+              <Select
+                label="Paciente de Terapias"
+                placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um paciente'}
+                data={teaProfileOptions}
+                value={selectedTeaProfileId}
+                onChange={setSelectedTeaProfileId}
+                searchable
+              />
+
+              {(selectedProfile || editingEvolutionId) && (
+                <Group gap="xs">
+                  {selectedProfile && (
+                    <Badge variant="light" color="indigo" size="lg">
+                      {selectedProfile.patient?.name || 'Paciente'}
+                    </Badge>
+                  )}
+                  {editingEvolutionId && (
+                    <Badge variant="light" color="orange" size="lg">
+                      Modo retificação ativo
+                    </Badge>
+                  )}
+                </Group>
+              )}
+            </Stack>
 
             {showFormSkeleton ? (
               <Stack gap="md">
@@ -506,305 +496,347 @@ export function TeaEvolucao() {
               </Stack>
             ) : (
               <>
-                <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" verticalSpacing="md">
-                  <FloatingDateInput
-                    label="Data da sessão"
-                    value={form.sessionDate}
-                    onChange={(value) => setForm((prev) => ({ ...prev, sessionDate: value || null }))}
-                    valueFormat="DD/MM/YYYY"
-                    locale="pt-br"
-                  />
-                  <FloatingSelect
-                    label="Plano terapêutico (opcional)"
-                    data={planOptions}
-                    value={form.therapeuticPlanId}
-                    onChange={(value) => {
-                      const planId = value || '';
-                      const selectedPlan = planOptions.find((item) => item.value === planId);
-                      setForm((prev) => ({ ...prev, therapeuticPlanId: planId }));
-                      if (selectedPlan?.label) {
-                        void applyTemplate({ procedureName: selectedPlan.label, sourceLabel: 'plano terapêutico' });
-                      }
-                    }}
-                    searchable
-                    clearable
-                  />
-                  <FloatingSelect
-                    label="Sessão/agendamento vinculado (opcional)"
-                    data={appointmentOptions}
-                    value={form.appointmentId || null}
-                    onChange={(value) => {
-                      const appointmentId = value || '';
-                      const selectedAppointment = appointmentOptions.find((item) => item.value === appointmentId);
-                      const procedureName = selectedAppointment?.label?.split('•')[1]?.trim() || '';
-                      setForm((prev) => ({ ...prev, appointmentId }));
-                      if (procedureName) {
-                        void applyTemplate({ procedureName, sourceLabel: 'sessão vinculada' });
-                      }
-                    }}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhum agendamento encontrado"
-                  />
-                  <FloatingSelect
-                    label="Profissional"
-                    data={doctorOptions}
-                    value={form.professionalDoctorId}
-                    onChange={(value) => {
-                      const doctorId = value || '';
-                      const selectedDoctor = doctorOptions.find((item) => item.value === doctorId);
-                      setForm((prev) => ({
-                        ...prev,
-                        professionalDoctorId: doctorId,
-                        professional: selectedDoctor?.label || '',
-                      }));
-                    }}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Nenhum médico encontrado"
-                  />
-                </SimpleGrid>
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
-                  <FloatingSelect
-                    label="Procedimento da sessão (template)"
-                    data={pitProcedureOptions}
-                    value={form.procedureContextId || null}
-                    onChange={(value) => {
-                      const procedure = value || '';
-                      const selectedProcedure = pitProcedureOptions.find((item) => item.value === procedure);
-                      const procedureName = selectedProcedure?.label || '';
-                      const procedureId = procedure.startsWith('name:') ? '' : procedure;
-                      setForm((prev) => ({
-                        ...prev,
-                        procedureContextId: procedure,
-                        procedureContextLabel: procedureName,
-                      }));
-                      if (procedure) {
-                        void applyTemplate({ procedureName, procedureId, sourceLabel: 'procedimento selecionado' });
-                      }
-                    }}
-                    searchable
-                    clearable
-                    nothingFoundMessage="Sem procedimentos ativos no PIT"
-                  />
-                  <Group align="flex-end" justify={isMobile ? 'stretch' : 'flex-end'}>
-                    <Button
-                      variant="light"
-                      leftSection={<WandSparkles size={16} />}
-                      onClick={() => void applyTemplate({
-                        procedureName: form.procedureContextLabel || undefined,
-                        procedureId: form.procedureContextId.startsWith('name:') ? undefined : form.procedureContextId,
-                      })}
-                      disabled={!form.procedureContextId}
-                      fullWidth={isMobile}
-                    >
-                      Aplicar template
-                    </Button>
-                  </Group>
-                </SimpleGrid>
+                <Box className="tea-evolucao-section">
+                  <Text className="tea-evolucao-section-title">Dados da sessão</Text>
+                  <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md" verticalSpacing="md">
+                    <DateInput
+                      label="Data da sessão"
+                      value={form.sessionDate}
+                      onChange={(value) => setForm((prev) => ({ ...prev, sessionDate: value || null }))}
+                    />
+                    <Select
+                      label="Plano terapêutico (opcional)"
+                      placeholder="Selecione um plano"
+                      data={planOptions}
+                      value={form.therapeuticPlanId}
+                      onChange={(value) => {
+                        const planId = value || '';
+                        const selectedPlan = planOptions.find((item) => item.value === planId);
+                        setForm((prev) => ({ ...prev, therapeuticPlanId: planId }));
+                        if (selectedPlan?.label) {
+                          void applyTemplate({ procedureName: selectedPlan.label, sourceLabel: 'plano terapêutico' });
+                        }
+                      }}
+                      searchable
+                      clearable
+                    />
+                    <Select
+                      label="Sessão/agendamento vinculado (opcional)"
+                      placeholder="Selecione um agendamento"
+                      data={appointmentOptions}
+                      value={form.appointmentId || null}
+                      onChange={(value) => {
+                        const appointmentId = value || '';
+                        const selectedAppointment = appointmentOptions.find((item) => item.value === appointmentId);
+                        const procedureName = selectedAppointment?.label?.split('•')[1]?.trim() || '';
+                        setForm((prev) => ({ ...prev, appointmentId }));
+                        if (procedureName) {
+                          void applyTemplate({ procedureName, sourceLabel: 'sessão vinculada' });
+                        }
+                      }}
+                      searchable
+                      clearable
+                      nothingFoundMessage="Nenhum agendamento encontrado"
+                    />
+                    <Select
+                      label="Profissional"
+                      placeholder="Selecione um profissional"
+                      data={doctorOptions}
+                      value={form.professionalDoctorId}
+                      onChange={(value) => {
+                        const doctorId = value || '';
+                        const selectedDoctor = doctorOptions.find((item) => item.value === doctorId);
+                        setForm((prev) => ({
+                          ...prev,
+                          professionalDoctorId: doctorId,
+                          professional: selectedDoctor?.label || '',
+                        }));
+                      }}
+                      searchable
+                      clearable
+                      nothingFoundMessage="Nenhum médico encontrado"
+                    />
+                  </SimpleGrid>
+                </Box>
+
+                <Box className="tea-evolucao-section">
+                  <Text className="tea-evolucao-section-title">Procedimento e template</Text>
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
+                    <Select
+                      label="Procedimento da sessão (template)"
+                      placeholder="Selecione um procedimento"
+                      data={pitProcedureOptions}
+                      value={form.procedureContextId || null}
+                      onChange={(value) => {
+                        const procedure = value || '';
+                        const selectedProcedure = pitProcedureOptions.find((item) => item.value === procedure);
+                        const procedureName = selectedProcedure?.label || '';
+                        const procedureId = procedure.startsWith('name:') ? '' : procedure;
+                        setForm((prev) => ({
+                          ...prev,
+                          procedureContextId: procedure,
+                          procedureContextLabel: procedureName,
+                        }));
+                        if (procedure) {
+                          void applyTemplate({ procedureName, procedureId, sourceLabel: 'procedimento selecionado' });
+                        }
+                      }}
+                      searchable
+                      clearable
+                      nothingFoundMessage="Sem procedimentos ativos no PIT"
+                    />
+                    <Group align="flex-end" justify={isMobile ? 'stretch' : 'flex-end'}>
+                      <Button
+                        variant="light"
+                        leftSection={<WandSparkles size={16} />}
+                        onClick={() => void applyTemplate({
+                          procedureName: form.procedureContextLabel || undefined,
+                          procedureId: form.procedureContextId.startsWith('name:') ? undefined : form.procedureContextId,
+                        })}
+                        disabled={!form.procedureContextId}
+                        fullWidth={isMobile}
+                      >
+                        Aplicar template
+                      </Button>
+                    </Group>
+                  </SimpleGrid>
+                  {autoTemplateInfo && (
+                    <Alert color="indigo" variant="light" title="Template da evolução" mt="md">
+                      {autoTemplateInfo}
+                    </Alert>
+                  )}
+                </Box>
+
+                <Box className="tea-evolucao-section">
+                  <Text className="tea-evolucao-section-title">Registro clínico</Text>
+                  <Stack gap="md">
+                    <Textarea
+                      label="Objetivo trabalhado na sessão"
+                      minRows={2}
+                      value={form.sessionGoal}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setForm((prev) => ({ ...prev, sessionGoal: value }));
+                      }}
+                    />
+                    <TagsInput
+                      label="Estratégias utilizadas"
+                      placeholder="Digite e pressione Enter"
+                      value={form.strategiesUsed}
+                      onChange={(value) => setForm((prev) => ({ ...prev, strategiesUsed: value }))}
+                      clearable
+                    />
+                    <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" verticalSpacing="md">
+                      <Select
+                        label="Engajamento"
+                        placeholder="Selecione"
+                        data={engagementOptions}
+                        value={form.engagementLevel || null}
+                        onChange={(value) => setForm((prev) => ({ ...prev, engagementLevel: value || '' }))}
+                        clearable
+                      />
+                      <Select
+                        label="Regulação"
+                        placeholder="Selecione"
+                        data={regulationOptions}
+                        value={form.regulationLevel || null}
+                        onChange={(value) => setForm((prev) => ({ ...prev, regulationLevel: value || '' }))}
+                        clearable
+                      />
+                      <Select
+                        label="Comportamento"
+                        placeholder="Selecione"
+                        data={behaviorOptions}
+                        value={form.behaviorLevel || null}
+                        onChange={(value) => setForm((prev) => ({ ...prev, behaviorLevel: value || '' }))}
+                        clearable
+                      />
+                    </SimpleGrid>
+                    <Textarea
+                      label="Intervenção realizada"
+                      minRows={2}
+                      value={form.interventionSummary}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setForm((prev) => ({ ...prev, interventionSummary: value }));
+                      }}
+                    />
+                    <Textarea
+                      label="Resposta do paciente"
+                      minRows={2}
+                      value={form.patientResponse}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setForm((prev) => ({ ...prev, patientResponse: value }));
+                      }}
+                    />
+                  </Stack>
+                </Box>
+
+                <Box className="tea-evolucao-section">
+                  <Text className="tea-evolucao-section-title">Fechamento da sessão</Text>
+                  <Stack gap="md">
+                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
+                      <NumberInput
+                        label="Score de progresso (0-10)"
+                        value={form.progressScore ?? undefined}
+                        onChange={(value) => setForm((prev) => ({ ...prev, progressScore: typeof value === 'number' ? value : null }))}
+                        min={0}
+                        max={10}
+                      />
+                      <Textarea
+                        label="Observações"
+                        minRows={1}
+                        value={form.notes}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setForm((prev) => ({ ...prev, notes: value }));
+                        }}
+                      />
+                    </SimpleGrid>
+                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
+                      <Textarea
+                        label="Devolutiva para família"
+                        minRows={2}
+                        value={form.familyFeedback}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setForm((prev) => ({ ...prev, familyFeedback: value }));
+                        }}
+                      />
+                      <Textarea
+                        label="Plano para casa / próxima sessão"
+                        minRows={2}
+                        value={form.homePlan}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setForm((prev) => ({ ...prev, homePlan: value }));
+                        }}
+                      />
+                    </SimpleGrid>
+                    <Textarea
+                      label="Alertas clínicos / riscos"
+                      minRows={2}
+                      value={form.alerts}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setForm((prev) => ({ ...prev, alerts: value }));
+                      }}
+                    />
+                    {editingEvolutionId && (
+                      <Textarea
+                        label="Motivo da retificação"
+                        minRows={2}
+                        required
+                        value={form.editReason}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setForm((prev) => ({ ...prev, editReason: value }));
+                        }}
+                      />
+                    )}
+                  </Stack>
+                </Box>
+
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => { setEditingEvolutionId(null); setForm(createInitialForm()); setAutoTemplateInfo(''); }}>
+                    {editingEvolutionId ? 'Cancelar edição' : 'Limpar'}
+                  </Button>
+                  <Button onClick={handleSave} loading={saving} disabled={saving}>
+                    {editingEvolutionId ? 'Atualizar evolução' : 'Salvar evolução'}
+                  </Button>
+                </Group>
               </>
             )}
-            {autoTemplateInfo && (
-              <Alert color="indigo" variant="light" title="Template da evolução">
-                {autoTemplateInfo}
-              </Alert>
-            )}
-            <FloatingTextarea
-              label="Objetivo trabalhado na sessão"
-              minRows={2}
-              value={form.sessionGoal}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setForm((prev) => ({ ...prev, sessionGoal: value }));
-              }}
-            />
-            <TagsInput
-              label="Estratégias utilizadas"
-              placeholder="Digite e pressione Enter"
-              value={form.strategiesUsed}
-              onChange={(value) => setForm((prev) => ({ ...prev, strategiesUsed: value }))}
-              clearable
-            />
-            <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md" verticalSpacing="md">
-              <FloatingSelect
-                label="Engajamento"
-                data={engagementOptions}
-                value={form.engagementLevel || null}
-                onChange={(value) => setForm((prev) => ({ ...prev, engagementLevel: value || '' }))}
-                clearable
-              />
-              <FloatingSelect
-                label="Regulação"
-                data={regulationOptions}
-                value={form.regulationLevel || null}
-                onChange={(value) => setForm((prev) => ({ ...prev, regulationLevel: value || '' }))}
-                clearable
-              />
-              <FloatingSelect
-                label="Comportamento"
-                data={behaviorOptions}
-                value={form.behaviorLevel || null}
-                onChange={(value) => setForm((prev) => ({ ...prev, behaviorLevel: value || '' }))}
-                clearable
-              />
-            </SimpleGrid>
+          </Stack>
+        </Paper>
 
-            <FloatingTextarea
-              label="Intervenção realizada"
-              minRows={2}
-              value={form.interventionSummary}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setForm((prev) => ({ ...prev, interventionSummary: value }));
-              }}
-            />
+        <Paper p={isMobile ? 'sm' : 'md'} className="tea-evolucao-panel tea-evolucao-history">
+          <Text fw={700} className="tea-evolucao-panel-title">Evoluções registradas</Text>
+          {loadingEvolutions ? (
+            <Stack gap="sm">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Paper key={index} p="sm" withBorder className="tea-evolucao-card">
+                  <Skeleton height={16} width="32%" mb={10} radius="xl" />
+                  <Skeleton height={12} width="48%" mb={8} radius="xl" />
+                  <Skeleton height={10} width="76%" mb={8} radius="xl" />
+                  <Skeleton height={10} width="64%" radius="xl" />
+                </Paper>
+              ))}
+            </Stack>
+          ) : evolutions.length === 0 ? (
+            <Text size="sm" c="dimmed" className="tea-evolucao-empty">Nenhuma evolução registrada.</Text>
+          ) : (
+            <Stack gap="sm">
+              {evolutions.map((item: any) => (
+                <Paper key={item.id} p="md" withBorder className="tea-evolucao-card">
+                  <Group justify="space-between" align="flex-start" gap="sm">
+                    <Box>
+                      <Text fw={700}>{dayjs(item.sessionDate).format('DD/MM/YYYY')}</Text>
+                      <Text size="sm" c="dimmed">{item.professional || 'Profissional não informado'}</Text>
+                    </Box>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<Pencil size={14} />}
+                      onClick={() => handleStartEdit(item)}
+                    >
+                      Editar
+                    </Button>
+                  </Group>
 
-            <FloatingTextarea
-              label="Resposta do paciente"
-              minRows={2}
-              value={form.patientResponse}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setForm((prev) => ({ ...prev, patientResponse: value }));
-              }}
-            />
-
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
-              <FloatingNumberInput
-                label="Score de progresso (0-10)"
-                value={form.progressScore ?? undefined}
-                onChange={(value) => setForm((prev) => ({ ...prev, progressScore: typeof value === 'number' ? value : null }))}
-                min={0}
-                max={10}
-              />
-              <FloatingTextarea
-                label="Observações"
-                minRows={1}
-                value={form.notes}
-                onChange={(e) => {
-                  const value = e.currentTarget.value;
-                  setForm((prev) => ({ ...prev, notes: value }));
-                }}
-              />
-            </SimpleGrid>
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" verticalSpacing="md">
-              <FloatingTextarea
-                label="Devolutiva para família"
-                minRows={2}
-                value={form.familyFeedback}
-                onChange={(e) => {
-                  const value = e.currentTarget.value;
-                  setForm((prev) => ({ ...prev, familyFeedback: value }));
-                }}
-              />
-              <FloatingTextarea
-                label="Plano para casa / próxima sessão"
-                minRows={2}
-                value={form.homePlan}
-                onChange={(e) => {
-                  const value = e.currentTarget.value;
-                  setForm((prev) => ({ ...prev, homePlan: value }));
-                }}
-              />
-            </SimpleGrid>
-            <FloatingTextarea
-              label="Alertas clínicos / riscos"
-              minRows={2}
-              value={form.alerts}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                setForm((prev) => ({ ...prev, alerts: value }));
-              }}
-            />
-            {editingEvolutionId && (
-              <FloatingTextarea
-                label="Motivo da retificação"
-                minRows={2}
-                required
-                value={form.editReason}
-                onChange={(e) => {
-                  const value = e.currentTarget.value;
-                  setForm((prev) => ({ ...prev, editReason: value }));
-                }}
-              />
-            )}
-
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => { setEditingEvolutionId(null); setForm(createInitialForm()); setAutoTemplateInfo(''); }}>
-                {editingEvolutionId ? 'Cancelar edição' : 'Limpar'}
-              </Button>
-              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>
-                {editingEvolutionId ? 'Atualizar evolução' : 'Salvar evolução'}
-              </Button>
-            </Group>
-
-            <Text fw={600}>Evoluções registradas</Text>
-            {loadingEvolutions ? (
-              <Stack gap="xs">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <Paper key={index} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: cardBg }}>
-                    <Skeleton height={16} width="32%" mb={10} radius="xl" />
-                    <Skeleton height={12} width="48%" mb={8} radius="xl" />
-                    <Skeleton height={10} width="76%" mb={8} radius="xl" />
-                    <Skeleton height={10} width="64%" radius="xl" />
-                  </Paper>
-                ))}
-              </Stack>
-            ) : evolutions.length === 0 ? (
-              <Text size="sm" c="dimmed">Nenhuma evolução registrada.</Text>
-            ) : (
-              <Stack gap="xs">
-                {evolutions.map((item: any) => (
-                  <Paper key={item.id} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)', background: cardBg }}>
-                    <Group justify="space-between" align="flex-start">
-                      <Text fw={600}>{dayjs(item.sessionDate).format('DD/MM/YYYY')} • {item.professional || 'Profissional não informado'}</Text>
-                      <ActionIcon variant="subtle" color="blue" onClick={() => handleStartEdit(item)} title="Editar evolução">
-                        <Pencil size={16} />
-                      </ActionIcon>
-                    </Group>
+                  <Stack gap={2} mt="sm">
                     <Text size="xs" c="dimmed">Plano: {item.therapeuticPlan?.title || 'Não vinculado'}</Text>
                     {item.appointment && (
                       <Text size="xs" c="dimmed">
                         Sessão vinculada: {item.appointment.date || '-'} {item.appointment.time || ''} • {item.appointment.specialty || '-'}
                       </Text>
                     )}
-                    {(item.engagementLevel || item.regulationLevel || item.behaviorLevel) && (
-                      <Group gap={6} mt={6}>
-                        {item.engagementLevel && <Badge size="xs" variant="light" color="indigo">Engajamento: {item.engagementLevel}</Badge>}
-                        {item.regulationLevel && <Badge size="xs" variant="light" color="teal">Regulação: {item.regulationLevel}</Badge>}
-                        {item.behaviorLevel && <Badge size="xs" variant="light" color="orange">Comportamento: {item.behaviorLevel}</Badge>}
-                      </Group>
-                    )}
-                    {item.sessionGoal && <Text size="sm" mt={6}><b>Objetivo:</b> {item.sessionGoal}</Text>}
-                    {Array.isArray(item.strategiesUsed) && item.strategiesUsed.length > 0 && (
-                      <Group gap={6} mt={4}>
-                        {item.strategiesUsed.map((strategy: string) => (
-                          <Badge key={`${item.id}-${strategy}`} size="xs" variant="outline" color="blue">
-                            {strategy}
-                          </Badge>
-                        ))}
-                      </Group>
-                    )}
-                    {item.interventionSummary && <Text size="sm" mt={4}>{item.interventionSummary}</Text>}
-                    {item.patientResponse && <Text size="xs" c="dimmed" mt={4}>Resposta: {item.patientResponse}</Text>}
-                    {Number.isFinite(item.progressScore) && <Text size="xs" c="dimmed">Score: {item.progressScore}</Text>}
-                    {(item.familyFeedback || item.homePlan || item.alerts || item.notes) && <Divider my={8} />}
-                    {item.familyFeedback && <Text size="xs" c="dimmed">Devolutiva: {item.familyFeedback}</Text>}
-                    {item.homePlan && <Text size="xs" c="dimmed">Plano próximo: {item.homePlan}</Text>}
-                    {item.alerts && <Text size="xs" c="red.5">Alerta: {item.alerts}</Text>}
-                    {item.notes && <Text size="xs" c="dimmed">Obs: {item.notes}</Text>}
-                    {(item.lastEditedBy || item.lastEditReason || item.createdBy) && (
-                      <Text size="xs" c="dimmed" mt={6}>
-                        {item.lastEditedBy
-                          ? `Retificado por ${item.lastEditedBy}${item.lastEditReason ? ` • Motivo: ${item.lastEditReason}` : ''}`
-                          : `Registrado por ${item.createdBy || 'não informado'}`}
-                      </Text>
-                    )}
-                  </Paper>
-                ))}
-              </Stack>
-            )}
-          </Stack>
+                  </Stack>
+
+                  {(item.engagementLevel || item.regulationLevel || item.behaviorLevel) && (
+                    <Group gap={6} mt="sm">
+                      {item.engagementLevel && <Badge size="sm" variant="light" color="indigo">Engajamento: {item.engagementLevel}</Badge>}
+                      {item.regulationLevel && <Badge size="sm" variant="light" color="teal">Regulação: {item.regulationLevel}</Badge>}
+                      {item.behaviorLevel && <Badge size="sm" variant="light" color="orange">Comportamento: {item.behaviorLevel}</Badge>}
+                    </Group>
+                  )}
+
+                  {item.sessionGoal && (
+                    <Text size="sm" mt="sm"><Text span fw={700} inherit>Objetivo: </Text>{item.sessionGoal}</Text>
+                  )}
+
+                  {Array.isArray(item.strategiesUsed) && item.strategiesUsed.length > 0 && (
+                    <Group gap={6} mt="xs">
+                      {item.strategiesUsed.map((strategy: string) => (
+                        <Badge key={`${item.id}-${strategy}`} size="xs" variant="outline" color="blue">
+                          {strategy}
+                        </Badge>
+                      ))}
+                    </Group>
+                  )}
+
+                  {item.interventionSummary && <Text size="sm" mt="xs">{item.interventionSummary}</Text>}
+                  {item.patientResponse && <Text size="xs" c="dimmed" mt="xs">Resposta: {item.patientResponse}</Text>}
+                  {Number.isFinite(item.progressScore) && <Text size="xs" c="dimmed" mt={4}>Score: {item.progressScore}</Text>}
+
+                  {(item.familyFeedback || item.homePlan || item.alerts || item.notes) && <Divider my="sm" />}
+                  {item.familyFeedback && <Text size="xs" c="dimmed">Devolutiva: {item.familyFeedback}</Text>}
+                  {item.homePlan && <Text size="xs" c="dimmed">Plano próximo: {item.homePlan}</Text>}
+                  {item.alerts && <Text size="xs" c="red">Alerta: {item.alerts}</Text>}
+                  {item.notes && <Text size="xs" c="dimmed">Obs: {item.notes}</Text>}
+
+                  {(item.lastEditedBy || item.lastEditReason || item.createdBy) && (
+                    <Text size="xs" c="dimmed" mt="sm" className="tea-evolucao-audit">
+                      {item.lastEditedBy
+                        ? `Retificado por ${item.lastEditedBy}${item.lastEditReason ? ` • Motivo: ${item.lastEditReason}` : ''}`
+                        : `Registrado por ${item.createdBy || 'não informado'}`}
+                    </Text>
+                  )}
+                </Paper>
+              ))}
+            </Stack>
+          )}
         </Paper>
       </Box>
     </Box>

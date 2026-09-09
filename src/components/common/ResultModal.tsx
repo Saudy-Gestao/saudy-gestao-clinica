@@ -1,6 +1,5 @@
-import { Modal, Center, ThemeIcon, Text, Group, Button } from '@mantine/core';
+import { Modal, Center, ThemeIcon, Text, Group, Button } from '@/components/ui';
 import { Check, X } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
 
 type Variant = 'success' | 'error';
 
@@ -34,7 +33,7 @@ export default function ResultModal({ opened, onClose, variant = 'success', titl
 
         <Group mt={8} justify="center" gap="lg">
           {primary && (
-            <Button bg={DARK_BLUE} c="white" onClick={() => { primary.onClick(); }} style={{ minWidth: 140 }}>
+            <Button onClick={() => { primary.onClick(); }} style={{ minWidth: 140 }}>
               {primary.label}
             </Button>
           )}

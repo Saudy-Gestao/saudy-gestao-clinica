@@ -1,10 +1,8 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Stack, Text, Group, Anchor } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { Box, Button, Stack, Text, Group, Anchor, TextInput } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import authService from '../../services/authService';
-import { FloatingInput } from '../common/FloatingInput';
 
 export function Adm() {
   const navigate = useNavigate();
@@ -14,13 +12,13 @@ export function Adm() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const previousScheme = root.getAttribute('data-mantine-color-scheme') || 'light';
+    const previousScheme = root.getAttribute('data-color-scheme');
 
-    root.setAttribute('data-mantine-color-scheme', 'light');
+    root.setAttribute('data-color-scheme', 'light');
 
     return () => {
-      const persistedScheme = localStorage.getItem('mantine-color-scheme') || previousScheme;
-      root.setAttribute('data-mantine-color-scheme', persistedScheme);
+      if (previousScheme) root.setAttribute('data-color-scheme', previousScheme);
+      else root.removeAttribute('data-color-scheme');
     };
   }, []);
 
@@ -69,7 +67,7 @@ export function Adm() {
         style={{
           width: '40%',
           minWidth: 320,
-          backgroundColor: DARK_BLUE,
+          backgroundColor: '#0A2568',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -93,8 +91,8 @@ export function Adm() {
               <Text c="dimmed" size="sm">Acesse a área administrativa</Text>
             </Box>
 
-            <FloatingInput label="E-mail / Usuário" value={login} onChange={(e: ChangeEvent<HTMLInputElement>) => setLogin(e.target.value)} />
-            <FloatingInput label="Senha" type="password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
+            <TextInput label="E-mail / Usuário" value={login} onChange={(e: ChangeEvent<HTMLInputElement>) => setLogin(e.target.value)} />
+            <TextInput label="Senha" type="password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
 
             <Group justify="flex-end">
               <Anchor size="sm" c="blue" style={{ cursor: 'pointer' }} onClick={() => navigate('/esqueci-a-senha')}>
@@ -102,11 +100,11 @@ export function Adm() {
               </Anchor>
             </Group>
 
-            <Button fullWidth size="lg" bg={DARK_BLUE} onClick={handleLogin} loading={loading} styles={{ root: { height: '56px', borderRadius: '8px' } }}>
+            <Button fullWidth size="lg" bg={'#0A2568'} onClick={handleLogin} loading={loading} styles={{ root: { height: '56px', borderRadius: '8px' } }}>
               Entrar
             </Button>
 
-            <Button fullWidth size="md" variant="outline" c={DARK_BLUE} onClick={() => navigate('/adm-register')}>
+            <Button fullWidth size="md" variant="outline" c={'#0A2568'} onClick={() => navigate('/adm-register')}>
               Registrar
             </Button>
 

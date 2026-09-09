@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, Group, NativeSelect, Text, useMantineColorScheme } from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
+import { Box, Button, Group, NativeSelect, Text, useColorScheme } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { Camera, LampDesk, Mic, MicOff, SignalHigh, Wifi, WifiOff } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../Header/Header';
@@ -115,7 +115,7 @@ export function TeleconsultaPreparation() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
 
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [microphoneDevices, setMicrophoneDevices] = useState<MediaDeviceInfo[]>([]);
@@ -425,7 +425,20 @@ export function TeleconsultaPreparation() {
 
   return (
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      {isDoctorToken ? <Header /> : null}
+      {isDoctorToken ? <Header contextLabel="Teleconsulta" /> : null}
+      {!isDoctorToken ? (
+        <Box className={styles.publicHeader}>
+          <Box className={styles.publicBrandMark}>S</Box>
+          <Box>
+            <Text className={styles.publicBrand}>Saudy</Text>
+            <Text className={styles.publicContext}>Teleconsulta segura</Text>
+          </Box>
+          <Box className={styles.publicHeaderStatus}>
+            <span className={styles.statusIndicator} />
+            Atendimento protegido
+          </Box>
+        </Box>
+      ) : null}
 
       <Box className={`${styles.page} ${isDark ? styles.pageDark : styles.pageLight}`}>
         <Box className={styles.wrapper}>
@@ -603,7 +616,7 @@ export function TeleconsultaPreparation() {
           </Box>
 
           {mediaError ? (
-            <Text c="red.6" mt="sm" ta="right">
+            <Text c="var(--ui-hue-red)" mt="sm" ta="right">
               {mediaError}
             </Text>
           ) : !canJoinWaitingWindow ? (

@@ -1,0 +1,81 @@
+.tea-evolucao-page {
+  min-height: 100vh;
+  background: var(--ui-background);
+}
+
+.tea-evolucao-shell {
+  width: min(1400px, 100%);
+  margin-inline: auto;
+}
+
+.tea-evolucao-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.tea-evolucao-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.tea-evolucao-title {
+  color: var(--ui-foreground);
+}
+
+.tea-evolucao-subtitle {
+  margin-top: .25rem;
+  color: var(--ui-muted);
+}
+
+.tea-evolucao-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .75rem 2rem rgb(0 0 0 / .08);
+  margin-bottom: 1.25rem;
+}
+
+.tea-evolucao-panel-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: 1.05rem;
+}
+
+.tea-evolucao-section {
+  padding-top: 1rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.tea-evolucao-section-title {
+  margin: 0 0 .85rem;
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.tea-evolucao-history {
+  margin-bottom: 0;
+}
+
+.tea-evolucao-history .tea-evolucao-panel-title {
+  margin-bottom: 1rem;
+}
+
+.tea-evolucao-empty {
+  padding: 1rem 0;
+}
+
+.tea-evolucao-card {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-radius: .8rem;
+}
+
+.tea-evolucao-audit {
+  padding-top: .5rem;
+  border-top: 1px dashed var(--ui-border);
+}

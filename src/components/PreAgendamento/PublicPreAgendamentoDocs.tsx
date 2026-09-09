@@ -18,8 +18,8 @@ import {
   TextInput,
   Textarea,
   ThemeIcon,
-} from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
+} from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import { CheckCheck } from 'lucide-react';
 import dayjs from 'dayjs';
 import { FacialCapture } from '../common/FacialCapture';

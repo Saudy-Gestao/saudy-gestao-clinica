@@ -30,12 +30,11 @@ import {
   ThemeIcon,
   Title,
   Tooltip,
-  useMantineColorScheme,
-} from '@mantine/core';
+  useColorScheme,
+} from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowLeft,
   BarChart3,
   CalendarCheck,
   CheckCircle2,
@@ -79,6 +78,7 @@ import {
   YAxis,
 } from 'recharts';
 import { Header } from '../Header/Header';
+import './BIGestao.css';
 import authService from '../../services/authService';
 import { useCurrentUserProfileQuery } from '../../hooks/useCurrentUserProfileQuery';
 import { normalizeCompanyModuleType } from '../../utils/moduleTypeAccess';
@@ -94,7 +94,6 @@ import { useSettingsSectorsQuery } from '../../hooks/useSettingsSectorsQuery';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTissBatchesQuery } from '../../hooks/useTissBatchesQuery';
 import { useBIAuthorizationsQuery, useBIClinicalQuery, useBICommunicationQuery, useBIFinancialQuery, useBIOccupancyQuery, useBIOverviewQuery, useBIReportsQuery, useBIResourcesQuery, useBITeaQuery } from '../../hooks/useBIOverviewQuery';
-import { DARK_BLUE } from '../../themes/theme';
 import biService from '../../services/biService';
 
 function InsertZone({ id, previewPercent }: { id: string; previewPercent: number }) {
@@ -143,7 +142,7 @@ function RowDropZone({ id, minHeight, previewPercent }: { id: string; minHeight:
             justifyContent: 'center',
           }}
         >
-          <Text size="xs" c="blue.2" fw={700} style={{ pointerEvents: 'none' }}>
+          <Text size="xs" c="#2f6fed" fw={700} style={{ pointerEvents: 'none' }}>
             Pré-visualização ({Math.round(previewPercent)}%)
           </Text>
         </div>
@@ -197,7 +196,7 @@ type TabLayoutState = {
 const TAB_LABELS: Record<string, string> = {
   executivo: 'Executivo', operacao: 'Operação', financeiro: 'Financeiro',
   clinico: 'Clínico', recursos: 'Recursos', convenios: 'Convênios',
-  tea: 'TEA', laudos: 'Laudos', comunicacao: 'Comunicação',
+  tea: 'Terapias', laudos: 'Laudos', comunicacao: 'Comunicação',
 };
 
 const DEFAULT_TAB_CARDS: Record<string, string[]> = {
@@ -586,7 +585,7 @@ function MetricTile({
     <Box
       p="md"
       style={{
-        border: '1px solid var(--mantine-color-default-border)',
+        border: '1px solid var(--ui-border)',
         borderRadius: 8,
         minHeight: 132,
       }}
@@ -684,7 +683,6 @@ function WidgetCardContent({
   widget,
   subtitle,
   panelBg,
-  colorScheme,
   chartGridColor,
   onDelete,
   onEditTitle,
@@ -692,13 +690,11 @@ function WidgetCardContent({
   widget: GeneratedWidget;
   subtitle: string;
   panelBg: string;
-  colorScheme: 'light' | 'dark' | 'auto';
   chartGridColor: string;
   onDelete?: () => void;
   onEditTitle?: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const textColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-2)' : undefined;
 
   return (
     <Box style={{ position: 'relative', height: '100%' }}>
@@ -747,7 +743,7 @@ function WidgetCardContent({
         <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <AIWidgetHeader title={widget.title} subtitle={subtitle} />
           <ScrollArea style={{ flex: 1 }} offsetScrollbars>
-            <Text size="sm" lh={1.7} c={textColor}>{widget.content}</Text>
+            <Text size="sm" lh={1.7}>{widget.content}</Text>
           </ScrollArea>
         </Paper>
       )}
@@ -845,12 +841,11 @@ function WidgetCardContent({
   );
 }
 
-function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartGridColor, isDragActive, onDelete, getWidgetSubtitle, onEditWidgetTitle }: {
+function WidgetGrid({ widgets, rowsLayout, heights, panelBg, chartGridColor, isDragActive, onDelete, getWidgetSubtitle, onEditWidgetTitle }: {
   widgets: GeneratedWidget[];
   rowsLayout: (string | null)[][] | null;
   heights: WidgetHeights;
   panelBg: string;
-  colorScheme: 'light' | 'dark' | 'auto';
   chartGridColor: string;
   isDragActive: boolean;
   onDelete: (id: string) => void;
@@ -892,7 +887,6 @@ function WidgetGrid({ widgets, rowsLayout, heights, panelBg, colorScheme, chartG
                         widget={widget}
                         subtitle={getWidgetSubtitle(widget)}
                         panelBg={panelBg}
-                        colorScheme={colorScheme}
                         chartGridColor={chartGridColor}
                         onDelete={() => onDelete(widget.id)}
                         onEditTitle={() => onEditWidgetTitle(widget)}
@@ -936,7 +930,7 @@ const gridCollision: CollisionDetection = (args) => {
 
 export function BIGestao() {
   const navigate = useNavigate();
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const currentUser = authService.getCurrentUser() as any;
   const { data: userProfile } = useCurrentUserProfileQuery();
   const companyModuleType = useMemo(
@@ -1404,14 +1398,25 @@ export function BIGestao() {
   const renderTabAISection = (tabId: string, tabLabel: string) => {
     const ps = panelCustom[tabId] || { widgets: [], prompt: '', loading: false, error: null, rowsLayout: null, heights: {}, layout: [] };
     const draft = customPromptDraft[tabId] ?? ps.prompt;
+    const layout = getTabLayout(tabId);
     return (
-      <Stack gap="md" mt="md">
-        <Paper p="md" withBorder style={{ background: panelBg, borderColor: 'rgba(10,37,104,0.18)' }}>
-          <Group gap="xs" mb="xs">
-            <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={28}>
-              <Sparkles size={14} />
-            </ThemeIcon>
-            <Text fw={700} size="sm">Descreva o que quer ver em "{tabLabel}"</Text>
+      <Stack gap="md" mt="xl">
+        <Paper p="md" withBorder className="bi-ai-panel">
+          <Group justify="space-between" align="flex-start" mb="xs" wrap="wrap">
+            <Group gap="xs">
+              <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={28}>
+                <Sparkles size={14} />
+              </ThemeIcon>
+              <Text fw={700} size="sm">Descreva o que quer ver em "{tabLabel}"</Text>
+            </Group>
+            <Group gap="xs">
+              {layout.hidden.length > 0 && (
+                <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>
+              )}
+              <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>
+                Resetar layout
+              </Button>
+            </Group>
           </Group>
           <Text size="xs" c="dimmed" mb="sm">
             Gere cards e análises personalizados para complementar os dados desta aba.
@@ -1473,7 +1478,6 @@ export function BIGestao() {
           widget={widget}
           subtitle={getEditedTitle('ai', tabId, widget.id, widget.title, 'Informação gerada por IA').subtitle}
           panelBg={panelBg}
-          colorScheme={colorScheme}
           chartGridColor={chartGridColor}
           // Em abas padrão, os ícones de ação ficam no shell (drag/lápis/lixeira).
           onDelete={undefined}
@@ -1520,8 +1524,8 @@ export function BIGestao() {
     res_coverage: { title: 'Cobertura e consumo', subtitle: 'Consumo e cobertura em dias.' },
     conv_metrics: { title: 'Autorizações por status', subtitle: 'Panorama do período.' },
     conv_mix: { title: 'Mix de status', subtitle: 'Distribuição das autorizações.' },
-    tea_metrics: { title: 'Visão TEA', subtitle: 'Planejamento e conversão de reservas.' },
-    tea_mix: { title: 'Mix das reservas TEA', subtitle: 'Pendentes, convertidas e canceladas.' },
+    tea_metrics: { title: 'Visão Terapias', subtitle: 'Planejamento e conversão de reservas.' },
+    tea_mix: { title: 'Mix das reservas de Terapias', subtitle: 'Pendentes, convertidas e canceladas.' },
     laud_metrics: { title: 'Laudos e exames', subtitle: 'Backlog e TAT.' },
     laud_volume: { title: 'Volume por modalidade', subtitle: 'Principais exames/modalidades do período.' },
     com_metrics: { title: 'Comunicação e experiência', subtitle: 'WhatsApp e entregas.' },
@@ -1916,7 +1920,8 @@ export function BIGestao() {
 
 
   const chartGridColor = colorScheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(10,37,104,0.09)';
-  const panelBg = colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : '#ffffff';
+  const chartPrimaryColor = colorScheme === 'dark' ? '#6f91ff' : '#2457d6';
+  const panelBg = 'var(--ui-surface)';
   const occupancy = biOccupancyQuery.data as any;
   const occupancyRankings = occupancy?.rankings || {};
   const occupancyCharts = occupancy?.charts || {};
@@ -2039,7 +2044,7 @@ export function BIGestao() {
             </Paper>
           )}
 
-          <Paper p="md" withBorder radius="md" style={{ background: colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : '#f8faff', borderColor: 'rgba(10,37,104,0.15)' }}>
+          <Paper className="bi-summary-panel" p="md" withBorder radius="md">
             <Text size="sm" fw={500} c="dimmed" mb={4}>Resumo executivo</Text>
             <Text size="sm" lh={1.7}>{insightsResult.summary}</Text>
           </Paper>
@@ -2058,16 +2063,14 @@ export function BIGestao() {
                 {insightsResult.alerts.map((raw, i) => {
                   const item = normalizeInsightAlert(raw);
                   const priorityColor = item.priority === 'CRÍTICO' ? 'red' : item.priority === 'ALTO' ? 'orange' : 'yellow';
-                  const darkBg: Record<string, string> = { red: 'rgba(220,38,38,0.15)', orange: 'rgba(234,88,12,0.15)', yellow: 'rgba(202,138,4,0.12)' };
-                  const darkBorder: Record<string, string> = { red: 'rgba(220,38,38,0.35)', orange: 'rgba(234,88,12,0.35)', yellow: 'rgba(202,138,4,0.3)' };
                   return (
                     <Paper key={i} p="sm" withBorder radius="sm" style={{
-                      borderColor: colorScheme === 'dark' ? darkBorder[priorityColor] : `var(--mantine-color-${priorityColor}-3)`,
-                      background: colorScheme === 'dark' ? darkBg[priorityColor] : `var(--mantine-color-${priorityColor}-0)`,
+                      borderColor: `color-mix(in srgb, var(--ui-hue-${priorityColor}) 45%, var(--ui-border))`,
+                      background: `color-mix(in srgb, var(--ui-hue-${priorityColor}) 12%, var(--ui-surface))`,
                     }}>
                       <Group gap="xs" align="flex-start" wrap="nowrap">
                         <Badge color={priorityColor} size="xs" variant="filled" style={{ flexShrink: 0, marginTop: 2 }}>{item.priority}</Badge>
-                        <Text size="sm" lh={1.6} c={colorScheme === 'dark' ? 'var(--mantine-color-gray-2)' : undefined}>{item.text}</Text>
+                        <Text size="sm" lh={1.6}>{item.text}</Text>
                       </Group>
                     </Paper>
                   );
@@ -2084,7 +2087,7 @@ export function BIGestao() {
                 </ThemeIcon>
                 <Text fw={700} size="sm" c="orange">Pontos negativos</Text>
               </Group>
-              <List spacing="xs" size="sm" icon={<TrendingDown size={14} color="var(--mantine-color-orange-6)" style={{ marginTop: 2 }} />}>
+              <List spacing="xs" size="sm" icon={<TrendingDown size={14} color="var(--ui-hue-orange)" style={{ marginTop: 2 }} />}>
                 {insightsResult.negatives.map((item, i) => (
                   <List.Item key={i}>{item}</List.Item>
                 ))}
@@ -2100,7 +2103,7 @@ export function BIGestao() {
                 </ThemeIcon>
                 <Text fw={700} size="sm" c="teal">Pontos positivos</Text>
               </Group>
-              <List spacing="xs" size="sm" icon={<CheckCircle2 size={14} color="var(--mantine-color-teal-6)" style={{ marginTop: 2 }} />}>
+              <List spacing="xs" size="sm" icon={<CheckCircle2 size={14} color="var(--ui-hue-teal)" style={{ marginTop: 2 }} />}>
                 {insightsResult.positives.map((item, i) => (
                   <List.Item key={i}>{item}</List.Item>
                 ))}
@@ -2121,15 +2124,12 @@ export function BIGestao() {
                   const item = normalizeInsightSuggestion(raw);
                   const timeframeColor = item.timeframe === 'imediato' ? 'red' : item.timeframe === 'esta semana' ? 'orange' : 'blue';
                   return (
-                    <Paper key={i} p="sm" withBorder radius="sm" style={{
-                      borderColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'var(--mantine-color-default-border)',
-                      background: colorScheme === 'dark' ? 'rgba(255,255,255,0.04)' : undefined,
-                    }}>
+                    <Paper key={i} p="sm" withBorder radius="sm">
                       <Group gap="xs" mb={4} wrap="nowrap">
                         <Badge size="xs" color={timeframeColor} variant="light" style={{ flexShrink: 0 }}>{item.timeframe}</Badge>
                         <Badge size="xs" color="gray" variant="outline" style={{ flexShrink: 0 }}>{item.owner}</Badge>
                       </Group>
-                      <Text size="sm" lh={1.6} c={colorScheme === 'dark' ? 'var(--mantine-color-gray-2)' : undefined}>{item.text}</Text>
+                      <Text size="sm" lh={1.6}>{item.text}</Text>
                     </Paper>
                   );
                 })}
@@ -2142,7 +2142,7 @@ export function BIGestao() {
     </Drawer>
 
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=gestao-e-apoio') }} />
       <Modal
         opened={titleEditorOpen}
         onClose={() => setTitleEditorOpen(false)}
@@ -2170,50 +2170,31 @@ export function BIGestao() {
         </Stack>
       </Modal>
       <Box maw={1500} mx="auto" px={{ base: 'md', md: 'xl' }} py="xl">
-        <Paper
-          p={{ base: 'md', md: 'lg' }}
-          mb="lg"
-          withBorder
-          style={{
-            overflow: 'hidden',
-            borderColor: 'rgba(10, 37, 104, 0.22)',
-            background: colorScheme === 'dark'
-              ? 'linear-gradient(135deg, rgba(10,37,104,0.55), rgba(15,118,110,0.2))'
-              : 'linear-gradient(135deg, #f7fbff 0%, #eef7f4 52%, #fff7ed 100%)',
-          }}
-        >
+        <Paper className="bi-hero" p={{ base: 'md', md: 'lg' }} mb="xl" withBorder>
           <Stack gap="sm">
             <Group gap="md" align="center" justify="space-between" wrap="wrap">
-              <Group gap="md" align="center">
-              <ActionIcon variant="white" color="dark" size="xl" onClick={() => navigate(-1)}>
-                <ArrowLeft size={20} />
-              </ActionIcon>
-              <Box>
-                <Title
-                  order={2}
-                  fw={750}
-                  c={colorScheme === 'dark' ? 'white' : 'dark'}
-                  style={{ fontSize: 'clamp(1.5rem, 2.3vw, 2.2rem)', letterSpacing: 0 }}
-                >
-                  Cockpit executivo da clínica
-                </Title>
-              </Box>
+              <Title
+                order={2}
+                fw={750}
+                className="bi-hero-title"
+                style={{ fontSize: 'clamp(1.5rem, 2.3vw, 2.2rem)', letterSpacing: 0 }}
+              >
+                Cockpit executivo da clínica
+              </Title>
+              <Button
+                leftSection={<Sparkles size={16} />}
+                variant="gradient"
+                gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
+                size="sm"
+                onClick={handleOpenInsights}
+              >
+                Visualizar Insights
+              </Button>
             </Group>
-            <Button
-              leftSection={<Sparkles size={16} />}
-              variant="gradient"
-              gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
-              size="sm"
-              onClick={handleOpenInsights}
-            >
-              Visualizar Insights
-            </Button>
-            </Group>
-            <Group align="flex-end" gap="sm" wrap="wrap">
+            <Group className="bi-hero-filters" align="flex-end" gap="sm" wrap="wrap">
               <Select
                 w={190}
                 label="Período"
-                styles={{ label: { color: colorScheme === 'dark' ? 'white' : '#1f2937' } }}
                 leftSection={<Filter size={16} />}
                 data={[
                   { value: '7d', label: 'Últimos 7 dias' },
@@ -2224,10 +2205,10 @@ export function BIGestao() {
                 value={period}
                 onChange={(value) => setPeriod((value || '30d') as PeriodKey)}
               />
-              <Select w={190} label="Médico" placeholder="Todos" searchable clearable value={doctorFilter} onChange={setDoctorFilter} data={doctorOptions} styles={{ label: { color: colorScheme === 'dark' ? 'white' : '#1f2937' } }} />
-              <Select w={190} label="Convênio" placeholder="Todos" searchable clearable value={insuranceFilter} onChange={setInsuranceFilter} data={insuranceOptions} styles={{ label: { color: colorScheme === 'dark' ? 'white' : '#1f2937' } }} />
-              <Select w={190} label="Procedimento" placeholder="Todos" searchable clearable value={procedureFilter} onChange={setProcedureFilter} data={procedureOptions} styles={{ label: { color: colorScheme === 'dark' ? 'white' : '#1f2937' } }} />
-              <Select w={190} label="Setor" placeholder="Todos" searchable clearable value={sectorFilter} onChange={setSectorFilter} data={sectorOptions} styles={{ label: { color: colorScheme === 'dark' ? 'white' : '#1f2937' } }} />
+              <Select w={190} label="Médico" placeholder="Todos" searchable clearable value={doctorFilter} onChange={setDoctorFilter} data={doctorOptions} />
+              <Select w={190} label="Convênio" placeholder="Todos" searchable clearable value={insuranceFilter} onChange={setInsuranceFilter} data={insuranceOptions} />
+              <Select w={190} label="Procedimento" placeholder="Todos" searchable clearable value={procedureFilter} onChange={setProcedureFilter} data={procedureOptions} />
+              <Select w={190} label="Setor" placeholder="Todos" searchable clearable value={sectorFilter} onChange={setSectorFilter} data={sectorOptions} />
             </Group>
           </Stack>
         </Paper>
@@ -2251,7 +2232,7 @@ export function BIGestao() {
           </Text>
           <input
             autoFocus
-            placeholder="Ex: Análise por médico, Faturamento TEA..."
+            placeholder="Ex: Análise por médico, Faturamento Terapias..."
             value={newTabName}
             onChange={(e) => setNewTabName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCustomTab(); }}
@@ -2259,7 +2240,7 @@ export function BIGestao() {
               width: '100%',
               padding: '10px 14px',
               borderRadius: 8,
-              border: '1.5px solid var(--mantine-color-default-border)',
+              border: '1.5px solid var(--ui-border)',
               background: 'transparent',
               color: 'inherit',
               fontSize: 14,
@@ -2324,7 +2305,7 @@ export function BIGestao() {
             { value: 'clinico', label: 'Clínico' },
             { value: 'recursos', label: 'Recursos' },
             { value: 'convenios', label: 'Convênios' },
-            { value: 'tea', label: 'TEA' },
+            { value: 'tea', label: 'Terapias' },
             { value: 'laudos', label: 'Laudos' },
             { value: 'comunicacao', label: 'Comunicação' },
             { value: 'personalizavel', label: '✦ Personalizável' },
@@ -2347,7 +2328,7 @@ export function BIGestao() {
             >
               <Stack gap="xs" mb="lg">
                 {hiddenTabsInfo.map((tab) => (
-                  <Group key={tab.value} justify="space-between" p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                  <Group key={tab.value} justify="space-between" p="sm" style={{ border: '1px solid var(--ui-border)', borderRadius: 8 }}>
                     <Text size="sm" fw={600}>{tab.label}</Text>
                     <Button size="xs" variant="light" color="teal" leftSection={<RotateCcw size={12} />} onClick={() => handleRestoreTab(tab.value)}>
                       Restaurar
@@ -2366,7 +2347,7 @@ export function BIGestao() {
         })()}
 
         {/* Navbar colorida */}
-        <ScrollArea mb="lg" scrollbarSize={4} type="hover">
+        <ScrollArea mb="xl" scrollbarSize={4} type="hover">
           <Group gap={6} wrap="nowrap" pb={4}>
             {([
               { value: 'executivo',   label: 'Executivo' },
@@ -2375,7 +2356,7 @@ export function BIGestao() {
               { value: 'clinico',     label: 'Clínico' },
               { value: 'recursos',    label: 'Recursos' },
               { value: 'convenios',   label: 'Convênios' },
-              { value: 'tea',         label: 'TEA' },
+              { value: 'tea',         label: 'Terapias' },
               { value: 'laudos',      label: 'Laudos' },
               { value: 'comunicacao', label: 'Comunicação' },
             ] as { value: string; label: string }[])
@@ -2391,8 +2372,8 @@ export function BIGestao() {
                     gap={0}
                     wrap="nowrap"
                     style={{
-                      background: isActive ? (isCustom ? 'linear-gradient(135deg,#0A2568,#0f766e)' : DARK_BLUE) : 'transparent',
-                      border: `1.5px solid ${isCustom ? 'rgba(15,118,110,0.6)' : 'rgba(255,255,255,0.25)'}`,
+                      background: isActive ? (isCustom ? 'linear-gradient(135deg,#0A2568,#0f766e)' : 'var(--ui-primary)') : 'transparent',
+                      border: `1.5px solid ${isCustom ? 'rgba(15,118,110,0.6)' : 'var(--ui-border)'}`,
                       borderRadius: 8,
                       transition: 'all 0.15s ease',
                       userSelect: 'none',
@@ -2401,16 +2382,16 @@ export function BIGestao() {
                   >
                     <Box
                       onClick={() => setActivePanel(tab.value)}
-                      style={{ padding: '6px 8px 6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 650, fontSize: 13, color: '#fff' }}
+                      style={{ padding: '6px 8px 6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 650, fontSize: 13, color: isActive ? '#fff' : 'var(--ui-foreground)' }}
                     >
                       {tab.label}
                     </Box>
                     <Tooltip label={`Excluir aba "${tab.label}"`} withArrow>
                       <Box
                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); setTabToDelete({ value: tab.value, label: tab.label }); }}
-                        style={{ padding: '6px 8px 6px 4px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                        style={{ padding: '6px 8px 6px 4px', cursor: 'pointer', color: isActive ? 'rgba(255,255,255,0.6)' : 'var(--ui-muted)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
                         onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.color = '#ef4444'; }}
-                        onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+                        onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.color = isActive ? 'rgba(255,255,255,0.6)' : 'var(--ui-muted)'; }}
                       >
                         <XCircle size={13} />
                       </Box>
@@ -2449,7 +2430,7 @@ export function BIGestao() {
               <Box
                 onClick={() => setRestoreModalOpen(true)}
                 style={{
-                  border: '1.5px dashed rgba(255,255,255,0.25)',
+                  border: '1.5px dashed var(--ui-border)',
                   borderRadius: 8,
                   padding: '6px 10px',
                   cursor: 'pointer',
@@ -2458,11 +2439,11 @@ export function BIGestao() {
                   gap: 6,
                   whiteSpace: 'nowrap',
                   fontSize: 12,
-                  color: 'rgba(255,255,255,0.5)',
+                  color: 'var(--ui-muted)',
                   transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)'; e.currentTarget.style.color = '#fff'; }}
-                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.borderColor = 'var(--ui-primary)'; e.currentTarget.style.color = 'var(--ui-foreground)'; }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.borderColor = 'var(--ui-border)'; e.currentTarget.style.color = 'var(--ui-muted)'; }}
               >
                 <PlusCircle size={13} />
                 Restaurar abas ({hiddenTabs.length})
@@ -2479,7 +2460,7 @@ export function BIGestao() {
           const draft = customPromptDraft[panelId] ?? ps.prompt;
           return (
             <Stack gap="lg">
-              <Paper p="md" withBorder style={{ background: panelBg, borderColor: 'rgba(10,37,104,0.18)' }}>
+              <Paper p="md" withBorder className="bi-ai-panel">
                 <Group gap="xs" mb="xs">
                   <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={30}>
                     <Sparkles size={15} />
@@ -2541,7 +2522,6 @@ export function BIGestao() {
                     rowsLayout={ps.rowsLayout}
                     heights={ps.heights}
                     panelBg={panelBg}
-                    colorScheme={colorScheme}
                     chartGridColor={chartGridColor}
                     isDragActive={!!activeDragId}
                     onDelete={(id) => handleDeleteWidget(panelId, id)}
@@ -2560,7 +2540,6 @@ export function BIGestao() {
                             widget={w}
                             subtitle={getEditedTitle('ai', panelId, w.id, w.title, 'Informação gerada por IA').subtitle}
                             panelBg={panelBg}
-                            colorScheme={colorScheme}
                             chartGridColor={chartGridColor}
                           />
                         </div>
@@ -2608,7 +2587,7 @@ export function BIGestao() {
                         <YAxis yAxisId="left" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <ChartTooltip formatter={(value: any, name: any) => (String(name) === 'receita' ? currencyFormatter.format(Number(value)) : integerFormatter.format(Number(value)))} />
-                        <Bar yAxisId="left" dataKey="atendimentos" fill={DARK_BLUE} radius={[6, 6, 0, 0]} />
+                        <Bar yAxisId="left" dataKey="atendimentos" fill={chartPrimaryColor} radius={[6, 6, 0, 0]} />
                         <Area yAxisId="right" type="monotone" dataKey="receita" stroke="#0f766e" fill="url(#receitaGradient)" strokeWidth={3} />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -2654,7 +2633,7 @@ export function BIGestao() {
                 {renderEditablePanelTitle(tabId, "Alertas de gestão", "Alertas de gestão", "Prioridades imediatas.", AlertTriangle)}
                 <Stack gap="sm">
                   {data.alerts.map((alert: any) => (
-                    <Box key={alert.title} p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+                    <Box key={alert.title} p="md" style={{ border: '1px solid var(--ui-border)', borderRadius: 8 }}>
                       <Group justify="space-between" wrap="nowrap">
                         <Box>
                           <Text size="sm" fw={700}>{alert.title}</Text>
@@ -2670,14 +2649,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && (
-                  <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>
-                )}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>
-                  Resetar layout
-                </Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -2724,7 +2695,7 @@ export function BIGestao() {
                         <XAxis type="number" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <ChartTooltip formatter={(value: any, name: any) => (String(name) === 'occupancyRate' ? `${percentFormatter.format(Number(value))}%` : integerFormatter.format(Number(value)))} />
-                        <Bar dataKey="occupancyRate" fill={DARK_BLUE} radius={[0, 8, 8, 0]} />
+                        <Bar dataKey="occupancyRate" fill={chartPrimaryColor} radius={[0, 8, 8, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -2798,10 +2769,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -2891,10 +2858,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -2922,7 +2885,7 @@ export function BIGestao() {
             cli_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
                 {isTeaOnly
-                  ? renderEditablePanelTitle(tabId, "Laudos e autorizações", "Autorizações e TEA", "Convênios e perfis TEA em acompanhamento.", FileClock)
+                  ? renderEditablePanelTitle(tabId, "Laudos e autorizações", "Autorizações e Terapias", "Convênios e perfis de Terapias em acompanhamento.", FileClock)
                   : renderEditablePanelTitle(tabId, "Laudos e autorizações", "Laudos e autorizações", "Backlog clínico e risco de atendimento.", FileClock)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <MetricTile label="Autoriz. pendentes" value={integerFormatter.format(asNumber(clinicalKpis.pendingAuthorizations) || data.pendingAuthorizations)} hint="Convênios em análise" icon={ShieldCheck} tone="grape" />
@@ -2930,7 +2893,7 @@ export function BIGestao() {
                   {!isTeaOnly && (
                     <MetricTile label="SLA médio" value={`${percentFormatter.format(asNumber(clinicalKpis.slaAvgHours))}h`} hint="Assinatura de laudos" icon={Clock3} tone="teal" />
                   )}
-                  <MetricTile label="TEA ativos" value={integerFormatter.format(data.activeTeaProfiles)} hint="Perfis ativos carregados" icon={HeartPulse} tone="red" />
+                  <MetricTile label="Terapias ativas" value={integerFormatter.format(data.activeTeaProfiles)} hint="Perfis ativos carregados" icon={HeartPulse} tone="red" />
                 </SimpleGrid>
               </Paper>
             ),
@@ -2949,7 +2912,7 @@ export function BIGestao() {
                         <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <ChartTooltip />
-                        <Bar dataKey="value" fill={DARK_BLUE} radius={[8, 8, 0, 0]} />
+                        <Bar dataKey="value" fill={chartPrimaryColor} radius={[8, 8, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
@@ -2987,10 +2950,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -3061,10 +3020,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -3122,10 +3077,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -3152,9 +3103,9 @@ export function BIGestao() {
           const cardNodes: Record<string, React.ReactNode> = {
             tea_metrics: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%' }}>
-                {renderEditablePanelTitle(tabId, "Visão TEA", "Visão TEA", "Planejamento e conversão de reservas.", HeartPulse)}
+                {renderEditablePanelTitle(tabId, "Visão Terapias", "Visão Terapias", "Planejamento e conversão de reservas.", HeartPulse)}
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                  <MetricTile label="Perfis ativos" value={integerFormatter.format(asNumber(teaKpis.activeProfiles) || data.activeTeaProfiles)} hint="Pacientes TEA ativos" icon={HeartPulse} tone="grape" />
+                  <MetricTile label="Perfis ativos" value={integerFormatter.format(asNumber(teaKpis.activeProfiles) || data.activeTeaProfiles)} hint="Pacientes de Terapias ativos" icon={HeartPulse} tone="grape" />
                   <MetricTile label="Pendentes" value={integerFormatter.format(asNumber(teaKpis.pendingReservations))} hint="Reservas em aberto" icon={FileClock} tone="orange" />
                   <MetricTile label="Convertidas" value={integerFormatter.format(asNumber(teaKpis.convertedReservations))} hint={`${percentFormatter.format(asNumber(teaKpis.conversionRate))}% de conversão`} icon={ShieldCheck} tone="teal" />
                   <MetricTile label="Canceladas" value={integerFormatter.format(asNumber(teaKpis.canceledReservations))} hint={periodLabel} icon={AlertTriangle} tone="red" />
@@ -3163,7 +3114,7 @@ export function BIGestao() {
             ),
             tea_mix: (
               <Paper p="lg" withBorder style={{ background: panelBg, height: '100%', minWidth: 0 }}>
-                {renderEditablePanelTitle(tabId, "Mix das reservas TEA", "Mix das reservas TEA", "Pendentes, convertidas e canceladas.", BarChart3)}
+                {renderEditablePanelTitle(tabId, "Mix das reservas de Terapias", "Mix das reservas de Terapias", "Pendentes, convertidas e canceladas.", BarChart3)}
                 <Box style={{ minWidth: 0 }}>
                   {(teaCharts.reservationMix || []).some((item: any) => asNumber(item?.value) > 0) ? (
                     <ResponsiveContainer width="100%" height={(DEFAULT_CARD_HEIGHTS['tea_mix'] ?? 460) - 120}>
@@ -3175,7 +3126,7 @@ export function BIGestao() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <Stack h={250} justify="center" align="center"><Text size="sm" c="dimmed">Sem movimentação TEA no período</Text></Stack>
+                    <Stack h={250} justify="center" align="center"><Text size="sm" c="dimmed">Sem movimentação de Terapias no período</Text></Stack>
                   )}
                 </Box>
               </Paper>
@@ -3183,10 +3134,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -3233,7 +3180,7 @@ export function BIGestao() {
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <ChartTooltip />
-                        <Bar dataKey="value" fill={DARK_BLUE} radius={[8, 8, 0, 0]} />
+                        <Bar dataKey="value" fill={chartPrimaryColor} radius={[8, 8, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -3245,10 +3192,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -3296,7 +3239,7 @@ export function BIGestao() {
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <ChartTooltip />
-                        <Bar dataKey="value" fill={DARK_BLUE} radius={[8, 8, 0, 0]} />
+                        <Bar dataKey="value" fill={chartPrimaryColor} radius={[8, 8, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -3308,10 +3251,6 @@ export function BIGestao() {
           };
           return (
             <Stack gap="lg">
-              <Group justify="flex-end" gap="xs">
-                {layout.hidden.length > 0 && <Text size="xs" c="dimmed">{layout.hidden.length} card(s) oculto(s)</Text>}
-                <Button size="xs" variant="subtle" color="gray" leftSection={<RotateCcw size={13} />} onClick={() => handleTabLayoutReset(tabId)}>Resetar layout</Button>
-              </Group>
               {renderTabAISection(tabId, TAB_LABELS[tabId] ?? tabId)}
               <DndContext sensors={dndSensors} collisionDetection={gridCollision} onDragStart={(e) => setActiveDragId(String(e.active.id))} onDragEnd={(e) => handleTabGridDndEnd(tabId, e)}>
                 <StaticWidgetGrid
@@ -3339,8 +3278,6 @@ export function BIGestao() {
     </>
   );
 }
-
-
 
 
 

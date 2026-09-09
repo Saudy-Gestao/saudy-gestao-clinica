@@ -1,4 +1,4 @@
-import { Box, Text, MultiSelect, type BoxProps, type MultiSelectProps } from '@mantine/core';
+import { Box, Text, MultiSelect, type BoxProps, type MultiSelectProps } from '@/components/ui';
 import type { ReactNode } from 'react';
 import { withRequiredIndicator } from './requiredLabel';
 
@@ -53,7 +53,7 @@ export function FloatingMultiSelect({ label, containerProps, value, error, style
           }}
           variant="unstyled"
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</label>
+        <span className="floating-field-label" style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</span>
       </Box>
       {error ? (
         <Text size="xs" c="red" mt={4}>

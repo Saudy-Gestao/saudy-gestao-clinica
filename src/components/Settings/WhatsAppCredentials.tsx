@@ -13,13 +13,9 @@ import {
   Box,
   Paper,
   Badge,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import {
-  IconDeviceFloppy,
-  IconChevronDown,
-  IconChevronUp,
-} from '@tabler/icons-react';
+} from '@/components/ui';
+import { notifications } from '@/components/ui';
+import { Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import whatsappService from '../../services/whatsappService';
 import { useWhatsAppConfigQuery } from '../../hooks/useWhatsAppConfigQuery';
@@ -196,7 +192,7 @@ export function WhatsAppCredentials({
               size="sm"
               disabled={editing}
             >
-              {expanded ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+              {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </ActionIcon>
           </Group>
         </Group>
@@ -261,20 +257,22 @@ export function WhatsAppCredentials({
           <form onSubmit={handleSaveConfig}>
             <Stack gap="md" mt="md">
               {isBranchScope ? (
-                <Switch
-                  label="Sobrescrever nesta filial"
-                  description="Desmarcado: herda automaticamente as credenciais da empresa"
-                  checked={useBranchOverride}
-                  onChange={(e) => {
-                    const checked = e.currentTarget.checked;
-                    setUseBranchOverride(checked);
-                    if (checked) {
-                      setEditing(true);
-                    } else {
-                      setEditing(false);
-                    }
-                  }}
-                />
+                <Box p="md" className="ui-toggle-card ui-toggle-card--dashed">
+                  <Switch
+                    label="Sobrescrever nesta filial"
+                    description="Desmarcado: herda automaticamente as credenciais da empresa"
+                    checked={useBranchOverride}
+                    onChange={(e) => {
+                      const checked = e.currentTarget.checked;
+                      setUseBranchOverride(checked);
+                      if (checked) {
+                        setEditing(true);
+                      } else {
+                        setEditing(false);
+                      }
+                    }}
+                  />
+                </Box>
               ) : null}
 
               {isBranchScope && !useBranchOverride ? (
@@ -316,13 +314,15 @@ export function WhatsAppCredentials({
                     disabled={!editing && hasExistingConfig}
                   />
 
-                  <Switch
-                    label="Ativo"
-                    description="Quando desativado, nenhuma mensagem será enviada"
-                    checked={configForm.isActive}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, isActive: e.target.checked }))}
-                    disabled={!editing && hasExistingConfig}
-                  />
+                  <Box p="md" className="ui-toggle-card">
+                    <Switch
+                      label="Ativo"
+                      description="Quando desativado, nenhuma mensagem será enviada"
+                      checked={configForm.isActive}
+                      onChange={(e) => setConfigForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                      disabled={!editing && hasExistingConfig}
+                    />
+                  </Box>
                 </>
               ) : null}
 
@@ -333,7 +333,7 @@ export function WhatsAppCredentials({
                   <Group>
                     <Button
                       type="submit"
-                      leftSection={<IconDeviceFloppy size={16} />}
+                      leftSection={<Save size={16} />}
                       loading={loading}
                     >
                       {isBranchScope && !useBranchOverride ? 'Salvar Herança da Empresa' : 'Salvar Configuração'}

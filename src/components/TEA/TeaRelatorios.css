@@ -1,0 +1,72 @@
+.tea-relatorios-page {
+  min-height: 100vh;
+  background: var(--ui-background);
+}
+
+.tea-relatorios-shell {
+  width: min(1400px, 100%);
+  margin-inline: auto;
+}
+
+.tea-relatorios-hero {
+  padding: 1.25rem 0 1.5rem;
+}
+
+.tea-relatorios-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.tea-relatorios-title {
+  color: var(--ui-foreground);
+}
+
+.tea-relatorios-subtitle {
+  margin-top: .25rem;
+  color: var(--ui-muted);
+}
+
+.tea-relatorios-panel {
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .75rem 2rem rgb(0 0 0 / .08);
+}
+
+.tea-relatorios-panel-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: 1.05rem;
+}
+
+.tea-relatorios-section {
+  padding-top: 1rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.tea-relatorios-section--first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.tea-relatorios-section-title {
+  margin: 0 0 .85rem;
+  color: var(--ui-muted);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.tea-relatorios-empty {
+  padding: 1rem 0;
+}
+
+.tea-relatorios-card {
+  border-color: var(--ui-border) !important;
+  background: color-mix(in srgb, var(--ui-background) 70%, var(--ui-surface));
+  border-radius: .8rem;
+}

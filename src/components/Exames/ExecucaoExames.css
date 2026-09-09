@@ -1,0 +1,626 @@
+.execucao-exames-page {
+  background:
+    radial-gradient(circle at 94% 7%, color-mix(in srgb, var(--ui-primary) 10%, transparent), transparent 24rem),
+    var(--ui-background);
+}
+
+.execucao-exames-content {
+  min-height: calc(100vh - 5rem);
+  padding-block: clamp(1.5rem, 4vw, 3.5rem) !important;
+  padding-inline: clamp(1rem, 3vw, 2rem) !important;
+}
+
+.execucao-exames-hero {
+  min-height: 8rem;
+  padding: 1.25rem 0 1.75rem;
+}
+
+.execucao-exames-eyebrow,
+.execucao-exames-toolbar-kicker {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.execucao-exames-title,
+.execucao-exames-toolbar-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  letter-spacing: -.035em;
+}
+
+.execucao-exames-title {
+  font-size: clamp(1.75rem, 3vw, 2.7rem) !important;
+  line-height: 1.05;
+}
+
+.execucao-exames-subtitle,
+.execucao-exames-toolbar-count {
+  margin-top: .55rem;
+  color: var(--ui-muted);
+  font-size: .98rem;
+}
+
+.execucao-exames-hero-meta {
+  justify-content: flex-end;
+}
+
+.execucao-exames-hero-badge,
+.execucao-exames-section-count {
+  min-height: 1.8rem;
+  padding: .35rem .7rem;
+  font-size: .75rem;
+}
+
+.execucao-exames-hub {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 1rem !important;
+  align-items: stretch;
+}
+
+.execucao-exames-hub-card {
+  position: relative;
+  min-height: 12rem !important;
+  padding: 1.35rem !important;
+  overflow: hidden;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 1.1rem;
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.execucao-exames-hub-card::after {
+  position: absolute;
+  right: -3.5rem;
+  bottom: -4rem;
+  width: 10rem;
+  height: 10rem;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 16%, transparent);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.execucao-exames-hub-card:hover,
+.execucao-exames-hub-card:focus-within {
+  border-color: var(--ui-primary);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / .16);
+  transform: translateY(-2px);
+}
+
+.execucao-exames-hub-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  align-self: center;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 42%, var(--ui-border));
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--ui-primary) 12%, var(--ui-background));
+  color: var(--ui-primary);
+}
+
+.execucao-exames-hub-icon svg {
+  display: block;
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.execucao-exames-list-toolbar {
+  align-items: center;
+  padding: .5rem 0 1rem;
+}
+
+.execucao-exames-toolbar-title {
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
+}
+
+.execucao-exames-toolbar-count {
+  margin: 0;
+  padding: .5rem .8rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  font-size: .8rem;
+  white-space: nowrap;
+}
+
+.execucao-exames-toolbar-meta {
+  justify-content: flex-end;
+}
+
+.execucao-exames-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin: 0;
+  color: var(--ui-success);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.execucao-exames-live-status svg {
+  animation: execucao-exames-live-pulse 1.8s ease-in-out infinite;
+}
+
+.execucao-exames-filters {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--ui-surface) 82%, var(--ui-background));
+}
+
+.execucao-exames-filters-row {
+  align-items: flex-end;
+}
+
+.execucao-exames-filter-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  max-width: 32rem;
+  margin: 0;
+  color: var(--ui-muted);
+  line-height: 1.4;
+}
+
+.execucao-exames-search {
+  width: min(100%, 28rem);
+}
+
+.execucao-exames-filter-field {
+  width: min(100%, 13rem);
+}
+
+.execucao-exames-clear-filters {
+  min-height: 2.75rem;
+}
+
+.execucao-exames-search .ui-field {
+  gap: .45rem;
+}
+
+.execucao-exames-search .ui-field-label {
+  color: var(--ui-muted);
+  font-size: .76rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.execucao-exames-search .ui-input-wrap {
+  position: relative;
+}
+
+.execucao-exames-search .ui-input-wrap > svg {
+  position: absolute;
+  left: .85rem;
+  z-index: 1;
+  color: var(--ui-muted);
+  pointer-events: none;
+}
+
+.execucao-exames-search .ui-input {
+  min-height: 3rem;
+  padding-left: 2.65rem;
+  border-radius: .8rem;
+  background: var(--ui-surface);
+}
+
+.execucao-exames-sections {
+  gap: 1rem !important;
+}
+
+.execucao-exames-section {
+  padding: 1.15rem !important;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 .75rem 2rem color-mix(in srgb, var(--ui-foreground) 5%, transparent);
+}
+
+.execucao-exames-section-header {
+  padding-bottom: .9rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.execucao-exames-section-heading {
+  min-width: 0;
+}
+
+.execucao-exames-section-marker {
+  width: .55rem;
+  min-width: .55rem;
+  height: .55rem;
+  border-radius: 999px;
+  background: var(--ui-primary);
+  box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--ui-primary) 12%, transparent);
+}
+
+.execucao-exames-section-title {
+  font-size: 1rem;
+  letter-spacing: -.015em;
+}
+
+.execucao-exames-section-description {
+  max-width: 42rem;
+  margin-top: .3rem;
+  font-size: .8rem;
+}
+
+.execucao-exames-section-count {
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--ui-primary) 13%, transparent);
+  color: var(--ui-primary);
+}
+
+.execucao-exames-section[data-status='Aguardando triagem'],
+.execucao-exames-section[data-status='Em triagem'] {
+  border-left: 3px solid var(--ui-warning) !important;
+}
+
+.execucao-exames-section[data-status='Aguardando triagem'] .execucao-exames-section-marker,
+.execucao-exames-section[data-status='Em triagem'] .execucao-exames-section-marker {
+  background: var(--ui-warning);
+  box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--ui-warning) 14%, transparent);
+}
+
+.execucao-exames-section[data-status='Aguardando exame'],
+.execucao-exames-section[data-status='Chamado para exame'] {
+  border-left: 3px solid var(--ui-primary) !important;
+}
+
+.execucao-exames-section[data-status='Em exame'] {
+  border-left: 3px solid var(--ui-success) !important;
+}
+
+.execucao-exames-section[data-status='Exame concluído'] {
+  border-left: 3px solid var(--ui-success) !important;
+}
+
+.execucao-exames-section[data-status='Em exame'] .execucao-exames-section-marker,
+.execucao-exames-section[data-status='Exame concluído'] .execucao-exames-section-marker {
+  background: var(--ui-success);
+  box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--ui-success) 14%, transparent);
+}
+
+.execucao-exames-patient-card {
+  padding: 1rem !important;
+  background: var(--ui-background);
+  border: 1px solid var(--ui-border) !important;
+  border-radius: .85rem;
+}
+
+.execucao-exames-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ui-primary) 18%, var(--ui-background));
+  color: var(--ui-primary);
+}
+
+.execucao-exames-patient-card .ui-badge {
+  max-width: 100%;
+}
+
+.execucao-exames-action-button,
+.execucao-exames-image-button {
+  min-height: 2.25rem;
+  white-space: nowrap;
+}
+
+.execucao-exames-image-button {
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 38%, var(--ui-border));
+}
+
+.execucao-exames-table-wrap,
+.execucao-exames-table {
+  width: 100%;
+}
+
+.execucao-exames-table {
+  min-width: 900px;
+  table-layout: auto;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: .8rem;
+  background: var(--ui-background);
+}
+
+.execucao-exames-table th:first-child,
+.execucao-exames-table td:first-child {
+  min-width: 15rem;
+}
+
+.execucao-exames-table th:nth-child(2),
+.execucao-exames-table td:nth-child(2) {
+  min-width: 13rem;
+}
+
+.execucao-exames-table th {
+  padding: .75rem .8rem;
+  background: color-mix(in srgb, var(--ui-surface) 72%, var(--ui-background));
+  color: var(--ui-muted) !important;
+  font-size: .7rem !important;
+  font-weight: 750 !important;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.execucao-exames-table td {
+  padding: .9rem .8rem;
+  border-bottom-color: var(--ui-border) !important;
+}
+
+.execucao-exames-table tbody tr {
+  transition: background-color .16s ease;
+}
+
+.execucao-exames-table tbody tr:hover {
+  background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-background));
+}
+
+.execucao-exames-table .ui-table-cell,
+.execucao-exames-table td {
+  overflow: hidden;
+}
+
+.execucao-exames-schedule-cell .ui-stack {
+  min-width: 0;
+}
+
+.execucao-exames-schedule-cell .ui-text:first-child {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.execucao-exames-schedule-cell .ui-text:first-child svg {
+  flex-shrink: 0;
+  color: var(--ui-primary);
+}
+
+.execucao-exames-actions-cell {
+  width: 13.5rem;
+  text-align: right;
+}
+
+.execucao-exames-actions-heading {
+  text-align: right !important;
+}
+
+.execucao-exames-actions {
+  flex-wrap: nowrap;
+}
+
+.execucao-exames-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.execucao-exames-table .ui-button {
+  font-size: .78rem;
+}
+
+.execucao-exames-table .ui-group {
+  justify-content: flex-end;
+}
+
+.execucao-exames-modal {
+  width: min(100% - 2rem, 52rem) !important;
+  max-height: min(92vh, 54rem) !important;
+  border-radius: 1.2rem !important;
+}
+
+.execucao-exames-modal .ui-modal-header {
+  padding: 1.35rem 1.5rem;
+  background: var(--ui-surface);
+}
+
+.execucao-exames-modal .ui-modal-header h2 {
+  font-size: 1.25rem;
+  letter-spacing: -.02em;
+}
+
+.execucao-exames-modal .ui-modal-body {
+  padding: 1.5rem;
+}
+
+.execucao-exames-modal-content {
+  gap: 1.15rem !important;
+}
+
+.execucao-exames-modal-intro {
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 28%, var(--ui-border));
+  border-radius: .9rem;
+  background: color-mix(in srgb, var(--ui-primary) 7%, var(--ui-surface));
+}
+
+.execucao-exames-modal-patient {
+  font-size: 1.15rem;
+}
+
+.execucao-exames-modal-template {
+  margin-top: .25rem;
+}
+
+.execucao-exames-modal-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: .85rem !important;
+}
+
+.execucao-exames-modal-metrics .ui-field,
+.execucao-exames-question,
+.execucao-exames-modal-content > .ui-field {
+  padding: .85rem;
+  border: 1px solid var(--ui-border);
+  border-radius: .8rem;
+  background: var(--ui-surface);
+}
+
+.execucao-exames-question {
+  display: grid;
+  gap: .55rem;
+}
+
+.execucao-exames-question-label {
+  font-size: .9rem;
+}
+
+.execucao-exames-modal-footer {
+  position: sticky;
+  bottom: -1.5rem;
+  z-index: 1;
+  margin-inline: -1.5rem;
+  margin-bottom: -1.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-background) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 799px) {
+  .execucao-exames-content {
+    padding-top: 1rem !important;
+  }
+
+  .execucao-exames-hero {
+    align-items: flex-start !important;
+    min-height: 0;
+    padding-block: .5rem 1.25rem;
+  }
+
+  .execucao-exames-hero-meta {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .execucao-exames-hub {
+    grid-template-columns: 1fr !important;
+  }
+
+  .execucao-exames-hub-card {
+    min-height: 9.5rem !important;
+  }
+
+  .execucao-exames-list-toolbar {
+    align-items: flex-start !important;
+  }
+
+  .execucao-exames-toolbar-meta {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .execucao-exames-toolbar-count {
+    margin-top: .5rem;
+  }
+
+  .execucao-exames-filters {
+    gap: .8rem;
+  }
+
+  .execucao-exames-filters-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .execucao-exames-search,
+  .execucao-exames-filter-field {
+    width: 100%;
+  }
+
+  .execucao-exames-clear-filters {
+    width: 100%;
+  }
+
+  .execucao-exames-filter-hint {
+    max-width: none;
+    margin: 0;
+  }
+
+  .execucao-exames-section {
+    padding: .8rem !important;
+  }
+
+  .execucao-exames-section > .ui-stack > .ui-group:first-child {
+    gap: .6rem;
+  }
+
+  .execucao-exames-patient-card .ui-group:last-child {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .execucao-exames-patient-card .ui-group:last-child > .ui-group {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .execucao-exames-patient-card .ui-group:last-child > .ui-button,
+  .execucao-exames-patient-card .ui-group:last-child .ui-button {
+    width: 100%;
+  }
+
+  .execucao-exames-modal {
+    width: 100% !important;
+    max-height: 100vh !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .execucao-exames-modal .ui-modal-body {
+    padding: 1rem;
+  }
+
+  .execucao-exames-modal-metrics {
+    grid-template-columns: 1fr !important;
+  }
+
+  .execucao-exames-modal-footer {
+    bottom: -1rem;
+    margin-inline: -1rem;
+    margin-bottom: -1rem;
+    padding: .85rem 1rem;
+  }
+
+  .execucao-exames-modal-footer .ui-button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .execucao-exames-live-status svg {
+    animation: none;
+  }
+
+  .execucao-exames-hub-card,
+  .execucao-exames-table tbody tr {
+    transition: none;
+  }
+}
+
+@keyframes execucao-exames-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .42; }
+}

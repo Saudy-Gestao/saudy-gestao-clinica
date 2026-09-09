@@ -1,0 +1,210 @@
+.pre-atendimento-page {
+  background:
+    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--ui-primary) 10%, transparent), transparent 24rem),
+    var(--ui-background);
+}
+
+.pre-atendimento-content {
+  min-height: calc(100vh - 5rem);
+  padding-block: clamp(1.5rem, 4vw, 3.5rem) !important;
+  padding-inline: clamp(1rem, 3vw, 2rem) !important;
+}
+
+.pre-atendimento-hero {
+  min-height: 6.5rem;
+  padding: 1.25rem 0 1.75rem;
+}
+
+.pre-atendimento-eyebrow {
+  margin: 0 0 .5rem;
+  color: var(--ui-primary) !important;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.pre-atendimento-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: clamp(1.75rem, 3vw, 2.7rem) !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+.pre-atendimento-subtitle {
+  margin-top: .55rem;
+  color: var(--ui-muted);
+  font-size: .98rem;
+}
+
+.pre-atendimento-search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--ui-surface) 82%, var(--ui-background));
+}
+
+.pre-atendimento-search-kicker {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.pre-atendimento-search-input {
+  width: min(100%, 28rem);
+}
+
+.pre-atendimento-avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ui-primary);
+  color: var(--ui-primary-foreground);
+}
+
+.pre-atendimento-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: .85rem;
+}
+
+.pre-atendimento-table th {
+  padding: .75rem .85rem;
+  background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-surface));
+  color: var(--ui-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pre-atendimento-table td {
+  padding: .9rem .85rem;
+  border-bottom-color: color-mix(in srgb, var(--ui-border) 78%, transparent);
+}
+
+.pre-atendimento-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.pre-atendimento-table tbody tr:hover {
+  background: color-mix(in srgb, var(--ui-primary) 6%, var(--ui-background));
+}
+
+.pre-atendimento-empty-state {
+  border-color: var(--ui-border) !important;
+  border-radius: .95rem;
+  background: color-mix(in srgb, var(--ui-primary) 2.5%, var(--ui-surface));
+}
+
+.checklist-modal {
+  max-height: min(88vh, 60rem);
+}
+
+.checklist-section {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+
+.checklist-section-header {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+.checklist-step-badge {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--ui-primary);
+  color: var(--ui-primary-foreground);
+  font-weight: 700;
+  font-size: .9rem;
+  box-shadow: 0 .35rem 1rem color-mix(in srgb, var(--ui-primary) 35%, transparent);
+}
+
+.checklist-section-title {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.checklist-section-subtitle {
+  margin: .1rem 0 0;
+  color: var(--ui-primary);
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.checklist-card {
+  padding: 1.35rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 1.1rem;
+  background: var(--ui-surface);
+  box-shadow: 0 .5rem 1.5rem rgb(0 0 0 / .1);
+}
+
+.checklist-divider {
+  border-color: var(--ui-border) !important;
+}
+
+.checklist-upload-box {
+  min-height: 4.5rem;
+  border: 1px dashed var(--ui-border) !important;
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--ui-primary) 4%, var(--ui-surface)) !important;
+  color: var(--ui-muted) !important;
+}
+
+.checklist-payment-option {
+  min-height: 4.75rem;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: .85rem;
+  background: var(--ui-surface) !important;
+  color: var(--ui-foreground) !important;
+  font-weight: 600;
+  transition: border-color .15s ease, background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.checklist-payment-option.is-selected {
+  border-color: var(--ui-primary) !important;
+  background: var(--ui-primary) !important;
+  color: var(--ui-primary-foreground) !important;
+  box-shadow: 0 .5rem 1.25rem color-mix(in srgb, var(--ui-primary) 35%, transparent);
+}
+
+@media (max-width: 799px) {
+  .pre-atendimento-content {
+    padding-top: 1rem !important;
+  }
+
+  .pre-atendimento-hero {
+    min-height: 0;
+    padding-block: .5rem 1.25rem;
+  }
+
+  .pre-atendimento-search-input {
+    width: 100%;
+  }
+
+  .checklist-card {
+    padding: 1rem;
+  }
+}
