@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Stack, Title, Text, Checkbox, Button, Group, List, ThemeIcon } from '@mantine/core';
+import { Modal, Stack, Title, Text, Checkbox, Button, Group, List, ThemeIcon } from '@/components/ui';
 import { ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface LGPDBiometricConsentProps {

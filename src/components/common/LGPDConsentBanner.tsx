@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Button, Group, Text, Anchor } from '@mantine/core';
+import { Box, Button, Group, Text, Anchor } from '@/components/ui';
 import { ShieldCheck } from 'lucide-react';
 
 const CONSENT_KEY = 'lgpd_consent_accepted';
@@ -33,18 +33,18 @@ export function LGPDConsentBanner() {
     >
       <Group justify="space-between" align="center" wrap="wrap" gap="md">
         <Group gap="sm" align="flex-start" style={{ flex: 1, minWidth: 260 }}>
-          <ShieldCheck size={20} color="var(--mantine-color-blue-4)" style={{ marginTop: 2, flexShrink: 0 }} />
+          <ShieldCheck size={20} color="#7dabff" style={{ marginTop: 2, flexShrink: 0 }} />
           <Box>
-            <Text size="sm" fw={600} c="white">
+            <Text size="sm" fw={600} style={{ color: '#f4f7fc' }}>
               Este sistema utiliza armazenamento local de dados
             </Text>
-            <Text size="xs" c="dimmed" mt={2}>
+            <Text size="xs" mt={2} style={{ color: '#a6b0c1' }}>
               Para funcionar corretamente, salvamos informações de sessão e preferências no seu dispositivo. Nenhum dado é compartilhado com terceiros nem utilizamos rastreamento externo. Ao continuar, você concorda com nossa{' '}
-              <Anchor href="/privacidade" target="_blank" rel="noopener noreferrer" size="xs" c="blue.4">
+              <Anchor href="/privacidade" target="_blank" rel="noopener noreferrer" size="xs" c="#7dabff">
                 Política de Privacidade
               </Anchor>
               {' '}e nossos{' '}
-              <Anchor href="/termos" target="_blank" rel="noopener noreferrer" size="xs" c="blue.4">
+              <Anchor href="/termos" target="_blank" rel="noopener noreferrer" size="xs" c="#7dabff">
                 Termos de Serviço
               </Anchor>
               {', '}em conformidade com a LGPD.

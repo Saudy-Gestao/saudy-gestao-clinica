@@ -1,4 +1,4 @@
-import { Box, Text } from '@mantine/core';
+import { Box, Text } from '@/components/ui';
 import { type ComponentPropsWithoutRef, type ReactNode, useMemo, useState } from 'react';
 import { formatCNPJ, formatCPF, formatDateInput, formatPhone, normalizeEmail } from '../../utils/formatters';
 import { withRequiredIndicator } from './requiredLabel';

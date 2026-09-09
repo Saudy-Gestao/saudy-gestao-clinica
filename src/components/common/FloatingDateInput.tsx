@@ -1,5 +1,5 @@
-import { Box, Text, type BoxProps } from '@mantine/core';
-import { DateInput, type DateInputProps } from '@mantine/dates';
+import { Box, Text, type BoxProps } from '@/components/ui';
+import { DateInput, type DateInputProps } from '@/components/ui';
 import type { ReactNode } from 'react';
 import { withRequiredIndicator } from './requiredLabel';
 
@@ -27,7 +27,7 @@ export function FloatingDateInput({ label, containerProps, value, error, ...prop
           placeholder=""
           variant="unstyled"
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</label>
+        <span className="floating-field-label" style={{ color: error ? '#fa5252' : undefined }}>{withRequiredIndicator(label, requiredIndicator)}</span>
       </Box>
       {error ? (
         <Text size="xs" c="red" mt={4}>

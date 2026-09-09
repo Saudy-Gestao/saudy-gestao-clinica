@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Button, Group, Stack, Text, Center, Box, Loader } from '@mantine/core';
+import { Modal, Button, Group, Stack, Text, Center, Box, Loader } from '@/components/ui';
 import { Camera, X, Check } from 'lucide-react';
 import facialRecognitionService from '../../services/facialRecognitionService';
-import { showNotification } from '@mantine/notifications';
+import { showNotification } from '@/components/ui';
 import { LGPDBiometricConsent } from './LGPDBiometricConsent';
 
 interface FacialCaptureProps {

@@ -1,4 +1,4 @@
-import { Box, TagsInput, Text, type BoxProps, type TagsInputProps } from '@mantine/core';
+import { Box, TagsInput, Text, type BoxProps, type TagsInputProps } from '@/components/ui';
 import type { ReactNode } from 'react';
 
 interface FloatingTagsInputProps extends TagsInputProps {
@@ -50,7 +50,7 @@ export function FloatingTagsInput({ label, containerProps, value, error, styles,
             ...styles,
           }}
         />
-        <label style={{ color: error ? '#fa5252' : undefined }}>{label}</label>
+        <span className="floating-field-label" style={{ color: error ? '#fa5252' : undefined }}>{label}</span>
       </Box>
       {error ? (
         <Text size="xs" c="red" mt={4}>
