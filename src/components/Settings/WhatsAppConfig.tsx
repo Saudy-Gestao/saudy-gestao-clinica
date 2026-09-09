@@ -19,30 +19,30 @@ import {
   Code,
   Card,
   Skeleton,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+  TextInput,
+  NumberInput,
+  Textarea,
+  Select,
+} from '@/components/ui';
+import { notifications } from '@/components/ui';
 import {
-  IconMessage,
-  IconBell,
-  IconHistory,
-  IconTrash,
-  IconPlus,
-  IconEye,
-  IconAlertCircle,
-  IconClock,
-  IconInfoCircle,
-  IconRefresh,
-  IconDeviceFloppy,
-  IconSparkles,
-} from '@tabler/icons-react';
+  MessageSquare,
+  Bell,
+  History,
+  Trash2,
+  Plus,
+  Eye,
+  AlertCircle,
+  Clock,
+  Info,
+  RefreshCcw,
+  Save,
+  Sparkles,
+} from 'lucide-react';
 import whatsappService from '../../services/whatsappService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { useWhatsAppPageDataQuery } from '../../hooks/useWhatsAppPageDataQuery';
 import { queryKeys } from '../../lib/queryKeys';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingNumberInput } from '../common/FloatingNumberInput';
-import { FloatingTextarea } from '../common/FloatingTextarea';
-import { FloatingSelect } from '../common/FloatingSelect';
 import { useWhatsAppConfigQuery } from '../../hooks/useWhatsAppConfigQuery';
 
 interface TemplateFormValues {
@@ -525,7 +525,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
     <Box p={embedded ? 0 : "md"}>
       {showAlert && (
         <Alert 
-          icon={<IconAlertCircle size={16} />} 
+          icon={<AlertCircle size={16} />} 
           mb="md" 
           color="yellow"
           withCloseButton
@@ -540,13 +540,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
       <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'templates')}>
         <Tabs.List>
-          <Tabs.Tab value="templates" leftSection={<IconMessage size={16} />}>
+          <Tabs.Tab value="templates" leftSection={<MessageSquare size={16} />}>
             Templates de Mensagens
           </Tabs.Tab>
-          <Tabs.Tab value="notifications" leftSection={<IconBell size={16} />}>
+          <Tabs.Tab value="notifications" leftSection={<Bell size={16} />}>
             Notificações
           </Tabs.Tab>
-          <Tabs.Tab value="logs" leftSection={<IconHistory size={16} />}>
+          <Tabs.Tab value="logs" leftSection={<History size={16} />}>
             Histórico
           </Tabs.Tab>
         </Tabs.List>
@@ -559,7 +559,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               <Group gap="xs">
                 <Button
                   variant="light"
-                  leftSection={<IconSparkles size={16} />}
+                  leftSection={<Sparkles size={16} />}
                   onClick={handleLoadDefaults}
                   loading={loading}
                 >
@@ -567,14 +567,14 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                 </Button>
                 <Button
                   variant="light"
-                  leftSection={<IconRefresh size={16} />}
+                  leftSection={<RefreshCcw size={16} />}
                   onClick={handleSyncHsm}
                   loading={syncLoading}
                 >
                   Sincronizar status HSM
                 </Button>
                 <Button
-                  leftSection={<IconPlus size={16} />}
+                  leftSection={<Plus size={16} />}
                   onClick={() => openTemplateModal()}
                 >
                   Novo Template
@@ -582,7 +582,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               </Group>
             </Group>
 
-            <Alert icon={<IconInfoCircle size={16} />} mb="md">
+            <Alert icon={<Info size={16} />} mb="md">
               Use variáveis como <Code>{'{{paciente_nome}}'}</Code>, <Code>{'{{data}}'}</Code>, <Code>{'{{hora}}'}</Code> para personalizar as mensagens.
             </Alert>
 
@@ -633,14 +633,14 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                         color="blue"
                         onClick={() => openTemplateModal(template)}
                       >
-                        <IconEye size={16} />
+                        <Eye size={16} />
                       </ActionIcon>
                       <ActionIcon
                         variant="light"
                         color="red"
                         onClick={() => setDeleteConfirmTemplate({ id: template.id, name: template.name })}
                       >
-                        <IconTrash size={16} />
+                        <Trash2 size={16} />
                       </ActionIcon>
                     </Group>
                   </Group>
@@ -652,7 +652,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               ))}
 
               {templates.length === 0 && (
-                <Alert icon={<IconAlertCircle size={16} />}>
+                <Alert icon={<AlertCircle size={16} />}>
                   Nenhum template cadastrado. Clique em "Novo Template" para criar.
                 </Alert>
               )}
@@ -668,24 +668,28 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
                 <Title order={4}>Configurações de Notificações</Title>
 
                 <Divider label="Mensagem ao criar agendamento" />
-                
-                <Switch
-                  label="Enviar mensagem ao criar agendamento"
-                  description="Envia mensagem WhatsApp imediatamente após criar um agendamento"
-                  checked={notificationForm.sendOnAppointmentCreated}
-                  onChange={(e) => setNotificationForm(prev => ({ ...prev, sendOnAppointmentCreated: e.target.checked }))}
-                />
+
+                <Box p="md" className="ui-toggle-card">
+                  <Switch
+                    label="Enviar mensagem ao criar agendamento"
+                    description="Envia mensagem WhatsApp imediatamente após criar um agendamento"
+                    checked={notificationForm.sendOnAppointmentCreated}
+                    onChange={(e) => setNotificationForm(prev => ({ ...prev, sendOnAppointmentCreated: e.target.checked }))}
+                  />
+                </Box>
 
                 <Divider label="Confirmação de agendamento" mt="md" />
-                
-                <Switch
-                  label="Enviar confirmação de agendamento"
-                  description="Envia uma mensagem de confirmação antes do agendamento"
-                  checked={notificationForm.sendConfirmationEnabled}
-                  onChange={(e) => setNotificationForm(prev => ({ ...prev, sendConfirmationEnabled: e.target.checked }))}
-                />
 
-                <FloatingNumberInput
+                <Box p="md" className="ui-toggle-card">
+                  <Switch
+                    label="Enviar confirmação de agendamento"
+                    description="Envia uma mensagem de confirmação antes do agendamento"
+                    checked={notificationForm.sendConfirmationEnabled}
+                    onChange={(e) => setNotificationForm(prev => ({ ...prev, sendConfirmationEnabled: e.target.checked }))}
+                  />
+                </Box>
+
+                <NumberInput
                   label="Horas antes do agendamento"
                   description="Defina quantas horas antes do agendamento a mensagem de confirmação deve ser enviada"
                   min={1}
@@ -697,13 +701,13 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
 
                 <Button
                   type="submit"
-                  leftSection={<IconDeviceFloppy size={16} />}
+                  leftSection={<Save size={16} />}
                   loading={loading || isFetching}
                 >
                   Salvar Configurações
                 </Button>
 
-                <Alert icon={<IconClock size={16} />} color="blue">
+                <Alert icon={<Clock size={16} />} color="blue">
                   <Text size="sm">
                     <strong>Nota:</strong> Para que as confirmações e lembretes funcionem, é necessário
                     configurar um job cron para chamar os endpoints de processamento regularmente.
@@ -754,7 +758,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             </Table>
 
             {logs.length === 0 && (
-              <Alert icon={<IconAlertCircle size={16} />} mt="md">
+              <Alert icon={<AlertCircle size={16} />} mt="md">
                 Nenhuma mensagem enviada ainda.
               </Alert>
             )}
@@ -771,9 +775,10 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
       >
         <form onSubmit={handleSaveTemplate}>
           <Stack gap="md">
-            <FloatingSelect
+            <Select
               label="Tipo de Mensagem"
               required
+              withAsterisk
               data={[
                 { value: 'APPOINTMENT_CREATED', label: 'Resumo de Agendamento', disabled: !isEditingTemplate && templates.some((template) => template.type === 'APPOINTMENT_CREATED') },
                 { value: 'TELECONSULTATION_LINK', label: 'Link de Teleconsulta', disabled: !isEditingTemplate && templates.some((template) => template.type === 'TELECONSULTATION_LINK') },
@@ -794,10 +799,11 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               }}
             />
 
-            <FloatingInput
+            <TextInput
               label="Nome do Template"
               placeholder="Ex: Confirmação Padrão"
               required
+              withAsterisk
               value={templateForm.name}
               onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
             />
@@ -822,27 +828,36 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
               </Group>
             </div>
 
-            <FloatingTextarea
+            <Textarea
               label="Mensagem"
               placeholder="Digite a mensagem..."
               required
+              withAsterisk
               minRows={6}
               value={templateForm.message}
               onChange={(e) => setTemplateForm(prev => ({ ...prev, message: e.target.value }))}
             />
 
-            <Switch
-              label="Template ativo"
-              checked={templateForm.isActive}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setActivationConfirm({ mode: 'form' });
-                  return;
-                }
-                setTemplateForm(prev => ({ ...prev, isActive: false }));
-                setSendValidationOnSave(false);
-              }}
-            />
+            <Box p="md" className="ui-toggle-card">
+              <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+                <Box>
+                  <Text fw={600} size="sm">Template ativo</Text>
+                  <Text size="xs" c="dimmed">Templates inativos não podem ser usados para enviar mensagens.</Text>
+                </Box>
+                <Switch
+                  label={templateForm.isActive ? 'Ativo' : 'Inativo'}
+                  checked={templateForm.isActive}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setActivationConfirm({ mode: 'form' });
+                      return;
+                    }
+                    setTemplateForm(prev => ({ ...prev, isActive: false }));
+                    setSendValidationOnSave(false);
+                  }}
+                />
+              </Group>
+            </Box>
 
             <Group justify="flex-end">
               <Button variant="light" type="button" onClick={() => {
@@ -878,7 +893,7 @@ export function WhatsAppConfig({ embedded = false }: WhatsAppConfigProps) {
             <Button variant="default" onClick={() => setDeleteConfirmTemplate(null)}>
               Cancelar
             </Button>
-            <Button color="red" leftSection={<IconTrash size={16} />} onClick={handleDeleteTemplate} loading={deleteLoading}>
+            <Button color="red" leftSection={<Trash2 size={16} />} onClick={handleDeleteTemplate} loading={deleteLoading}>
               Excluir
             </Button>
           </Group>

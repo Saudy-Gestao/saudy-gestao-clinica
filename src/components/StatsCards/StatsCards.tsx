@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from 'react';
-import { Paper, SimpleGrid, Text, Skeleton, useMantineColorScheme, Stack } from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
+import { Paper, Text, Skeleton, Stack, Group } from '@/components/ui';
+import { showNotification } from '@/components/ui';
 import dayjs from 'dayjs';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { isDoctorUser } from '../../utils/userRole';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { Activity, CalendarDays, CheckCircle2, Clock3 } from 'lucide-react';
+import './StatsCards.css';
 
 const ACTIVE_CONSULTATION_STATUSES = [
   'aguardando atendimento',
@@ -55,7 +57,6 @@ const extractAppointmentDoctorName = (appointment: any) => normalizeText(
 );
 
 export function StatsCards({ user }: StatsCardsProps) {
-  const { colorScheme } = useMantineColorScheme();
   const { data: consultations = [], isLoading: consultationsLoading, error: consultationsError } = useClinicalQueueQuery();
   const { data: appointments = [], isLoading: appointmentsLoading, error: appointmentsError } = useAppointmentsQuery();
   const doctorView = isDoctorUser(user);
@@ -122,17 +123,13 @@ export function StatsCards({ user }: StatsCardsProps) {
 
   if (loading) {
     return (
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg" mb={40}>
+      <div className="dashboard-stats-grid" aria-label="Carregando indicadores">
         {Array.from({ length: 3 }).map((_, index) => (
           <Paper
             key={index}
-            p="lg"
+            className="dashboard-stat-card"
             withBorder
             shadow="none"
-            style={colorScheme === 'dark' ? {
-              backgroundColor: 'transparent',
-              borderColor: 'var(--mantine-color-default-border)',
-            } : undefined}
           >
             <Stack gap="sm">
               <Skeleton height={14} width="45%" radius="xl" />
@@ -140,37 +137,45 @@ export function StatsCards({ user }: StatsCardsProps) {
             </Stack>
           </Paper>
         ))}
-      </SimpleGrid>
+      </div>
     );
   }
 
+  const statItems = [
+    {
+      label: 'Agendados hoje',
+      value: stats.agendadosHoje,
+      helper: 'compromissos previstos para hoje',
+      icon: CalendarDays,
+      tone: 'blue',
+    },
+    ...(doctorView
+      ? [{ label: 'Atendidos hoje', value: stats.atendidosHoje, helper: 'atendimentos finalizados no dia', icon: CheckCircle2, tone: 'green' }]
+      : [
+        { label: 'Pendentes hoje', value: stats.pendentesHoje, helper: 'aguardando confirmação ou início', icon: Clock3, tone: 'amber' },
+        { label: 'Em atendimento', value: stats.emAtendimento, helper: 'na operação clínica agora', icon: Activity, tone: 'violet' },
+      ]),
+  ];
+
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg" mb={40}>
-      {[
-        { label: 'Agendados hoje', value: stats.agendadosHoje },
-        ...(doctorView
-          ? [{ label: 'Atendidos hoje', value: stats.atendidosHoje }]
-          : [
-            { label: 'Pendentes hoje', value: stats.pendentesHoje },
-            { label: 'Em atendimento', value: stats.emAtendimento },
-          ]),
-      ].map((stat, index) => (
+    <div className="dashboard-stats-grid" aria-label="Indicadores do dia">
+      {statItems.map((stat) => (
         <Paper
-          key={index}
-          p="lg"
+          key={stat.label}
+          className="dashboard-stat-card"
           withBorder
           shadow="none"
-          style={colorScheme === 'dark' ? {
-            backgroundColor: 'transparent',
-            borderColor: 'var(--mantine-color-default-border)',
-          } : undefined}
         >
-          <Text c="dimmed" size="sm" fw={500} mb="xs">{stat.label}</Text>
-          <Text size="2.5rem" fw={500} style={{ lineHeight: 1 }}>
+          <Group className={`dashboard-stat-card__top dashboard-stat-card__top--${stat.tone}`} justify="space-between" wrap="nowrap">
+            <Text className="dashboard-stat-card__label" size="sm" fw={600}>{stat.label}</Text>
+            <span className="dashboard-stat-card__icon" aria-hidden="true"><stat.icon size={18} strokeWidth={2.1} /></span>
+          </Group>
+          <Text className="dashboard-stat-card__value" size="2.5rem" fw={700}>
             {String(stat.value).padStart(2, '0')}
           </Text>
+          <Text className="dashboard-stat-card__helper" size="sm">{stat.helper}</Text>
         </Paper>
       ))}
-    </SimpleGrid>
+    </div>
   );
 }

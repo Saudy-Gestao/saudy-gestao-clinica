@@ -1,25 +1,21 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Table, Modal, Stack, Popover, ActionIcon, Paper, Menu, Switch, Skeleton, Badge } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { Plus, ChevronLeft, Calendar as CalendarIcon, MoreVertical, Settings } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { Box, Group, Text, Button, Table, Modal, Stack, ActionIcon, Paper, Menu, Switch, Skeleton, Badge, TextInput, Select, Textarea, DateInput } from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { Plus, MoreVertical, Settings } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
-import { DatePicker } from '@mantine/dates';
 import deliveryService from '../../services/deliveryService';
 import facialRecognitionService from '../../services/facialRecognitionService';
 import { FacialCapture } from '../common/FacialCapture';
-import { formatDateInput, isValidCPF } from '../../utils/formatters';
+import { isValidCPF } from '../../utils/formatters';
 import { useDeliveriesQuery } from '../../hooks/useDeliveriesQuery';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import './Entrega.css';
 
 interface DeliveryRow {
   id: string;
@@ -105,9 +101,6 @@ export function Entrega() {
 
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
 
-  const [popoverOpened, setPopoverOpened] = useState(false);
-  const [dateInput, setDateInput] = useState('');
-
   useEffect(() => {
     const mapped: DeliveryRow[] = deliveries.map((it: any, idx: number) => {
       const id = String(it.id ?? it.deliveryId ?? idx + 1);
@@ -164,26 +157,6 @@ export function Entrega() {
     });
     return byId;
   }, [patientsList]);
-
-  const formatDate = (d: Date | null) => {
-    if (!d) return '';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
-  const parseDate = (s: string) => {
-    if (!s) return null;
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (!m) return null;
-    const day = Number(m[1]);
-    const month = Number(m[2]) - 1;
-    const year = Number(m[3]);
-    const date = new Date(year, month, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
-    return date;
-  };
 
   const humanize = (s?: string) => {
     if (!s) return '-';
@@ -358,12 +331,6 @@ export function Entrega() {
       return;
     }
 
-    if (dateInput && !form.dataDisponivel) {
-      setFieldErrors((p) => ({ ...p, dataDisponivel: 'Data disponível inválida' }));
-      showNotification({ title: 'Erro', message: 'Data disponível inválida', color: 'red' });
-      return;
-    }
-
     if (editingId) {
       setRows((prev) => prev.map((p) => p.id === editingId ? { ...p, nomeCompleto: form.paciente, tipo: form.tipoDocumento || p.tipo } : p));
       showNotification({ title: 'Atualizado', message: 'Registro atualizado', color: 'green' });
@@ -404,7 +371,6 @@ export function Entrega() {
       showNotification({ title: 'Adicionado', message: 'Entrega registrada', color: 'green' });
       setModalOpen(false);
       setForm({ paciente: '', tipoDocumento: '', dataDisponivel: null, descricao: '' });
-      setDateInput('');
       await queryClient.invalidateQueries({ queryKey: queryKeys.deliveries });
     } catch (err: any) {
       // map server field errors to front fields (patientName -> paciente, documentType -> tipoDocumento)
@@ -432,57 +398,39 @@ export function Entrega() {
 
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=gestao-e-apoio') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Entrega
-              </Text>
-              <Text size="sm" c="dimmed">
-                Controle de entregas
-              </Text>
-            </Box>
-          </Group>
-          <ActionIcon 
-            variant="default" 
-            size="lg" 
+        <Group justify="space-between" align="flex-start" wrap="wrap" mb="md">
+          <Box className="entrega-hero">
+            <Text className="entrega-eyebrow">GESTÃO E APOIO</Text>
+            <Text className="entrega-title" fw={700} size="2xl">Entrega</Text>
+            <Text className="entrega-subtitle" size="sm">Controle de entregas de exames, laudos e documentos aos pacientes.</Text>
+          </Box>
+          <ActionIcon
+            variant="default"
+            size="lg"
             onClick={() => setSettingsModalOpen(true)}
+            aria-label="Configurações de entrega"
             title="Configurações"
           >
             <Settings size={20} />
           </ActionIcon>
         </Group>
 
-        {/* Search and Button Section */}
-        <Box mb={isMobile ? 20 : 30}>
-          <Group gap="md" align="flex-end">
-            <FloatingInput
-              label="Buscar entregas"
-              placeholder={isMobile ? 'Buscar...' : 'Buscar paciente...'}
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
-              containerProps={{ style: { flex: 1 } }}
-            />
-            <Button
-              bg={DARK_BLUE}
-              c="white"
-              leftSection={isMobile ? undefined : <Plus size={18} />}
-              onClick={() => openRegistrar()}
-              size={isMobile ? 'sm' : 'md'}
-              fw={600}
-              px={isMobile ? 'sm' : 'xl'}
-            >
-              {isMobile ? <Plus size={16} /> : 'Novo entrega'}
-            </Button>
-          </Group>
-        </Box>
+        <Group justify="space-between" align="end" wrap="wrap" gap="sm" mb="md">
+          <TextInput
+            label="Buscar entregas"
+            placeholder={isMobile ? 'Buscar...' : 'Buscar paciente...'}
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            style={{ flex: '1 1 220px', maxWidth: isMobile ? '100%' : 420 }}
+          />
+          <Button leftSection={<Plus size={16} />} onClick={() => openRegistrar()} fullWidth={isMobile}>
+            Nova entrega
+          </Button>
+        </Group>
 
         <Box>
           {rowsLoading ? (
@@ -509,49 +457,28 @@ export function Entrega() {
             >
             <Table horizontalSpacing={isMobile ? 'sm' : 'md'} verticalSpacing={isMobile ? 'sm' : 'md'}>
               <Table.Thead>
-                <Table.Tr style={{ borderBottom: 'none' }}>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Nome</Table.Th>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Data/Hora</Table.Th>
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Responsável</Table.Th>}
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Tipo</Table.Th>}
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Entregue para</Table.Th>}
-                  {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Data/Hora da entrega</Table.Th>}
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Ações</Table.Th>
-
+                <Table.Tr>
+                  <Table.Th>Paciente</Table.Th>
+                  <Table.Th>Disponível desde</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  {!isTablet && <Table.Th>Tipo</Table.Th>}
+                  {!isTablet && <Table.Th>Entrega</Table.Th>}
+                  <Table.Th style={{ width: 56, textAlign: 'center' }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {filtered.length > 0 ? paginatedRows.map((r) => (
-                  <Table.Tr key={r.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                  <Table.Tr key={r.id}>
                     <Table.Td>
-                      <Group gap={isMobile ? 'xs' : 'sm'}>
-                        {!isMobile && (
-                          <Box
-                            bg={DARK_BLUE}
-                            w={32}
-                            h={32}
-                            style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                          >
-                            <Text c="white" fw={600} size="sm">{r.nomeCompleto.charAt(0).toUpperCase()}</Text>
-                          </Box>
-                        )}
-                        <Box>
-                          <Text fw={500} size="xs" style={{ fontSize: isMobile ? '0.8rem' : '0.85rem' }}>{r.nomeCompleto}</Text>
-                          {isMobile && <Text size="xs" c="dimmed">Responsável: {r.responsavel}</Text>}
-                        </Box>
-                      </Group>
+                      <Stack gap={2}>
+                        <Text fw={600} size="sm">{r.nomeCompleto}</Text>
+                        <Text size="xs" c="dimmed">Responsável: {r.responsavel}</Text>
+                      </Stack>
                     </Table.Td>
 
                     <Table.Td>
-                      <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.dataHora}</Text>
+                      <Text size="sm">{r.dataHora}</Text>
                     </Table.Td>
-
-                    {!isTablet && (
-                      <Table.Td>
-                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.responsavel}</Text>
-                      </Table.Td>
-                    )}
 
                     <Table.Td>
                       <Badge variant="light" color={String(r.status).toUpperCase().includes('ENTREGUE') ? 'green' : 'blue'} radius="xl">
@@ -561,26 +488,27 @@ export function Entrega() {
 
                     {!isTablet && (
                       <Table.Td>
-                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.tipo}</Text>
+                        <Text size="sm">{r.tipo}</Text>
                       </Table.Td>
                     )}
 
                     {!isTablet && (
                       <Table.Td>
-                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.entreguePara || '-'}</Text>
+                        {r.entreguePara && r.entreguePara !== '-' ? (
+                          <Stack gap={2}>
+                            <Text size="sm">{r.entreguePara}</Text>
+                            <Text size="xs" c="dimmed">{r.dataHoraEntrega || '-'}</Text>
+                          </Stack>
+                        ) : (
+                          <Text size="sm" c="dimmed">-</Text>
+                        )}
                       </Table.Td>
                     )}
 
-                    {!isTablet && (
-                      <Table.Td>
-                        <Text size="xs" style={{ fontSize: isMobile ? '0.75rem' : '0.82rem' }}>{r.dataHoraEntrega || '-'}</Text>
-                      </Table.Td>
-                    )}
-
-                    <Table.Td>
+                    <Table.Td style={{ textAlign: 'center' }}>
                       <Menu withinPortal position="bottom-end" shadow="sm">
                         <Menu.Target>
-                          <ActionIcon variant="subtle" color="gray">
+                          <ActionIcon variant="subtle" color="gray" aria-label={`Ações de ${r.nomeCompleto}`}>
                             <MoreVertical size={18} />
                           </ActionIcon>
                         </Menu.Target>
@@ -597,7 +525,7 @@ export function Entrega() {
                   </Table.Tr>
                 )) : (
                   <Table.Tr>
-                    <Table.Td colSpan={isTablet ? 4 : 8}>
+                    <Table.Td colSpan={isTablet ? 4 : 6}>
                       <Stack align="center" py="xl" gap={6}>
                         <Text fw={600}>Nenhuma entrega encontrada</Text>
                         <Text c="dimmed" size="sm" ta="center">
@@ -617,168 +545,124 @@ export function Entrega() {
       <Modal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={'Registrar entrega'}
+        title="Registrar entrega"
         size={isMobile ? '100%' : 520}
-        centered={false}
+        centered
         fullScreen={isMobile}
-        styles={{
-          content: { left: 48, bottom: 96, top: 'auto', transform: 'none', width: isMobile ? '100%' : 520 },
-          body: { overflowY: 'auto' },
-        }}
       >
-        <Stack gap={10}>
-          <Box style={{ padding: 8 }}>
+        <Stack gap="md">
+          <Select
+            label="Paciente"
+            data={patientOptions}
+            placeholder={patientsLoading ? 'Carregando pacientes...' : 'Paciente'}
+            value={form.paciente}
+            onChange={(val) => { setForm({ ...form, paciente: val || '' }); setFieldErrors((p) => { const { paciente, ...rest } = p; return rest; }); }}
+            searchable
+            clearable
+            nothingFoundMessage="Nenhum paciente encontrado"
+            disabled={patientsLoading}
+            error={fieldErrors.paciente}
+            withAsterisk
+          />
 
-            <Box style={{ marginBottom: 8 }}>
-              <FloatingSelect
-                label="Paciente"
-                data={patientOptions}
-                placeholder={patientsLoading ? 'Carregando pacientes...' : 'Paciente'}
-                value={form.paciente}
-                onChange={(val) => { setForm({ ...form, paciente: val || '' }); setFieldErrors((p) => { const { paciente, ...rest } = p; return rest; }); }}
-                searchable
-                clearable
-                nothingFoundMessage="Nenhum paciente encontrado"
-                disabled={patientsLoading}
-                error={fieldErrors.paciente}
-                required
-              />
-            </Box>
+          <Select
+            label="Tipo de documento"
+            data={[{ value: 'laudo', label: 'Laudo' }, { value: 'exame', label: 'Exame' }, { value: 'relatorio', label: 'Relatório' }, { value: 'outro', label: 'Outro' }]}
+            placeholder="Tipo de documento"
+            value={form.tipoDocumento}
+            onChange={(val) => { setForm({ ...form, tipoDocumento: val || '' }); setFieldErrors((p) => { const { tipoDocumento, ...rest } = p; return rest; }); }}
+            error={fieldErrors.tipoDocumento}
+            withAsterisk
+          />
 
-            <Box style={{ marginBottom: 8 }}>
-              <FloatingSelect
-                label="Tipo de documento"
-                data={[{ value: 'laudo', label: 'Laudo' }, { value: 'exame', label: 'Exame' }, { value: 'relatorio', label: 'Relatório' }, { value: 'outro', label: 'Outro' }]}
-                placeholder="Tipo de documento"
-                value={form.tipoDocumento}
-                onChange={(val) => { setForm({ ...form, tipoDocumento: val || '' }); setFieldErrors((p) => { const { tipoDocumento, ...rest } = p; return rest; }); }}
-                error={fieldErrors.tipoDocumento}
-                required
-              />
-            </Box>
+          <DateInput
+            label="Data disponível"
+            value={form.dataDisponivel}
+            onChange={(d) => {
+              setForm({ ...form, dataDisponivel: d ?? null });
+              setFieldErrors((p) => { const { dataDisponivel, ...rest } = p; return rest; });
+            }}
+            error={fieldErrors.dataDisponivel}
+          />
 
-            <Box style={{ marginBottom: 8 }}>
-              <Text size="sm" mb={6}>Data disponível</Text>
-              <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
-                <Popover.Target>
-                  <FloatingInput
-                    label="Data disponível"
-                    placeholder="dd/mm/yyyy"
-                    value={dateInput}
-                    onChange={(e) => {
-                      const v = formatDateInput(e.currentTarget.value);
-                      setDateInput(v);
-                      const parsed = parseDate(v);
-                      setForm({ ...form, dataDisponivel: parsed });
-                      setFieldErrors((p) => { const { dataDisponivel, ...rest } = p; return rest; });
-                    }}
-                    rightSection={
-                      <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
-                        <CalendarIcon size={16} />
-                      </ActionIcon>
-                    }
-                    error={fieldErrors.dataDisponivel}
-                    alwaysFloatLabel
-                  />
-                </Popover.Target>
-                <Popover.Dropdown style={{ padding: 8 }}>
-                  <DatePicker value={form.dataDisponivel} onChange={(d) => { setForm({ ...form, dataDisponivel: d }); setDateInput(formatDate(d)); setPopoverOpened(false); }} />
-                </Popover.Dropdown>
-              </Popover>
-            </Box>
+          <Textarea label="Descrição" placeholder="Descrição/Conteúdo" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.currentTarget.value })} minRows={3} />
 
-            <Box style={{ marginBottom: 8 }}>
-              <FloatingTextarea label="Descrição" placeholder="Descrição/Conteúdo" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.currentTarget.value })} minRows={3} />
-            </Box>
-
-            <Group justify="flex-end" mt={8}>
-              <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={handleRegister} size="sm" loading={savingDelivery} disabled={savingDelivery}>Registrar</Button>
-            </Group>
-          </Box>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setModalOpen(false)} size="sm">Cancelar</Button>
+            <Button onClick={handleRegister} size="sm" loading={savingDelivery} disabled={savingDelivery}>Registrar</Button>
+          </Group>
         </Stack>
       </Modal>
 
       <Modal
         opened={deliverModalOpen}
         onClose={() => setDeliverModalOpen(false)}
-        title={'Registrar entrega'}
+        title="Registrar entrega"
         size={isMobile ? '100%' : 520}
-        centered={false}
+        centered
         fullScreen={isMobile}
-        styles={{
-          content: { left: 48, bottom: 96, top: 'auto', transform: 'none', width: isMobile ? '100%' : 520 },
-          body: { overflowY: 'auto' },
-        }}
       >
-        <Stack gap={10}>
-          <Box style={{ padding: 8 }}>
-            <Text size="sm" mb={4}>Paciente</Text>
-            <Text fw={600} mb={8}>{deliverTarget?.nomeCompleto || '-'}</Text>
-
-            <Box style={{ marginBottom: 8 }}>
-              <FloatingInput
-                label="Nome de quem recebeu"
-                placeholder="Nome de quem recebeu"
-                value={deliverToName}
-                onChange={(e) => setDeliverToName(e.currentTarget.value)}
-              />
-            </Box>
-
-            <Box style={{ marginBottom: 8 }}>
-              <FloatingInput
-                label="CPF de quem recebeu"
-                placeholder="CPF de quem recebeu"
-                value={deliverToCpf}
-                onChange={(e) => setDeliverToCpf(e.currentTarget.value)}
-              />
-            </Box>
-
-            {requireFacialRecognition && (
-              <Box style={{ marginBottom: 8 }}>
-                <Paper p="sm" withBorder style={{ backgroundColor: facialVerified ? '#e7f5ff' : '#fff' }}>
-                  <Group justify="space-between" align="center">
-                    <Text size="sm" fw={500}>
-                      {facialVerified ? '✓ Identidade verificada' : 'Verificação facial obrigatória'}
-                    </Text>
-                    {!facialVerified && (
-                      <Button
-                        size="xs"
-                        variant="light"
-                        onClick={() => {
-                          if (!deliverToCpf.trim()) {
-                            showNotification({
-                              title: 'CPF obrigatório',
-                              message: 'Informe o CPF antes de fazer a verificação facial.',
-                              color: 'orange',
-                            });
-                            return;
-                          }
-                          setFacialCaptureOpen(true);
-                        }}
-                        loading={verifyingFace}
-                      >
-                        Verificar Identidade
-                      </Button>
-                    )}
-                  </Group>
-                </Paper>
-              </Box>
-            )}
-
-            <Group justify="flex-end" mt={8}>
-              <Button variant="default" onClick={() => setDeliverModalOpen(false)} size="sm">Cancelar</Button>
-              <Button 
-                bg={DARK_BLUE} 
-                onClick={handleDeliver} 
-                size="sm" 
-                loading={delivering} 
-                disabled={delivering || (requireFacialRecognition && !facialVerified)}
-              >
-                Entregar
-              </Button>
-            </Group>
+        <Stack gap="md">
+          <Box>
+            <Text size="sm" c="dimmed">Paciente</Text>
+            <Text fw={600}>{deliverTarget?.nomeCompleto || '-'}</Text>
           </Box>
+
+          <TextInput
+            label="Nome de quem recebeu"
+            placeholder="Nome de quem recebeu"
+            value={deliverToName}
+            onChange={(e) => setDeliverToName(e.currentTarget.value)}
+          />
+
+          <TextInput
+            label="CPF de quem recebeu"
+            placeholder="CPF de quem recebeu"
+            value={deliverToCpf}
+            onChange={(e) => setDeliverToCpf(e.currentTarget.value)}
+          />
+
+          {requireFacialRecognition && (
+            <Paper p="sm" withBorder className={facialVerified ? 'entrega-facial-check entrega-facial-check--verified' : 'entrega-facial-check'}>
+              <Group justify="space-between" align="center">
+                <Text size="sm" fw={500}>
+                  {facialVerified ? '✓ Identidade verificada' : 'Verificação facial obrigatória'}
+                </Text>
+                {!facialVerified && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={() => {
+                      if (!deliverToCpf.trim()) {
+                        showNotification({
+                          title: 'CPF obrigatório',
+                          message: 'Informe o CPF antes de fazer a verificação facial.',
+                          color: 'orange',
+                        });
+                        return;
+                      }
+                      setFacialCaptureOpen(true);
+                    }}
+                    loading={verifyingFace}
+                  >
+                    Verificar Identidade
+                  </Button>
+                )}
+              </Group>
+            </Paper>
+          )}
+
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setDeliverModalOpen(false)} size="sm">Cancelar</Button>
+            <Button
+              onClick={handleDeliver}
+              size="sm"
+              loading={delivering}
+              disabled={delivering || (requireFacialRecognition && !facialVerified)}
+            >
+              Entregar
+            </Button>
+          </Group>
         </Stack>
       </Modal>
 
@@ -791,25 +675,30 @@ export function Entrega() {
         centered
       >
         <Stack gap="md">
-          <Paper p="md" withBorder>
-            <Switch
-              label="Exigir reconhecimento facial na entrega"
-              description="Quando ativado, será necessário verificar a identidade do paciente através do reconhecimento facial antes de realizar a entrega de exames/laudos."
-              checked={requireFacialRecognition}
-              onChange={(e) => {
-                const newValue = e.currentTarget.checked;
-                setRequireFacialRecognition(newValue);
-                localStorage.setItem('delivery:requireFacialRecognition', JSON.stringify(newValue));
-                showNotification({
-                  title: 'Configuração atualizada',
-                  message: newValue 
-                    ? 'Reconhecimento facial agora é obrigatório para entregas' 
-                    : 'Reconhecimento facial desativado para entregas',
-                  color: 'blue',
-                });
-              }}
-            />
-          </Paper>
+          <Box p="md" className="ui-toggle-card">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Box>
+                <Text fw={600} size="sm">Exigir reconhecimento facial na entrega</Text>
+                <Text size="xs" c="dimmed">Quando ativado, será necessário verificar a identidade do paciente através do reconhecimento facial antes de realizar a entrega de exames/laudos.</Text>
+              </Box>
+              <Switch
+                label={requireFacialRecognition ? 'Ativo' : 'Inativo'}
+                checked={requireFacialRecognition}
+                onChange={(e) => {
+                  const newValue = e.currentTarget.checked;
+                  setRequireFacialRecognition(newValue);
+                  localStorage.setItem('delivery:requireFacialRecognition', JSON.stringify(newValue));
+                  showNotification({
+                    title: 'Configuração atualizada',
+                    message: newValue
+                      ? 'Reconhecimento facial agora é obrigatório para entregas'
+                      : 'Reconhecimento facial desativado para entregas',
+                    color: 'blue',
+                  });
+                }}
+              />
+            </Group>
+          </Box>
 
           <Group justify="flex-end">
             <Button onClick={() => setSettingsModalOpen(false)}>Fechar</Button>

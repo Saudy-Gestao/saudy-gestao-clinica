@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
-  Container,
   Group,
   Modal,
   Stack,
@@ -11,31 +10,28 @@ import {
   Badge,
   Grid,
   Paper,
-  Avatar,
   Text,
-  Popover,
   ActionIcon,
   Menu,
   Skeleton,
   SimpleGrid,
-  useMantineColorScheme,
-} from '@mantine/core';
-import { Calendar as CalendarIcon, MoreVertical, ChevronLeft, ChevronRight, CircleDollarSign, TrendingUp, TrendingDown } from 'lucide-react';
-import { formatDateInput } from '../utils/formatters';
-import { DatePicker } from '@mantine/dates';
+  TextInput,
+  Select,
+  Textarea,
+  DateInput,
+  Tooltip,
+} from '@/components/ui';
+import { MoreVertical, ChevronRight, CircleDollarSign, TrendingUp, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useMediaQuery } from '@mantine/hooks';
-import { FloatingInput } from '../components/common/FloatingInput';
-import { FloatingSelect } from '../components/common/FloatingSelect';
-import { FloatingTextarea } from '../components/common/FloatingTextarea';
+import { useMediaQuery } from '@/components/ui';
 import { Header } from '../components/Header/Header';
-import { DARK_BLUE } from '../themes/theme';
 import ResultModal from '../components/common/ResultModal';
 import financeService from '../services/financeService';
 import { useFinanceEntriesQuery } from '../hooks/useFinanceEntriesQuery';
 import { resolveApiErrorMessage } from '../lib/apiError';
 import { queryKeys } from '../lib/queryKeys';
 import { PaginatedGrid } from '../components/common/PaginatedGrid';
+import './Financeiro.css';
 
 interface Lancamento {
   id: string;
@@ -54,8 +50,6 @@ interface Lancamento {
 export function Financeiro() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { colorScheme } = useMantineColorScheme();
-  const isDark = colorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
   const [activeSubModule, setActiveSubModule] = useState<'hub' | 'todos' | 'receita' | 'despesas'>('hub');
@@ -63,8 +57,6 @@ export function Financeiro() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [modalOpened, setModalOpened] = useState(false);
-  const [popoverOpened, setPopoverOpened] = useState(false);
-  const [dateInput, setDateInput] = useState('');
   const {
     data: entries = [],
     isLoading: entriesLoading,
@@ -90,26 +82,6 @@ export function Financeiro() {
   const [showLancamentoError, setShowLancamentoError] = useState(false);
   const [lancamentoErrorMessage, setLancamentoErrorMessage] = useState<string | null>(null);
 
-  const formatDate = (d: Date | null) => {
-    if (!d) return '';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
-  const parseDate = (s: string) => {
-    if (!s) return null;
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (!m) return null;
-    const day = Number(m[1]);
-    const month = Number(m[2]) - 1;
-    const year = Number(m[3]);
-    const date = new Date(year, month, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
-    return date;
-  };
-
   const parseNumber = (v: any) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
@@ -122,7 +94,6 @@ export function Financeiro() {
 
   const handleModalClose = () => {
     setModalOpened(false);
-    setDateInput('');
     setFormData({
       tipo: '',
       categoria: '',
@@ -283,36 +254,36 @@ export function Financeiro() {
   const rows = paginatedLancamentos.map((lancamento) => (
     <Table.Tr key={lancamento.id}>
       <Table.Td>
-        <Avatar color="darkBlue" radius="xl" size="md">
-          {lancamento.nome.charAt(0).toUpperCase()}
-        </Avatar>
+        <Stack gap={2}>
+          <Text fw={600} size="sm">{lancamento.nome}</Text>
+          <Text size="xs" c="dimmed">{lancamento.tipo}</Text>
+        </Stack>
       </Table.Td>
-      <Table.Td>{lancamento.nome}</Table.Td>
-      <Table.Td>{lancamento.dataHora}</Table.Td>
-      <Table.Td>{lancamento.tipo}</Table.Td>
+      <Table.Td>
+        <Text size="sm">{lancamento.dataHora}</Text>
+      </Table.Td>
       <Table.Td>
         <Badge color={getStatusColor(lancamento.status, lancamento.dueDate)} variant="light">
           {getStatusLabel(lancamento.status, lancamento.dueDate)}
         </Badge>
       </Table.Td>
-      <Table.Td>R${lancamento.valor.toFixed(2)}</Table.Td>
-      <Table.Td>{lancamento.desconto > 0 ? `${lancamento.desconto}%` : '-'}</Table.Td>
-      <Table.Td fw={600}>R${lancamento.valorTotal.toFixed(2)}</Table.Td>
-      <Table.Td>{lancamento.metodoPagamento || '-'}</Table.Td>
+      {!isTablet && <Table.Td>R$ {lancamento.valor.toFixed(2)}</Table.Td>}
+      {!isTablet && <Table.Td>{lancamento.desconto > 0 ? `${lancamento.desconto}%` : '-'}</Table.Td>}
+      <Table.Td>
+        <Tooltip label={`Valor: R$ ${lancamento.valor.toFixed(2)} • Desconto: ${lancamento.desconto > 0 ? `${lancamento.desconto}%` : 'nenhum'} • Forma de pagamento: ${lancamento.metodoPagamento || '-'}`} withArrow>
+          <Text fw={600} size="sm" style={{ cursor: 'help', width: 'fit-content' }}>R$ {lancamento.valorTotal.toFixed(2)}</Text>
+        </Tooltip>
+      </Table.Td>
+      {!isTablet && <Table.Td>{lancamento.metodoPagamento || '-'}</Table.Td>}
       <Table.Td style={{ textAlign: 'center' }}>
         <Group justify="center">
           <Menu position="bottom-end" shadow="md">
             <Menu.Target>
-              <ActionIcon variant="subtle" color="darkBlue">
+              <ActionIcon variant="subtle" color="gray" aria-label={`Ações de ${lancamento.nome}`}>
                 <MoreVertical size={18} />
               </ActionIcon>
             </Menu.Target>
-            <Menu.Dropdown
-              style={isDark ? {
-                backgroundColor: 'var(--mantine-color-default)',
-                borderColor: 'var(--mantine-color-default-border)',
-              } : undefined}
-            >
+            <Menu.Dropdown>
               <Menu.Item
                 color="green"
                 disabled={(String(lancamento.status || '').toUpperCase() === 'PAID') || payingIds.includes(lancamento.id)}
@@ -349,143 +320,81 @@ export function Financeiro() {
       : 'Todos os lançamentos';
 
   return (
-    <Box style={{ minHeight: '100vh', backgroundColor: 'var(--mantine-color-body)' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => (activeSubModule === 'hub' ? navigate('/dashboard?secao=gestao-e-apoio') : setActiveSubModule('hub')) }} />
 
-      {/* Page Header */}
-      <Box
-        style={{
-          backgroundColor: 'var(--mantine-color-body)',
-          padding: isMobile ? '12px 16px' : '16px 24px',
-        }}
-      >
-        <Container size="xl" px={isMobile ? 0 : 'md'}>
-          <Group mb={isMobile ? 16 : 24} wrap="nowrap">
-            <ActionIcon variant="default" color="black" size={isMobile ? 'lg' : 'xl'} onClick={() => navigate(-1)}>
-              <ChevronLeft size={isMobile ? 22 : 28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Financeiro
-              </Text>
-              <Text size="sm" c="dimmed">
-                Gestão financeira
-              </Text>
-            </Box>
-          </Group>
-
-        </Container>
-      </Box>
-
-      {/* Content */}
-      <Container size="xl" py={isMobile ? 'md' : 'xl'}>
+      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeSubModule === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-            {[
-              {
-                key: 'todos',
-                icon: CircleDollarSign,
-                title: 'Todos',
-                desc: 'Visualize todos os lançamentos financeiros em um único painel.',
-                onClick: () => setActiveSubModule('todos'),
-              },
-              {
-                key: 'receita',
-                icon: TrendingUp,
-                title: 'Receita',
-                desc: 'Acompanhe apenas entradas financeiras e recebimentos.',
-                onClick: () => setActiveSubModule('receita'),
-              },
-              {
-                key: 'despesas',
-                icon: TrendingDown,
-                title: 'Despesas',
-                desc: 'Filtre e gerencie pagamentos e saídas financeiras.',
-                onClick: () => setActiveSubModule('despesas'),
-              },
-            ].map((card) => (
-              <Paper
-                key={card.key}
-                p="lg"
-                withBorder
-                onClick={card.onClick}
-                style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
-              >
-                <Group justify="space-between" align="center" wrap="nowrap">
-                  <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDark ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDark ? '#dbe7ff' : DARK_BLUE} />
-                    </Box>
-                    <Box style={{ minWidth: 0 }}>
-                      <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
-                      <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
-                    </Box>
+          <>
+            <Box className="financeiro-hero">
+              <Text className="financeiro-eyebrow">GESTÃO E APOIO</Text>
+              <Text className="financeiro-title" fw={700} size="2xl">Financeiro</Text>
+              <Text className="financeiro-subtitle" size="sm">Lançamentos, receitas e despesas da clínica.</Text>
+            </Box>
+
+            <SimpleGrid className="financeiro-hub-grid" cols={{ base: 1, sm: 2, md: 3 }}>
+              {[
+                {
+                  key: 'todos',
+                  icon: CircleDollarSign,
+                  title: 'Todos',
+                  desc: 'Visualize todos os lançamentos financeiros em um único painel.',
+                  onClick: () => setActiveSubModule('todos'),
+                },
+                {
+                  key: 'receita',
+                  icon: TrendingUp,
+                  title: 'Receita',
+                  desc: 'Acompanhe apenas entradas financeiras e recebimentos.',
+                  onClick: () => setActiveSubModule('receita'),
+                },
+                {
+                  key: 'despesas',
+                  icon: TrendingDown,
+                  title: 'Despesas',
+                  desc: 'Filtre e gerencie pagamentos e saídas financeiras.',
+                  onClick: () => setActiveSubModule('despesas'),
+                },
+              ].map((card) => (
+                <Paper key={card.key} className="financeiro-hub-card" withBorder onClick={card.onClick}>
+                  <Group justify="space-between" align="center" wrap="nowrap">
+                    <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <Box className="financeiro-hub-icon">
+                        <card.icon size={20} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                      </Box>
+                    </Group>
+                    <ChevronRight size={18} className="financeiro-hub-chevron" style={{ flexShrink: 0 }} />
                   </Group>
-                  <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </>
         ) : (
           <>
             <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveSubModule('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>{subModuleLabel}</Text>
-              </Group>
+              <Text fw={600} size="lg">{subModuleLabel}</Text>
             </Group>
 
-            <Group align="center" gap="md" wrap={isMobile ? 'wrap' : 'nowrap'} mb="md">
-              <FloatingInput
+            <Group align="end" gap="md" wrap="wrap" mb="md">
+              <TextInput
                 label="Buscar lançamentos"
                 placeholder="Buscar paciente por nome ou CPF..."
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.currentTarget.value)}
-                containerProps={{ style: { flex: 1, minWidth: isMobile ? '100%' : 240 } }}
+                style={{ flex: '1 1 220px', maxWidth: isMobile ? '100%' : 420 }}
               />
-
-              <Button
-                onClick={() => setModalOpened(true)}
-                fullWidth={isMobile}
-                style={{
-                  backgroundColor: DARK_BLUE,
-                  color: '#ffffff',
-                  borderRadius: 10,
-                  paddingLeft: 18,
-                  paddingRight: 18,
-                }}
-              >
-                + Novo lançamento
+              <Button onClick={() => setModalOpened(true)} fullWidth={isMobile}>
+                Novo lançamento
               </Button>
             </Group>
 
             {/* Tabela */}
             {entriesLoading ? (
-              <Paper
-                style={{
-                  borderRadius: '8px',
-                  padding: 24,
-                  backgroundColor: 'var(--mantine-color-default)',
-                  border: '1px solid var(--mantine-color-default-border)',
-                }}
-              >
+              <Paper withBorder radius="md" p="lg">
                 <Stack gap="sm">
                   {Array.from({ length: 4 }).map((_, index) => (
                     <Stack key={index} gap="sm">
@@ -507,24 +416,22 @@ export function Financeiro() {
                 showFooter
               >
                 <Table striped highlightOnHover>
-                  <Table.Thead style={{ backgroundColor: 'var(--mantine-color-body)' }}>
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Th c="dimmed"></Table.Th>
-                      <Table.Th c="dimmed">Nome</Table.Th>
-                      <Table.Th c="dimmed">Data/Hora</Table.Th>
-                      <Table.Th c="dimmed">Tipo</Table.Th>
-                      <Table.Th c="dimmed">Status</Table.Th>
-                      <Table.Th c="dimmed">Valor</Table.Th>
-                      <Table.Th c="dimmed">Desconto</Table.Th>
-                      <Table.Th c="dimmed">Valor Total</Table.Th>
-                      <Table.Th c="dimmed">Método Pagamento</Table.Th>
-                      <Table.Th c="dimmed" style={{ textAlign: 'center', width: 96 }}>Ações</Table.Th>
+                      <Table.Th>Lançamento</Table.Th>
+                      <Table.Th>Data/Hora</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      {!isTablet && <Table.Th>Valor</Table.Th>}
+                      {!isTablet && <Table.Th>Desconto</Table.Th>}
+                      <Table.Th>Valor Total</Table.Th>
+                      {!isTablet && <Table.Th>Método Pagamento</Table.Th>}
+                      <Table.Th style={{ textAlign: 'center', width: 72 }}>Ações</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {rows.length > 0 ? rows : (
                       <Table.Tr>
-                        <Table.Td colSpan={10}>
+                        <Table.Td colSpan={isTablet ? 5 : 8}>
                           <Stack align="center" py="xl" gap={6}>
                             <Text fw={600}>Nenhum lançamento encontrado</Text>
                             <Text c="dimmed" size="sm" ta="center">
@@ -540,39 +447,21 @@ export function Financeiro() {
             )}
           </>
         )}
-      </Container>
+      </Box>
 
       {/* Modal Novo Lançamento */}
       <Modal
         opened={modalOpened}
         onClose={handleModalClose}
-        title="Novo orçamento"
+        title="Novo lançamento"
         centered
         size={isTablet ? 'lg' : 'md'}
         fullScreen={isMobile}
-        styles={{
-          content: {
-            backgroundColor: 'var(--mantine-color-default)',
-            border: '1px solid var(--mantine-color-default-border)',
-          },
-          header: {
-            backgroundColor: 'var(--mantine-color-default)',
-            borderBottom: '1px solid var(--mantine-color-default-border)',
-          },
-          body: {
-            backgroundColor: 'var(--mantine-color-default)',
-            paddingTop: 28,
-          },
-          title: {
-            color: 'var(--mantine-color-text)',
-            fontWeight: 600,
-          },
-        }}
       >
         <Stack gap="md">
           <Grid grow>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <FloatingSelect
+              <Select
                 label="Tipo"
                 placeholder="Selecione um tipo"
                 data={[
@@ -587,7 +476,7 @@ export function Financeiro() {
               />
             </Grid.Col>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <FloatingSelect
+              <Select
                 label="Categoria"
                 placeholder="Selecione uma categoria"
                 data={[
@@ -603,83 +492,45 @@ export function Financeiro() {
             </Grid.Col>
           </Grid>
 
-          <FloatingTextarea
+          <Textarea
             label="Descrição"
             placeholder="Descreva o lançamento"
             value={formData.descricao}
             onChange={(e) => setFormData({ ...formData, descricao: e.currentTarget.value })}
-            rows={3}
+            minRows={3}
           />
 
           <Grid grow>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <FloatingInput
+              <TextInput
                 label="Valor (R$)"
                 value={formData.valor}
                 onChange={(e) => setFormData({ ...formData, valor: e.currentTarget.value })}
                 type="number"
-                alwaysFloatLabel
               />
             </Grid.Col>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <FloatingInput
+              <TextInput
                 label="Desconto (%)"
                 value={formData.desconto}
                 onChange={(e) => setFormData({ ...formData, desconto: e.currentTarget.value })}
                 type="number"
                 min="0"
                 max="100"
-                alwaysFloatLabel
               />
             </Grid.Col>
           </Grid>
 
           <Grid grow>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <Popover opened={popoverOpened} onClose={() => setPopoverOpened(false)} position="bottom" withArrow>
-                <Popover.Target>
-                  <FloatingInput
-                    label="Vencimento"
-                    placeholder="dd/mm/yyyy"
-                    value={dateInput}
-                    onChange={(e) => {
-                      const v = e.currentTarget.value;
-                      setDateInput(formatDateInput(v));
-                    }}
-                    onBlur={() => {
-                      if (!dateInput) {
-                        setFormData({ ...formData, vencimento: null });
-                        return;
-                      }
-                      const parsed = parseDate(dateInput);
-                      if (!parsed) {
-                        setFormData({ ...formData, vencimento: null });
-                      } else {
-                        setFormData({ ...formData, vencimento: parsed });
-                      }
-                    }}
-                    rightSection={
-                      <ActionIcon size="sm" variant="subtle" onClick={() => setPopoverOpened((s) => !s)} title="Abrir calendário">
-                        <CalendarIcon size={16} />
-                      </ActionIcon>
-                    }
-                    alwaysFloatLabel
-                  />
-                </Popover.Target>
-                <Popover.Dropdown style={{ padding: 8 }}>
-                  <DatePicker 
-                    value={formData.vencimento} 
-                    onChange={(d) => { 
-                      setFormData({ ...formData, vencimento: d }); 
-                      setDateInput(formatDate(d)); 
-                      setPopoverOpened(false); 
-                    }} 
-                  />
-                </Popover.Dropdown>
-              </Popover>
+              <DateInput
+                label="Vencimento"
+                value={formData.vencimento}
+                onChange={(d) => setFormData({ ...formData, vencimento: d ?? null })}
+              />
             </Grid.Col>
             <Grid.Col span={isMobile ? 12 : 6}>
-              <FloatingSelect
+              <Select
                 label="Forma de pagamento"
                 placeholder="Selecione uma forma de pagamento"
                 data={[
@@ -697,7 +548,7 @@ export function Financeiro() {
           </Grid>
 
           <Stack gap={4}>
-            <FloatingInput
+            <TextInput
               label="Nome"
               value={formData.nome}
               onChange={(e) => setFormData({ ...formData, nome: e.currentTarget.value })}
@@ -713,7 +564,6 @@ export function Financeiro() {
               Cancelar
             </Button>
             <Button
-              style={{ backgroundColor: DARK_BLUE, color: '#ffffff' }}
               onClick={handleSaveLancamento}
               loading={savingLancamento}
               disabled={savingLancamento}

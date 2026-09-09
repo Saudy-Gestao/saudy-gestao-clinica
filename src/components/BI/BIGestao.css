@@ -1,0 +1,28 @@
+.bi-hero {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border)) !important;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef7f4 52%, #fff7ed 100%);
+  --bi-hero-fg: #1f2937;
+}
+
+[data-color-scheme='dark'] .bi-hero {
+  background: linear-gradient(135deg, rgba(10, 37, 104, 0.55), rgba(15, 118, 110, 0.2));
+  --bi-hero-fg: #fff;
+}
+
+.bi-hero-title {
+  color: var(--bi-hero-fg) !important;
+}
+
+.bi-hero-filters .ui-field-label {
+  color: var(--bi-hero-fg) !important;
+}
+
+.bi-ai-panel {
+  border-color: color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border)) !important;
+}
+
+.bi-summary-panel {
+  border-color: color-mix(in srgb, var(--ui-primary) 20%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-surface)) !important;
+}
