@@ -1,4 +1,4 @@
-import { notifications } from '@mantine/notifications';
+import { notifications } from '@/components/ui';
 
 type ErrorTranslation = {
   pattern: RegExp;

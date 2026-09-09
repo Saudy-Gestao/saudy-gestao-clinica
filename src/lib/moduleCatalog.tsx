@@ -80,7 +80,7 @@ export const MACRO_SECTIONS: MacroSection[] = [
       { icon: ClipboardCheck, label: 'Execução de Exames', desc: 'Triagem e andamento do exame', route: '/execucao-exames', moduleName: 'execucao-exames' },
       { icon: FileText, label: 'Laudo por Exame', desc: 'Fila com editor de laudo', route: '/laudo-exames', moduleName: 'laudo' },
       { icon: ShieldCheck, label: 'Autorização Convênio', desc: 'Autorizações pendentes', route: '/autorizacao-convenio', moduleName: 'autorizacao-convenio' },
-      { icon: Brain, label: 'Módulo TEA', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
+      { icon: Brain, label: 'Módulo Terapias', desc: 'Cadastro e acompanhamento', route: '/tea', moduleName: 'modulo-tea' },
     ],
   },
   {

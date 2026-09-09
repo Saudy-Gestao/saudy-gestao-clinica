@@ -7,10 +7,10 @@
  * (/dashboard?secao=<key>); "Visão Geral" leva ao dashboard clássico. Em
  * qualquer outra rota, o macro que contém a rota atual fica destacado.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams, Outlet } from 'react-router-dom';
-import { Tooltip } from '@mantine/core';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tooltip } from '@/components/ui';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import authService from '../../services/authService';
 import {
   OVERVIEW_ENTRY,
@@ -28,6 +28,7 @@ export function AppShellLayout() {
   const [searchParams] = useSearchParams();
   const { sections } = useVisibleSections();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true');
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isAuthenticated = authService.isAuthenticated();
   const currentUser = authService.getCurrentUser() as any;
@@ -38,12 +39,29 @@ export function AppShellLayout() {
     : findSectionKeyForPath(location.pathname);
 
   const goToSection = (key: string) => {
+    setMobileOpen(false);
     if (key === OVERVIEW_SECTION_KEY) {
       navigate('/dashboard');
       return;
     }
     navigate(`/dashboard?secao=${key}`);
   };
+
+  useEffect(() => {
+    const toggleMobileSidebar = () => setMobileOpen((previous) => !previous);
+    const closeMobileSidebar = () => setMobileOpen(false);
+
+    window.addEventListener('saudy:sidebar-toggle', toggleMobileSidebar);
+    window.addEventListener('saudy:sidebar-close', closeMobileSidebar);
+    return () => {
+      window.removeEventListener('saudy:sidebar-toggle', toggleMobileSidebar);
+      window.removeEventListener('saudy:sidebar-close', closeMobileSidebar);
+    };
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -57,16 +75,28 @@ export function AppShellLayout() {
     return <Outlet />;
   }
 
+  const showExpandedSidebar = !collapsed || mobileOpen;
+
   return (
     <div className="saudy-shell">
-      <nav className="saudy-sidebar" data-collapsed={collapsed || undefined} aria-label="Navegação principal">
+      {mobileOpen ? (
+        <button
+          type="button"
+          className="saudy-sidebar__scrim"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Fechar menu principal"
+        />
+      ) : null}
+
+      <nav
+        className="saudy-sidebar"
+        data-collapsed={collapsed || undefined}
+        data-mobile-open={mobileOpen || undefined}
+        aria-label="Navegação principal"
+      >
         <div className="saudy-sidebar__brand">
-          {!collapsed ? (
-            <>
-              <img src="/logo_azul_32x32.svg" width={26} height={26} alt="" style={{ filter: 'brightness(0) invert(1)' }} />
-              <span className="saudy-sidebar__brand-name">Saud<span>y</span></span>
-            </>
-          ) : null}
+          <img className="saudy-sidebar__brand-logo" src="/logo_azul_32x32.svg" width={28} height={28} alt="" />
+          {showExpandedSidebar ? <span className="saudy-sidebar__brand-name">Saud<span>y</span></span> : null}
           <button
             type="button"
             className="saudy-sidebar__collapse-toggle"
@@ -75,37 +105,57 @@ export function AppShellLayout() {
           >
             {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           </button>
-        </div>
-
-        {!collapsed ? <p className="saudy-sidebar__label">Menu</p> : null}
-
-        <Tooltip label={OVERVIEW_ENTRY.title} position="right" disabled={!collapsed} withArrow>
           <button
             type="button"
-            className="saudy-sidebar__item"
-            data-active={activeKey === OVERVIEW_SECTION_KEY || undefined}
-            onClick={() => goToSection(OVERVIEW_SECTION_KEY)}
+            className="saudy-sidebar__mobile-close"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Fechar menu principal"
           >
-            <span className="saudy-sidebar__item-icon"><OVERVIEW_ENTRY.icon size={17} /></span>
-            {!collapsed ? OVERVIEW_ENTRY.title : null}
+            <X size={18} />
           </button>
-        </Tooltip>
+        </div>
 
-        {sections.map((section) => (
-          <Tooltip key={section.key} label={section.title} position="right" disabled={!collapsed} withArrow>
+        {showExpandedSidebar ? <p className="saudy-sidebar__label">Navegação principal</p> : null}
+
+        <div className="saudy-sidebar__nav">
+          <Tooltip label={OVERVIEW_ENTRY.title} position="right" disabled={!collapsed || mobileOpen} withArrow>
             <button
               type="button"
               className="saudy-sidebar__item"
-              data-active={activeKey === section.key || undefined}
-              onClick={() => goToSection(section.key)}
+              data-active={activeKey === OVERVIEW_SECTION_KEY || undefined}
+              aria-current={activeKey === OVERVIEW_SECTION_KEY ? 'page' : undefined}
+              onClick={() => goToSection(OVERVIEW_SECTION_KEY)}
             >
-              <span className="saudy-sidebar__item-icon"><section.icon size={17} /></span>
-              {!collapsed ? section.title : null}
+              <span className="saudy-sidebar__item-icon"><OVERVIEW_ENTRY.icon size={17} /></span>
+              {showExpandedSidebar ? OVERVIEW_ENTRY.title : null}
             </button>
           </Tooltip>
-        ))}
 
-        {!collapsed ? <div className="saudy-sidebar__footer">Saudy · Gestão Clínica</div> : null}
+          <div className="saudy-sidebar__section-divider" aria-hidden="true" />
+
+          {sections.map((section) => (
+            <Tooltip key={section.key} label={section.title} position="right" disabled={!collapsed || mobileOpen} withArrow>
+              <button
+                type="button"
+                className="saudy-sidebar__item"
+                data-active={activeKey === section.key || undefined}
+                aria-current={activeKey === section.key ? 'page' : undefined}
+                onClick={() => goToSection(section.key)}
+              >
+                <span className="saudy-sidebar__item-icon"><section.icon size={17} /></span>
+                {showExpandedSidebar ? section.title : null}
+              </button>
+            </Tooltip>
+          ))}
+        </div>
+
+        {showExpandedSidebar ? (
+          <div className="saudy-sidebar__footer">
+            <span className="saudy-sidebar__footer-dot" aria-hidden="true" />
+            <span>Saudy Gestão</span>
+            <small>Clínica integrada</small>
+          </div>
+        ) : null}
       </nav>
 
       <div className="saudy-shell__content">
