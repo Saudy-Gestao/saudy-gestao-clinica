@@ -9,10 +9,9 @@ import {
   Group,
   Checkbox,
   Image,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { notifications } from '@/components/ui';
 import authService from '../../services/authService';
 
 type Step = 'email' | 'code' | 'newPassword';
@@ -183,19 +182,19 @@ export function EsqueciSenha() {
       <Box
         w={8}
         h={8}
-        bg={step === 'email' ? DARK_BLUE : '#e9ecef'}
+        bg={step === 'email' ? '#0A2568' : '#e9ecef'}
         style={{ borderRadius: '50%', transition: 'all 0.3s' }}
       />
       <Box
         w={8}
         h={8}
-        bg={step === 'code' ? DARK_BLUE : '#e9ecef'}
+        bg={step === 'code' ? '#0A2568' : '#e9ecef'}
         style={{ borderRadius: '50%', transition: 'all 0.3s' }}
       />
       <Box
         w={8}
         h={8}
-        bg={step === 'newPassword' ? DARK_BLUE : '#e9ecef'}
+        bg={step === 'newPassword' ? '#0A2568' : '#e9ecef'}
         style={{ borderRadius: '50%', transition: 'all 0.3s' }}
       />
     </Group>
@@ -226,7 +225,7 @@ export function EsqueciSenha() {
       <Button
         fullWidth
         size="lg"
-        bg={DARK_BLUE}
+        bg={'#0A2568'}
         onClick={handleSendEmail}
         loading={loading}
         mt="md"
@@ -244,10 +243,10 @@ export function EsqueciSenha() {
         fullWidth
         size="lg"
         variant="outline"
-        c={DARK_BLUE}
+        c={'#0A2568'}
         styles={{
           root: {
-            borderColor: DARK_BLUE,
+            borderColor: '#0A2568',
             height: '56px',
             borderRadius: '8px',
             borderWidth: '2px',
@@ -291,7 +290,7 @@ export function EsqueciSenha() {
       <Button
         fullWidth
         size="lg"
-        bg={DARK_BLUE}
+        bg={'#0A2568'}
         onClick={handleVerifyCode}
         loading={loading}
         mt="md"
@@ -309,12 +308,12 @@ export function EsqueciSenha() {
         fullWidth
         size="lg"
         variant="outline"
-        c={DARK_BLUE}
+        c={'#0A2568'}
         onClick={handleResendCode}
         loading={loading}
         styles={{
           root: {
-            borderColor: DARK_BLUE,
+            borderColor: '#0A2568',
             height: '56px',
             borderRadius: '8px',
             borderWidth: '2px',
@@ -328,10 +327,10 @@ export function EsqueciSenha() {
         fullWidth
         size="lg"
         variant="outline"
-        c={DARK_BLUE}
+        c={'#0A2568'}
         styles={{
           root: {
-            borderColor: DARK_BLUE,
+            borderColor: '#0A2568',
             height: '56px',
             borderRadius: '8px',
             borderWidth: '2px',
@@ -415,7 +414,7 @@ export function EsqueciSenha() {
       <Button
         fullWidth
         size="lg"
-        bg={DARK_BLUE}
+        bg={'#0A2568'}
         onClick={handleResetPassword}
         loading={loading}
         mt="md"
@@ -433,10 +432,10 @@ export function EsqueciSenha() {
         fullWidth
         size="lg"
         variant="outline"
-        c={DARK_BLUE}
+        c={'#0A2568'}
         styles={{
           root: {
-            borderColor: DARK_BLUE,
+            borderColor: '#0A2568',
             height: '56px',
             borderRadius: '8px',
             borderWidth: '2px',
@@ -465,7 +464,7 @@ export function EsqueciSenha() {
         style={{
           width: isMobile ? '100%' : '50%',
           height: isMobile ? '35vh' : '100vh',
-          backgroundColor: DARK_BLUE,
+          backgroundColor: '#0A2568',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
