@@ -22,14 +22,10 @@ import {
   Skeleton,
   SimpleGrid,
   Grid,
-  ThemeIcon,
-  useMantineColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { Search, ChevronLeft, Lock, ClipboardCheck, Camera, Upload, Wallet, CreditCard, QrCode, Eye } from 'lucide-react';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
-import { FloatingInput } from '../common/FloatingInput';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { Search, Lock, ClipboardCheck, Camera, Upload, Wallet, CreditCard, QrCode, Eye } from 'lucide-react';
+import { showNotification } from '@/components/ui';
 import { FacialCapture } from '../common/FacialCapture';
 import preAttendanceService from '../../services/preAttendanceService';
 import patientService from '../../services/patientService';
@@ -47,6 +43,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { Header } from '../Header/Header';
 import type { ChangeEvent } from 'react';
+import './PreAtendimento.css';
 
 interface Patient extends NovoPatiente {
   id: string;
@@ -149,8 +146,6 @@ const isConsultationAppointmentFkError = (error: any) => {
 export function PreAtendimento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { colorScheme } = useMantineColorScheme();
-  const isDarkMode = colorScheme === 'dark';
   const [patients, setPatients] = useState<Patient[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -221,35 +216,6 @@ export function PreAtendimento() {
     paddingBottom: 2,
     minHeight: 26,
   } as const;
-  const paymentChoiceStyle = (selected: boolean) => ({
-    minHeight: isMobile ? 64 : 86,
-    borderRadius: 10,
-    border: isDarkMode
-      ? `1px solid ${selected ? '#0b4ec2' : '#0b3b93'}`
-      : '1px solid rgba(8, 31, 84, 0.08)',
-    background: isDarkMode
-      ? selected ? '#123b86' : '#0b2c6d'
-      : selected ? '#0b2f78' : '#0d3178',
-    color: 'white',
-    boxShadow: isDarkMode
-      ? selected ? '0 8px 24px rgba(0, 31, 84, 0.18)' : 'none'
-      : '0 10px 24px rgba(11, 47, 120, 0.14)',
-  });
-  const checklistCardStyle = {
-    borderColor: isDarkMode ? '#0b3b93' : 'rgba(15, 38, 84, 0.14)',
-    background: isDarkMode ? 'rgba(10, 17, 40, 0.18)' : '#ffffff',
-    boxShadow: isDarkMode ? 'none' : '0 6px 18px rgba(16, 24, 40, 0.08)',
-  } as const;
-  const checklistMutedBlueStyle = {
-    color: isDarkMode ? '#7f97ea' : '#6f8eef',
-  } as const;
-  const checklistUploadBoxStyle = {
-    minHeight: 72,
-    borderStyle: 'solid',
-    borderColor: isDarkMode ? 'rgba(159, 178, 223, 0.42)' : 'rgba(15, 38, 84, 0.12)',
-    justifyContent: 'center',
-    background: isDarkMode ? 'rgba(10, 17, 40, 0.22)' : '#ffffff',
-  } as const;
   function isPrivateCare(patient: Patient | null) {
     const convenio = (patient?.convenio || '').trim().toLowerCase();
     return !convenio || convenio === 'particular';
@@ -276,8 +242,8 @@ export function PreAtendimento() {
   const extractDoctorNameFromAgenda = (agenda?: string | null) => {
     const value = String(agenda || '').trim();
     if (!value) return '';
-    const parts = value.split('Ã¢â‚¬Â¢').map((item) => item.trim()).filter(Boolean);
-    if (parts.length === 0) return '';
+    const parts = value.split(' • ').map((item) => item.trim()).filter(Boolean);
+    if (parts.length < 2) return '';
     return parts[parts.length - 1];
   };
 
@@ -1323,16 +1289,11 @@ export function PreAtendimento() {
   };
 
   const rows = filteredPatients.map((patient) => (
-    <Table.Tr key={patient.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+    <Table.Tr key={patient.id}>
       <Table.Td>
         <Group gap={isMobile ? "xs" : "sm"}>
           {!isMobile && (
-            <Box
-              bg={DARK_BLUE}
-              w={32}
-              h={32}
-              style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-            >
+            <Box className="pre-atendimento-avatar" w={32} h={32}>
               <Text c="white" fw={600} size="sm">
                 {patient.nomeCompleto.charAt(0).toUpperCase()}
               </Text>
@@ -1343,7 +1304,7 @@ export function PreAtendimento() {
               {patient.nomeCompleto}
             </Text>
             <Text size="xs" c="dimmed">
-              CPF: {patient.cpf || 'Não informado'}
+              CPF: {patient.cpf ? formatCPF(patient.cpf) : 'Não informado'}
             </Text>
           </Box>
         </Group>
@@ -1385,19 +1346,14 @@ export function PreAtendimento() {
         <Stack gap="sm">
           <Group justify="space-between" align="flex-start">
             <Group gap="sm" align="flex-start">
-              <Box
-                bg={DARK_BLUE}
-                w={36}
-                h={36}
-                style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              >
+              <Box className="pre-atendimento-avatar" w={36} h={36}>
                 <Text c="white" fw={600} size="sm">
                   {patient.nomeCompleto.charAt(0).toUpperCase()}
                 </Text>
               </Box>
               <Box>
                 <Text fw={600} size="sm">{patient.nomeCompleto}</Text>
-                <Text size="xs" c="dimmed">CPF: {patient.cpf || 'Não informado'}</Text>
+                <Text size="xs" c="dimmed">CPF: {patient.cpf ? formatCPF(patient.cpf) : 'Não informado'}</Text>
               </Box>
             </Group>
             <Badge variant="light" color={getReceptionStatusColor(patient.status)} radius="xl">
@@ -1423,38 +1379,33 @@ export function PreAtendimento() {
   });
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Autorização e Recepção
-              </Text>
-              <Text size="sm" c="dimmed">
-                Pacientes chamados para atendimento na recepção
-              </Text>
-            </Box>
-          </Group>
-        </Group>
+    <Box className="pre-atendimento-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header
+        back={{ label: 'Voltar', onClick: () => navigate(-1) }}
+      />
+      <Box className="pre-atendimento-content" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
+        <Box className="pre-atendimento-hero" mb={isMobile ? 'md' : 'xl'}>
+          <Text className="pre-atendimento-eyebrow">OPERAÇÃO CLÍNICA · RECEPÇÃO</Text>
+          <Text className="pre-atendimento-title" fw={700} size={isMobile ? 'xl' : '2xl'}>
+            Autorização e Recepção
+          </Text>
+          <Text className="pre-atendimento-subtitle" size="sm">
+            Pacientes chamados para atendimento na recepção
+          </Text>
+        </Box>
 
         {/* Search Section */}
-        <Box mb={isMobile ? 20 : 30}>
-          <Group gap="md" align="flex-end">
-            <FloatingInput
+        <Box className="pre-atendimento-search-panel" mb={isMobile ? 'md' : 'xl'}>
+          <Text className="pre-atendimento-search-kicker">BUSCAR NA FILA</Text>
+          <Box className="pre-atendimento-search-input">
+            <TextInput
               label="Buscar"
-              alwaysFloatLabel
               placeholder={isMobile ? "Buscar..." : "Buscar paciente por nome ou CPF..."}
               value={searchValue}
               onChange={(e) => setSearchValue(e.currentTarget.value)}
               rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-              containerProps={{ style: { flex: 1, minHeight: 64 } }}
             />
-          </Group>
+          </Box>
         </Box>
 
         {/* Patients Table */}
@@ -1485,8 +1436,8 @@ export function PreAtendimento() {
               ))}
             </Stack>
           ) : (
-            <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-              <Table horizontalSpacing="md" verticalSpacing="md">
+            <Box className="pre-atendimento-table-wrap">
+              <Table className="pre-atendimento-table" horizontalSpacing="md" verticalSpacing="md">
                 <Table.Thead>
                   <Table.Tr style={{ borderBottom: 'none' }}>
                     <Table.Th>Paciente</Table.Th>
@@ -1526,7 +1477,7 @@ export function PreAtendimento() {
           mobileCards.length > 0 ? (
             <Stack gap="sm">{mobileCards}</Stack>
           ) : (
-            <Paper withBorder radius="md" p="xl" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+            <Paper className="pre-atendimento-empty-state" withBorder p="xl">
               <Text ta="center" fw={600}>Fila da recepção vazia</Text>
               <Text ta="center" c="dimmed" size="sm" mt={4}>
                 Assim que um paciente for chamado do check-in, ele aparecerá aqui para conferência e checklist.
@@ -1534,15 +1485,15 @@ export function PreAtendimento() {
             </Paper>
           )
         ) : (
-          <Box style={{ overflowX: 'auto', border: '1px solid #e9ecef', borderRadius: 6 }}>
-            <Table horizontalSpacing={isMobile ? "sm" : "md"} verticalSpacing={isMobile ? "sm" : "md"}>
+          <Box className="pre-atendimento-table-wrap">
+            <Table className="pre-atendimento-table" horizontalSpacing={isMobile ? "sm" : "md"} verticalSpacing={isMobile ? "sm" : "md"}>
               <Table.Thead>
                 <Table.Tr style={{ borderBottom: 'none' }}>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Paciente</Table.Th>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                  <Table.Th style={{ color: '#868e96', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
+                  <Table.Th>Paciente</Table.Th>
+                  <Table.Th>Agendamento</Table.Th>
+                  <Table.Th>Convênio</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>{rows.length > 0 ? rows : (
@@ -1611,7 +1562,7 @@ export function PreAtendimento() {
                 />
               </Box>
 
-              <FloatingInput
+              <TextInput
                 label="Nome completo"
                 value={novoPaciente.nomeCompleto}
                 onChange={(e) =>
@@ -1623,7 +1574,7 @@ export function PreAtendimento() {
               />
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <FloatingInput
+                <TextInput
                   label="CPF"
                   value={novoPaciente.cpf}
                   onChange={(e) => setNovoPaciente({ ...novoPaciente, cpf: formatCPF(e.currentTarget.value) })}
@@ -1631,7 +1582,7 @@ export function PreAtendimento() {
                   style={isEditing ? { color: '#adb5bd' } : {}}
                   rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
                 />
-                <FloatingInput
+                <TextInput
                   label="Data de nascimento"
                   value={novoPaciente.dataNascimento}
                   onChange={(e) => setNovoPaciente({ ...novoPaciente, dataNascimento: formatDateInput(e.currentTarget.value) })}
@@ -1657,21 +1608,21 @@ export function PreAtendimento() {
                     }
                   />
                 </Box>
-                <FloatingInput
+                <TextInput
                   label="Telefone"
                   value={novoPaciente.telefone}
                   onChange={(e) => setNovoPaciente({ ...novoPaciente, telefone: formatPhone(e.currentTarget.value) })}
                 />
               </Group>
 
-              <FloatingInput
+              <TextInput
                 type="email"
                 label="E-mail"
                 value={novoPaciente.email}
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, email: normalizeEmail(e.currentTarget.value) })}
               />
 
-              <FloatingInput
+              <TextInput
                 label="Endereço"
                 value={novoPaciente.endereco}
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, endereco: e.currentTarget.value })}
@@ -1706,21 +1657,21 @@ export function PreAtendimento() {
               </Box>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <FloatingInput
+                <TextInput
                   label="Tipo"
                   value={novoPaciente.tipoConvenio}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, tipoConvenio: e.currentTarget.value })
                   }
                 />
-                <FloatingInput
+                <TextInput
                   label="Validade"
                   value={novoPaciente.validadeConvenio}
                   onChange={(e) => setNovoPaciente({ ...novoPaciente, validadeConvenio: formatDateInput(e.currentTarget.value) })}
                 />
               </Group>
 
-              <FloatingInput
+              <TextInput
                 label="Número (ID beneficiário)"
                 value={novoPaciente.numCarteira}
                 onChange={(e) =>
@@ -1759,7 +1710,7 @@ export function PreAtendimento() {
           <Tabs.Panel value="triagem">
             <Stack gap="xs" mih={isMobile ? undefined : 750}>
               <Group grow>
-                <FloatingInput
+                <TextInput
                   label="Nome"
                   value={novoPaciente.nomeCompleto}
                   readOnly
@@ -1768,7 +1719,7 @@ export function PreAtendimento() {
                   style={{ color: '#adb5bd' }}
                   rightSection={isEditing && <Lock size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#adb5bd' }} />}
                 />
-                <FloatingInput
+                <TextInput
                   label="Convênio"
                   value={novoPaciente.convenio}
                   readOnly
@@ -1780,21 +1731,21 @@ export function PreAtendimento() {
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <FloatingInput
+                <TextInput
                   label="PA (mmHg)"
                   value={novoPaciente.pressaoArterial}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, pressaoArterial: e.currentTarget.value })
                   }
                 />
-                <FloatingInput
+                <TextInput
                   label="FC (bmp)"
                   value={novoPaciente.frequenciaCardiaca}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, frequenciaCardiaca: e.currentTarget.value })
                   }
                 />
-                <FloatingInput
+                <TextInput
                   label="Temp (Ã‚Â°C)"
                   value={novoPaciente.temperatura}
                   onChange={(e) =>
@@ -1804,21 +1755,21 @@ export function PreAtendimento() {
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <FloatingInput
+                <TextInput
                   label="SpO2 (%)"
                   value={novoPaciente.saturacao}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, saturacao: e.currentTarget.value })
                   }
                 />
-                <FloatingInput
+                <TextInput
                   label="Peso (kg)"
                   value={novoPaciente.peso}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, peso: e.currentTarget.value })
                   }
                 />
-                <FloatingInput
+                <TextInput
                   label="Altura (cm)"
                   value={novoPaciente.altura}
                   onChange={(e) =>
@@ -1828,14 +1779,14 @@ export function PreAtendimento() {
               </Group>
 
               <Group grow gap={isMobile ? "xs" : "md"} wrap="wrap">
-                <FloatingInput
+                <TextInput
                   label="Glicemia"
                   value={novoPaciente.glicemia}
                   onChange={(e) =>
                     setNovoPaciente({ ...novoPaciente, glicemia: e.currentTarget.value })
                   }
                 />
-                <FloatingInput
+                <TextInput
                   label="IMC"
                   value={novoPaciente.imc}
                   onChange={(e) =>
@@ -1844,7 +1795,7 @@ export function PreAtendimento() {
                 />
               </Group>
 
-              <FloatingInput
+              <TextInput
                 label="Queixa principal"
                 value={novoPaciente.queixaPrincipal}
                 onChange={(e) =>
@@ -1852,7 +1803,7 @@ export function PreAtendimento() {
                 }
               />
 
-              <FloatingInput
+              <TextInput
                 label="História da Doença"
                 value={novoPaciente.historiaDoenca}
                 onChange={(e) =>
@@ -1860,7 +1811,7 @@ export function PreAtendimento() {
                 }
               />
 
-              <FloatingInput
+              <TextInput
                 label="Alergias"
                 value={novoPaciente.alergias}
                 onChange={(e) =>
@@ -1868,7 +1819,7 @@ export function PreAtendimento() {
                 }
               />
 
-              <FloatingInput
+              <TextInput
                 label="Medicamentos"
                 value={novoPaciente.medicamentos}
                 onChange={(e) =>
@@ -1876,7 +1827,7 @@ export function PreAtendimento() {
                 }
               />
 
-              <FloatingInput
+              <TextInput
                 label="Antecedentes"
                 value={novoPaciente.antecedentes}
                 onChange={(e) =>
@@ -1884,7 +1835,7 @@ export function PreAtendimento() {
                 }
               />
 
-              <FloatingInput
+              <TextInput
                 label="Observação"
                 value={novoPaciente.observacoesTriagem}
                 onChange={(e) =>
@@ -1896,7 +1847,7 @@ export function PreAtendimento() {
                 <Button variant="default" onClick={() => setModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button bg={DARK_BLUE} onClick={handleAddPatient}>
+                <Button onClick={handleAddPatient}>
                   Salvar
                 </Button>
               </Group>
@@ -1906,6 +1857,7 @@ export function PreAtendimento() {
       </Modal>
 
       <Modal
+        className="checklist-modal"
         opened={checklistOpen}
         onClose={() => {
           setChecklistOpen(false);
@@ -1916,27 +1868,44 @@ export function PreAtendimento() {
         centered={!isMobile}
         fullScreen={isMobile}
         closeButtonProps={{ 'aria-label': 'Fechar checklist' }}
+        footer={(
+          <Group justify="flex-end">
+            {teleconsultationEligibility?.isTeleconsultation && (
+              <Button
+                variant="light"
+                onClick={() => handleFinishChecklist(true)}
+                disabled={!canCompleteChecklist() || checklistLoading || teleconsultationSendingLink || !teleconsultationEligibility.canSendLink}
+                loading={checklistLoading || teleconsultationSendingLink}
+              >
+                Confirmar e enviar link
+              </Button>
+            )}
+            <Button
+              onClick={() => handleFinishChecklist(false)}
+              disabled={!canCompleteChecklist() || checklistLoading}
+              loading={checklistLoading}
+            >
+              Confirmar
+            </Button>
+          </Group>
+        )}
       >
         <Stack gap="xl">
           {checklistPatient && (
             <Box>
               <Stack gap="xl">
-                <Box style={{ position: 'relative' }}>
-                  <ThemeIcon
-                    radius="xl"
-                    size={30}
-                    color="dark"
-                    bg={DARK_BLUE}
-                    style={{ position: 'absolute', left: isMobile ? -42 : -50, top: 0 }}
-                  >
-                    <Text fw={700} size="sm" c="white">1</Text>
-                  </ThemeIcon>
-                  <Text fw={500} size={isMobile ? 'lg' : 'xl'} lh={1.15}>Dados e Convênio</Text>
-                  <Text size="sm" style={checklistMutedBlueStyle}>Conferência e autorização</Text>
+                <Box className="checklist-section">
+                  <Box className="checklist-section-header">
+                    <span className="checklist-step-badge">1</span>
+                    <Box>
+                      <Text className="checklist-section-title">Dados e Convênio</Text>
+                      <Text className="checklist-section-subtitle">Conferência e autorização</Text>
+                    </Box>
+                  </Box>
 
-                  <Paper withBorder radius="md" p={isMobile ? 'sm' : 'md'} mt="md" shadow="xs" style={checklistCardStyle}>
-                    <Stack gap="md">
-                      <SimpleGrid cols={isMobile ? 1 : 2} spacing="md">
+                  <Box className="checklist-card">
+                    <Stack gap="lg">
+                      <SimpleGrid cols={isMobile ? 1 : 2} spacing="lg">
                         <TextInput
                           label="Nome completo"
                           value={checklistPatient?.nomeCompleto || ''}
@@ -1949,7 +1918,7 @@ export function PreAtendimento() {
                         />
                       </SimpleGrid>
 
-                      <Grid gutter="md">
+                      <Grid gutter="lg">
                         <Grid.Col span={isMobile ? 12 : 3}>
                           <TextInput
                             label="CPF"
@@ -2001,21 +1970,14 @@ export function PreAtendimento() {
 
                       <Divider />
 
-                      <SimpleGrid cols={isMobile ? 1 : 2} spacing="md">
-                        <TextInput
-                          label="Convênio do cadastro"
-                          value={checklistPatient?.convenio || 'Particular'}
-                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('convenio', event.currentTarget.value)}
-                        />
-                        <TextInput
-                          label="Status da autorização"
-                          value={checklistPatient?.statusAutorizacao || ''}
-                          placeholder="Sem autorização prévia"
-                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('statusAutorizacao', event.currentTarget.value)}
-                        />
-                      </SimpleGrid>
+                      <TextInput
+                        label="Status da autorização"
+                        value={checklistPatient?.statusAutorizacao || ''}
+                        placeholder="Sem autorização prévia"
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistPatientField('statusAutorizacao', event.currentTarget.value)}
+                      />
 
-                      <SimpleGrid cols={isMobile ? 1 : 4} spacing="md" verticalSpacing="xs">
+                      <SimpleGrid cols={isMobile ? 1 : 4} spacing="lg" verticalSpacing="sm">
                         <TextInput
                           label="Validade"
                           value={checklistPatient?.validadeConvenio || ''}
@@ -2037,8 +1999,6 @@ export function PreAtendimento() {
                           onChange={(event: ChangeEvent<HTMLInputElement>) => updateChecklistAgendaPart('profissional', event.currentTarget.value)}
                         />
                       </SimpleGrid>
-
-                      <Divider />
 
                       <Divider />
 
@@ -2077,22 +2037,14 @@ export function PreAtendimento() {
                             }));
                           }}
                         />
-                        <Checkbox
-                          label="Autorização do convênio conferida"
-                          style={{ display: 'none' }}
-                          checked={false}
-                          onChange={(event) => {
-                            void event;
-                          }}
-                        />
                       </Group>
 
                       <Box maw={isMobile ? '100%' : 380}>
-                        <FloatingInput
+                        <TextInput
                           label="Número da Guia"
                           value={checklistData.guiaNumero}
                           disabled={checklistData.atendimentoParticular}
-                          onChange={(event) => {
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => {
                             const value = event.currentTarget.value;
                             setChecklistData((prev) => ({ ...prev, guiaNumero: value }));
                           }}
@@ -2104,10 +2056,10 @@ export function PreAtendimento() {
                         <Button
                           component="label"
                           variant="default"
+                          className="checklist-upload-box"
                           fullWidth
                           loading={checklistAttachmentUploading}
                           disabled={!checklistPatient?.appointmentId}
-                          style={checklistUploadBoxStyle}
                           leftSection={<Upload size={18} />}
                         >
                           Coloque o anexo aqui
@@ -2147,23 +2099,20 @@ export function PreAtendimento() {
                         )}
                       </Box>
                     </Stack>
-                  </Paper>
+                  </Box>
                 </Box>
 
-                <Box style={{ position: 'relative' }}>
-                  <ThemeIcon
-                    radius="xl"
-                    size={30}
-                    color="dark"
-                    bg={DARK_BLUE}
-                    style={{ position: 'absolute', left: isMobile ? -42 : -50, top: 0 }}
-                  >
-                    <Text fw={700} size="sm" c="white">2</Text>
-                  </ThemeIcon>
-                  <Text fw={500} size={isMobile ? 'lg' : 'xl'} lh={1.15}>Pagamento</Text>
-                  <Text size="sm" style={checklistMutedBlueStyle}>Particular e coparticipação</Text>
+                <Box className="checklist-section">
+                  <Box className="checklist-section-header">
+                    <span className="checklist-step-badge">2</span>
+                    <Box>
+                      <Text className="checklist-section-title">Pagamento</Text>
+                      <Text className="checklist-section-subtitle">Particular e coparticipação</Text>
+                    </Box>
+                  </Box>
 
-                  <Stack gap="md" mt="md">
+                  <Box className="checklist-card">
+                  <Stack gap="lg">
                     <Box maw={isMobile ? '100%' : 380}>
                       <NumberInput
                         label="Valor"
@@ -2179,7 +2128,7 @@ export function PreAtendimento() {
                       />
                     </Box>
 
-                    <SimpleGrid cols={isMobile ? 1 : 3} spacing="md">
+                    <SimpleGrid cols={isMobile ? 1 : 3} spacing="lg">
                       {[
                         { label: 'Dinheiro', value: 'Dinheiro', icon: Wallet },
                         { label: 'Cartão', value: 'Cartão', icon: CreditCard },
@@ -2191,9 +2140,9 @@ export function PreAtendimento() {
                           <Button
                             key={option.value}
                             variant="default"
+                            className={`checklist-payment-option${selected ? ' is-selected' : ''}`}
                             leftSection={<Icon size={18} />}
                             disabled={!canEditPayment}
-                            style={paymentChoiceStyle(selected)}
                             onClick={() => {
                               if (!canEditPayment) return;
                               setChecklistData((prev) => ({ ...prev, formaPagamento: option.value }));
@@ -2215,23 +2164,20 @@ export function PreAtendimento() {
                       }}
                     />
                   </Stack>
+                  </Box>
                 </Box>
 
-                <Box style={{ position: 'relative' }}>
-                  <ThemeIcon
-                    radius="xl"
-                    size={30}
-                    color="dark"
-                    bg={DARK_BLUE}
-                    style={{ position: 'absolute', left: isMobile ? -42 : -50, top: 0 }}
-                  >
-                    <Text fw={700} size="sm" c="white">3</Text>
-                  </ThemeIcon>
-                  <Text fw={500} size={isMobile ? 'lg' : 'xl'} lh={1.15}>Revisão e Validação</Text>
-                  <Text size="sm" style={checklistMutedBlueStyle}>Checagem e identidade</Text>
+                <Box className="checklist-section">
+                  <Box className="checklist-section-header">
+                    <span className="checklist-step-badge">3</span>
+                    <Box>
+                      <Text className="checklist-section-title">Revisão e Validação</Text>
+                      <Text className="checklist-section-subtitle">Checagem e identidade</Text>
+                    </Box>
+                  </Box>
 
-                  <Paper withBorder radius="md" p={isMobile ? 'sm' : 'md'} mt="md" shadow="xs" style={checklistCardStyle}>
-                    <Stack gap="md">
+                  <Box className="checklist-card">
+                    <Stack gap="lg">
                       <Text fw={600}>Resumo</Text>
                       <SimpleGrid cols={isMobile ? 2 : 3} spacing="lg" verticalSpacing="md">
                         <Box>
@@ -2260,9 +2206,9 @@ export function PreAtendimento() {
                         </Box>
                       </SimpleGrid>
                     </Stack>
-                  </Paper>
+                  </Box>
 
-                  <Stack gap="md" mt="md">
+                  <Stack gap="lg" mt="md">
                     <Group gap="xl" wrap="wrap">
                       <Checkbox
                         label="Dados do paciente conferidos"
@@ -2284,7 +2230,6 @@ export function PreAtendimento() {
                     {requireFacialForPatientRegistration && (
                       <Group gap="md" wrap="wrap">
                         <Button
-                          bg={DARK_BLUE}
                           leftSection={<Camera size={16} />}
                           onClick={() => setFacialValidationOpen(true)}
                           loading={facialValidationLoading}
@@ -2321,27 +2266,6 @@ export function PreAtendimento() {
               </Stack>
             </Box>
           )}
-
-          <Group justify="flex-end">
-            {teleconsultationEligibility?.isTeleconsultation && (
-              <Button
-                variant="light"
-                onClick={() => handleFinishChecklist(true)}
-                disabled={!canCompleteChecklist() || checklistLoading || teleconsultationSendingLink || !teleconsultationEligibility.canSendLink}
-                loading={checklistLoading || teleconsultationSendingLink}
-              >
-                Confirmar e enviar link
-              </Button>
-            )}
-            <Button
-              bg={DARK_BLUE}
-              onClick={() => handleFinishChecklist(false)}
-              disabled={!canCompleteChecklist() || checklistLoading}
-              loading={checklistLoading}
-            >
-              Confirmar
-            </Button>
-          </Group>
         </Stack>
       </Modal>
 

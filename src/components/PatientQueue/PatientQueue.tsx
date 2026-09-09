@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Box, Group, Text, Paper, Button, Stack, Skeleton, Center, Badge } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { useMantineColorScheme } from '@mantine/core';
+import { Box, Group, Text, Paper, Button, Stack, Skeleton, Center, Badge } from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { useColorScheme } from '@/components/ui';
 import { Play, ChevronRight, ArrowRight, Clock } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
 import preAttendanceService from '../../services/preAttendanceService';
 import { usePatientQueueQuery, type QueuePatient } from '../../hooks/usePatientQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { showErrorToast, showSuccessToast } from '../../lib/toast';
+import './PatientQueue.css';
 
 interface PatientQueueProps {
   limit?: number;
@@ -21,7 +21,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const [callingId, setCallingId] = useState<string | null>(null);
   const { data: queueData = [], isLoading: loading, error } = usePatientQueueQuery();
   const queue = useMemo(() => (limit ? queueData.slice(0, limit) : queueData), [queueData, limit]);
@@ -45,7 +45,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
 
   if (loading) {
     return (
-      <Box mb={40}>
+      <Box className="patient-queue-section" mb={40}>
         <Group justify="space-between" mb="md">
           <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         </Group>
@@ -56,11 +56,12 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
 
   if (queue.length === 0) {
     return (
-      <Box mb={40}>
+      <Box className="patient-queue-section" mb={40}>
         <Group justify="space-between" mb="md">
           <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         </Group>
         <Paper
+          className="patient-queue-empty"
           p="xl"
           withBorder
           style={colorScheme === 'dark' ? {
@@ -105,7 +106,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
   };
 
   return (
-    <Box mb={40}>
+    <Box className="patient-queue-section" mb={40}>
       <Group justify="space-between" mb="md">
         <Text fw={600} size="lg" c="dimmed">Fila de Atendimento</Text>
         {showViewAll && !fullPage && (
@@ -120,8 +121,9 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
         {/* Active Item */}
         {firstPatient && (
           <Paper
+            className="patient-queue-item patient-queue-item--active"
             p="md"
-            bg={isMobile ? '#001F54' : DARK_BLUE}
+            bg={isMobile ? '#001F54' : 'var(--ui-primary)'}
             c="white"
             radius="md"
             withBorder
@@ -130,7 +132,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
             <Group justify="space-between">
               <Group>
                 <Box
-                  bg={isMobile ? '#193a7a' : DARK_BLUE}
+                  bg={isMobile ? '#193a7a' : 'var(--ui-primary)'}
                   c="white"
                   w={32}
                   h={32}
@@ -170,7 +172,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
               {!isMobile && (
                 <Button
                   bg="white"
-                  c={colorScheme === 'dark' ? 'dark' : 'darkBlue.9'}
+                  c={colorScheme === 'dark' ? 'var(--ui-foreground)' : 'var(--ui-primary)'}
                   leftSection={<Play size={16} fill={colorScheme === 'dark' ? '#1a1b1e' : '#001f54'} />}
                   loading={callingId === firstPatient.id}
                   onClick={() => handleCallPatient(firstPatient)}
@@ -185,6 +187,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
         {/* Inactive Items */}
         {restPatients.map((patient) => (
           <Paper
+            className="patient-queue-item"
             key={patient.id}
             p="md"
             withBorder
@@ -235,7 +238,7 @@ export function PatientQueue({ limit = 3, showViewAll = true, fullPage = false }
               </Group>
               {!isMobile && (
                 <Button
-                  bg={DARK_BLUE}
+                  bg="var(--ui-primary)"
                   c="white"
                   leftSection={<Play size={16} fill="white" />}
                   loading={callingId === patient.id}

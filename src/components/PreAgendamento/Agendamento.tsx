@@ -7,35 +7,31 @@ import {
   Group,
   Text,
   Button,
+  TextInput,
   Modal,
   Stack,
   Select,
+  MultiSelect,
   ActionIcon,
-  Popover,
   SimpleGrid,
   UnstyledButton,
   Paper,
   Badge,
   Tabs,
-  useComputedColorScheme,
+  useColorSchemeValue,
   Loader,
   Textarea,
   Divider,
-} from '@mantine/core';
-import { Calendar as MantineCalendar } from '@mantine/dates';
-import { useMediaQuery } from '@mantine/hooks';
-import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User, Globe, Check, X } from 'lucide-react';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User, Globe, Check, X, ClipboardCheck, Paperclip } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
-import { showNotification } from '@mantine/notifications';
-import { DARK_BLUE } from '../../themes/theme';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
 import { PaginatedGrid } from '../common/PaginatedGrid';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingMultiSelect } from '../common/FloatingMultiSelect';
-import { FloatingDateInput } from '../common/FloatingDateInput';
-import { FloatingTextarea } from '../common/FloatingTextarea';
+import { FloatingDatePicker } from '../common/FloatingDatePicker';
+import './Agendamento.css';
 import appointmentService, { type OnlineAppointment } from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import appointmentAttachmentService from '../../services/appointmentAttachmentService';
@@ -591,11 +587,11 @@ export function Agendamento() {
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
   const [isEditing, setIsEditing] = useState(false);
   const [editingAgendamentoId, setEditingAgendamentoId] = useState<string | null>(null);
-  const computedColorScheme = useComputedColorScheme('dark');
+  const computedColorScheme = useColorSchemeValue('dark');
   const isDarkMode = computedColorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('list');
+  const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('grid');
   const [agendadosPage, setAgendadosPage] = useState(1);
   const [agendadosPageSize, setAgendadosPageSize] = useState(10);
   // State to track expanded cards (ids)
@@ -646,9 +642,6 @@ export function Agendamento() {
   const [convenio, setConvenio] = useState<string | null>(null);
   const [dataHoraFiltro, setDataHoraFiltro] = useState<Date | null>(new Date());
   const [statusFiltro, setStatusFiltro] = useState<string | null>(null);
-  // State for date filter picker
-  const [pickerOpened, setPickerOpened] = useState(false);
-  const [tempDateFilter, setTempDateFilter] = useState<Date | null>(new Date());
   const [viewedDate, setViewedDate] = useState<Date>(new Date());
   const appointmentDateFilter = dataHoraFiltro ?formatDateForApi(dataHoraFiltro) : undefined;
   const appointmentsQuery = useAppointmentsQuery({ date: appointmentDateFilter });
@@ -1803,13 +1796,13 @@ export function Agendamento() {
   };
 
   const rows = paginatedAgendamentos.map((agendamento) => (
-    <Box key={agendamento.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+    <Box key={agendamento.id} className="agendamento-agenda-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
       {/* Time column - centered */}
-      <Box style={{ minWidth: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box className="agendamento-agenda-row__time" style={{ minWidth: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Text size="sm" fw={500} c="var(--mantine-color-text)">{agendamento.hora}</Text>
       </Box>
       {/* Vertical separator and main content */}
-      <Box onClick={() => handleOpenAppointmentDetail(agendamento)} style={{ borderLeft: !isMobile ?'1px solid var(--mantine-color-default-border)' : 'none', paddingLeft: !isMobile ?16 : 0, flex: 1, cursor: 'pointer' }}>
+      <Box className="agendamento-agenda-row__content" onClick={() => handleOpenAppointmentDetail(agendamento)} style={{ borderLeft: !isMobile ?'1px solid var(--mantine-color-default-border)' : 'none', paddingLeft: !isMobile ?16 : 0, flex: 1, cursor: 'pointer' }}>
         <Text fw={600} size="sm">{agendamento.pacienteNome}</Text>
         <Text size="xs" c="dimmed" mt={6}>
           {getResumoLinha(agendamento)}
@@ -1817,6 +1810,7 @@ export function Agendamento() {
       </Box>
       {/* Right aligned status */}
       <Box
+        className="agendamento-agenda-row__actions"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1826,7 +1820,7 @@ export function Agendamento() {
           paddingRight: isMobile ?12 : 20,
         }}
       >
-        <Box style={{ minWidth: isMobile ?170 : 190 }}>
+        <Box className="agendamento-agenda-row__status" style={{ minWidth: isMobile ?170 : 190 }}>
 	          <Select
 	              data={[
 	              { value: 'AGENDADO', label: 'Agendado' },
@@ -1844,20 +1838,23 @@ export function Agendamento() {
             rightSection={updatingStatusId === agendamento.id ? <Loader size={14} /> : undefined}
 	          />
 	        </Box>
-        {(agendamento.status === 'NAO_COMPARECEU' || agendamento.status === 'CANCELADO') && (
-          <Button
-            size="xs"
-            variant="light"
-            miw={110}
-            px="md"
-            onClick={() => handleRescheduleAppointment(agendamento)}
-          >
-            Reagendar
+	        <Box className="agendamento-agenda-row__action-buttons">
+          {(agendamento.status === 'NAO_COMPARECEU' || agendamento.status === 'CANCELADO') && (
+            <Button
+              className="agendamento-agenda-row__reschedule"
+              size="xs"
+              variant="light"
+              miw={110}
+              px="md"
+              onClick={() => handleRescheduleAppointment(agendamento)}
+            >
+              Reagendar
+            </Button>
+          )}
+          <Button className="agendamento-agenda-row__edit" size="xs" variant="subtle" onClick={() => handleEditAgendamento(agendamento)}>
+            Editar
           </Button>
-        )}
-        <Button size="xs" variant="subtle" onClick={() => handleEditAgendamento(agendamento)}>
-          Editar
-        </Button>
+	        </Box>
 	      </Box>
 	    </Box>
 	  ));
@@ -3031,44 +3028,16 @@ export function Agendamento() {
     setSelectedSuggestedOptionId(null);
   }, [selectedSpecialties, novoAgendamento.profissional, viewedDate, selectedPatientId, novoAgendamento.convenio]);
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-      <Box p={isMobile ?'sm' : isTablet ?'md' : 'xl'} maw={isMobile ?'100%' : 1400} mx="auto">
-        {/* Breadcrumb/Back Button */}
-        <Group mb={isMobile ?20 : 30}>
-          <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-            <ChevronLeft size={28} />
-          </ActionIcon>
-          <Box>
-            <Text fw={600} size={isMobile ?'md' : 'lg'} c="var(--mantine-color-text)">
-              Agendamento
-            </Text>
-            <Text size="sm" c="dimmed">
-              Consultas e exames
-            </Text>
-          </Box>
-        </Group>
-
+    <Box className="agendamento-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header
+        contextLabel={activeTab === 'hub' ? 'Agendamento' : activeTab === 'marcacao' ? 'Realizar marcação' : activeTab === 'online' ? 'Agendamentos online' : 'Visualizar agenda'}
+        back={activeTab !== 'hub' ? { label: 'Voltar', onClick: () => setActiveTab('hub') } : undefined}
+      />
+      <Box className="agendamento-container" p={isMobile ?'sm' : isTablet ?'md' : 'xl'} maw={isMobile ?'100%' : 1400} mx="auto">
         <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'hub')} variant="default">
-          {activeTab !== 'hub' && (
-            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setActiveTab('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>
-                  {activeTab === 'marcacao' ? 'Realizar marcação' : activeTab === 'online' ? 'Agendamentos Online' : 'Visualizar agenda'}
-                </Text>
-              </Group>
-            </Group>
-          )}
-
           <Tabs.Panel value="hub">
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+            <Box className="agendamento-hub">
+            <SimpleGrid className="agendamento-hub-grid" cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
               {[
                 {
                   key: 'marcacao',
@@ -3095,6 +3064,7 @@ export function Agendamento() {
               ].map((card) => (
                 <Paper
                   key={card.key}
+                  className="agendamento-hub-card"
                   p="lg"
                   withBorder
                   onClick={card.onClick}
@@ -3106,26 +3076,15 @@ export function Agendamento() {
                 >
                   <Group justify="space-between" align="center" wrap="nowrap">
                     <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                      <Box
-                        w={44}
-                        h={44}
-                        style={{
-                          borderRadius: 10,
-                          border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                      <Box className="agendamento-hub-card__icon" w={44} h={44}>
+                        <card.icon size={22} />
                       </Box>
-                      <Box style={{ minWidth: 0 }}>
+                      <Box className="agendamento-hub-card__content" style={{ minWidth: 0 }}>
                         <Group gap={6} wrap="nowrap">
-                          <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
+                          <Text className="agendamento-hub-card__title" fw={600} size="md" lineClamp={1}>{card.title}</Text>
                           {card.badge ? <Badge color="orange" size="xs">{card.badge}</Badge> : null}
                         </Group>
-                        <Text size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
+                        <Text className="agendamento-hub-card__description" size="sm" c="dimmed" lineClamp={2}>{card.desc}</Text>
                       </Box>
                     </Group>
                     <ChevronRight size={18} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
@@ -3133,19 +3092,32 @@ export function Agendamento() {
                 </Paper>
               ))}
             </SimpleGrid>
+            </Box>
           </Tabs.Panel>
 
           <Tabs.Panel value="marcacao">
-        <Box ref={schedulerRef}>
-          <Paper
-            p={isMobile ?'md' : 'lg'}
-            radius="md"
-            withBorder
-            bg={isDarkMode ?'var(--mantine-color-body)' : 'var(--mantine-color-default)'}
-            style={{ borderColor: 'var(--mantine-color-default-border)' }}
-            mb={isMobile ?20 : 28}
+        <Box ref={schedulerRef} className="agendamento-scheduler">
+          <Box
+            className="agendamento-scheduler-card"
           >
+            <Box className="agendamento-scheduler-intro">
+              <Box className="agendamento-scheduler-intro__copy">
+                <Text className="agendamento-scheduler-intro__eyebrow">FLUXO OPERACIONAL</Text>
+                <Text className="agendamento-scheduler-intro__title" component="h2">Nova marcação</Text>
+                <Text className="agendamento-scheduler-intro__description">
+                  Cadastre o atendimento em três passos claros: paciente, horário e confirmação.
+                </Text>
+              </Box>
+              <Group className="agendamento-scheduler-intro__status" gap="xs" wrap="nowrap">
+                <Box className="agendamento-scheduler-intro__status-dot" aria-hidden="true" />
+                <Box>
+                  <Text className="agendamento-scheduler-intro__status-label">Fluxo guiado</Text>
+                  <Text className="agendamento-scheduler-intro__status-value">Dados ainda não confirmados</Text>
+                </Box>
+              </Group>
+            </Box>
             <Stack
+              className="agendamento-scheduler-flow"
               gap="xl"
               style={{
                 position: 'relative',
@@ -3153,16 +3125,16 @@ export function Agendamento() {
                 paddingRight: isMobile ?4 : 8,
               }}
             >
-	              <Group justify="space-between" align="center" wrap="wrap" style={{ position: 'relative', zIndex: 1, marginLeft: isMobile ?-8 : -10 }}>
+              <Group className={`agendamento-step-heading agendamento-step-heading--patient${isManualPatientFlow ? ' agendamento-step-heading--manual' : ''}`} justify="space-between" align="center" wrap="wrap">
 	                <Group gap="xs">
 	                  <Badge circle color="blue" variant="filled" size="lg">1</Badge>
-	                  <Box>
+                  <Box className="agendamento-step-heading__copy">
 	                    <Text fw={700} size="lg">Dados cadastrais</Text>
 	                    <Text size="sm" c="dimmed">Dados do paciente</Text>
 	                  </Box>
 	                </Group>
 	
-                  <Group gap="sm" justify="flex-end">
+                  <Group className="agendamento-step-actions" gap="sm" justify="flex-end">
                     {isManualPatientFlow ?(
                       <>
                         <Badge variant="light" color="blue" size="lg">
@@ -3177,7 +3149,6 @@ export function Agendamento() {
                       </>
                     ) : (
 		                  <Button
-		                    bg={DARK_BLUE}
 		                    leftSection={<Plus size={14} />}
 		                    onClick={handleEnableManualPatientFlow}
 		                  >
@@ -3185,14 +3156,12 @@ export function Agendamento() {
 		                  </Button>
                     )}
                   </Group>
-	              </Group>
-              <Box
-                ml={isMobile ?6 : 4}
-                h={26}
-                style={{ borderLeft: '1px solid rgba(120, 158, 230, 0.45)' }}
-              />
-              <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                <FloatingSelect
+              </Group>
+              <Box className="agendamento-step-connector" aria-hidden="true" />
+              <Box className="agendamento-stage-panel agendamento-stage-panel--details">
+              <SimpleGrid className="agendamento-patient-grid" cols={{ base: 1, md: 2 }} spacing="md">
+                <Select
+                  className="agendamento-native-field"
                   label="Nome completo"
                   placeholder={patientsLoading ?'Carregando pacientes...' : 'Selecione o paciente'}
                   data={patientOptions}
@@ -3203,7 +3172,8 @@ export function Agendamento() {
                   nothingFoundMessage="Nenhum paciente encontrado"
                   disabled={patientsLoading || isManualPatientFlow}
                 />
-                <FloatingInput
+                <TextInput
+                  className="agendamento-native-field"
                   label="CPF"
                   value={novoAgendamento.pacienteCPF || pendingPatient.cpf}
                   onChange={(e) => {
@@ -3214,15 +3184,17 @@ export function Agendamento() {
                 />
               </SimpleGrid>
               {isManualPatientFlow && (
-                <Stack gap="md">
-                  <FloatingInput
+                <Stack className="agendamento-manual-patient-section" gap="md">
+                  <TextInput
+                    className="agendamento-native-field"
                     label="Paciente novo"
                     placeholder="Digite o nome do paciente"
                     value={pendingPatient.name}
                     onChange={(e) => handlePendingPatientField('name', e.currentTarget.value)}
                   />
                   <Paper
-                    p="md"
+                    className="agendamento-manual-patient-card"
+                    p={0}
                     radius="lg"
                     bg={isDarkMode ?'transparent' : 'var(--mantine-color-body)'}
                     style={{
@@ -3232,29 +3204,28 @@ export function Agendamento() {
                       boxShadow: isDarkMode ?'none' : '0 4px 16px rgba(15, 23, 42, 0.04)',
                     }}
                   >
-                    <Stack gap="sm">
-                      <Box>
-                        <Text fw={700}>Completar cadastro do paciente</Text>
-                        <Text size="sm" c="dimmed">
+                    <Stack className="agendamento-manual-patient-card__content" gap="md">
+                      <Group className="agendamento-manual-patient-card__header" justify="space-between" align="flex-start" wrap="wrap" gap="md">
+                        <Box className="agendamento-manual-patient-card__intro">
+                          <Text className="agendamento-manual-patient-card__title" fw={700}>Completar cadastro do paciente</Text>
+                          <Text className="agendamento-manual-patient-card__description" size="sm" c="dimmed">
                           Preencha os dados mínimos para concluir o cadastro desse novo paciente.
-                        </Text>
-                      </Box>
-                      <Group justify="flex-end">
-                        <Button variant="subtle" color="gray" onClick={handleDisableManualPatientFlow}>
+                          </Text>
+                        </Box>
+                        <Button className="agendamento-manual-patient-card__cancel" variant="subtle" color="gray" onClick={handleDisableManualPatientFlow}>
                           Cancelar novo paciente
                         </Button>
                       </Group>
-                      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                        <FloatingDateInput
+                      <SimpleGrid className="agendamento-manual-patient-grid" cols={{ base: 1, md: 2 }} spacing="md">
+                        <FloatingDatePicker
                           label="Data de nascimento"
-                          placeholder="Selecione"
-                          value={pendingPatient.birthDate}
-                          onChange={(value) => handlePendingPatientField('birthDate', value ?new Date(value) : null)}
-                          rightSection={<Calendar size={16} />}
-                          valueFormat="DD/MM/YYYY"
-                          locale="pt-br"
+                          labelPlacement="stacked"
+                          value={pendingPatient.birthDate ? dayjs(pendingPatient.birthDate).format('YYYY-MM-DD') : ''}
+                          onChange={(event) => handlePendingPatientField('birthDate', event.currentTarget.value ? new Date(`${event.currentTarget.value}T12:00:00`) : null)}
+                          containerProps={{ className: 'agendamento-native-date-field' }}
                         />
-                        <FloatingSelect
+                        <Select
+                          className="agendamento-native-field"
                           label="Gênero"
                           placeholder="Selecione"
                           data={[
@@ -3265,13 +3236,15 @@ export function Agendamento() {
                           value={pendingPatient.gender}
                           onChange={(value) => handlePendingPatientField('gender', value || '')}
                         />
-                        <FloatingInput
+                        <TextInput
+                          className="agendamento-native-field"
                           label="Celular"
                           placeholder="Digite o celular"
                           value={pendingPatient.cellphone}
                           onChange={(e) => handlePendingPatientField('cellphone', e.currentTarget.value)}
                         />
-                        <FloatingInput
+                        <TextInput
+                          className="agendamento-native-field"
                           label="E-mail"
                           placeholder="Opcional"
                           value={pendingPatient.email}
@@ -3282,9 +3255,10 @@ export function Agendamento() {
                   </Paper>
                 </Stack>
               )}
-              <Text fw={600} size="md">Dados do convênio</Text>
-              <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
-                <FloatingSelect
+              <Text className="agendamento-form-section-title" fw={600} size="md">Dados do convênio</Text>
+              <SimpleGrid className="agendamento-insurance-grid" cols={{ base: 1, md: 4 }} spacing="md">
+                <Select
+                  className="agendamento-native-field"
                   label="Tipo do convênio*"
                   placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
@@ -3305,25 +3279,29 @@ export function Agendamento() {
                   disabled={insurancesLoading}
                   nothingFoundMessage="Nenhum convênio encontrado"
                 />
-                <FloatingInput
+                <TextInput
+                  className="agendamento-native-field"
                   label="Número da carteirinha"
                   value={insuranceCardNumberValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioNumber: e.currentTarget.value })}
                 />
-                <FloatingInput
+                <TextInput
+                  className="agendamento-native-field"
                   label="Data de validade"
                   value={insuranceValidityValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioValidUntil: e.currentTarget.value })}
                 />
-                <FloatingInput
+                <TextInput
+                  className="agendamento-native-field"
                   label="Status"
                   value={insuranceStatusValue}
                   onChange={(e) => setNovoAgendamento({ ...novoAgendamento, convenioStatus: e.currentTarget.value })}
                 />
               </SimpleGrid>
-              <Text fw={600} size="md">Dados do agendamento</Text>
-              <SimpleGrid cols={{ base: 1, md: isExamAppointment ?2 : 3, lg: isExamAppointment ?5 : 3 }} spacing="md">
-                <FloatingMultiSelect
+              <Text className="agendamento-form-section-title" fw={600} size="md">Dados do agendamento</Text>
+              <SimpleGrid className="agendamento-appointment-grid" cols={{ base: 1, md: isExamAppointment ?2 : 3, lg: isExamAppointment ?5 : 3 }} spacing="md">
+                <MultiSelect
+                  className="agendamento-native-field"
                   label="Procedimento"
                   placeholder={proceduresLoading ?'Carregando procedimentos...' : 'Selecione os procedimentos'}
                   data={procedureOptions}
@@ -3334,12 +3312,12 @@ export function Agendamento() {
                   disabled={proceduresLoading}
                   nothingFoundMessage="Nenhum procedimento encontrado"
                 />
-                <FloatingDateInput
+                <FloatingDatePicker
                   label="Data da marcação"
-                  placeholder="Selecione a data"
-                  value={novoAgendamento.data}
-                  onChange={(value) => {
-                    const rawDate = value ?new Date(value) : null;
+                  labelPlacement="stacked"
+                  value={novoAgendamento.data ? dayjs(novoAgendamento.data).format('YYYY-MM-DD') : ''}
+                  onChange={(event) => {
+                    const rawDate = event.currentTarget.value ? new Date(`${event.currentTarget.value}T12:00:00`) : null;
                     const nextDate = rawDate
                       ?(isPastCalendarDate(rawDate) ?getTodayStart() : rawDate)
                       : null;
@@ -3348,12 +3326,11 @@ export function Agendamento() {
                     if (nextDate) setViewedDate(nextDate);
                   }}
                   minDate={getTodayStart()}
-                  rightSection={<Calendar size={16} />}
-                  valueFormat="DD/MM/YYYY"
-                  locale="pt-br"
+                  containerProps={{ className: 'agendamento-native-date-field' }}
                 />
                 {!isExamAppointment && (
-                  <FloatingSelect
+                  <Select
+                    className="agendamento-native-field"
                     label="Profissional"
                     placeholder={doctorsLoading ?'Carregando médicos...' : 'Selecione se quiser filtrar por um profissional'}
                     data={filteredDoctorOptions}
@@ -3366,7 +3343,8 @@ export function Agendamento() {
                   />
                 )}
                 {isExamAppointment && (
-                  <FloatingSelect
+                  <Select
+                    className="agendamento-native-field"
                     label="Sala (exame)"
                     placeholder={!examProcedureIds.length
                         ?'Selecione o procedimento de exame'
@@ -3383,7 +3361,8 @@ export function Agendamento() {
                   />
                 )}
                 {isExamAppointment && (
-                  <FloatingSelect
+                  <Select
+                    className="agendamento-native-field"
                     label="Equipamento (exame)"
                     placeholder={!novoAgendamento.roomId
                       ?'Selecione a sala'
@@ -3398,14 +3377,15 @@ export function Agendamento() {
                   />
                 )}
               </SimpleGrid>
-              <FloatingTextarea
+              <Textarea
+                className="agendamento-native-field"
                 label="Observações"
                 placeholder="Alguma observação importante para a recepção ou profissional"
                 minRows={2}
                 value={novoAgendamento.informacoes}
                 onChange={(e) => setNovoAgendamento({ ...novoAgendamento, informacoes: e.currentTarget.value })}
               />
-              <Group gap="xs">
+              <Group className="agendamento-selection-summary" gap="xs">
                 {selectedProcedureSummary.length > 0 ?(
                   selectedProcedureSummary.map((item) => (
                     <Badge key={item} variant="light" color="blue" radius="xl" size="lg">
@@ -3416,65 +3396,63 @@ export function Agendamento() {
                   <Text size="sm" c="dimmed">Nenhum procedimento selecionado ainda.</Text>
                 )}
               </Group>
-              <Group gap="xs" style={{ position: 'relative', zIndex: 1, marginLeft: isMobile ?-8 : -10 }}>
+              </Box>
+              <Group className="agendamento-step-heading agendamento-step-heading--schedule" gap="xs">
                 <Badge circle color="blue" variant="filled" size="lg">2</Badge>
-                <Box>
+                <Box className="agendamento-step-heading__copy">
                   <Text fw={700} size="lg">Horários</Text>
                   <Text size="sm" c="dimmed">Disponibilidade de horários</Text>
                 </Box>
               </Group>
+              <Box className="agendamento-stage-panel agendamento-stage-panel--availability">
               {selectedProcedureSummary.length > 0 ?(
               <>
-              <Box
-                ml={isMobile ?6 : 4}
-                h={26}
-                style={{ borderLeft: '1px solid rgba(120, 158, 230, 0.45)' }}
-              />
-              <Group gap="sm" wrap="wrap">
-                <ActionIcon
-                  variant="light"
-                  onClick={() => goToSchedulingDate(addDays(schedulingDate, -1))}
-                  aria-label="Dia anterior"
-                  disabled={dayjs(schedulingDate).isSame(dayjs(), 'day') || isPastCalendarDate(schedulingDate)}
-                >
-                  <ChevronLeft size={16} />
-                </ActionIcon>
-                <Group
-                  gap={6}
-                  px="sm"
-                  py={6}
-                  style={{
-                    borderBottom: '1px solid var(--mantine-color-default-border)',
-                    minWidth: 132,
-                  }}
-                >
-                  <Calendar size={14} />
-                  <Text fw={600} size="md">
-                    {dayjs(schedulingDate).format('DD/MM/YYYY')}
-                  </Text>
+              <Box className="agendamento-step-connector" aria-hidden="true" />
+              <Group className="agendamento-schedule-toolbar" gap="md" wrap="wrap">
+                <Group className="agendamento-schedule-date-nav" gap="sm" wrap="nowrap">
+                  <ActionIcon
+                    variant="light"
+                    onClick={() => goToSchedulingDate(addDays(schedulingDate, -1))}
+                    aria-label="Dia anterior"
+                    disabled={dayjs(schedulingDate).isSame(dayjs(), 'day') || isPastCalendarDate(schedulingDate)}
+                  >
+                    <ChevronLeft size={16} />
+                  </ActionIcon>
+                  <Group className="agendamento-schedule-date-display" gap="xs" wrap="nowrap">
+                    <Calendar size={16} aria-hidden="true" />
+                    <Box>
+                      <Text className="agendamento-schedule-date-label" size="xs" c="dimmed">Data da agenda</Text>
+                      <Text className="agendamento-schedule-date-value" fw={700} size="md">
+                        {dayjs(schedulingDate).format('DD/MM/YYYY')}
+                      </Text>
+                    </Box>
+                  </Group>
+                  <ActionIcon variant="light" onClick={() => goToSchedulingDate(addDays(schedulingDate, 1))} aria-label="Próximo dia">
+                    <ChevronRight size={16} />
+                  </ActionIcon>
                 </Group>
-                <ActionIcon variant="light" onClick={() => goToSchedulingDate(addDays(schedulingDate, 1))} aria-label="Próximo dia">
-                  <ChevronRight size={16} />
-                </ActionIcon>
-                <FloatingSelect
-                  label="Turno"
-                  data={(['Manhã', 'Tarde', 'Noite'] as const).map((turnoLabel) => ({ value: turnoLabel, label: turnoLabel }))}
-                  value={activeSchedulePeriod}
-                  onChange={(value) => setActiveSchedulePeriod((value as 'Manhã' | 'Tarde' | 'Noite') || 'Manhã')}
-                  containerProps={{ w: 140 }}
-                />
-                {!isExamAppointment && (
-                  <FloatingSelect
-                    label="Profissional"
-                    data={[{ value: '', label: 'Todos os profissionais' }, ...filteredDoctorOptions]}
-                    value={novoAgendamento.profissional}
-                    onChange={(value) => setNovoAgendamento((prev) => ({ ...prev, profissional: value || '' }))}
-                    containerProps={{ w: 260 }}
+                <Group className="agendamento-schedule-filters" gap="md" wrap="wrap">
+                  <Select
+                    className="agendamento-native-field agendamento-schedule-select"
+                    label="Turno"
+                    data={(['Manhã', 'Tarde', 'Noite'] as const).map((turnoLabel) => ({ value: turnoLabel, label: turnoLabel }))}
+                    value={activeSchedulePeriod}
+                    onChange={(value) => setActiveSchedulePeriod((value as 'Manhã' | 'Tarde' | 'Noite') || 'Manhã')}
                   />
-                )}
+                  {!isExamAppointment && (
+                    <Select
+                      className="agendamento-native-field agendamento-schedule-select agendamento-schedule-select--professional"
+                      label="Profissional"
+                      data={[{ value: '', label: 'Todos os profissionais' }, ...filteredDoctorOptions]}
+                      value={novoAgendamento.profissional}
+                      onChange={(value) => setNovoAgendamento((prev) => ({ ...prev, profissional: value || '' }))}
+                    />
+                  )}
+                </Group>
               </Group>
               {safeSchedulerDoctors.length === 0 ?(
                 <Paper
+                  className="agendamento-availability-empty"
                   p="xl"
                   radius="lg"
                   bg={isDarkMode ?'transparent' : 'rgba(255,255,255,0.02)'}
@@ -3489,9 +3467,10 @@ export function Agendamento() {
                   </Text>
                 </Paper>
               ) : (
-                <Stack gap="md">
+                <Stack className="agendamento-availability-section" gap="md">
                   {isMultiProcedureFlow && (
                     <Paper
+                      className="agendamento-suggestion-panel"
                       p="md"
                       radius="lg"
                       bg={isDarkMode ?'transparent' : 'rgba(0, 31, 84, 0.18)'}
@@ -3506,7 +3485,7 @@ export function Agendamento() {
                             Vamos tentar encaixar os procedimentos no mesmo dia e com o menor intervalo possível entre eles.
                           </Text>
                         </Box>
-                        <Button bg={DARK_BLUE} onClick={handleGenerateSuggestedSchedules} loading={generatingSuggestion}>
+                        <Button onClick={handleGenerateSuggestedSchedules} loading={generatingSuggestion}>
                           Sugerir horários próximos
                         </Button>
                       </Group>
@@ -3610,6 +3589,7 @@ export function Agendamento() {
                   )}
                   {isExamAppointment && !examResourcesSelected && (
                     <Paper
+                      className="agendamento-exam-hint"
                       p="md"
                       radius="lg"
                       bg={isDarkMode ?'rgba(66, 99, 235, 0.08)' : 'rgba(66, 99, 235, 0.10)'}
@@ -3623,6 +3603,7 @@ export function Agendamento() {
                   )}
                   {!schedulingDateHasAvailability && examResourcesSelected && (
                     <Paper
+                      className="agendamento-availability-warning"
                       p="md"
                       radius="lg"
                       bg={isDarkMode ?'rgba(250, 176, 5, 0.06)' : 'rgba(250, 176, 5, 0.08)'}
@@ -3641,9 +3622,29 @@ export function Agendamento() {
                       </Group>
                     </Paper>
                   )}
-                  <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
+                  <Group className="agendamento-availability-heading" justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+                    <Box>
+                      <Text className="agendamento-availability-heading__title" fw={700}>Horários disponíveis</Text>
+                      <Text className="agendamento-availability-heading__description" size="sm" c="dimmed">
+                        Escolha um horário para continuar a marcação.
+                      </Text>
+                    </Box>
+                    <Text className="agendamento-availability-heading__count" size="sm" c="dimmed">
+                      {displayScheduleSlots.length} {displayScheduleSlots.length === 1 ? 'horário encontrado' : 'horários encontrados'}
+                    </Text>
+                  </Group>
+                  <SimpleGrid className="agendamento-availability-grid" cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
                     {displayScheduleSlots.map((slotItem) => (
                       <UnstyledButton
+                        className={[
+                          'agendamento-availability-slot',
+                          slotItem.isSelected && 'is-selected',
+                          slotItem.isAnchorStart && 'is-anchor-start',
+                          slotItem.isCoveredByAnchorRange && 'is-anchor-covered',
+                          slotItem.isSuggestedStart && 'is-suggested-start',
+                          slotItem.isCoveredBySuggestedRange && 'is-suggested-covered',
+                          slotItem.isCoveredBySelectedRange && 'is-selected-covered',
+                        ].filter(Boolean).join(' ')}
                         key={slotItem.key}
                           onClick={() => {
                             if (slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange) {
@@ -3877,20 +3878,41 @@ export function Agendamento() {
                   Selecione ao menos um procedimento para visualizar os horários disponíveis.
                 </Text>
               )}
-              <Group gap="xs" style={{ position: 'relative', zIndex: 1, marginLeft: isMobile ?-8 : -10 }}>
+              </Box>
+              <Box className="agendamento-step-connector" aria-hidden="true" />
+              <Group className="agendamento-step-heading agendamento-step-heading--review" gap="xs">
                 <Badge circle color="blue" variant="filled" size="lg">3</Badge>
-                <Box>
+                <Box className="agendamento-step-heading__copy">
                   <Text fw={700} size="lg">Revisão</Text>
                   <Text size="sm" c="dimmed">Revisão e confirmação</Text>
                 </Box>
               </Group>
-              <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
-              <FloatingInput label="Nome completo" value={novoAgendamento.pacienteNome || ''} readOnly />
-              <FloatingInput label="Convênio" value={novoAgendamento.convenio || ''} readOnly />
-              <FloatingInput label="Procedimento" value={selectedProcedureSummary.join(', ')} readOnly />
-              <FloatingInput label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
+              <Box className="agendamento-stage-panel agendamento-stage-panel--confirmation">
+              <Box className="agendamento-review-summary">
+                <Group className="agendamento-review-summary__header" justify="space-between" align="center" wrap="wrap" gap="md">
+                  <Group gap="sm" wrap="nowrap">
+                    <Box className="agendamento-review-summary__icon" aria-hidden="true">
+                      <ClipboardCheck size={18} />
+                    </Box>
+                    <Box className="agendamento-review-summary__intro">
+                      <Text className="agendamento-review-summary__title" fw={700}>Resumo do atendimento</Text>
+                      <Text className="agendamento-review-summary__description" size="sm" c="dimmed">
+                        Confira os dados antes de confirmar a marcação.
+                      </Text>
+                    </Box>
+                  </Group>
+                  <Badge className="agendamento-review-summary__status" variant="light" color="blue">
+                    Revisão final
+                  </Badge>
+                </Group>
+                <SimpleGrid className="agendamento-review-grid" cols={{ base: 1, md: 3 }} spacing="md">
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Nome completo" value={novoAgendamento.pacienteNome || ''} readOnly />
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Convênio" value={novoAgendamento.convenio || ''} readOnly />
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Procedimento" value={selectedProcedureSummary.join(', ')} readOnly />
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
               {!isExamAppointment && (
-                <FloatingSelect
+                <Select
+                  className="agendamento-native-field agendamento-review-field"
                   label="Modalidade"
                   data={[
                     { value: 'Presencial', label: 'Presencial' },
@@ -3907,24 +3929,27 @@ export function Agendamento() {
                     : undefined}
                 />
               )}
-              <FloatingInput label="Data" value={reviewDateValue ?dayjs(reviewDateValue).format('DD/MM/YYYY') : ''} readOnly />
-              <FloatingInput label="Horário" value={reviewTimeValue} readOnly />
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Data" value={reviewDateValue ?dayjs(reviewDateValue).format('DD/MM/YYYY') : ''} readOnly />
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Horário" value={reviewTimeValue} readOnly />
               {!isExamAppointment && (
-                <FloatingInput label="Profissional respons." value={reviewProfessionalValue} readOnly />
+                <TextInput className="agendamento-native-field agendamento-review-field" label="Profissional respons." value={reviewProfessionalValue} readOnly />
               )}
               {isExamAppointment && (
-                <FloatingInput label="Sala" value={roomLabelById[novoAgendamento.roomId] || ''} readOnly />
+                <TextInput className="agendamento-native-field agendamento-review-field" label="Sala" value={roomLabelById[novoAgendamento.roomId] || ''} readOnly />
               )}
               {isExamAppointment && (
-                <FloatingInput
+                <TextInput
+                  className="agendamento-native-field agendamento-review-field"
                   label="Equipamento"
                   value={eligibleEquipmentOptions.find((item) => item.value === novoAgendamento.medicalEquipmentId)?.label || ''}
                   readOnly
                 />
               )}
-              </SimpleGrid>
+                </SimpleGrid>
+              </Box>
               <Paper
-                p="md"
+                className="agendamento-documents-card"
+                p={0}
                 radius="lg"
                 bg={isDarkMode ?'transparent' : 'var(--mantine-color-body)'}
                 style={{
@@ -3935,13 +3960,18 @@ export function Agendamento() {
                 }}
               >
                 <Stack gap="sm">
-                  <Group justify="space-between" align="center">
-                    <Box>
-                      <Text fw={700}>Documentos do agendamento</Text>
-                      <Text size="sm" c="dimmed">
-                        Anexe pedido medico, guia, identidade ou outros documentos relevantes.
-                      </Text>
-                    </Box>
+                  <Group className="agendamento-documents-card__header" justify="space-between" align="center" wrap="wrap" gap="md">
+                    <Group gap="sm" wrap="nowrap">
+                      <Box className="agendamento-documents-card__icon" aria-hidden="true">
+                        <Paperclip size={17} />
+                      </Box>
+                      <Box className="agendamento-documents-card__intro">
+                        <Text className="agendamento-documents-card__title" fw={700}>Documentos do agendamento</Text>
+                        <Text className="agendamento-documents-card__description" size="sm" c="dimmed">
+                          Anexe pedido médico, guia, identidade ou outros documentos relevantes.
+                        </Text>
+                      </Box>
+                    </Group>
                     <Button variant="light" onClick={() => attachmentInputRef.current?.click()}>
                       Anexar documentos
                     </Button>
@@ -4002,12 +4032,11 @@ export function Agendamento() {
                   )}
                 </Stack>
               </Paper>
-              <Group justify="space-between">
+              <Group className="agendamento-form-actions" justify="space-between">
                 <Button variant="default" onClick={() => resetSchedulingForm(dataHoraFiltro || new Date())}>
                   Limpar fluxo
                 </Button>
                 <Button
-                  bg={DARK_BLUE}
                   onClick={handleAddAgendamento}
                   loading={savingAgendamento}
                   disabled={!schedulingReady || savingAgendamento}
@@ -4015,33 +4044,34 @@ export function Agendamento() {
                   {isEditing ?'Salvar alterações' : 'Confirmar Marcação'}
                 </Button>
               </Group>
+              </Box>
             </Stack>
-          </Paper>
+          </Box>
         </Box>
           </Tabs.Panel>
           <Tabs.Panel value="agendados">
-        <Box mb="md">
-          <Text size={isMobile ?'lg' : 'xl'} fw={700}>Agenda existente</Text>
-          <Text size="sm" c="dimmed">
-            Aqui a gente consulta, filtra e ajusta os agendamentos já criados.
-          </Text>
+        <Box className="agendamento-agenda-page">
+        <Box className="agendamento-agenda-intro">
+          <Box className="agendamento-agenda-intro__copy">
+            <Text className="agendamento-agenda-intro__eyebrow">CONTROLE OPERACIONAL</Text>
+            <Text className="agendamento-agenda-intro__title" component="h2">Visualizar agenda</Text>
+            <Text className="agendamento-agenda-intro__description">
+              Consulte, filtre e ajuste os atendimentos da unidade em um único lugar.
+            </Text>
+          </Box>
+          <Box className="agendamento-agenda-intro__summary">
+            <Text className="agendamento-agenda-intro__summary-label">VISÃO ATUAL</Text>
+            <Text className="agendamento-agenda-intro__summary-value">
+              {filteredAgendamentos.length} {filteredAgendamentos.length === 1 ? 'atendimento' : 'atendimentos'} encontrados
+            </Text>
+          </Box>
         </Box>
-        {/* Search and Button Section */}
-        <Box mb={isMobile ?20 : 30}>
-          <Box
-            style={{
-              display: 'grid',
-              gap: 16,
-              gridTemplateColumns: isMobile
-                ?'1fr'
-                : 'minmax(210px, 1.1fr) minmax(180px, 0.9fr) minmax(210px, 1.1fr) minmax(180px, 0.9fr)',
-              alignItems: 'start',
-            }}
-          >
+        <Box className="agendamento-agenda-toolbar">
+          <Box className="agendamento-agenda-filter-grid">
             {/* Filtros */}
-            <FloatingSelect
+            <Select
+              className="agendamento-agenda-native-field"
               label="Procedimento"
-              alwaysFloatLabel
               data={procedureOptions}
               value={procedimentoFiltro}
               onChange={setProcedimentoFiltro}
@@ -4049,98 +4079,25 @@ export function Agendamento() {
               clearable
               disabled={proceduresLoading}
               nothingFoundMessage="Nenhum procedimento encontrado"
-              containerProps={{ style: { width: '100%', minHeight: 64 } }}
             />
-            <Popover 
-              opened={pickerOpened} 
-              onChange={setPickerOpened}
-              position="bottom-start"
-              withArrow
-              shadow="md"
-              width={320}
-              trapFocus
-            >
-              <Popover.Target>
-                <FloatingInput
-                  label=" "
-                  value={dataHoraFiltro ?dayjs(dataHoraFiltro).format('DD/MM/YYYY') : ''}
-                  onClick={() => {
-                    const initialDate = dataHoraFiltro || new Date();
-                    setTempDateFilter(initialDate);
-                    setViewedDate(initialDate);
-                    setPickerOpened(true);
-                  }}
-                  readOnly
-                  rightSection={<Calendar size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-                  containerProps={{ className: 'agenda-date-filter', style: { width: '100%', minHeight: 64, cursor: 'pointer' } }}
-                  style={{ cursor: 'pointer' }}
-                />
-              </Popover.Target>
-              <Popover.Dropdown p="md">
-                <Stack gap="md">
-                  <MantineCalendar
-                    date={viewedDate}
-                    onDateChange={(date) => setViewedDate(new Date(date))}
-                    locale="pt-br"
-                    size="md"
-                    styles={{
-                      day: { borderRadius: '50%' },
-                    }}
-                    getDayProps={(date) => ({
-                      onClick: () => {
-                        const d = new Date(date);
-                        setTempDateFilter(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0));
-                      },
-                      selected: tempDateFilter ?dayjs(date).isSame(tempDateFilter, 'day') : false,
-                    })}
-                  />
-                  <Group justify="space-between" gap="xs">
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      color="gray"
-                      onClick={() => {
-                        const today = new Date();
-                        setTempDateFilter(today);
-                        setViewedDate(today);
-                      }}
-                    >
-                      Hoje
-                    </Button>
-                    <Group gap="xs">
-                      <Button
-                        variant="subtle"
-                        size="xs"
-                        color="gray"
-                        onClick={() => {
-                          setTempDateFilter(null);
-                          setDataHoraFiltro(null);
-                          setPickerOpened(false);
-                        }}
-                      >
-                        Limpar
-                      </Button>
-                      <Button variant="default" size="xs" onClick={() => setPickerOpened(false)}>
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="xs"
-                        bg={DARK_BLUE}
-                        onClick={() => {
-                          setDataHoraFiltro(tempDateFilter);
-                          setPickerOpened(false);
-                        }}
-                      >
-                        Aplicar
-                      </Button>
-                    </Group>
-                  </Group>
-                </Stack>
-              </Popover.Dropdown>
-            </Popover>
-            <FloatingSelect
+            <FloatingDatePicker
+              label="Data"
+              labelPlacement="stacked"
+              value={dataHoraFiltro ? dayjs(dataHoraFiltro).format('YYYY-MM-DD') : ''}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (!value) {
+                  setDataHoraFiltro(null);
+                  return;
+                }
+                const [year, month, day] = value.split('-').map(Number);
+                setDataHoraFiltro(new Date(year, month - 1, day, 0, 0, 0, 0));
+              }}
+              containerProps={{ className: 'agendamento-agenda-native-date-field' }}
+            />
+            <Select
+              className="agendamento-agenda-native-field"
               label="Convênio"
-              alwaysFloatLabel
               data={insuranceOptions}
               value={convenio}
               onChange={setConvenio}
@@ -4148,11 +4105,10 @@ export function Agendamento() {
               clearable
               disabled={insurancesLoading}
               nothingFoundMessage="Nenhum convênio encontrado"
-              containerProps={{ style: { width: '100%', minHeight: 64 } }}
             />
-            <FloatingSelect
+            <Select
+              className="agendamento-agenda-native-field"
               label="Status"
-              alwaysFloatLabel
               data={[
                 { value: 'AGENDADO', label: 'Agendado' },
                 { value: 'CONFIRMADO', label: 'Confirmado' },
@@ -4163,27 +4119,25 @@ export function Agendamento() {
               value={statusFiltro}
               onChange={setStatusFiltro}
               clearable
-              containerProps={{ style: { width: '100%', minHeight: 64 } }}
             />
           </Box>
-          {/* Layout switch icons (Lista / Grade / Calendário) */}
-          <Group mt={12} mb={8} justify="space-between" align="end" wrap="wrap">
-            <Box style={{ flex: 1, minWidth: isMobile ?'100%' : 360 }}>
-              <FloatingInput
+          <Group className="agendamento-agenda-search-row" justify="space-between" align="end" wrap="wrap">
+            <Box className="agendamento-agenda-search-input">
+              <TextInput
+                className="agendamento-agenda-native-search"
                 label={isMobile ?'Buscar' : 'Buscar por paciente, CPF ou médico'}
-                alwaysFloatLabel
-                disableMask
+                placeholder="Digite para filtrar os atendimentos"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.currentTarget.value)}
-                rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-                containerProps={{ style: { width: '100%', minHeight: 64 } }}
+                rightSection={<Search size={16} aria-hidden="true" />}
               />
             </Box>
-            <Group gap="xs" style={{ alignSelf: 'center' }}>
+            <Group className="agendamento-agenda-view-switcher" gap="xs">
               <ActionIcon
                 variant={layout === 'list' ?'filled' : 'subtle'}
                 color={layout === 'list' ?'darkBlue' : undefined}
                 onClick={() => setLayout('list')}
+                aria-label="Visualização em lista"
                 title="Lista"
               >
                 <List size={16} />
@@ -4192,6 +4146,7 @@ export function Agendamento() {
                 variant={layout === 'grid' ?'filled' : 'subtle'}
                 color={layout === 'grid' ?'darkBlue' : undefined}
                 onClick={() => setLayout('grid')}
+                aria-label="Visualização em grade"
                 title="Grade"
               >
                 <LayoutGrid size={16} />
@@ -4200,140 +4155,151 @@ export function Agendamento() {
                 variant={layout === 'calendar' ?'filled' : 'subtle'}
                 color={layout === 'calendar' ?'darkBlue' : undefined}
                 onClick={() => setLayout('calendar')}
+                aria-label="Visualização em calendário"
                 title="Calendário"
               >
                 <Calendar size={16} />
               </ActionIcon>
             </Group>
           </Group>
-        </Box>
+          </Box>
         {dataHoraFiltro && (
-          <Text size="xl" fw={700} mb="md">
+          <Text className="agendamento-agenda-date-heading" size="xl" fw={700}>
             {dayjs(dataHoraFiltro).format('dddd').charAt(0).toUpperCase() + dayjs(dataHoraFiltro).format('dddd').slice(1)} | {dayjs(dataHoraFiltro).format('DD [de] MMMM [de] YYYY')}
           </Text>
         )}
         {/* Agendamentos List */}
         {(layout === 'list' || layout === 'grid') && (
-          <PaginatedGrid
-            totalItems={filteredAgendamentos.length}
-            page={agendadosPage}
-            pageSize={agendadosPageSize}
-            onPageChange={setAgendadosPage}
-            onPageSizeChange={(size) => {
-              setAgendadosPageSize(size);
-              setAgendadosPage(1);
-            }}
-            isMobile={isMobile}
-            maxHeight={560}
-          >
+          <Box className="agendamento-agenda-results">
+            <PaginatedGrid
+              totalItems={filteredAgendamentos.length}
+              page={agendadosPage}
+              pageSize={agendadosPageSize}
+              onPageChange={setAgendadosPage}
+              onPageSizeChange={(size) => {
+                setAgendadosPageSize(size);
+                setAgendadosPage(1);
+              }}
+              isMobile={isMobile}
+              maxHeight={layout === 'grid' ?'none' : 560}
+            >
             {/* LIST */}
             {layout === 'list' && (
-              <Box>
+              <Box className="agendamento-agenda-list">
                 {rows.length > 0 ? rows : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
               </Box>
             )}
 
             {/* GRID */}
             {layout === 'grid' && (
-              <Box p="md">
-                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+              <Box className="agendamento-agenda-grid" p="md">
+                <SimpleGrid cols={isMobile ? 1 : isTablet ? 2 : 3} spacing="md">
                   {filteredAgendamentos.length > 0 ? paginatedAgendamentos.map(a => {
                   const isExpanded = expandedIds.includes(a.id);
                   return (
                     <Box
                       key={a.id}
-                      p="md"
+                      className={`agendamento-agenda-card${isExpanded ?' agendamento-agenda-card--expanded' : ''}`}
                       style={{
                         border: '1px solid var(--mantine-color-default-border)',
                         borderRadius: 12,
                         background: 'var(--mantine-color-body)',
-                        minHeight: 188,
+                        minHeight: 280,
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
                       }}
                     >
-                      <Group justify="apart" align="flex-start" mb="xs">
-                        <Box style={{ flex: 1, minWidth: 0 }}>
-                          <Text fw={700} lineClamp={1}>{a.pacienteNome || '—'}</Text>
-                          <Text size="xs" c="dimmed" mt={4}>
-                            {dayjs(a.data).format('DD/MM/YYYY')} • {a.hora || '—'}
-                          </Text>
+                      <Box className="agendamento-agenda-card__header">
+                        <Box className="agendamento-agenda-card__identity">
+                          <Box className="agendamento-agenda-card__time">
+                            <Clock3 size={15} aria-hidden="true" />
+                            <Text>{a.hora || '—'}</Text>
+                          </Box>
+                          <Box style={{ minWidth: 0 }}>
+                            <Text className="agendamento-agenda-card__patient" lineClamp={1}>
+                              {a.pacienteNome || 'Paciente não informado'}
+                            </Text>
+                            <Text className="agendamento-agenda-card__date">
+                              {dayjs(a.data).format('DD/MM/YYYY')}
+                            </Text>
+                          </Box>
                         </Box>
-                        <Badge variant="light" radius="xl" color={getAppointmentStatusBadgeColor(a.status)}>
+                        <Badge className="agendamento-agenda-card__status" variant="light" radius="xl" color={getAppointmentStatusBadgeColor(a.status)}>
                           {getAppointmentStatusLabel(a.status)}
                         </Badge>
-                      </Group>
-                      <Stack gap={8}>
-                        <Box>
-                          <Text size="xs" c="dimmed" fw={600}>Procedimento</Text>
-                          <Text size="sm" fw={500} lineClamp={1}>{a.especialidade || '—'}</Text>
+                      </Box>
+                      <Box className="agendamento-agenda-card__body">
+                        <Box className="agendamento-agenda-card__field">
+                          <Text className="agendamento-agenda-card__label">Procedimento</Text>
+                          <Text className="agendamento-agenda-card__value" lineClamp={2}>{a.especialidade || 'Não informado'}</Text>
                         </Box>
-                        <Group gap="xs">
-                          <Badge variant="dot" color={a.tipoConsulta === 'EXAME' ?'grape' : 'blue'}>
-                            {getAppointmentTypeLabel(a.tipoConsulta)}
-                          </Badge>
-                          <Text size="xs" c="dimmed" lineClamp={1}>
-                            {a.convenio || 'Sem convênio'}
-                          </Text>
-                        </Group>
-                        <Box>
-                          <Text size="xs" c="dimmed" fw={600}>Profissional</Text>
-                          <Text size="sm" lineClamp={1}>{a.medicoNome || 'Não informado'}</Text>
+                        <Box className="agendamento-agenda-card__meta-grid">
+                          <Box className="agendamento-agenda-card__field">
+                            <Text className="agendamento-agenda-card__label">Tipo</Text>
+                            <Badge variant="light" color={a.tipoConsulta === 'EXAME' ?'grape' : 'blue'}>
+                              {getAppointmentTypeLabel(a.tipoConsulta)}
+                            </Badge>
+                          </Box>
+                          <Box className="agendamento-agenda-card__field">
+                            <Text className="agendamento-agenda-card__label">Convênio</Text>
+                            <Text className="agendamento-agenda-card__value" lineClamp={1}>{a.convenio || 'Particular'}</Text>
+                          </Box>
                         </Box>
-                      </Stack>
-                      {!isExpanded ?(
-                        <Group mt="md" justify="apart">
-                          <Button size="xs" variant="light" onClick={() => handleOpenAppointmentDetail(a)}>
-                            Detalhes
-                          </Button>
-                          <Group gap="xs">
-                            <Button size="xs" variant="subtle" onClick={() => setExpandedIds(prev => prev.includes(a.id) ?prev.filter(id => id !== a.id) : [...prev, a.id])}>
-                              Ver mais
-                            </Button>
-                            <Button size="xs" variant="subtle" onClick={() => handleEditAgendamento(a)}>
-                              Editar
-                            </Button>
-                          </Group>
-                        </Group>
-                      ) : (
-                        <Box mt="md">
-                          <Stack gap={6}>
-                            <Text size="sm"><strong>CPF:</strong> {a.pacienteCPF ?formatCPF(a.pacienteCPF) : 'Não informado'}</Text>
-                            <Text size="sm"><strong>Resumo:</strong> {getResumoLinha(a)}</Text>
+                        <Box className="agendamento-agenda-card__field">
+                          <Text className="agendamento-agenda-card__label">Profissional</Text>
+                          <Text className="agendamento-agenda-card__value" lineClamp={1}>{a.medicoNome || 'Não informado'}</Text>
+                        </Box>
+                        {isExpanded && (
+                          <Box className="agendamento-agenda-card__expanded">
+                            <Box className="agendamento-agenda-card__expanded-row">
+                              <Text className="agendamento-agenda-card__expanded-label">CPF</Text>
+                              <Text className="agendamento-agenda-card__expanded-value">{a.pacienteCPF ?formatCPF(a.pacienteCPF) : 'Não informado'}</Text>
+                            </Box>
+                            <Box className="agendamento-agenda-card__expanded-row">
+                              <Text className="agendamento-agenda-card__expanded-label">Resumo</Text>
+                              <Text className="agendamento-agenda-card__expanded-value">{getResumoLinha(a)}</Text>
+                            </Box>
                             {a.observacoes ?(
-                              <Text size="sm"><strong>Observações:</strong> {a.observacoes}</Text>
+                              <Box className="agendamento-agenda-card__expanded-row">
+                                <Text className="agendamento-agenda-card__expanded-label">Observações</Text>
+                                <Text className="agendamento-agenda-card__expanded-value">{a.observacoes}</Text>
+                              </Box>
                             ) : null}
-                          </Stack>
-                          <Group mt="md" justify="apart">
-                            <Button size="xs" variant="light" onClick={() => handleOpenAppointmentDetail(a)}>
-                              Detalhes
+                          </Box>
+                        )}
+                      </Box>
+                      <Box className="agendamento-agenda-card__footer">
+                        <Button className="agendamento-agenda-card__primary-action" size="xs" variant="light" onClick={() => handleOpenAppointmentDetail(a)}>
+                          Detalhes
+                        </Button>
+                        <Group className="agendamento-agenda-card__secondary-actions" gap="xs">
+                          {(a.status === 'NAO_COMPARECEU' || a.status === 'CANCELADO') && (
+                            <Button size="xs" variant="outline" onClick={() => handleRescheduleAppointment(a)}>
+                              Reagendar
                             </Button>
-                            <Group gap="xs">
-                              {(a.status === 'NAO_COMPARECEU' || a.status === 'CANCELADO') && (
-                                <Button size="xs" variant="outline" onClick={() => handleRescheduleAppointment(a)}>
-                                  Reagendar
-                                </Button>
-                              )}
-                              <Button size="xs" variant="subtle" onClick={() => setExpandedIds(prev => prev.filter(id => id !== a.id))}>
-                                Ver menos
-                              </Button>
-                            </Group>
-                          </Group>
-                        </Box>
-                      )}
+                          )}
+                          <Button size="xs" variant="subtle" onClick={() => setExpandedIds(prev => isExpanded ?prev.filter(id => id !== a.id) : [...prev, a.id])}>
+                            {isExpanded ?'Ver menos' : 'Ver mais'}
+                          </Button>
+                          <Button size="xs" variant="subtle" onClick={() => handleEditAgendamento(a)}>
+                            Editar
+                          </Button>
+                        </Group>
+                      </Box>
                     </Box>
                   );
                   }) : <Box p="md"><Text ta="center" c="dimmed">Nenhum agendamento encontrado</Text></Box>}
                 </SimpleGrid>
               </Box>
             )}
-          </PaginatedGrid>
+            </PaginatedGrid>
+          </Box>
         )}
 
           {/* CALENDAR */}
           {layout === 'calendar' && (
-            <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }} p="md">
+            <Box className="agendamento-agenda-calendar" style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }} p="md">
               {/* Calendar header */}
               <Group justify="apart" align="center" mb={8}>
                 <Group gap="xs">
@@ -4352,7 +4318,7 @@ export function Agendamento() {
                 </Group>
               </Group>
               {/* Weekdays */}
-              <SimpleGrid cols={7} spacing={0} mb={8}>
+              <SimpleGrid className="agendamento-agenda-calendar__weekdays" cols={7} spacing={0} mb={8}>
                 {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d) => (
                   <Box key={d} style={{ textAlign: 'center', padding: '6px 0' }}>
                     <Text size="xs" c="dimmed" fw={600}>{d}</Text>
@@ -4360,7 +4326,7 @@ export function Agendamento() {
                 ))}
               </SimpleGrid>
               {/* Days grid */}
-              <SimpleGrid cols={7} spacing="xs">
+              <SimpleGrid className="agendamento-agenda-calendar__days" cols={7} spacing="xs">
                 {(() => {
                   const startOfMonth = dayjs(currentMonth).startOf('month');
                   // Monday-first: compute start date to show (previous Monday)
@@ -4392,6 +4358,7 @@ export function Agendamento() {
                           setDataHoraFiltro(d.toDate());
                           setCalendarModalOpen(false);
                         }}
+                        className={`agendamento-agenda-calendar__day${isCurrentMonth ? '' : ' is-outside'}${isSelected ? ' is-selected' : ''}${isToday ? ' is-today' : ''}${count > 0 ? ' has-appointments' : ''}`}
                         style={{
                           padding: 10,
                           minHeight: 92,
@@ -4405,7 +4372,7 @@ export function Agendamento() {
                           color: isCurrentMonth ?'var(--mantine-color-text)' : 'var(--mantine-color-dimmed)',
                           boxShadow: isSelected ?'0 8px 24px rgba(0, 31, 84, 0.10)' : undefined,
                           border: isSelected
-                            ?`1px solid ${DARK_BLUE}`
+                            ?'1px solid var(--ui-primary)'
                             : isToday
                               ?'1px solid var(--mantine-color-default-border)'
                               : '1px solid transparent',
@@ -4415,31 +4382,33 @@ export function Agendamento() {
                         }}
                         title={d.format('DD/MM/YYYY')}
                       >
-                        <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Group gap={6} align="center">
-                            <Text fw={700} size="sm">{d.date()}</Text>
+                        <Box className="agendamento-agenda-calendar__day-header">
+                          <Box className="agendamento-agenda-calendar__day-heading">
+                            <Text className="agendamento-agenda-calendar__day-number" fw={700} size="sm">{d.date()}</Text>
                             {isToday && (
-                              <Badge size="xs" variant={isSelected ?'filled' : 'light'} color={isSelected ?'dark' : 'blue'} radius="xl">
+                              <Badge className="agendamento-agenda-calendar__today" size="xs" variant={isSelected ?'filled' : 'light'} color={isSelected ?'dark' : 'blue'} radius="xl">
                                 Hoje
                               </Badge>
                             )}
-                          </Group>
+                          </Box>
                           {count > 0 && (
-                            <Box style={{ width: 8, height: 8, borderRadius: 8, background: isSelected ?DARK_BLUE : DARK_BLUE }} />
+                            <Badge className="agendamento-agenda-calendar__appointment-count" size="sm" variant="light" radius="xl">
+                              {count}
+                            </Badge>
                           )}
                         </Box>
-                        <Box style={{ marginTop: 6 }}>
+                        <Box className="agendamento-agenda-calendar__appointment-summary">
                           {count > 0 && (
-                            <Stack gap={2}>
-                              <Text size="xs" fw={600} c={isSelected ?'var(--mantine-color-text)' : 'dimmed'}>
+                            <>
+                              <Text className="agendamento-agenda-calendar__appointment-total" size="xs" fw={600} c={isSelected ?'var(--mantine-color-text)' : 'dimmed'}>
                                 {count} agendamento{count > 1 ?'s' : ''}
                               </Text>
                               {daySummary[0] ?(
-                                <Text size="xs" c="dimmed" lineClamp={1}>
+                                <Text className="agendamento-agenda-calendar__appointment-status" size="xs" c="dimmed" lineClamp={1}>
                                   {daySummary[0].count} {daySummary[0].label.toLowerCase()}
                                 </Text>
                               ) : null}
-                            </Stack>
+                            </>
                           )}
                         </Box>
                       </Box>
@@ -4558,70 +4527,142 @@ export function Agendamento() {
               </Modal>
             </Box>
           )}
+          </Box>
           </Tabs.Panel>
 
           <Tabs.Panel value="online">
-            <Stack gap="md">
+            <Box className="agendamento-online-page">
+              <Box className="agendamento-online-content">
+                <Box className="agendamento-online-hero">
+                  <Box className="agendamento-online-hero__copy">
+                    <Text className="agendamento-online-hero__eyebrow">OPERAÇÃO • PORTAL DO PACIENTE</Text>
+                    <Text className="agendamento-online-hero__title" component="h2">Agendamentos online</Text>
+                    <Text className="agendamento-online-hero__description">
+                      Revise as solicitações recebidas pelo portal antes de confirmar o atendimento.
+                    </Text>
+                  </Box>
+                  <Box className="agendamento-online-hero__summary" aria-live="polite">
+                    <Text className="agendamento-online-hero__summary-label">EM ANÁLISE</Text>
+                    <Text className="agendamento-online-hero__summary-value">{onlineAppointments.length}</Text>
+                    <Text className="agendamento-online-hero__summary-caption">
+                      {onlineAppointments.length === 1 ? 'solicitação pendente' : 'solicitações pendentes'}
+                    </Text>
+                  </Box>
+                </Box>
+
               {loadingOnline ? (
-                <Group justify="center" py="xl"><Loader /></Group>
+                <Box className="agendamento-online-state" aria-live="polite">
+                  <Loader />
+                  <Text>Carregando solicitações online...</Text>
+                </Box>
               ) : onlineAppointments.length === 0 ? (
-                <Paper p="xl" withBorder radius="md">
-                  <Stack align="center" gap="xs">
-                    <Globe size={32} color="var(--mantine-color-dimmed)" />
-                    <Text c="dimmed" ta="center">Nenhum agendamento online pendente de revisão.</Text>
-                  </Stack>
-                </Paper>
+                <Box className="agendamento-online-empty" aria-live="polite">
+                  <Box className="agendamento-online-empty__icon" aria-hidden="true">
+                    <ClipboardCheck size={24} />
+                  </Box>
+                  <Box className="agendamento-online-empty__content">
+                    <Text className="agendamento-online-empty__title">Tudo em dia</Text>
+                    <Text className="agendamento-online-empty__description">
+                      Nenhum agendamento online está pendente de revisão neste momento.
+                    </Text>
+                  </Box>
+                </Box>
               ) : (
-                onlineAppointments.map((a) => (
-                  <Paper key={a.id} p="md" withBorder radius="md">
-                    <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-                      <Stack gap={4} style={{ flex: 1 }}>
-                        <Group gap="xs">
-                          <Text fw={700}>{a.patientName || '—'}</Text>
-                          {a.patientCpf && <Text size="sm" c="dimmed">CPF: {formatCPF(a.patientCpf)}</Text>}
-                        </Group>
-                        <Group gap="xs" wrap="wrap">
-                          <Badge variant="light" color="blue">{a.specialty || '—'}</Badge>
-                          {a.convenio && <Badge variant="light" color="teal">{a.convenio}</Badge>}
-                          {a.type && <Badge variant="outline">{a.type}</Badge>}
-                        </Group>
-                        <Group gap="xs">
-                          <Clock3 size={14} />
-                          <Text size="sm">{a.date ? a.date.split('-').reverse().join('/') : '—'} às {a.time || '—'}</Text>
-                          <User size={14} />
-                          <Text size="sm">{a.doctorName || '—'}</Text>
-                        </Group>
-                        {a.observations && (
-                          <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>{a.observations}</Text>
-                        )}
-                        <Text size="xs" c="dimmed">Solicitado em: {new Date(a.createdAt).toLocaleString('pt-BR')}</Text>
-                      </Stack>
-                      <Group gap="xs" align="flex-start">
-                        <Button
-                          size="xs"
-                          color="green"
-                          leftSection={<Check size={13} />}
-                          loading={resolvingOnlineId === a.id}
-                          onClick={() => handleConfirmOnline(a.id)}
-                        >
-                          Aceitar
-                        </Button>
-                        <Button
-                          size="xs"
-                          color="red"
-                          variant="light"
-                          leftSection={<X size={13} />}
-                          disabled={resolvingOnlineId === a.id}
-                          onClick={() => { setRejectTargetId(a.id); setRejectModalOpen(true); }}
-                        >
-                          Recusar
-                        </Button>
-                      </Group>
-                    </Group>
-                  </Paper>
-                ))
+                <Box className="agendamento-online-list" aria-label="Solicitações de agendamento online">
+                    {onlineAppointments.map((a) => (
+                      <Paper key={a.id} className="agendamento-online-card" withBorder>
+                        <Box className="agendamento-online-card__top">
+                          <Box className="agendamento-online-card__top-copy">
+                            <Text className="agendamento-online-card__eyebrow">SOLICITAÇÃO ONLINE</Text>
+                            <Text className="agendamento-online-card__request-date">
+                              {a.createdAt ? `Recebida em ${dayjs(a.createdAt).format('DD/MM/YYYY [às] HH:mm')}` : 'Solicitação recebida'}
+                            </Text>
+                          </Box>
+                          <Badge className="agendamento-online-card__status" variant="light" color="orange" radius="xl">
+                            Aguardando revisão
+                          </Badge>
+                        </Box>
+
+                        <Box className="agendamento-online-card__body">
+                          <Box className="agendamento-online-card__patient">
+                            <Text className="agendamento-online-card__field-label">PACIENTE</Text>
+                            <Text className="agendamento-online-card__patient-name">{a.patientName || 'Paciente não informado'}</Text>
+                            {a.patientCpf ? (
+                              <Text className="agendamento-online-card__patient-cpf">CPF {formatCPF(a.patientCpf)}</Text>
+                            ) : null}
+                          </Box>
+
+                          <Box className="agendamento-online-card__details">
+                            <Box className="agendamento-online-card__detail">
+                              <Text className="agendamento-online-card__field-label">DATA E HORÁRIO</Text>
+                              <Box className="agendamento-online-card__detail-value">
+                                <Clock3 size={16} aria-hidden="true" />
+                                <Text>{a.date ? dayjs(a.date).format('DD/MM/YYYY') : 'Data não informada'}{a.time ? ` • ${a.time}` : ''}</Text>
+                              </Box>
+                            </Box>
+                            <Box className="agendamento-online-card__detail">
+                              <Text className="agendamento-online-card__field-label">PROCEDIMENTO</Text>
+                              <Text className="agendamento-online-card__detail-text">{a.specialty || 'Não informado'}</Text>
+                            </Box>
+                            <Box className="agendamento-online-card__detail">
+                              <Text className="agendamento-online-card__field-label">PROFISSIONAL</Text>
+                              <Box className="agendamento-online-card__detail-value">
+                                <User size={16} aria-hidden="true" />
+                                <Text>{a.doctorName || 'A definir'}</Text>
+                              </Box>
+                            </Box>
+                            <Box className="agendamento-online-card__detail">
+                              <Text className="agendamento-online-card__field-label">TIPO</Text>
+                              <Text className="agendamento-online-card__detail-text">
+                                {a.type === 'CONSULTA' ? 'Consulta' : a.type === 'EXAME' ? 'Exame' : a.type || 'Não informado'}
+                              </Text>
+                            </Box>
+                            <Box className="agendamento-online-card__detail">
+                              <Text className="agendamento-online-card__field-label">CONVÊNIO</Text>
+                              <Text className="agendamento-online-card__detail-text">{a.convenio || 'Particular'}</Text>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        {a.observations ? (
+                          <Box className="agendamento-online-card__observations">
+                            <Text className="agendamento-online-card__field-label">OBSERVAÇÕES</Text>
+                            <Text>{a.observations}</Text>
+                          </Box>
+                        ) : null}
+
+                        <Box className="agendamento-online-card__footer">
+                          <Text className="agendamento-online-card__footer-note">
+                            Confirme os dados antes de aceitar esta solicitação.
+                          </Text>
+                          <Group className="agendamento-online-card__actions" gap="sm">
+                            <Button
+                              className="agendamento-online-card__accept"
+                              color="green"
+                              leftSection={<Check size={16} />}
+                              loading={resolvingOnlineId === a.id}
+                              onClick={() => handleConfirmOnline(a.id)}
+                            >
+                              Aceitar solicitação
+                            </Button>
+                            <Button
+                              className="agendamento-online-card__reject"
+                              color="red"
+                              variant="light"
+                              leftSection={<X size={16} />}
+                              disabled={resolvingOnlineId === a.id}
+                              onClick={() => { setRejectTargetId(a.id); setRejectModalOpen(true); }}
+                            >
+                              Recusar
+                            </Button>
+                          </Group>
+                        </Box>
+                      </Paper>
+                    ))}
+                </Box>
               )}
-            </Stack>
+              </Box>
+            </Box>
           </Tabs.Panel>
         </Tabs>
 
@@ -4629,6 +4670,7 @@ export function Agendamento() {
           opened={rejectModalOpen}
           onClose={() => { setRejectModalOpen(false); setRejectTargetId(null); setRejectReason(''); }}
           title="Recusar agendamento"
+          className="agendamento-online-reject-modal"
           centered
         >
           <Stack gap="md">
@@ -4657,95 +4699,82 @@ export function Agendamento() {
         opened={detailOpen}
         onClose={() => setDetailOpen(false)}
         title="Detalhes do agendamento"
+        className="agendamento-detail-modal"
         centered
         size={isMobile ?'100%' : 'xl'}
-        fullScreen={isMobile}
-        styles={{
-          body: {
-            paddingTop: 8,
-          },
-        }}
       >
         {detailAppointment ?(
-          <Stack gap="md">
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Stack className="agendamento-detail-content" gap="lg">
+            <Box className="agendamento-detail-summary">
+              <Box className="agendamento-detail-summary__copy">
+                <Text className="agendamento-detail-eyebrow">ATENDIMENTO AGENDADO</Text>
+                <Text className="agendamento-detail-summary__patient">
+                  {detailAppointment.pacienteNome || 'Paciente não informado'}
+                </Text>
+                <Group className="agendamento-detail-summary__meta" gap="sm" wrap="wrap">
+                  <Group gap="xs">
+                    <Calendar size={15} aria-hidden="true" />
+                    <Text>{detailAppointment.data ?dayjs(detailAppointment.data).format('DD/MM/YYYY') : 'Data não informada'}</Text>
+                  </Group>
+                  <Group gap="xs">
+                    <Clock3 size={15} aria-hidden="true" />
+                    <Text>{detailAppointment.hora || 'Horário não informado'}</Text>
+                  </Group>
+                </Group>
+              </Box>
+              <Badge className="agendamento-detail-summary__status" variant="light" color={getAppointmentStatusBadgeColor(detailAppointment.status)}>
+                {getAppointmentStatusLabel(detailAppointment.status)}
+              </Badge>
+            </Box>
+            <SimpleGrid className="agendamento-detail-fields" cols={isMobile ? 1 : 2} spacing="md">
               {[
-                { label: 'Paciente', value: detailAppointment.pacienteNome || 'Não informado' },
                 { label: 'CPF', value: detailAppointment.pacienteCPF ?formatCPF(detailAppointment.pacienteCPF) : 'Não informado' },
                 { label: 'Procedimento', value: detailAppointment.especialidade || 'Não informado' },
                 { label: 'Convênio', value: detailAppointment.convenio || 'Não informado' },
-                { label: 'Data', value: detailAppointment.data ?dayjs(detailAppointment.data).format('DD/MM/YYYY') : 'Não informada' },
-                { label: 'Horário', value: detailAppointment.hora || 'Não informado' },
                 { label: 'Profissional', value: detailAppointment.medicoNome || 'Não informado' },
                 { label: 'Modalidade', value: detailAppointment.modalidadeAtendimento || 'Presencial' },
-                { label: 'Status', value: detailAppointment.status || 'Não informado' },
               ].map((item) => (
-                <Paper
+                <Box
                   key={item.label}
-                  p="md"
-                  radius="md"
-                  bg={isDarkMode ?'rgba(120, 158, 230, 0.08)' : 'rgba(0, 31, 84, 0.06)'}
-                  style={{
-                    border: isDarkMode ?'1px solid rgba(120, 158, 230, 0.18)' : '1px solid rgba(0, 31, 84, 0.10)',
-                  }}
+                  className="agendamento-detail-field"
                 >
-                  <Stack gap={4}>
-                    <Text size="xs" tt="uppercase" fw={700} c="dimmed">
-                      {item.label}
-                    </Text>
-                    <Text fw={600}>
-                      {item.value}
-                    </Text>
-                  </Stack>
-                </Paper>
+                  <Text className="agendamento-detail-field__label">{item.label}</Text>
+                  <Text className="agendamento-detail-field__value">{item.value}</Text>
+                </Box>
               ))}
             </SimpleGrid>
-            <Paper
-              p="md"
-              radius="md"
-              bg={isDarkMode ?'rgba(120, 158, 230, 0.08)' : 'rgba(0, 31, 84, 0.06)'}
-              style={{
-                border: isDarkMode ?'1px solid rgba(120, 158, 230, 0.18)' : '1px solid rgba(0, 31, 84, 0.10)',
-              }}
-            >
-              <Stack gap={6}>
-                <Text size="xs" tt="uppercase" fw={700} c="dimmed">
-                  Observacoes
-                </Text>
-                <Text>
-                  {detailAppointment.observacoes || 'Sem observacoes registradas.'}
-                </Text>
-              </Stack>
-            </Paper>
-            <Paper
-              p="md"
-              radius="md"
-              bg={isDarkMode ?'rgba(120, 158, 230, 0.08)' : 'rgba(0, 31, 84, 0.06)'}
-              style={{
-                border: isDarkMode ?'1px solid rgba(120, 158, 230, 0.18)' : '1px solid rgba(0, 31, 84, 0.10)',
-              }}
-            >
-              <Stack gap="sm">
-                <Text fw={700}>Anexos</Text>
+            <Box className="agendamento-detail-section">
+              <Box className="agendamento-detail-section__heading">
+                <Text className="agendamento-detail-section__title">Observações</Text>
+                <Text className="agendamento-detail-section__description">Informações adicionais deste atendimento.</Text>
+              </Box>
+              <Text className="agendamento-detail-section__text">
+                {detailAppointment.observacoes || 'Sem observações registradas.'}
+              </Text>
+            </Box>
+            <Box className="agendamento-detail-section agendamento-detail-attachments">
+              <Box className="agendamento-detail-section__heading">
+                <Group gap="xs">
+                  <Paperclip size={16} aria-hidden="true" />
+                  <Text className="agendamento-detail-section__title">Anexos</Text>
+                </Group>
+                <Text className="agendamento-detail-section__description">Documentos enviados para este agendamento.</Text>
+              </Box>
                 {detailAttachmentsLoading ?(
-                  <Text size="sm" c="dimmed">Carregando anexos...</Text>
+                  <Text className="agendamento-detail-section__empty">Carregando anexos...</Text>
                 ) : detailAttachments.length > 0 ?(
-                  detailAttachments.map((attachment) => (
-                    <Paper
+                  <Stack className="agendamento-detail-attachments__list" gap="xs">
+                    {detailAttachments.map((attachment) => (
+                    <Box
                       key={attachment.id}
-                      p="sm"
-                      radius="md"
-                      bg={isDarkMode ?'rgba(255,255,255,0.02)' : 'white'}
-                      style={{
-                        border: '1px solid rgba(120, 158, 230, 0.18)',
-                      }}
+                      className="agendamento-detail-attachment"
                     >
                       <Group justify="space-between" align="center" wrap={isMobile ?'wrap' : 'nowrap'}>
                         <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="sm" fw={500}>{attachment.fileName}</Text>
-                        <Text size="xs" c="dimmed">
-                          {attachment.uploadedAt ?dayjs(attachment.uploadedAt).format('DD/MM/YYYY HH:mm') : 'Anexo enviado'}
-                        </Text>
+                          <Text className="agendamento-detail-attachment__name">{attachment.fileName}</Text>
+                          <Text className="agendamento-detail-attachment__date">
+                            {attachment.uploadedAt ?dayjs(attachment.uploadedAt).format('DD/MM/YYYY HH:mm') : 'Anexo enviado'}
+                          </Text>
                         </Box>
                         <Button
                           variant="light"
@@ -4756,21 +4785,21 @@ export function Agendamento() {
                           Abrir
                         </Button>
                       </Group>
-                    </Paper>
-                  ))
+                    </Box>
+                    ))}
+                  </Stack>
                 ) : (
-                  <Text size="sm" c="dimmed">Nenhum anexo enviado para este agendamento.</Text>
+                  <Text className="agendamento-detail-section__empty">Nenhum anexo enviado para este agendamento.</Text>
                 )}
-              </Stack>
-            </Paper>
-            <Group justify="space-between" wrap="wrap">
+            </Box>
+            <Box className="agendamento-detail-footer">
               <Button variant="default" onClick={() => setDetailOpen(false)}>
                 Fechar
               </Button>
-              <Button bg={DARK_BLUE} onClick={handleEditFromDetail}>
+              <Button onClick={handleEditFromDetail}>
                 Editar agendamento
               </Button>
-            </Group>
+            </Box>
           </Stack>
         ) : null}
       </Modal>

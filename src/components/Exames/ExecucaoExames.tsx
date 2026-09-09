@@ -2,7 +2,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  ActionIcon,
   Badge,
   Box,
   Button,
@@ -18,20 +17,18 @@ import {
   Text,
   TextInput,
   Textarea,
-  useComputedColorScheme,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { showNotification } from '@mantine/notifications';
-import { ChevronLeft, ChevronRight, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search, Image as ImageIcon } from 'lucide-react';
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { ChevronRight, ClipboardCheck, PhoneCall, Play, CheckCircle2, Search, Image as ImageIcon, Radio, Clock3 } from 'lucide-react';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
-import { FloatingInput } from '../common/FloatingInput';
 import consultationService from '../../services/consultationService';
 import { useAppointmentsQuery } from '../../hooks/useAppointmentsQuery';
 import { useClinicalQueueQuery } from '../../hooks/useClinicalQueueQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { formatCPF } from '../../utils/formatters';
+import './ExecucaoExames.css';
 
 interface NursingTemplateQuestionOption {
   label: string;
@@ -218,10 +215,23 @@ const requiresOptionList = (responseType?: string) => (
   responseType === 'SINGLE_CHOICE' || responseType === 'MULTIPLE_CHOICE'
 );
 
+const getPatientInitials = (name: string) => {
+  const initials = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+  return initials || '?';
+};
+
 export function ExecucaoExames() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
+  const [convenioFilter, setConvenioFilter] = useState<string | null>(null);
+  const [imageFilter, setImageFilter] = useState<string | null>(null);
   const [rows, setRows] = useState<ConsultationRow[]>([]);
   const [viewMode, setViewMode] = useState<ExamViewMode>('hub');
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -240,7 +250,6 @@ export function ExecucaoExames() {
   const [answers, setAnswers] = useState<TriageAnswerForm[]>([]);
   const isMobile = useMediaQuery('(max-width: 799px)');
   const isTablet = useMediaQuery('(max-width: 1279px)');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
   const clinicalQueueQuery = useClinicalQueueQuery();
   const appointmentsQuery = useAppointmentsQuery();
 
@@ -299,15 +308,31 @@ export function ExecucaoExames() {
     );
   }, [appointmentCpfById, clinicalQueueQuery.data]);
 
+  const convenioOptions = useMemo(() => {
+    const unique = Array.from(new Set(rows.map((row) => row.convenio).filter(Boolean))) as string[];
+    return unique.sort((a, b) => a.localeCompare(b, 'pt-BR')).map((value) => ({ value, label: value }));
+  }, [rows]);
+
+  const hasActiveFilters = Boolean(query.trim() || convenioFilter || imageFilter);
+
+  const clearFilters = () => {
+    setQuery('');
+    setConvenioFilter(null);
+    setImageFilter(null);
+  };
+
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return rows;
-    return rows.filter((row) =>
-      [row.nomeCompleto, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo]
+    return rows.filter((row) => {
+      if (convenioFilter && row.convenio !== convenioFilter) return false;
+      if (imageFilter === 'received' && !row.hasExamImageReceived) return false;
+      if (imageFilter === 'pending' && row.hasExamImageReceived) return false;
+      if (!normalized) return true;
+      return [row.nomeCompleto, row.convenio, row.agenda, row.agendadoPara, row.statusFluxo]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized)),
-    );
-  }, [rows, query]);
+        .some((value) => String(value).toLowerCase().includes(normalized));
+    });
+  }, [rows, query, convenioFilter, imageFilter]);
 
   const examQueueLoading = clinicalQueueQuery.isLoading && rows.length === 0;
   const pendingStatuses = useMemo<Set<string>>(
@@ -444,6 +469,7 @@ export function ExecucaoExames() {
     if (action.onClick === 'start-triage') {
       return (
         <Button
+          className="execucao-exames-action-button"
           size="xs"
           variant={action.variant}
           color={action.color}
@@ -459,6 +485,7 @@ export function ExecucaoExames() {
     if (action.onClick === 'continue-triage') {
       return (
         <Button
+          className="execucao-exames-action-button"
           size="xs"
           variant={action.variant}
           color={action.color}
@@ -474,6 +501,7 @@ export function ExecucaoExames() {
     if (action.onClick === 'call-exam') {
       return (
         <Button
+          className="execucao-exames-action-button"
           size="xs"
           variant={action.variant}
           color={action.color}
@@ -489,6 +517,7 @@ export function ExecucaoExames() {
     if (action.onClick === 'start-exam') {
       return (
         <Button
+          className="execucao-exames-action-button"
           size="xs"
           variant={action.variant}
           color={action.color}
@@ -504,6 +533,7 @@ export function ExecucaoExames() {
     const finishBlockedByMissingImage = action.onClick === 'finish-exam' && !row.hasExamImageReceived;
     return (
       <Button
+        className="execucao-exames-image-button"
         size="xs"
         variant={action.variant}
         color={action.color}
@@ -547,31 +577,45 @@ export function ExecucaoExames() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="execucao-exames-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header
+        contextLabel="Execução de exames"
+        back={{
+          label: 'Voltar',
+          onClick: () => {
+            if (viewMode === 'hub') navigate(-1);
+            else setViewMode('hub');
+          },
+        }}
+      />
 
-      <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" color="black" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Execução de Exames
-              </Text>
-              <Text size="sm" c="dimmed">
-                Triagem, chamada e andamento operacional dos exames.
-              </Text>
-            </Box>
+      <Box className="execucao-exames-content" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : '1400px'} mx="auto">
+        <Group className="execucao-exames-hero" mb="xl" justify="space-between" align="flex-end" wrap="wrap">
+          <Box>
+            <Text className="execucao-exames-eyebrow">OPERAÇÃO CLÍNICA</Text>
+            <Text className="execucao-exames-title" fw={700} size={isMobile ? 'xl' : '2xl'}>
+              {viewMode === 'hub' ? 'Operação de exames' : viewMode === 'completed' ? 'Exames concluídos' : 'Fila de exames'}
+            </Text>
+            <Text className="execucao-exames-subtitle" size="sm">
+              {viewMode === 'hub'
+                ? 'Acompanhe cada exame desde a triagem até a conclusão.'
+                : viewMode === 'completed'
+                  ? 'Consulte o histórico recente de exames finalizados.'
+                  : 'Organize a triagem, a chamada e a execução dos exames.'}
+            </Text>
+          </Box>
+          <Group className="execucao-exames-hero-meta" gap="xs" wrap="wrap">
+            <Badge className="execucao-exames-hero-badge" variant="light" color="cyan" radius="xl">
+              {pendingCount} em andamento
+            </Badge>
+            <Badge className="execucao-exames-hero-badge" variant="light" color="green" radius="xl">
+              {completedCount} concluído(s)
+            </Badge>
           </Group>
-          <Badge variant="light" color="cyan" radius="sm">
-            {viewMode === 'completed' ? 'Exames concluídos' : 'Fila de exames'}
-          </Badge>
         </Group>
 
         {viewMode === 'hub' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+          <SimpleGrid className="execucao-exames-hub" cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
             {[
               {
                 key: 'pending',
@@ -594,6 +638,7 @@ export function ExecucaoExames() {
             ].map((card) => (
               <Paper
                 key={card.key}
+                className="execucao-exames-hub-card"
                 p="lg"
                 withBorder
                 onClick={card.onClick}
@@ -601,19 +646,8 @@ export function ExecucaoExames() {
               >
                 <Group justify="space-between" align="center" wrap="nowrap">
                   <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                    <Box
-                      w={44}
-                      h={44}
-                      style={{
-                        borderRadius: 10,
-                        border: `1px solid ${isDarkMode ? '#dbe7ff' : DARK_BLUE}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <card.icon size={22} color={isDarkMode ? '#dbe7ff' : DARK_BLUE} />
+                    <Box className="execucao-exames-hub-icon">
+                      <card.icon size={22} />
                     </Box>
                     <Box style={{ minWidth: 0 }}>
                       <Group gap={6} wrap="nowrap">
@@ -630,31 +664,66 @@ export function ExecucaoExames() {
           </SimpleGrid>
         ) : (
           <>
-            <Group justify="space-between" align="center" mb="lg" wrap="wrap">
-              <Group gap="xs">
-                <Button
-                  variant="default"
-                  leftSection={<ChevronLeft size={16} />}
-                  onClick={() => setViewMode('hub')}
-                >
-                  Voltar
-                </Button>
-                <Text fw={600}>
-                  {viewMode === 'completed' ? 'Exames concluídos' : 'Fila de exames'}
+            <Group className="execucao-exames-list-toolbar" justify="space-between" align="flex-end" mb="lg" wrap="wrap">
+              <Box>
+                <Text className="execucao-exames-toolbar-kicker">ACOMPANHAMENTO EM TEMPO REAL</Text>
+                <Text className="execucao-exames-toolbar-title" fw={700}>
+                  {viewMode === 'completed' ? 'Histórico da fila' : 'Pacientes na fila'}
+                </Text>
+              </Box>
+              <Group className="execucao-exames-toolbar-meta" gap="sm" wrap="wrap">
+                <Text className="execucao-exames-toolbar-count" size="sm">
+                  {filteredRows.length} registro(s) exibido(s)
+                </Text>
+                <Text className="execucao-exames-live-status" size="xs">
+                  <Radio size={13} aria-hidden="true" /> Atualização automática
                 </Text>
               </Group>
             </Group>
 
-            <Box mb={isMobile ? 20 : 30}>
-              <FloatingInput
-                label="Buscar"
-                alwaysFloatLabel
-                placeholder={isMobile ? 'Buscar...' : 'Buscar paciente, convênio ou agenda...'}
-                value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-                rightSection={<Search size={16} color="var(--mantine-color-dimmed)" style={{ pointerEvents: 'none' }} />}
-                containerProps={{ style: { minHeight: 64 } }}
-              />
+            <Box className="execucao-exames-filters" mb="lg">
+              <Group className="execucao-exames-filters-row" align="flex-end" gap="md" wrap="wrap">
+                <Box className="execucao-exames-search">
+                  <TextInput
+                    label="Buscar na fila"
+                    placeholder={isMobile ? 'Buscar paciente...' : 'Buscar paciente, convênio ou procedimento...'}
+                    value={query}
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                    leftSection={<Search size={17} aria-hidden="true" />}
+                  />
+                </Box>
+                <Box className="execucao-exames-filter-field">
+                  <Select
+                    label="Convênio"
+                    placeholder="Todos"
+                    data={convenioOptions}
+                    value={convenioFilter}
+                    onChange={setConvenioFilter}
+                    clearable
+                  />
+                </Box>
+                <Box className="execucao-exames-filter-field">
+                  <Select
+                    label="Imagem"
+                    placeholder="Todas"
+                    data={[
+                      { value: 'received', label: 'Imagem recebida' },
+                      { value: 'pending', label: 'Aguardando imagem' },
+                    ]}
+                    value={imageFilter}
+                    onChange={setImageFilter}
+                    clearable
+                  />
+                </Box>
+                {hasActiveFilters && (
+                  <Button className="execucao-exames-clear-filters" variant="subtle" color="gray" onClick={clearFilters}>
+                    Limpar filtros
+                  </Button>
+                )}
+              </Group>
+              <Text className="execucao-exames-filter-hint" size="xs">
+                <Clock3 size={14} aria-hidden="true" /> Os exames aparecem agrupados pela próxima etapa do fluxo.
+              </Text>
             </Box>
 
         {examQueueLoading ? (
@@ -690,7 +759,7 @@ export function ExecucaoExames() {
                     <Skeleton height={18} width={180} radius="xl" />
                     <Skeleton height={12} width={260} radius="xl" />
                     <Box style={{ overflowX: 'auto' }}>
-                      <Table horizontalSpacing="md" verticalSpacing="md">
+                      <Table className="execucao-exames-table" horizontalSpacing="md" verticalSpacing="md">
                         <Table.Tbody>
                           {Array.from({ length: 2 }).map((_, index) => (
                             <Table.Tr key={index}>
@@ -710,16 +779,19 @@ export function ExecucaoExames() {
             </Stack>
           )
         ) : groupedRows.some((section) => section.items.length > 0) ? (
-          <Stack gap="md">
+          <Stack className="execucao-exames-sections" gap="md">
             {groupedRows.filter((section) => section.items.length > 0).map((section) => (
-              <Paper key={section.key} withBorder p="md" radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+              <Paper className="execucao-exames-section" data-status={section.key} key={section.key} withBorder p="md" radius="md">
                 <Stack gap="md">
-                  <Group justify="space-between" align="flex-start">
-                    <Box>
-                      <Text fw={700}>{section.title}</Text>
-                      <Text size="sm" c="dimmed">{section.description}</Text>
+                  <Group className="execucao-exames-section-header" justify="space-between" align="center">
+                    <Box className="execucao-exames-section-heading">
+                      <Group gap="sm" wrap="nowrap">
+                        <Box className="execucao-exames-section-marker" aria-hidden="true" />
+                        <Text className="execucao-exames-section-title" fw={700}>{section.title}</Text>
+                      </Group>
+                      <Text className="execucao-exames-section-description" size="sm" c="dimmed">{section.description}</Text>
                     </Box>
-                    <Badge variant="light" radius="xl">{section.items.length}</Badge>
+                    <Badge className="execucao-exames-section-count" variant="light" radius="xl">{section.items.length}</Badge>
                   </Group>
 
                   {isMobile ? (
@@ -728,18 +800,16 @@ export function ExecucaoExames() {
                         const badge = statusBadge(row.statusFluxo);
                         const imageStatus = imageBadge(row);
                         return (
-                          <Paper key={row.id} p="md" withBorder radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
+                          <Paper className="execucao-exames-patient-card" key={row.id} p="md" withBorder radius="md" style={{ borderColor: 'var(--mantine-color-default-border)' }}>
                             <Stack gap="sm">
                               <Group justify="space-between" align="flex-start">
                                 <Group gap="sm" align="flex-start">
                                   <Box
-                                    bg={DARK_BLUE}
-                                    w={36}
-                                    h={36}
+                                    className="execucao-exames-avatar"
                                     style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                                   >
                                     <Text c="white" fw={600} size="sm">
-                                      {row.nomeCompleto.charAt(0).toUpperCase()}
+                                      {getPatientInitials(row.nomeCompleto)}
                                     </Text>
                                   </Box>
                                     <Box>
@@ -779,15 +849,15 @@ export function ExecucaoExames() {
                     </Stack>
                   ) : (
                     <Box style={{ overflowX: 'auto' }}>
-                      <Table horizontalSpacing="md" verticalSpacing="md">
+                      <Table className="execucao-exames-table" horizontalSpacing="md" verticalSpacing="md">
                         <Table.Thead>
-                          <Table.Tr style={{ borderBottom: 'none' }}>
-                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Paciente</Table.Th>
-                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Agendamento</Table.Th>
-                            {!isTablet && <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Convênio</Table.Th>}
-                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Status</Table.Th>
-                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500 }}>Imagem</Table.Th>
-                            <Table.Th style={{ color: '#868e96', fontSize: '0.8rem', fontWeight: 500, textAlign: 'right' }}>Ações</Table.Th>
+                            <Table.Tr>
+                            <Table.Th>Paciente</Table.Th>
+                            <Table.Th>Agendamento</Table.Th>
+                            {!isTablet && <Table.Th>Convênio</Table.Th>}
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th>Imagem</Table.Th>
+                            <Table.Th className="execucao-exames-actions-heading">Ações</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
@@ -795,17 +865,15 @@ export function ExecucaoExames() {
                             const badge = statusBadge(row.statusFluxo);
                             const imageStatus = imageBadge(row);
                             return (
-                              <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e9ecef' }}>
+                              <Table.Tr key={row.id}>
                                 <Table.Td>
                                   <Group gap="sm">
                                     <Box
-                                      bg={DARK_BLUE}
-                                      w={32}
-                                      h={32}
+                                      className="execucao-exames-avatar"
                                       style={{ borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                                     >
                                       <Text c="white" fw={600} size="sm">
-                                        {row.nomeCompleto.charAt(0).toUpperCase()}
+                                        {getPatientInitials(row.nomeCompleto)}
                                       </Text>
                                     </Box>
                                     <Box>
@@ -818,9 +886,10 @@ export function ExecucaoExames() {
                                     </Box>
                                   </Group>
                                 </Table.Td>
-                                <Table.Td>
+                                <Table.Td className="execucao-exames-schedule-cell">
                                   <Stack gap={2}>
-                                    <Text size="xs" fw={600} style={{ fontSize: '0.82rem' }}>
+                                    <Text size="xs" fw={600}>
+                                      <Clock3 size={13} aria-hidden="true" />
                                       {row.agenda || row.agendadoPara || '-'}
                                     </Text>
                                     <Text size="xs" c="dimmed">
@@ -845,8 +914,8 @@ export function ExecucaoExames() {
                                     {imageStatus.label}
                                   </Badge>
                                 </Table.Td>
-                                <Table.Td>
-                                  <Group gap={8} justify="flex-end">
+                                <Table.Td className="execucao-exames-actions-cell">
+                                  <Group className="execucao-exames-actions" gap={8} justify="flex-end">
                                     {renderImageAction(row)}
                                     {renderExamAction(row)}
                                   </Group>
@@ -879,6 +948,7 @@ export function ExecucaoExames() {
       </Box>
 
       <Modal
+        className="execucao-exames-modal"
         opened={triageOpen}
         onClose={() => {
           setTriageOpen(false);
@@ -889,16 +959,16 @@ export function ExecucaoExames() {
         fullScreen={isMobile}
         centered
       >
-        <Stack gap="lg">
-          <Box>
-            <Text fw={700}>{selectedRow?.nomeCompleto}</Text>
-            <Text size="sm" c="dimmed">{selectedRow?.nursingTemplate?.name || 'Triagem do procedimento'}</Text>
+        <Stack className="execucao-exames-modal-content" gap="lg">
+          <Box className="execucao-exames-modal-intro">
+            <Text className="execucao-exames-modal-patient" fw={700}>{selectedRow?.nomeCompleto}</Text>
+            <Text className="execucao-exames-modal-template" size="sm" c="dimmed">{selectedRow?.nursingTemplate?.name || 'Triagem do procedimento'}</Text>
             {selectedRow?.nursingTemplate?.description && (
               <Text size="sm" c="dimmed" mt={4}>{selectedRow.nursingTemplate.description}</Text>
             )}
           </Box>
 
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <SimpleGrid className="execucao-exames-modal-metrics" cols={{ base: 1, md: 2 }} spacing="md">
             {selectedRow?.nursingTemplate?.collectBloodPressure && (
               <TextInput label="Pressão arterial" value={bloodPressure} onChange={(event) => setBloodPressure(event.currentTarget.value)} />
             )}
@@ -939,8 +1009,8 @@ export function ExecucaoExames() {
             if (!current) return null;
 
             return (
-              <Box key={question.id}>
-                <Text fw={600}>
+              <Box className="execucao-exames-question" key={question.id}>
+                <Text className="execucao-exames-question-label" fw={600}>
                   {question.label}
                   {question.isRequired ? ' *' : ''}
                 </Text>
@@ -1022,7 +1092,7 @@ export function ExecucaoExames() {
             onChange={(event) => setTriageNotes(event.currentTarget.value)}
           />
 
-          <Group justify="space-between">
+          <Group className="execucao-exames-modal-footer" justify="space-between">
             <Button variant="default" onClick={() => setTriageOpen(false)}>
               Fechar
             </Button>
@@ -1035,4 +1105,3 @@ export function ExecucaoExames() {
     </Box>
   );
 }
-

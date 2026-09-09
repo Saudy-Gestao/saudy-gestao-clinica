@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Group, Text, Button, Stack, Paper, Title, ActionIcon, Center, Badge, Card, SimpleGrid, Skeleton } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Camera, User } from 'lucide-react';
-import { DARK_BLUE } from '../../themes/theme';
+import { Box, Group, Text, Button, Stack, Paper, Title, Center, Badge, Card, SimpleGrid, Skeleton } from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { Camera, User } from 'lucide-react';
 import { Header } from '../Header/Header';
 import { FacialCapture } from '../common/FacialCapture';
 import facialRecognitionService, { type FacialScanResponse } from '../../services/facialRecognitionService';
@@ -100,26 +99,18 @@ export function FacialRecognition() {
   );
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1200} mx="auto">
-        <Group mb={isMobile ? 20 : 30} justify="space-between" align="center">
-          <Group align="center">
-            <ActionIcon variant="default" size="xl" onClick={() => navigate(-1)}>
-              <ChevronLeft size={28} />
-            </ActionIcon>
-
-            <Box>
-              <Text fw={600} size={isMobile ? 'md' : 'lg'} c="var(--mantine-color-text)">
-                Reconhecimento Facial - Recepção
-              </Text>
-              <Text size="sm" c="dimmed">
-                Identifique o paciente pela câmera
-              </Text>
-            </Box>
-          </Group>
-        </Group>
+        <Box mb={isMobile ? 20 : 30}>
+          <Text fw={600} size={isMobile ? 'md' : 'lg'}>
+            Reconhecimento Facial - Recepção
+          </Text>
+          <Text size="sm" c="dimmed">
+            Identifique o paciente pela câmera
+          </Text>
+        </Box>
 
         <Stack gap="md">
           {!recognitionResult ? (
@@ -152,7 +143,7 @@ export function FacialRecognition() {
                   leftSection={<Camera size={20} />}
                   onClick={() => setFacialCaptureOpen(true)}
                   loading={recognizing}
-                  bg={DARK_BLUE}
+                  bg="var(--ui-primary)"
                 >
                   Iniciar Reconhecimento
                 </Button>

@@ -16,18 +16,22 @@ import {
   Badge,
   SimpleGrid,
   Skeleton,
-  useMantineColorScheme,
+  useColorScheme,
   Modal,
   Tabs,
-} from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { ChevronLeft, Brain, Pencil, Search, Plus, Trash2, ClipboardList, Activity, BarChart3, Users } from 'lucide-react';
+  TextInput,
+  Table,
+  Select,
+  DateInput,
+  Textarea,
+} from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
+import { Pencil, Search, Plus, ClipboardList, Activity, BarChart3, Users, Trash2 } from 'lucide-react';
 import dayjs from 'dayjs';
-import { showNotification } from '@mantine/notifications';
+import { showNotification } from '@/components/ui';
 import { Header } from '../Header/Header';
 import { TeaHome } from './TeaHome';
 import teaProfileService from '../../services/teaProfileService';
-import { DARK_BLUE } from '../../themes/theme';
 import { onlyDigits, formatCPF, isValidCPF, isValidEmail, normalizeEmail, parseApiDateToLocalDate } from '../../utils/formatters';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { useDoctorsAdminQuery } from '../../hooks/useDoctorsAdminQuery';
@@ -36,10 +40,7 @@ import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaPlansQuery } from '../../hooks/useTeaPlansQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
-import { FloatingTextarea } from '../common/FloatingTextarea';
-import { FloatingDateInput } from '../common/FloatingDateInput';
+import './CadastroTEA.css';
 
 type Gender = 'MALE' | 'FEMALE' | 'OTHER' | '';
 export type TeaSubmodule = 'cadastro' | 'pacientes' | 'plano' | 'evolucao' | 'relatorios';
@@ -147,7 +148,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const location = useLocation();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
+  const { colorScheme } = useColorScheme();
   const [enteredShell, setEnteredShell] = useState(false);
   const [enteredForm, setEnteredForm] = useState(false);
   const locationState = (location.state as {
@@ -159,19 +160,20 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   const isFromModuleHub = Boolean(locationState?.fromModuleHub);
   const isStandaloneSubmodule = Boolean(forcedSubmodule);
 
-  const titleColor = colorScheme === 'dark' ? 'var(--mantine-color-gray-0)' : DARK_BLUE;
-  const pageBg = colorScheme === 'dark' ? 'var(--mantine-color-body)' : '#f8f9fa';
-  const cardBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-white)';
-  const cardBorder = colorScheme === 'dark' ? 'var(--mantine-color-default-border)' : '#e9ecef';
-  const shellBg = colorScheme === 'dark' ? 'transparent' : 'var(--mantine-color-gray-0)';
-  const activeModuleBg = colorScheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'var(--mantine-color-indigo-0)';
-  const activeModuleBorder = colorScheme === 'dark' ? '#3a5392' : 'var(--mantine-color-indigo-6)';
+  const titleColor = 'var(--ui-foreground)';
+  const pageBg = 'var(--ui-background)';
+  const cardBg = 'var(--ui-surface)';
+  const cardBorder = 'var(--ui-border)';
+  const shellBg = 'color-mix(in srgb, var(--ui-foreground) 4%, var(--ui-surface))';
+  const activeModuleBg = 'color-mix(in srgb, var(--ui-hue-indigo) 12%, var(--ui-surface))';
+  const activeModuleBorder = 'var(--ui-hue-indigo)';
 
   const [form, setForm] = useState<TeaForm>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [teaSearch, setTeaSearch] = useState('');
-  const [activeSubmodule, setActiveSubmodule] = useState<TeaSubmodule>(forcedSubmodule || 'cadastro');
+  const [activeSubmodule, setActiveSubmodule] = useState<TeaSubmodule>(forcedSubmodule || 'pacientes');
+  const isRebuiltView = activeSubmodule === 'pacientes' || activeSubmodule === 'plano';
   const [selectedTeaProfileId, setSelectedTeaProfileId] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState<PlanForm>(INITIAL_PLAN_FORM);
   const [savingPlan, setSavingPlan] = useState(false);
@@ -250,6 +252,21 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     [teaItems],
   );
 
+  const plans = useMemo(() => {
+    const list: any[] = Array.isArray(plansData) ? plansData : [];
+    return list.map((it: any) => ({
+      id: String(it.id || ''),
+      title: String(it.title || ''),
+      objective: String(it.objective || ''),
+      priority: String(it.priority || ''),
+      status: String(it.status || ''),
+      responsibleDoctorId: String(it.responsibleDoctorId || ''),
+      responsibleProfessional: String(it.responsibleProfessional || ''),
+      targetDate: it.targetDate ? String(it.targetDate) : '',
+      isActive: Boolean(it.isActive),
+    })).filter((it: TherapeuticPlanRow) => it.id);
+  }, [plansData]);
+
   useEffect(() => {
     if (activeSubmodule === 'cadastro') {
       setCadastroModalOpened(true);
@@ -324,21 +341,6 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     return base;
   }, [insuranceOptions, patientById, form.healthInsuranceName]);
 
-  const plans = useMemo(() => {
-    const list: any[] = Array.isArray(plansData) ? plansData : [];
-    return list.map((it: any) => ({
-      id: String(it.id || ''),
-      title: String(it.title || ''),
-      objective: String(it.objective || ''),
-      priority: String(it.priority || ''),
-      status: String(it.status || ''),
-      responsibleDoctorId: String(it.responsibleDoctorId || ''),
-      responsibleProfessional: String(it.responsibleProfessional || ''),
-      targetDate: it.targetDate ? String(it.targetDate) : '',
-      isActive: Boolean(it.isActive),
-    })).filter((it: TherapeuticPlanRow) => it.id);
-  }, [plansData]);
-
   useEffect(() => {
     if (!patientsError) return;
     const err: any = patientsError;
@@ -360,7 +362,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
   useEffect(() => {
     if (!teaProfilesError) return;
     const err: any = teaProfilesError;
-    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes TEA'), color: 'red' });
+    showNotification({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao carregar pacientes de Terapias'), color: 'red' });
   }, [teaProfilesError]);
 
   useEffect(() => {
@@ -413,7 +415,9 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
   const handleCloseCadastroModal = () => {
     setCadastroModalOpened(false);
-    navigate('/tea');
+    if (forcedSubmodule !== 'pacientes') {
+      navigate('/tea');
+    }
   };
 
   const handleProfileCheckboxChange = (checked: boolean) => {
@@ -499,7 +503,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
       showNotification({
         title: 'Sucesso',
-        message: 'Dados TEA salvos com sucesso',
+        message: 'Dados de Terapias salvos com sucesso',
         color: 'green',
       });
 
@@ -509,15 +513,17 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       ]);
 
       setCadastroModalOpened(false);
-      navigate('/tea');
+      if (forcedSubmodule !== 'pacientes') {
+        navigate('/tea');
+      }
     } catch (err: any) {
       const details = err?.response?.data?.fields
         ? Object.values(err.response.data.fields).join(' | ')
-        : (err?.response?.data?.details || resolveApiErrorMessage(err, 'Falha ao salvar dados TEA'));
+        : (err?.response?.data?.details || resolveApiErrorMessage(err, 'Falha ao salvar dados de Terapias'));
 
       showNotification({
         title: 'Erro ao salvar',
-        message: details || 'Falha ao salvar dados TEA',
+        message: details || 'Falha ao salvar dados de Terapias',
         color: 'red',
       });
     } finally {
@@ -603,15 +609,8 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
     enabled: boolean;
   }> = [
     {
-      key: 'cadastro',
-      label: 'Vincular Paciente',
-      description: 'Paciente base + perfil TEA',
-      icon: Brain,
-      enabled: true,
-    },
-    {
       key: 'pacientes',
-      label: 'Pacientes TEA',
+      label: 'Pacientes de Terapias',
       description: 'Lista e edição dos cadastrados',
       icon: Users,
       enabled: true,
@@ -651,12 +650,12 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
       <Tabs value={cadastroTab} onChange={(value) => setCadastroTab(value || 'patient')}>
         <Tabs.List>
           <Tabs.Tab value="patient">Dados do Paciente</Tabs.Tab>
-          <Tabs.Tab value="profile" disabled={!profileTeaEnabled}>Perfil TEA</Tabs.Tab>
+          <Tabs.Tab value="profile" disabled={!profileTeaEnabled}>Perfil de Terapias</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="patient" pt="md">
           <Stack gap="md">
-            <FloatingSelect
+            <Select
               label="Nome"
               placeholder={patientsLoading ? 'Carregando pacientes...' : 'Buscar paciente por nome/CPF'}
               data={patientOptions}
@@ -666,28 +665,24 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
               clearable
               disabled={patientsLoading}
               nothingFoundMessage="Nenhum paciente encontrado"
-              alwaysFloatLabel
             />
 
             <Group grow align="flex-start">
-              <FloatingInput
+              <TextInput
                 label="CPF"
                 placeholder="XXX.XXX.XXX-XX"
                 value={form.patientCpf}
                 onChange={(e) => setTeaField('patientCpf', formatCPF(onlyDigits(e.currentTarget.value).slice(0, 11)))}
-                alwaysFloatLabel
               />
-              <FloatingDateInput
+              <DateInput
                 label="Data de nascimento"
                 value={form.birthDate}
-                onChange={(value) => setTeaField('birthDate', value)}
-                valueFormat="DD/MM/YYYY"
-                placeholder="dd/mm/aaaa"
+                onChange={(value) => setTeaField('birthDate', value ?? null)}
               />
             </Group>
 
             <Group grow align="flex-start">
-              <FloatingSelect
+              <Select
                 label="Gênero"
                 value={form.gender}
                 onChange={(value) => setForm((prev) => ({ ...prev, gender: (value as Gender) || '' }))}
@@ -696,18 +691,16 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                   { value: 'FEMALE', label: 'Feminino' },
                   { value: 'OTHER', label: 'Outro' },
                 ]}
-                alwaysFloatLabel
               />
-              <FloatingInput
+              <TextInput
                 label="Celular"
                 placeholder="(xx) xxxxx-xxxx"
                 value={form.cellphone}
                 onChange={(e) => setTeaField('cellphone', e.currentTarget.value)}
-                alwaysFloatLabel
               />
             </Group>
 
-            <FloatingSelect
+            <Select
               label="Status"
               value={form.isActive ? 'Em avaliação' : 'Inativo'}
               data={[
@@ -715,28 +708,26 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                 { value: 'Inativo', label: 'Inativo' },
               ]}
               onChange={(value) => setTeaField('isActive', value !== 'Inativo')}
-              alwaysFloatLabel
             />
 
             <Divider label="Responsável" labelPosition="left" />
             <Group grow align="flex-start">
-              <FloatingInput label="Nome do Responsável" placeholder="Nome do responsável" alwaysFloatLabel />
-              <FloatingInput
+              <TextInput label="Nome do Responsável" placeholder="Nome do responsável" />
+              <TextInput
                 label="E-mail"
                 placeholder="xxxxxx@xxxxx.xxx"
                 value={form.email}
                 onChange={(e) => setTeaField('email', e.currentTarget.value)}
-                alwaysFloatLabel
               />
             </Group>
             <Group grow align="flex-start">
-              <FloatingInput label="Telefone" placeholder="(xx) xxxxx-xxxx" alwaysFloatLabel />
+              <TextInput label="Telefone" placeholder="(xx) xxxxx-xxxx" />
               <Box />
             </Group>
 
             <Divider label="Convênio" labelPosition="left" />
             <Group grow align="flex-start">
-              <FloatingSelect
+              <Select
                 label="Convênio"
                 placeholder={loadingInsurances ? 'Carregando convênios...' : 'Selecione'}
                 clearable={false}
@@ -750,19 +741,17 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                   }
                 }}
                 disabled={loadingInsurances}
-                alwaysFloatLabel
               />
-              <FloatingInput
+              <TextInput
                 label="Número do Convênio"
                 value={form.healthInsuranceNumber}
                 disabled={form.healthInsuranceName === PARTICULAR_INSURANCE_VALUE}
                 onChange={(e) => setTeaField('healthInsuranceNumber', e.currentTarget.value)}
-                alwaysFloatLabel
               />
             </Group>
 
             <Checkbox
-              label="Perfil TEA"
+              label="Perfil de Terapias"
               checked={profileTeaEnabled}
               onChange={(e) => handleProfileCheckboxChange(e.currentTarget.checked)}
             />
@@ -772,7 +761,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
               <Button variant="light" color="indigo" disabled={!profileTeaEnabled} onClick={() => setCadastroTab('profile')}>
                 Continuar
               </Button>
-              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving}>
+              <Button onClick={handleSave} loading={saving} disabled={saving}>
                 Salvar
               </Button>
             </Group>
@@ -781,7 +770,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
         <Tabs.Panel value="profile" pt="md">
           <Stack gap="md">
-            <FloatingSelect
+            <Select
               label="Nível de Suporte TEA"
               placeholder="Selecione"
               value={form.supportLevel}
@@ -792,20 +781,19 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                 { value: 'Nível 3', label: 'Nível 3 (apoio muito substancial)' },
               ]}
               clearable
-              alwaysFloatLabel
             />
 
-            <FloatingTextarea label="Perfil de Comunicação" minRows={2} value={form.communicationProfile} onChange={(e) => setTeaField('communicationProfile', e.currentTarget.value)} />
-            <FloatingTextarea label="Perfil Sensorial" minRows={2} value={form.sensoryProfile} onChange={(e) => setTeaField('sensoryProfile', e.currentTarget.value)} />
-            <FloatingTextarea label="Comportamentos Observados" minRows={2} value={form.behaviorNotes} onChange={(e) => setTeaField('behaviorNotes', e.currentTarget.value)} />
-            <FloatingInput label="Comorbidades (separadas por vírgula)" value={form.comorbiditiesInput} onChange={(e) => setTeaField('comorbiditiesInput', e.currentTarget.value)} alwaysFloatLabel />
-            <FloatingTextarea label="Objetivos Terapêuticos" minRows={2} value={form.therapeuticGoals} onChange={(e) => setTeaField('therapeuticGoals', e.currentTarget.value)} />
-            <FloatingTextarea label="Orientações para Família" minRows={2} value={form.familyGuidance} onChange={(e) => setTeaField('familyGuidance', e.currentTarget.value)} />
-            <FloatingTextarea label="Anotações Escola" minRows={2} value={form.schoolNotes} onChange={(e) => setTeaField('schoolNotes', e.currentTarget.value)} />
+            <Textarea label="Perfil de Comunicação" minRows={2} value={form.communicationProfile} onChange={(e) => setTeaField('communicationProfile', e.currentTarget.value)} />
+            <Textarea label="Perfil Sensorial" minRows={2} value={form.sensoryProfile} onChange={(e) => setTeaField('sensoryProfile', e.currentTarget.value)} />
+            <Textarea label="Comportamentos Observados" minRows={2} value={form.behaviorNotes} onChange={(e) => setTeaField('behaviorNotes', e.currentTarget.value)} />
+            <TextInput label="Comorbidades (separadas por vírgula)" value={form.comorbiditiesInput} onChange={(e) => setTeaField('comorbiditiesInput', e.currentTarget.value)} />
+            <Textarea label="Objetivos Terapêuticos" minRows={2} value={form.therapeuticGoals} onChange={(e) => setTeaField('therapeuticGoals', e.currentTarget.value)} />
+            <Textarea label="Orientações para Família" minRows={2} value={form.familyGuidance} onChange={(e) => setTeaField('familyGuidance', e.currentTarget.value)} />
+            <Textarea label="Anotações Escola" minRows={2} value={form.schoolNotes} onChange={(e) => setTeaField('schoolNotes', e.currentTarget.value)} />
 
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setCadastroTab('patient')}>Cancelar</Button>
-              <Button bg={DARK_BLUE} onClick={handleSave} loading={saving} disabled={saving || !profileTeaEnabled}>
+              <Button onClick={handleSave} loading={saving} disabled={saving || !profileTeaEnabled}>
                 Salvar
               </Button>
             </Group>
@@ -826,7 +814,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
   const handleCreatePlan = async () => {
     if (!selectedTeaProfileId) {
-      showNotification({ title: 'Atenção', message: 'Salve ou selecione um perfil TEA antes de criar plano.', color: 'yellow' });
+      showNotification({ title: 'Atenção', message: 'Salve ou selecione um perfil de Terapias antes de criar plano.', color: 'yellow' });
       return;
     }
     if (!planForm.title.trim()) {
@@ -879,18 +867,17 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
   return (
     <Box bg={pageBg} style={{ minHeight: '100vh' }}>
-      <Header />
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
-      <Box p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
-        <Group mb={14}>
-          <Button variant="subtle" color="dark" leftSection={<ChevronLeft size={18} />} onClick={() => navigate('/tea')}>
-            Voltar
-          </Button>
-          <Box>
-            <Text fw={700} size="lg" style={{ color: titleColor }}>Módulo TEA</Text>
-            <Text size="sm" c="dimmed">Subsistema clínico TEA</Text>
-          </Box>
-        </Group>
+      <Box className={isRebuiltView ? 'tea-pacientes-content' : undefined} p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
+        {!isRebuiltView && (
+          <Group mb={14}>
+            <Box>
+              <Text fw={700} size="lg" style={{ color: titleColor }}>Módulo Terapias</Text>
+              <Text size="sm" c="dimmed">Subsistema clínico de Terapias</Text>
+            </Box>
+          </Group>
+        )}
 
         <Transition mounted={enteredShell} transition={isFromModuleHub ? 'pop' : 'fade-up'} duration={isFromModuleHub ? 300 : 240} timingFunction="ease">
           {(styles) => (
@@ -905,7 +892,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
                     borderRadius: 12,
                   }}
                 >
-                  <Text size="xs" c="dimmed" mb="xs">Submódulos TEA</Text>
+                  <Text size="xs" c="dimmed" mb="xs">Submódulos de Terapias</Text>
                   <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="xs">
                     {submodules.map((module) => {
                       const Icon = module.icon;
@@ -944,15 +931,20 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
               )}
               <Transition mounted={enteredForm} transition="fade" duration={isFromModuleHub ? 280 : 220} timingFunction="ease">
                 {(formStyles) => (
-        <Stack gap="md" p="md" bg={cardBg} style={{ border: `1px solid ${cardBorder}`, borderRadius: 12, ...formStyles }}>
+        <Stack
+          gap={isRebuiltView ? 'xl' : 'md'}
+          p={isRebuiltView ? 0 : 'md'}
+          bg={isRebuiltView ? 'transparent' : cardBg}
+          style={isRebuiltView ? { ...formStyles } : { border: `1px solid ${cardBorder}`, borderRadius: 12, ...formStyles }}
+        >
           {activeSubmodule === 'cadastro' ? (
             <>
               <Group justify="space-between" align="center" wrap="wrap">
                 <Box>
                   <Text fw={700}>Vincular Paciente</Text>
-                  <Text size="sm" c="dimmed">Converta um paciente base para o fluxo TEA em um modal guiado.</Text>
+                  <Text size="sm" c="dimmed">Converta um paciente base para o fluxo de Terapias em um modal guiado.</Text>
                 </Box>
-                <Button bg={DARK_BLUE} leftSection={<Plus size={16} />} onClick={() => setCadastroModalOpened(true)}>
+                <Button leftSection={<Plus size={16} />} onClick={() => setCadastroModalOpened(true)}>
                   Vincular paciente
                 </Button>
               </Group>
@@ -960,258 +952,282 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
             </>
           ) : activeSubmodule === 'pacientes' ? (
             <>
-              <Group justify="space-between" align="center" wrap="wrap">
+              <Group className="tea-view-hero" justify="space-between" align="flex-end" wrap="wrap">
                 <Box>
-                  <Text fw={700}>Pacientes TEA</Text>
-                  <Text size="sm" c="dimmed">Lista e edição dos pacientes vinculados ao módulo TEA.</Text>
+                  <Text className="tea-view-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
+                  <Text className="tea-view-title" fw={700} size="2xl">Pacientes de Terapias</Text>
+                  <Text className="tea-view-subtitle" size="sm">Lista e edição dos pacientes vinculados ao módulo Terapias</Text>
                 </Box>
               </Group>
 
-              <FloatingInput
-                label="Buscar paciente"
-                rightSection={<Search size={14} />}
-                value={teaSearch}
-                onChange={(e) => setTeaSearch(e.currentTarget.value)}
-                placeholder="Nome ou CPF"
-                alwaysFloatLabel
-                containerProps={{ maw: isMobile ? '100%' : 360 }}
-              />
+              <Box className="tea-pacientes-search-panel">
+                <Text className="tea-pacientes-search-kicker">BUSCAR</Text>
+                <Box className="tea-pacientes-search-input">
+                  <TextInput
+                    label="Buscar paciente"
+                    placeholder="Nome ou CPF"
+                    value={teaSearch}
+                    onChange={(e) => setTeaSearch(e.currentTarget.value)}
+                    leftSection={<Search size={16} aria-hidden="true" />}
+                  />
+                </Box>
+              </Box>
 
-                  {teaLoading ? (
-                <Stack gap="xs">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <Paper key={index} p="sm" withBorder radius="md">
-                      <Group justify="space-between" align="center" wrap="nowrap">
-                        <Box style={{ flex: 1 }}>
-                          <Skeleton height={16} width="28%" mb={8} radius="xl" />
-                          <Skeleton height={12} width="42%" radius="xl" />
-                        </Box>
-                        <Group gap="xs" wrap="nowrap">
-                          <Skeleton height={32} width={32} radius="md" />
-                          <Skeleton height={32} width={32} radius="md" />
-                        </Group>
-                      </Group>
-                    </Paper>
-                  ))}
-                </Stack>
-              ) : teaItems.length === 0 ? (
-                <Paper withBorder radius="md" p="xl">
-                  <Stack gap={6} align="center">
-                    <Text fw={600}>Nenhum paciente TEA encontrado</Text>
-                    <Text size="sm" c="dimmed" ta="center">
-                      Ajuste a busca ou vincule um novo paciente ao módulo TEA.
-                    </Text>
-                  </Stack>
-                </Paper>
-              ) : (
-                <Stack gap="xs">
-                  {teaItems.map((item) => (
-                    <Paper key={item.id} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                      <Group justify="space-between" align={isMobile ? 'flex-start' : 'center'} wrap={isMobile ? 'wrap' : 'nowrap'}>
-                        <Box style={{ flex: 1 }}>
-                          <Text fw={600}>{item.patientName || 'Paciente sem nome'}</Text>
-                          <Group gap={8} mt={4} wrap="wrap">
+              <Paper className="tea-view-panel" p="md">
+                <Table className="tea-pacientes-table" verticalSpacing="sm" horizontalSpacing="md">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Paciente</Table.Th>
+                      <Table.Th style={{ width: 200 }}>Nível de suporte</Table.Th>
+                      <Table.Th style={{ width: 120 }}>Status</Table.Th>
+                      <Table.Th style={{ width: 140 }}>Ações</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {teaLoading ? (
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <Table.Tr key={`tea-pacientes-skeleton-${index}`}>
+                          <Table.Td>
+                            <Skeleton height={14} width="55%" radius="xl" mb={8} />
+                            <Skeleton height={12} width="35%" radius="xl" />
+                          </Table.Td>
+                          <Table.Td><Skeleton height={22} width={110} radius="xl" /></Table.Td>
+                          <Table.Td><Skeleton height={22} width={70} radius="xl" /></Table.Td>
+                          <Table.Td><Skeleton height={30} width={80} radius="md" /></Table.Td>
+                        </Table.Tr>
+                      ))
+                    ) : teaItems.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={4}>
+                          <Stack gap={4} align="center" py="xl">
+                            <Text fw={600}>Nenhum paciente de Terapias encontrado</Text>
+                            <Text size="sm" c="dimmed" ta="center">
+                              Ajuste a busca ou marque um paciente como "Paciente de Terapias" em Cadastro de Paciente.
+                            </Text>
+                          </Stack>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : (
+                      teaItems.map((item) => (
+                        <Table.Tr key={item.id}>
+                          <Table.Td>
+                            <Text fw={600} size="sm">{item.patientName || 'Paciente sem nome'}</Text>
                             <Text size="xs" c="dimmed">
                               {item.patientCpf ? formatCPF(item.patientCpf) : 'CPF não informado'}
                             </Text>
+                          </Table.Td>
+                          <Table.Td>
                             {item.supportLevel ? (
                               <Badge variant="light" color="indigo" size="sm">{item.supportLevel}</Badge>
-                            ) : null}
+                            ) : (
+                              <Text size="sm" c="dimmed">—</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
                             <Badge variant="light" color={item.isActive ? 'green' : 'gray'} size="sm">
                               {item.isActive ? 'Ativo' : 'Inativo'}
                             </Badge>
-                          </Group>
-                        </Box>
-                        <Group gap="xs" wrap="nowrap">
-                          <ActionIcon
-                            variant="light"
-                            color="violet"
-                            onClick={() => {
-                              navigate('/tea/pit', { state: { teaProfileId: item.id } });
-                            }}
-                            title="Ver PIT deste paciente"
-                          >
-                            <ClipboardList size={14} />
-                          </ActionIcon>
-                          <ActionIcon variant="light" color="indigo" onClick={() => handleEditTeaProfile(item)} title="Editar perfil TEA">
-                            <Pencil size={14} />
-                          </ActionIcon>
-                        </Group>
-                      </Group>
-                    </Paper>
-                  ))}
-                </Stack>
-              )}
-
-              {selectedTeaProfileId && (
-                <>
-                  <Divider my="xs" />
-                  <Text fw={600}>Planos terapêuticos do paciente selecionado</Text>
-
-                  {plansLoading ? (
-                    <Stack gap="xs" py="xs">
-                      {Array.from({ length: 2 }).map((_, index) => (
-                        <Paper key={index} p="sm" withBorder radius="md">
-                          <Skeleton height={16} width="28%" mb={10} radius="xl" />
-                          <Skeleton height={12} width="52%" mb={8} radius="xl" />
-                          <Skeleton height={10} width="72%" radius="xl" />
-                        </Paper>
-                      ))}
-                    </Stack>
-                  ) : plans.length === 0 ? (
-                    <Text size="sm" c="dimmed">Nenhum plano terapêutico cadastrado para este paciente.</Text>
-                  ) : (
-                    <Stack gap="xs">
-                      {plans.map((plan) => (
-                        <Paper key={plan.id} p="sm" withBorder style={{ borderColor: 'var(--mantine-color-default-border)' }}>
-                          <Group justify="space-between" align="center" wrap="nowrap">
-                            <Box>
-                              <Text fw={600}>{plan.title}</Text>
-                              <Text size="xs" c="dimmed">
-                                {plan.priority ? `${plan.priority} • ` : ''}
-                                {plan.status || 'Ativo'}
-                                {plan.responsibleProfessional ? ` • ${plan.responsibleProfessional}` : ''}
-                                {plan.targetDate ? ` • Prazo: ${dayjs(plan.targetDate).format('DD/MM/YYYY')}` : ''}
-                              </Text>
-                              {plan.objective && <Text size="xs" mt={4}>{plan.objective}</Text>}
-                            </Box>
-                            <ActionIcon variant="light" color="red" onClick={() => handleDeactivatePlan(plan.id)} title="Inativar plano">
-                              <Trash2 size={14} />
-                            </ActionIcon>
-                          </Group>
-                        </Paper>
-                      ))}
-                    </Stack>
-                  )}
-                </>
-              )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Group gap="xs" wrap="nowrap">
+                              <ActionIcon
+                                variant="light"
+                                color="violet"
+                                onClick={() => {
+                                  navigate('/tea/pit', { state: { teaProfileId: item.id } });
+                                }}
+                                title="Ver PIT deste paciente"
+                              >
+                                <ClipboardList size={14} />
+                              </ActionIcon>
+                              <ActionIcon variant="light" color="indigo" onClick={() => handleEditTeaProfile(item)} title="Editar perfil de Terapias">
+                                <Pencil size={14} />
+                              </ActionIcon>
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </Paper>
             </>
           ) : activeSubmodule === 'plano' ? (
             <>
-              <Group justify="space-between" align="center" wrap="wrap">
-                <Text fw={700}>Plano Terapêutico</Text>
+              <Group className="tea-view-hero" justify="space-between" align="flex-end" wrap="wrap">
+                <Box>
+                  <Text className="tea-view-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
+                  <Text className="tea-view-title" fw={700} size="2xl">Plano Terapêutico</Text>
+                  <Text className="tea-view-subtitle" size="sm">Objetivos e prioridades clínicas por paciente de Terapias</Text>
+                </Box>
               </Group>
 
-              <FloatingSelect
-                label="Paciente TEA"
-                placeholder={teaLoading ? 'Carregando pacientes TEA...' : 'Selecione um paciente TEA'}
-                data={teaProfileOptions}
-                value={selectedTeaProfileId}
-                onChange={(value) => {
-                  const selectedId = value || null;
-                  setSelectedTeaProfileId(selectedId);
-                  const selected = teaItems.find((it) => it.id === selectedId);
-                  setSelectedPatientId(selected?.patientId || null);
-                }}
-                searchable
-                clearable
-                disabled={teaLoading}
-                nothingFoundMessage="Nenhum paciente TEA encontrado"
-              />
-
-              {!selectedTeaProfileId ? (
-                <Text size="sm" c="dimmed">Selecione um paciente TEA para criar e visualizar planos terapêuticos.</Text>
-              ) : (
-                <>
-                  <Group justify="space-between" align="center" wrap="wrap" gap="xs">
-                    <Text fw={600}>Novo plano terapêutico</Text>
-                    <Badge variant="light" color="indigo">Perfil TEA ativo</Badge>
-                  </Group>
-
-                  <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" verticalSpacing="md">
-                    <FloatingInput
-                      label="Título"
-                      value={planForm.title}
-                      onChange={(e) => {
-                        const value = e.currentTarget.value;
-                        setPlanField('title', value);
-                      }}
-                    />
-                    <FloatingSelect
-                      label="Prioridade"
-                      value={planForm.priority}
-                      onChange={(value) => setPlanForm((prev) => ({ ...prev, priority: value || 'Média' }))}
-                      data={[
-                        { value: 'Baixa', label: 'Baixa' },
-                        { value: 'Média', label: 'Média' },
-                        { value: 'Alta', label: 'Alta' },
-                      ]}
-                    />
-                    <FloatingSelect
-                      label="Status"
-                      value={planForm.status}
-                      onChange={(value) => setPlanForm((prev) => ({ ...prev, status: value || 'Ativo' }))}
-                      data={[
-                        { value: 'Ativo', label: 'Ativo' },
-                        { value: 'Pausado', label: 'Pausado' },
-                        { value: 'Concluído', label: 'Concluído' },
-                      ]}
-                    />
-                  </SimpleGrid>
-
-                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
-                    <FloatingSelect
-                      label="Profissional responsável"
-                      placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
-                      data={doctorOptions}
-                      value={planForm.responsibleDoctorId}
-                      onChange={(value) => {
-                        const doctorId = value || '';
-                        const selectedDoctor = doctorOptions.find((item) => item.value === doctorId);
-                        setPlanForm((prev) => ({
-                          ...prev,
-                          responsibleDoctorId: doctorId,
-                          responsibleProfessional: selectedDoctor?.label || '',
-                        }));
-                      }}
-                      searchable
-                      clearable
-                      nothingFoundMessage="Nenhum médico encontrado"
-                    />
-                    <FloatingDateInput
-                      label="Prazo alvo"
-                      value={planForm.targetDate}
-                      onChange={(value) => setPlanForm((prev) => ({ ...prev, targetDate: value || null }))}
-                      valueFormat="DD/MM/YYYY"
-                      locale="pt-br"
-                    />
-                  </SimpleGrid>
-
-                  <FloatingTextarea
-                    label="Objetivo clínico"
-                    minRows={2}
-                    value={planForm.objective}
-                    onChange={(e) => {
-                      const value = e.currentTarget.value;
-                      setPlanField('objective', value);
+              <Paper className="tea-view-panel" p="md">
+                <Stack gap="md">
+                  <Select
+                    label="Paciente de Terapias"
+                    placeholder={teaLoading ? 'Carregando pacientes de Terapias...' : 'Selecione um paciente de Terapias'}
+                    data={teaProfileOptions}
+                    value={selectedTeaProfileId}
+                    onChange={(value) => {
+                      const selectedId = value || null;
+                      setSelectedTeaProfileId(selectedId);
+                      const selected = teaItems.find((it) => it.id === selectedId);
+                      setSelectedPatientId(selected?.patientId || null);
                     }}
+                    searchable
+                    clearable
+                    disabled={teaLoading}
+                    nothingFoundMessage="Nenhum paciente de Terapias encontrado"
                   />
 
-                  <FloatingTextarea
-                    label="Observações"
-                    minRows={2}
-                    value={planForm.notes}
-                    onChange={(e) => {
-                      const value = e.currentTarget.value;
-                      setPlanField('notes', value);
-                    }}
-                  />
+                  {!selectedTeaProfileId ? (
+                    <Box className="tea-plano-empty">
+                      <Text fw={600}>Selecione um paciente de Terapias</Text>
+                      <Text size="sm" c="dimmed" mt={4}>Escolha um paciente acima para ver e criar planos terapêuticos.</Text>
+                    </Box>
+                  ) : (
+                    <Stack gap="lg">
+                      <Box>
+                        <Text className="tea-plano-section-title" mb="sm">Planos terapêuticos</Text>
+                        {plansLoading ? (
+                          <Stack gap="sm">
+                            {Array.from({ length: 2 }).map((_, index) => (
+                              <Box key={index} className="tea-plano-card">
+                                <Skeleton height={16} width="30%" radius="xl" mb={10} />
+                                <Skeleton height={12} width="55%" radius="xl" />
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : plans.length === 0 ? (
+                          <Text size="sm" c="dimmed">Nenhum plano terapêutico cadastrado para este paciente.</Text>
+                        ) : (
+                          <Stack gap="sm">
+                            {plans.map((plan) => (
+                              <Box key={plan.id} className="tea-plano-card">
+                                <Group justify="space-between" align="flex-start" wrap="wrap">
+                                  <Box>
+                                    <Text fw={600}>{plan.title}</Text>
+                                    <Text className="tea-plano-card-meta">
+                                      {plan.priority ? `${plan.priority} • ` : ''}
+                                      {plan.status || 'Ativo'}
+                                      {plan.responsibleProfessional ? ` • ${plan.responsibleProfessional}` : ''}
+                                      {plan.targetDate ? ` • Prazo: ${dayjs(plan.targetDate).format('DD/MM/YYYY')}` : ''}
+                                    </Text>
+                                    {plan.objective && <Text className="tea-plano-card-objective">{plan.objective}</Text>}
+                                  </Box>
+                                  <ActionIcon variant="light" color="red" onClick={() => handleDeactivatePlan(plan.id)} aria-label="Inativar plano" title="Inativar plano">
+                                    <Trash2 size={14} />
+                                  </ActionIcon>
+                                </Group>
+                              </Box>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
 
-                  <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setPlanForm(INITIAL_PLAN_FORM)}>Limpar</Button>
-                    <Button bg={DARK_BLUE} leftSection={<Plus size={14} />} onClick={handleCreatePlan} loading={savingPlan} disabled={savingPlan}>
-                      Adicionar plano
-                    </Button>
-                  </Group>
+                      <Box>
+                        <Group justify="space-between" align="center" wrap="wrap" mb="sm">
+                          <Text className="tea-plano-section-title">Novo plano terapêutico</Text>
+                          <Badge variant="light" color="indigo">Perfil de Terapias ativo</Badge>
+                        </Group>
 
-                </>
-              )}
+                        <Stack gap="md">
+                          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" verticalSpacing="md">
+                            <TextInput
+                              label="Título"
+                              value={planForm.title}
+                              onChange={(e) => {
+                                const value = e.currentTarget.value;
+                                setPlanField('title', value);
+                              }}
+                            />
+                            <Select
+                              label="Prioridade"
+                              value={planForm.priority}
+                              onChange={(value) => setPlanForm((prev) => ({ ...prev, priority: value || 'Média' }))}
+                              data={[
+                                { value: 'Baixa', label: 'Baixa' },
+                                { value: 'Média', label: 'Média' },
+                                { value: 'Alta', label: 'Alta' },
+                              ]}
+                            />
+                            <Select
+                              label="Status"
+                              value={planForm.status}
+                              onChange={(value) => setPlanForm((prev) => ({ ...prev, status: value || 'Ativo' }))}
+                              data={[
+                                { value: 'Ativo', label: 'Ativo' },
+                                { value: 'Pausado', label: 'Pausado' },
+                                { value: 'Concluído', label: 'Concluído' },
+                              ]}
+                            />
+                          </SimpleGrid>
+
+                          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
+                            <Select
+                              label="Profissional responsável"
+                              placeholder={loadingDoctors ? 'Carregando médicos...' : 'Selecione um médico'}
+                              data={doctorOptions}
+                              value={planForm.responsibleDoctorId}
+                              onChange={(value) => {
+                                const doctorId = value || '';
+                                const selectedDoctor = doctorOptions.find((item) => item.value === doctorId);
+                                setPlanForm((prev) => ({
+                                  ...prev,
+                                  responsibleDoctorId: doctorId,
+                                  responsibleProfessional: selectedDoctor?.label || '',
+                                }));
+                              }}
+                              searchable
+                              clearable
+                              nothingFoundMessage="Nenhum médico encontrado"
+                            />
+                            <DateInput
+                              label="Prazo alvo"
+                              value={planForm.targetDate}
+                              onChange={(value) => setPlanForm((prev) => ({ ...prev, targetDate: value || null }))}
+                            />
+                          </SimpleGrid>
+
+                          <Textarea
+                            label="Objetivo clínico"
+                            minRows={2}
+                            value={planForm.objective}
+                            onChange={(e) => {
+                              const value = e.currentTarget.value;
+                              setPlanField('objective', value);
+                            }}
+                          />
+
+                          <Textarea
+                            label="Observações"
+                            minRows={2}
+                            value={planForm.notes}
+                            onChange={(e) => {
+                              const value = e.currentTarget.value;
+                              setPlanField('notes', value);
+                            }}
+                          />
+
+                          <Group justify="flex-end">
+                            <Button variant="default" onClick={() => setPlanForm(INITIAL_PLAN_FORM)}>Limpar</Button>
+                            <Button leftSection={<Plus size={14} />} onClick={handleCreatePlan} loading={savingPlan} disabled={savingPlan}>
+                              Adicionar plano
+                            </Button>
+                          </Group>
+                        </Stack>
+                      </Box>
+                    </Stack>
+                  )}
+                </Stack>
+              </Paper>
             </>
           ) : (
             <>
               <Text fw={700} size="md">{activeSubmodule === 'evolucao' ? 'Evolução' : 'Relatórios'}</Text>
               <Text size="sm" c="dimmed">
-                Este submódulo será a próxima etapa. Estrutura já separada para manter o módulo TEA organizado por áreas.
+                Este submódulo será a próxima etapa. Estrutura já separada para manter o módulo Terapias organizado por áreas.
               </Text>
             </>
           )}

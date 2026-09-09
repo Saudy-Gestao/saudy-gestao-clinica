@@ -1,0 +1,28 @@
+.patient-queue-section { min-width: 0; }
+
+.patient-queue-section > .ui-group:first-child {
+  margin-bottom: 1rem !important;
+}
+
+.patient-queue-section > .ui-group:first-child > .ui-text {
+  color: var(--ui-foreground);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.patient-queue-empty {
+  display: grid;
+  min-height: 9rem;
+  place-items: center;
+  background: color-mix(in srgb, var(--ui-surface) 82%, var(--ui-background));
+}
+
+.patient-queue-item {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.patient-queue-item--active {
+  background: color-mix(in srgb, var(--ui-primary) 18%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-primary) 48%, var(--ui-border));
+}

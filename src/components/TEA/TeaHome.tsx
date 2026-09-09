@@ -1,5 +1,5 @@
-import { ActionIcon, Box, Group, Paper, SimpleGrid, Skeleton, Stack, Text, ThemeIcon, useMantineColorScheme } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { Box, Group, Paper, SimpleGrid, Skeleton, Stack, Text } from '@/components/ui';
+import { useMediaQuery } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import {
   BellRing,
@@ -8,18 +8,18 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarX2,
-  ChevronLeft,
   ChevronRight,
   ClipboardList,
   FileSpreadsheet,
   NotebookPen,
-  UserRoundPlus,
   Users,
 } from 'lucide-react';
 import { Header } from '../Header/Header';
-import { DARK_BLUE } from '../../themes/theme';
 import { useTeaProfilesQuery } from '../../hooks/useTeaProfilesQuery';
 import { useTeaPendingReservationsQuery } from '../../hooks/useTeaPendingReservationsQuery';
+import './TeaHome.css';
+
+type StatHue = 'blue' | 'green' | 'orange' | 'violet';
 
 type StatCard = {
   key: string;
@@ -27,8 +27,7 @@ type StatCard = {
   helper: string;
   value: string;
   icon: typeof Users;
-  tint: string;
-  iconColor: string;
+  hue: StatHue;
 };
 
 type TeaSectionCard = {
@@ -44,16 +43,9 @@ const SECTIONS: Array<{ title: string; items: TeaSectionCard[] }> = [
     title: 'Cadastro e Perfil',
     items: [
       {
-        key: 'cadastro',
-        title: 'Vincular Paciente',
-        description: 'Paciente base + Perfil TEA',
-        route: '/tea/cadastro',
-        icon: UserRoundPlus,
-      },
-      {
         key: 'pacientes',
-        title: 'Pacientes TEA',
-        description: 'Lista e edição',
+        title: 'Pacientes de Terapias',
+        description: 'Lista, vincula e edita perfis',
         route: '/tea/pacientes',
         icon: Users,
       },
@@ -90,7 +82,7 @@ const SECTIONS: Array<{ title: string; items: TeaSectionCard[] }> = [
       },
       {
         key: 'agenda-semanal',
-        title: 'Agenda Semanal TEA',
+        title: 'Agenda Semanal de Terapias',
         description: 'Visão macro',
         route: '/tea/agenda-semanal',
         icon: CalendarDays,
@@ -133,39 +125,15 @@ const SECTIONS: Array<{ title: string; items: TeaSectionCard[] }> = [
 ];
 
 function TeaSummaryCard({ item }: { item: StatCard }) {
-  const { colorScheme } = useMantineColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return (
-    <Paper
-      withBorder
-      radius="md"
-      p={8}
-      style={{
-        background: isDark ? 'var(--mantine-color-dark-7)' : '#ffffff',
-        borderColor: isDark ? '#4d66a7' : 'var(--mantine-color-default-border)',
-        boxShadow: isDark ? 'none' : '0 4px 12px rgba(15, 23, 42, 0.08)',
-      }}
-    >
-      <Group align="center" justify="space-between" wrap="nowrap" gap={8}>
-        <Group align="center" wrap="nowrap" gap={8}>
-          <Box
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: item.tint,
-              boxShadow: isDark ? 'none' : '0 6px 12px rgba(15, 23, 42, 0.10)',
-              flexShrink: 0,
-            }}
-          >
-            <item.icon size={18} color={item.iconColor} />
+    <Paper className="tea-home-stat-card" withBorder>
+      <Group align="center" justify="space-between" wrap="nowrap" gap="sm">
+        <Group align="center" wrap="nowrap" gap="sm">
+          <Box className="tea-home-stat-icon" style={{ '--stat-hue': `var(--ui-hue-${item.hue})` } as any}>
+            <item.icon size={20} />
           </Box>
           <Box>
-            <Text fw={500} size="xs" lineClamp={1}>
+            <Text fw={600} size="sm" lineClamp={1}>
               {item.label}
             </Text>
             <Text c="dimmed" size="xs" lineClamp={1}>
@@ -173,63 +141,36 @@ function TeaSummaryCard({ item }: { item: StatCard }) {
             </Text>
           </Box>
         </Group>
-        <Box
-          style={{
-            minWidth: 22,
-            textAlign: 'right',
-            flexShrink: 0,
-          }}
-        >
-          <Text fw={500} lh={1} size="1.45rem">
-            {item.value}
-          </Text>
-        </Box>
+        <Text className="tea-home-stat-value">
+          {item.value}
+        </Text>
       </Group>
     </Paper>
   );
 }
 
 function TeaSectionModuleCard({ item, onOpen }: { item: TeaSectionCard; onOpen: (route: string) => void }) {
-  const { colorScheme } = useMantineColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return (
     <Paper
+      className="tea-home-module-card"
       withBorder
-      radius="md"
-      p={10}
       onClick={() => onOpen(item.route)}
-      style={{
-        cursor: 'pointer',
-        background: isDark ? '#0f2f6a' : '#ffffff',
-        borderColor: isDark ? '#0f2f6a' : DARK_BLUE,
-        transition: 'transform 140ms ease, box-shadow 140ms ease',
-        boxShadow: isDark ? 'none' : '0 3px 10px rgba(15, 23, 42, 0.06)',
-      }}
     >
       <Group justify="space-between" align="center" wrap="nowrap">
-        <Group gap={10} wrap="nowrap">
-          <ThemeIcon
-            size={38}
-            radius="md"
-            variant="transparent"
-            style={{
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.85)' : DARK_BLUE}`,
-              color: isDark ? '#ffffff' : DARK_BLUE,
-            }}
-          >
+        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+          <Box className="tea-home-module-icon">
             <item.icon size={18} />
-          </ThemeIcon>
-          <Box>
-            <Text fw={500} size="sm" c={isDark ? '#ffffff' : 'var(--mantine-color-text)'}>
+          </Box>
+          <Box style={{ minWidth: 0 }}>
+            <Text fw={600} size="sm" lineClamp={1}>
               {item.title}
             </Text>
-            <Text c="dimmed" size="xs">
+            <Text c="dimmed" size="xs" lineClamp={1}>
               {item.description}
             </Text>
           </Box>
         </Group>
-        <ChevronRight size={14} color={isDark ? '#dce6ff' : '#b5bcc9'} />
+        <ChevronRight size={16} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
       </Group>
     </Paper>
   );
@@ -238,11 +179,6 @@ function TeaSectionModuleCard({ item, onOpen }: { item: TeaSectionCard; onOpen: 
 export function TeaHome() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
-  const { colorScheme } = useMantineColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const titleColor = isDark ? '#ffffff' : 'var(--mantine-color-text)';
-  const subtitleColor = isDark ? '#6c86cf' : 'var(--mantine-color-dimmed)';
 
   const { data: teaProfiles = [], isLoading: profilesLoading } = useTeaProfilesQuery();
   const { data: activePitProfiles = [], isLoading: pitsLoading } = useTeaProfilesQuery({ hasActivePit: true });
@@ -257,12 +193,11 @@ export function TeaHome() {
   const statCards: StatCard[] = [
     {
       key: 'profiles',
-      label: 'Paciente cadastrados',
+      label: 'Pacientes cadastrados',
       helper: `${activeProfilesCount} ativos`,
       value: String(teaProfiles.length),
       icon: Users,
-      tint: isDark ? '#eef1ff' : '#e7edff',
-      iconColor: '#5067ad',
+      hue: 'blue',
     },
     {
       key: 'pits',
@@ -270,8 +205,7 @@ export function TeaHome() {
       helper: `${activePitProfiles.length} ativos`,
       value: String(activePitProfiles.length),
       icon: FileSpreadsheet,
-      tint: isDark ? '#eefde5' : '#e4f7d5',
-      iconColor: '#1fa700',
+      hue: 'green',
     },
     {
       key: 'pre-reservas',
@@ -279,8 +213,7 @@ export function TeaHome() {
       helper: 'Aguardando definição',
       value: String(pendingReservations.length),
       icon: CalendarClock,
-      tint: isDark ? '#fff1e1' : '#fff0df',
-      iconColor: '#f08a00',
+      hue: 'orange',
     },
     {
       key: 'pendencias',
@@ -288,70 +221,50 @@ export function TeaHome() {
       helper: 'Alertas operacionais',
       value: String(pendingAlertCount),
       icon: BellRing,
-      tint: isDark ? '#f5e8ff' : '#f3e4ff',
-      iconColor: '#b31dff',
+      hue: 'violet',
     },
   ];
 
   const loadingSummary = profilesLoading || pitsLoading || reservationsLoading;
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="tea-home-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
 
-      <Box p={isMobile ? 'sm' : 'md'} maw={1400} mx="auto" w="100%">
-        <Group mb={isMobile ? 12 : 14} gap="xs" align="center" wrap="nowrap">
-          <ActionIcon variant="default" color="dark" size={isMobile ? 'lg' : 48} onClick={() => navigate(-1)}>
-            <ChevronLeft size={isMobile ? 18 : 18} />
-          </ActionIcon>
-          <Box>
-            <Text fw={700} size={isMobile ? 'xl' : '1.2rem'} c={titleColor} lh={1.1}>
-              Módulo TEA
-            </Text>
-            <Text size="xs" c={subtitleColor}>
-              Subsistema clínico TEA
-            </Text>
-          </Box>
-        </Group>
+      <Box className="tea-home-content" p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
+        <Box className="tea-home-hero">
+          <Text className="tea-home-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
+          <Text className="tea-home-title" fw={700} size="2xl">Módulo Terapias</Text>
+          <Text className="tea-home-subtitle" size="sm">Subsistema clínico de acompanhamento de Terapias</Text>
+        </Box>
 
         {loadingSummary ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="xs" mb="sm">
+          <SimpleGrid className="tea-home-stats" cols={{ base: 1, sm: 2, lg: 4 }}>
             {Array.from({ length: 4 }).map((_, index) => (
-              <Paper key={index} withBorder radius="md" p={8}>
-                <Group wrap="nowrap" gap={8}>
-                  <Skeleton height={38} width={38} radius="md" />
+              <Paper key={index} className="tea-home-stat-card" withBorder>
+                <Group wrap="nowrap" gap="sm">
+                  <Skeleton height={44} width={44} radius="md" />
                   <Stack gap={8} style={{ flex: 1 }}>
-                    <Skeleton height={18} width="28%" radius="xl" />
-                    <Skeleton height={14} width="72%" radius="xl" />
-                    <Skeleton height={12} width="54%" radius="xl" />
+                    <Skeleton height={14} width="70%" radius="xl" />
+                    <Skeleton height={12} width="50%" radius="xl" />
                   </Stack>
                 </Group>
               </Paper>
             ))}
           </SimpleGrid>
         ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="xs" mb="sm">
+          <SimpleGrid className="tea-home-stats" cols={{ base: 1, sm: 2, lg: 4 }}>
             {statCards.map((item) => (
               <TeaSummaryCard key={item.key} item={item} />
             ))}
           </SimpleGrid>
         )}
 
-        <Stack gap="sm">
+        <Stack gap="xl">
           {SECTIONS.map((section) => (
-            <Box key={section.title}>
-              <Text fw={700} size={isMobile ? 'lg' : '0.95rem'} mb={8} c={titleColor}>
-                {section.title}
-              </Text>
-              <SimpleGrid
-                cols={{
-                  base: 1,
-                  sm: 2,
-                  lg: 4,
-                }}
-                spacing="xs"
-                verticalSpacing="xs"
-              >
+            <Box key={section.title} className="tea-home-section">
+              <Text className="tea-home-section-title">{section.title}</Text>
+              <SimpleGrid className="tea-home-section-grid" cols={{ base: 1, sm: 2, lg: 4 }}>
                 {section.items.map((item) => (
                   <TeaSectionModuleCard
                     key={item.key}

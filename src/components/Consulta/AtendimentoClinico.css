@@ -1,0 +1,168 @@
+.atendimento-page {
+  min-height: 100vh;
+  background: var(--ui-background);
+  color: var(--ui-foreground);
+}
+
+.atendimento-container {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3vw, 2.75rem) clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.atendimento-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.atendimento-hero-main,
+.atendimento-patient-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: .85rem;
+}
+
+.atendimento-hero-icon,
+.atendimento-patient-avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 42%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-primary) 13%, transparent);
+  color: var(--ui-primary);
+}
+
+.atendimento-hero-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: .85rem;
+}
+
+.atendimento-eyebrow,
+.atendimento-card-eyebrow,
+.atendimento-card-label,
+.atendimento-detail-label,
+.atendimento-status-label {
+  color: var(--ui-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.atendimento-eyebrow { margin-bottom: .4rem; color: var(--ui-primary) !important; letter-spacing: .15em; }
+.atendimento-title { margin: 0; font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 780; letter-spacing: -.045em; line-height: 1.05; }
+.atendimento-subtitle { margin-top: .45rem; color: var(--ui-muted); font-size: 1rem; }
+.atendimento-status { display: grid; justify-items: end; gap: .45rem; flex-shrink: 0; }
+.atendimento-status .ui-badge { padding: .35rem .7rem; font-size: .78rem; }
+
+.atendimento-report-alert { display: grid; gap: .75rem; margin-top: 1rem; border-color: color-mix(in srgb, var(--ui-success) 34%, var(--ui-border)); background: color-mix(in srgb, var(--ui-success) 8%, var(--ui-surface)); }
+.atendimento-report-content { width: 100%; align-items: center; }
+
+.atendimento-patient-card,
+.atendimento-workspace {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: 1rem;
+}
+
+.atendimento-patient-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 2fr;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+}
+
+.atendimento-patient-avatar { width: 3.15rem; height: 3.15rem; border-radius: .9rem; background: var(--ui-primary); color: var(--ui-primary-foreground); font-size: 1.25rem; font-weight: 800; }
+.atendimento-card-eyebrow { margin-bottom: .3rem; font-size: .65rem; }
+.atendimento-patient-name { font-size: 1.2rem; font-weight: 750; }
+.atendimento-patient-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: center; }
+.atendimento-patient-facts > div { min-width: 0; padding-left: 1rem; border-left: 1px solid var(--ui-border); }
+.atendimento-patient-facts > div > p:last-child { margin-top: .28rem; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+.atendimento-workspace { margin-top: 1.25rem; padding: clamp(.85rem, 2vw, 1.35rem); }
+.atendimento-tabs-list { display: flex; gap: .3rem; overflow-x: auto; padding-bottom: .15rem; }
+.atendimento-tabs-list .ui-tab { display: inline-flex; align-items: center; gap: .45rem; min-height: 2.8rem; padding-inline: .8rem; border-radius: .55rem .55rem 0 0; white-space: nowrap; }
+.atendimento-tabs-list .ui-tab-active { background: color-mix(in srgb, var(--ui-primary) 10%, transparent); }
+.atendimento-tab-panel { padding-top: 1.35rem; }
+
+.atendimento-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.15rem; }
+.atendimento-panel-title { font-size: 1.05rem; font-weight: 750; }
+.atendimento-panel-description { margin-top: .25rem; color: var(--ui-muted); font-size: .84rem; }
+.atendimento-panel-heading .ui-badge { flex-shrink: 0; }
+
+.atendimento-evolution-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.atendimento-field { min-width: 0; }
+.atendimento-field--wide { grid-column: 1 / -1; }
+.atendimento-field .ui-field-label { color: var(--ui-muted); font-size: .78rem; font-weight: 700; }
+.atendimento-field .ui-input { min-height: 7rem; resize: vertical; border-radius: .75rem; background: var(--ui-background); line-height: 1.5; }
+.atendimento-field--wide .ui-input { min-height: 8rem; }
+
+.atendimento-order-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.atendimento-order-grid .ui-field { min-width: 0; }
+.atendimento-info-alert { margin-bottom: 1rem; }
+.atendimento-panel-actions { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--ui-border); }
+.atendimento-orders-card { display: grid; gap: .8rem; margin-top: 1rem; padding: 1rem; background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-background)); border-color: color-mix(in srgb, var(--ui-primary) 24%, var(--ui-border)); }
+.atendimento-orders-card > .ui-text { font-weight: 700; }
+.atendimento-orders-card .ui-stack { gap: .55rem; }
+.atendimento-orders-card .ui-group { padding: .65rem 0; border-bottom: 1px solid var(--ui-border); }
+.atendimento-orders-card .ui-group:last-child { border-bottom: 0; }
+
+.atendimento-history-list { margin-top: .2rem; }
+.atendimento-history-card { padding: 1rem; background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-background)); border-color: color-mix(in srgb, var(--ui-primary) 25%, var(--ui-border)); }
+.atendimento-history-card > .ui-group { align-items: flex-start; }
+.atendimento-history-card > .ui-group .ui-badge { flex-shrink: 0; }
+.atendimento-history-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+.atendimento-history-field { min-width: 0; padding: .75rem; border: 1px solid var(--ui-border); border-radius: .65rem; background: color-mix(in srgb, var(--ui-surface) 72%, var(--ui-background)); }
+.atendimento-history-field .ui-text + .ui-text { margin-top: .3rem; line-height: 1.5; }
+.atendimento-empty-history { display: grid; place-items: center; gap: .45rem; padding: 3rem 1rem; color: var(--ui-muted); text-align: center; }
+.atendimento-empty-history svg { color: var(--ui-primary); }
+
+.atendimento-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--ui-border); }
+.atendimento-footer > .ui-text { flex-shrink: 0; font-size: .78rem; }
+.atendimento-footer-actions { justify-content: flex-end; }
+.atendimento-loading { display: grid; gap: 1rem; width: min(100%, 900px); margin-inline: auto; padding: 2rem 1rem; }
+.atendimento-loading-hero { min-height: 6rem; }
+.atendimento-loading-panel { min-height: 28rem; }
+
+@media (max-width: 900px) {
+  .atendimento-patient-card { grid-template-columns: 1fr; }
+  .atendimento-patient-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .atendimento-container { padding: 1.15rem .75rem 2.5rem; }
+  .atendimento-hero { align-items: flex-start; flex-direction: column; gap: 1rem; }
+  .atendimento-hero-icon { width: 2.55rem; height: 2.55rem; }
+  .atendimento-title { font-size: 1.75rem; }
+  .atendimento-subtitle { font-size: .88rem; }
+  .atendimento-status { justify-items: start; }
+  .atendimento-patient-card { gap: 1rem; padding: 1rem; }
+  .atendimento-patient-facts { grid-template-columns: 1fr; gap: .75rem; }
+  .atendimento-patient-facts > div { padding: .65rem 0 0; border-top: 1px solid var(--ui-border); border-left: 0; }
+  .atendimento-workspace { padding: .75rem; }
+  .atendimento-tabs-list { margin-inline: -.75rem; padding-inline: .75rem; }
+  .atendimento-tabs-list .ui-tab { padding-inline: .65rem; font-size: .8rem; }
+  .atendimento-panel-heading { align-items: stretch; flex-direction: column; }
+  .atendimento-panel-heading > .ui-button { width: 100%; }
+  .atendimento-evolution-grid,
+  .atendimento-order-grid,
+  .atendimento-history-grid { grid-template-columns: 1fr; }
+  .atendimento-field--wide { grid-column: auto; }
+  .atendimento-panel-actions { align-items: stretch; flex-direction: column; }
+  .atendimento-panel-actions .ui-button { width: 100%; }
+  .atendimento-footer { align-items: stretch; flex-direction: column; }
+  .atendimento-footer-actions { align-items: stretch; flex-direction: column; }
+  .atendimento-footer-actions .ui-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atendimento-tabs-list .ui-tab { transition: none; }
+}

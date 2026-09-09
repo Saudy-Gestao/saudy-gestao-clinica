@@ -9,6 +9,7 @@ import {
   Menu,
   Modal,
   Paper,
+  Select,
   Skeleton,
   Stack,
   Table,
@@ -16,21 +17,19 @@ import {
   TextInput,
   Textarea,
   SimpleGrid,
-  useComputedColorScheme,
-} from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, ChevronRight, FileSearch, History, Link as LinkIcon, MoreVertical, ShieldCheck, BriefcaseBusiness } from 'lucide-react';
+} from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { CheckCircle2, ChevronLeft, ChevronRight, FileSearch, History, Link as LinkIcon, MoreVertical, Search, ShieldCheck, BriefcaseBusiness } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Header } from '../Header/Header';
-import { FloatingInput } from '../common/FloatingInput';
-import { FloatingSelect } from '../common/FloatingSelect';
 import preSchedulingService, { type PreSchedulingItem, type PreSchedulingStatus } from '../../services/preSchedulingService';
 import teleconsultationLinkService from '../../services/teleconsultationLinkService';
 import { formatCPF } from '../../utils/formatters';
 import { usePreSchedulingsQuery } from '../../hooks/usePreSchedulingsQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import './PreAgendamento.css';
 
 const STATUS_LABEL: Record<PreSchedulingStatus, string> = {
   PENDING: 'Pendente',
@@ -144,7 +143,6 @@ export function PreAgendamento() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'hub' | 'queue' | 'history'>('hub');
-  const isDarkMode = useComputedColorScheme('light') === 'dark';
 
   const [preAuthOpen, setPreAuthOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PreSchedulingItem | null>(null);
@@ -416,22 +414,20 @@ export function PreAgendamento() {
   };
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
+    <Box className="pre-agendamento-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
+      <Header
+        back={{ label: 'Voltar', onClick: () => navigate(-1) }}
+      />
 
-      <Box p="xl" maw={1400} mx="auto">
-        <Group justify="space-between" align="center" mb="md" wrap="wrap">
-          <Group>
-            <ActionIcon variant="default" size="lg" onClick={() => navigate(-1)}>
-              <ChevronLeft size={18} />
-            </ActionIcon>
-            <Box>
-              <Text fw={700} size="lg" c="var(--mantine-color-text)">Pré-atendimento</Text>
-              <Text size="sm" c="dimmed">Fila de confirmados para pré-autorização e coleta de documentos.</Text>
-            </Box>
-          </Group>
+      <Box className="pre-agendamento-content" p="xl" maw={1400} mx="auto">
+        <Group className="pre-agendamento-hero" justify="space-between" align="flex-end" mb="xl" wrap="wrap">
+          <Box>
+            <Text className="pre-agendamento-eyebrow">OPERAÇÃO CLÍNICA · PRÉ-AGENDAMENTO</Text>
+            <Text className="pre-agendamento-title" fw={700} size="2xl">Pré-atendimento</Text>
+            <Text className="pre-agendamento-subtitle" size="sm">Fila de confirmados para pré-autorização e coleta de documentos.</Text>
+          </Box>
 
-          <Group gap="xs" wrap="wrap">
+          <Group className="pre-agendamento-hero-meta" gap="xs" wrap="wrap">
             <Badge variant="light">Total: {counters.total}</Badge>
             <Badge color="teal" variant="light">Pré-autorizados: {counters.PRE_AUTHORIZED}</Badge>
             <Badge color="violet" variant="light">Aguardando docs: {counters.WAITING_PATIENT_DOCUMENTS}</Badge>
@@ -440,13 +436,13 @@ export function PreAgendamento() {
         </Group>
 
         <Paper
+          className={viewMode !== 'hub' ? 'pre-agendamento-panel' : undefined}
           p="md"
           withBorder={viewMode !== 'hub'}
-          style={viewMode !== 'hub' ? { borderColor: 'var(--mantine-color-default-border)' } : undefined}
         >
           <Stack gap="md">
             {viewMode === 'hub' ? (
-              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+              <SimpleGrid className="pre-agendamento-hub" cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
                 {[
                   {
                     key: 'queue',
@@ -465,26 +461,13 @@ export function PreAgendamento() {
                 ].map((card) => (
                   <Paper
                     key={card.key}
-                    p="lg"
-                    withBorder
+                    className="pre-agendamento-hub-card"
                     onClick={card.onClick}
-                    style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)', minHeight: 96 }}
                   >
                     <Group justify="space-between" align="center" wrap="nowrap">
                       <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                        <Box
-                          w={44}
-                          h={44}
-                          style={{
-                            borderRadius: 10,
-                            border: `1px solid ${isDarkMode ? '#dbe7ff' : '#0D2E6C'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <card.icon size={22} color={isDarkMode ? '#dbe7ff' : '#0D2E6C'} />
+                        <Box className="pre-agendamento-hub-icon">
+                          <card.icon size={22} />
                         </Box>
                         <Box style={{ minWidth: 0 }}>
                           <Text fw={600} size="md" lineClamp={1}>{card.title}</Text>
@@ -497,7 +480,7 @@ export function PreAgendamento() {
                 ))}
               </SimpleGrid>
             ) : (
-              <Group justify="space-between" wrap="wrap">
+              <Group className="pre-agendamento-subview-toolbar" justify="space-between" wrap="wrap">
                 <Group gap="xs">
                   <Button
                     variant="default"
@@ -520,31 +503,36 @@ export function PreAgendamento() {
 
             {viewMode === 'hub' ? null : (
               <>
-                <Group grow align="flex-end">
-                  <FloatingInput
-                    label="Buscar"
-                    alwaysFloatLabel
-                    placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
-                    value={search}
-                    onChange={(e) => setSearch(e.currentTarget.value)}
-                    containerProps={{ style: { minHeight: 64 } }}
-                  />
-                  <FloatingSelect
-                    label="Status"
-                    alwaysFloatLabel
-                    data={statusOptions}
-                    clearable
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    containerProps={{ style: { minHeight: 64 } }}
-                  />
-                </Group>
+                <Box className="pre-agendamento-search-panel">
+                  <Text className="pre-agendamento-search-kicker">BUSCAR NA FILA</Text>
+                  <Group align="flex-end" gap="md" wrap="wrap">
+                    <Box className="pre-agendamento-search-input">
+                      <TextInput
+                        label="Buscar"
+                        placeholder="Buscar por paciente, CPF, médico, procedimento ou convênio"
+                        value={search}
+                        onChange={(e) => setSearch(e.currentTarget.value)}
+                        leftSection={<Search size={17} aria-hidden="true" />}
+                      />
+                    </Box>
+                    <Box className="pre-agendamento-filter-field">
+                      <Select
+                        label="Status"
+                        placeholder="Todos"
+                        data={statusOptions}
+                        clearable
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                      />
+                    </Box>
+                  </Group>
+                </Box>
 
                 {loading && items.length === 0 ? (
                   <PreSchedulingTableSkeleton />
                 ) : (
-                  <Box style={{ overflowX: 'auto', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
-                    <Table verticalSpacing="sm" horizontalSpacing="md">
+                  <Box className="pre-agendamento-table-wrap">
+                    <Table className="pre-agendamento-table" verticalSpacing="sm" horizontalSpacing="md">
                       <Table.Thead>
                         <Table.Tr>
                           <Table.Th>Paciente</Table.Th>

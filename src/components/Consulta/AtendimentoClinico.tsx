@@ -1,14 +1,15 @@
 ﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ActionIcon, Alert, Badge, Box, Button, Group, Paper, Select, SimpleGrid, Skeleton, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core';
-import { showNotification } from '@mantine/notifications';
-import { CheckCircle2, ChevronLeft, FlaskConical, Play, Printer, Save, WandSparkles } from 'lucide-react';
+import { Alert, Badge, Box, Button, DateInput, Group, Paper, Select, SimpleGrid, Skeleton, Stack, Tabs, Text, Textarea, TextInput } from '@/components/ui';
+import { showNotification } from '@/components/ui';
+import { CheckCircle2, ClipboardList, FileCheck2, FlaskConical, History, Play, Printer, Save, Stethoscope, WandSparkles } from 'lucide-react';
 import { Header } from '../Header/Header';
 import consultationService from '../../services/consultationService';
 import appointmentService from '../../services/appointmentService';
 import patientService from '../../services/patientService';
 import medicalRecordService from '../../services/medicalRecordService';
 import { formatCNPJ, formatCPF, formatPhone } from '../../utils/formatters';
+import './AtendimentoClinico.css';
 
 const CALLED_STATUS = 'Chamado para atendimento';
 const IN_PROGRESS_STATUS = 'Em atendimento';
@@ -240,6 +241,21 @@ const splitTriageNotes = (value: any) => {
     clinicalNotes: clinicalLines.join('\n'),
     auditNotes: auditLines.join('\n'),
   };
+};
+
+const parseIsoDate = (value: string): Date | null => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const formatIsoDate = (date: Date | null): string => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export function AtendimentoClinico() {
@@ -642,35 +658,62 @@ export function AtendimentoClinico() {
     );
   };
 
-  if (loading) return <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}><Header /><Box p="xl"><Skeleton h={80} /><Skeleton mt="md" h={300} /></Box></Box>;
+  if (loading) return (
+    <Box className="atendimento-page">
+      <Header />
+      <Box className="atendimento-loading"><Skeleton className="atendimento-loading-hero" /><Skeleton className="atendimento-loading-panel" /></Box>
+    </Box>
+  );
 
   return (
-    <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
-      <Header />
-      <Box p="xl" maw={1400} mx="auto">
-        <Group mb="lg" justify="space-between"><Group><ActionIcon variant="default" color="black" size="xl" onClick={() => navigate('/consulta')}><ChevronLeft size={28} /></ActionIcon><Box><Text fw={700} size="xl">Atendimento Clínico</Text><Text size="sm" c="dimmed">PEP e condução completa da consulta médica</Text></Box></Group><Badge color={isDone ? 'green' : 'blue'} variant="light">{status || '-'}</Badge></Group>
-        {hasFinalizedExamReport && <Alert mb="md" color="teal" title="Laudo de exame finalizado" icon={<CheckCircle2 size={16} />}><Group justify="space-between"><Text size="sm">{latestFinalizedExamReport?.exam ? `Último laudo finalizado: ${latestFinalizedExamReport.exam}.` : 'Paciente com laudo finalizado para acompanhamento médico.'}{hasExamImagesAvailable ? ' Imagens disponíveis para revisão.' : ''}</Text><Button size="xs" variant="light" onClick={() => navigate('/laudo-exames')}>Abrir laudo</Button></Group></Alert>}
-        <Paper p="md" withBorder radius="md" mb="md"><SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}><Text>Paciente: <b>{patient?.name || consultation?.patientName || '-'}</b></Text><Text>CPF: <b>{patient?.cpf ? formatCPF(patient.cpf) : '-'}</b></Text><Text>Médico: <b>{consultation?.doctorName || appointment?.doctorName || '-'}</b></Text></SimpleGrid></Paper>
-        <Paper p="md" withBorder radius="md">
+    <Box className="atendimento-page">
+      <Header back={{ label: 'Voltar', onClick: () => navigate('/consulta') }} />
+      <Box className="atendimento-container">
+        <Box className="atendimento-hero">
+          <Box className="atendimento-hero-main">
+            <Box className="atendimento-hero-icon"><Stethoscope size={23} /></Box>
+            <Box>
+              <Text className="atendimento-eyebrow">OPERAÇÃO CLÍNICA · CONSULTA</Text>
+              <Text component="h1" className="atendimento-title">Atendimento clínico</Text>
+              <Text className="atendimento-subtitle">PEP e condução completa da consulta médica.</Text>
+            </Box>
+          </Box>
+          <Box className="atendimento-status">
+            <Text className="atendimento-status-label">Status do atendimento</Text>
+            <Badge color={isDone ? 'green' : 'blue'} variant="light">{status || '-'}</Badge>
+          </Box>
+        </Box>
+
+        {hasFinalizedExamReport && <Alert className="atendimento-report-alert" color="teal" title="Laudo de exame finalizado" icon={<CheckCircle2 size={16} />}><Group className="atendimento-report-content" justify="space-between"><Text size="sm">{latestFinalizedExamReport?.exam ? `Último laudo finalizado: ${latestFinalizedExamReport.exam}.` : 'Paciente com laudo finalizado para acompanhamento médico.'}{hasExamImagesAvailable ? ' Imagens disponíveis para revisão.' : ''}</Text><Button size="sm" variant="light" onClick={() => navigate('/laudo-exames')}>Abrir laudo</Button></Group></Alert>}
+
+        <Paper className="atendimento-patient-card" withBorder>
+          <Box className="atendimento-patient-identity"><Box className="atendimento-patient-avatar">{(patient?.name || consultation?.patientName || '?').slice(0, 1).toUpperCase()}</Box><Box><Text className="atendimento-card-eyebrow">Paciente em atendimento</Text><Text className="atendimento-patient-name">{patient?.name || consultation?.patientName || '-'}</Text></Box></Box>
+          <Box className="atendimento-patient-facts"><Box><Text className="atendimento-card-label">CPF</Text><Text>{patient?.cpf ? formatCPF(patient.cpf) : 'Não informado'}</Text></Box><Box><Text className="atendimento-card-label">Profissional</Text><Text>{consultation?.doctorName || appointment?.doctorName || 'Não informado'}</Text></Box><Box><Text className="atendimento-card-label">Agendamento</Text><Text>{appointment?.date ? formatDateOnlyPtBr(appointment.date) : 'Data não informada'}{appointment?.time ? ` · ${appointment.time}` : ''}</Text></Box></Box>
+        </Paper>
+
+        <Paper className="atendimento-workspace" withBorder>
           <Tabs defaultValue="evolucao">
-            <Tabs.List>
-              <Tabs.Tab value="evolucao">Evolução</Tabs.Tab>
-              <Tabs.Tab value="pedidos">Pedidos</Tabs.Tab>
-              <Tabs.Tab value="receita">Receituário</Tabs.Tab>
-              <Tabs.Tab value="historia">Histórico</Tabs.Tab>
+            <Tabs.List className="atendimento-tabs-list">
+              <Tabs.Tab value="evolucao"><Stethoscope size={16} /> Evolução</Tabs.Tab>
+              <Tabs.Tab value="pedidos"><ClipboardList size={16} /> Pedidos</Tabs.Tab>
+              <Tabs.Tab value="receita"><FileCheck2 size={16} /> Receituário</Tabs.Tab>
+              <Tabs.Tab value="historia"><History size={16} /> Histórico</Tabs.Tab>
             </Tabs.List>
-            <Tabs.Panel value="evolucao" pt="md">
-              <Textarea mt="sm" label="Queixa principal" autosize minRows={3} maxRows={8} value={form.chiefComplaint} onChange={(e) => { const value = e.currentTarget.value; setFormField('chiefComplaint', value); }} />
-              <Textarea mt="sm" label="História da doença atual" autosize minRows={4} maxRows={12} value={form.historyOfPresentIllness} onChange={(e) => { const value = e.currentTarget.value; setFormField('historyOfPresentIllness', value); }} />
-              <Textarea mt="sm" label="Exame físico" autosize minRows={3} maxRows={10} value={form.physicalExamination} onChange={(e) => { const value = e.currentTarget.value; setFormField('physicalExamination', value); }} />
-              <Textarea mt="sm" label="Diagnóstico/CID" autosize minRows={3} maxRows={8} value={form.diagnosis} onChange={(e) => { const value = e.currentTarget.value; setFormField('diagnosis', value); }} />
-              <Textarea mt="sm" label="Observações" autosize minRows={4} maxRows={12} value={form.notes} onChange={(e) => { const value = e.currentTarget.value; setFormField('notes', value); }} />
+            <Tabs.Panel className="atendimento-tab-panel" value="evolucao">
+              <Box className="atendimento-panel-heading"><Box><Text className="atendimento-panel-title">Evolução clínica</Text><Text className="atendimento-panel-description">Registre os achados e a conduta deste atendimento.</Text></Box><Badge variant="light" color={hasPendingRecordSave ? 'yellow' : 'green'}>{hasPendingRecordSave ? 'Alterações não salvas' : 'Prontuário sincronizado'}</Badge></Box>
+              <Box className="atendimento-evolution-grid">
+                <Textarea className="atendimento-field atendimento-field--wide" label="Queixa principal" autosize minRows={3} maxRows={8} value={form.chiefComplaint} onChange={(e) => { const value = e.currentTarget.value; setFormField('chiefComplaint', value); }} />
+                <Textarea className="atendimento-field atendimento-field--wide" label="História da doença atual" autosize minRows={4} maxRows={12} value={form.historyOfPresentIllness} onChange={(e) => { const value = e.currentTarget.value; setFormField('historyOfPresentIllness', value); }} />
+                <Textarea className="atendimento-field" label="Exame físico" autosize minRows={3} maxRows={10} value={form.physicalExamination} onChange={(e) => { const value = e.currentTarget.value; setFormField('physicalExamination', value); }} />
+                <Textarea className="atendimento-field" label="Diagnóstico/CID" autosize minRows={3} maxRows={8} value={form.diagnosis} onChange={(e) => { const value = e.currentTarget.value; setFormField('diagnosis', value); }} />
+                <Textarea className="atendimento-field atendimento-field--wide" label="Observações" autosize minRows={4} maxRows={12} value={form.notes} onChange={(e) => { const value = e.currentTarget.value; setFormField('notes', value); }} />
+              </Box>
             </Tabs.Panel>
-            <Tabs.Panel value="pedidos" pt="md">
-              <Group mb="xs" justify="space-between"><Text fw={600}>Pedido estruturado</Text><Button size="xs" variant="light" leftSection={<WandSparkles size={14} />} onClick={() => setExamOrder((p: any) => ({ ...p, notes: p.notes || 'Solicitação médica registrada em consulta.' }))}>Sugerir texto</Button></Group>
-              {!examConfig.doctorCanScheduleExamFromConsultation && <Alert mb="sm" color="blue" variant="light">Nesta filial, o médico emite o pedido e o agendamento do exame é realizado pela recepção.</Alert>}
-              {examConfig.doctorCanScheduleExamFromConsultation && <Alert mb="sm" color="teal" variant="light">Agendamento médico habilitado: selecione um dos horários sugeridos para já sair com o exame marcado.</Alert>}
-              <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <Tabs.Panel className="atendimento-tab-panel" value="pedidos">
+              <Box className="atendimento-panel-heading"><Box><Text className="atendimento-panel-title">Pedidos de exames</Text><Text className="atendimento-panel-description">Emita um pedido estruturado ou registre uma solicitação livre.</Text></Box><Button size="sm" variant="light" leftSection={<WandSparkles size={14} />} onClick={() => setExamOrder((p: any) => ({ ...p, notes: p.notes || 'Solicitação médica registrada em consulta.' }))}>Sugerir texto</Button></Box>
+              {!examConfig.doctorCanScheduleExamFromConsultation && <Alert className="atendimento-info-alert" color="blue" variant="light">Nesta filial, o médico emite o pedido e o agendamento do exame é realizado pela recepção.</Alert>}
+              {examConfig.doctorCanScheduleExamFromConsultation && <Alert className="atendimento-info-alert" color="teal" variant="light">Agendamento médico habilitado: selecione um dos horários sugeridos para já sair com o exame marcado.</Alert>}
+              <SimpleGrid className="atendimento-order-grid" cols={{ base: 1, sm: 2 }}>
                 <Select
                   label="Procedimento de exame"
                   placeholder="Selecione o procedimento"
@@ -693,14 +736,10 @@ export function AtendimentoClinico() {
                 />
               ) : (
                 <SimpleGrid cols={{ base: 1, sm: 2 }} mt="sm">
-                  <TextInput
+                  <DateInput
                     label="Data preferencial"
-                    type="date"
-                    value={examOrder.preferredDate}
-                    onChange={(e) => {
-                      const value = e.currentTarget.value;
-                      setExamOrder((p: any) => ({ ...p, preferredDate: value }));
-                    }}
+                    value={parseIsoDate(examOrder.preferredDate)}
+                    onChange={(date) => setExamOrder((p: any) => ({ ...p, preferredDate: formatIsoDate(date ?? null) }))}
                   />
                   <TextInput
                     label="Horário preferencial"
@@ -714,10 +753,10 @@ export function AtendimentoClinico() {
                   />
                 </SimpleGrid>
               )}
-              <Textarea mt="sm" label="Observações do pedido" autosize minRows={3} maxRows={8} value={examOrder.notes} onChange={(e) => { const value = e.currentTarget.value; setExamOrder((p: any) => ({ ...p, notes: value })); }} />
-              <Group justify="space-between" mt="sm"><Button variant="light" leftSection={<Printer size={14} />} onClick={handlePrintExamOrder}>Imprimir pedido</Button><Button leftSection={<FlaskConical size={14} />} onClick={emitExamOrder} loading={saving}>{examConfig.doctorCanScheduleExamFromConsultation ? 'Agendar exame' : 'Emitir pedido'}</Button></Group>
+              <Textarea className="atendimento-field atendimento-field--wide" label="Observações do pedido" autosize minRows={3} maxRows={8} value={examOrder.notes} onChange={(e) => { const value = e.currentTarget.value; setExamOrder((p: any) => ({ ...p, notes: value })); }} />
+              <Group className="atendimento-panel-actions" justify="space-between"><Button variant="light" leftSection={<Printer size={14} />} onClick={handlePrintExamOrder}>Imprimir pedido</Button><Button leftSection={<FlaskConical size={14} />} onClick={emitExamOrder} loading={saving}>{examConfig.doctorCanScheduleExamFromConsultation ? 'Agendar exame' : 'Emitir pedido'}</Button></Group>
               {orders.length > 0 && (
-                <Paper withBorder p="sm" mt="sm">
+                <Paper className="atendimento-orders-card" withBorder>
                   <Text fw={600} mb="xs">Pedidos emitidos nesta consulta</Text>
                   <Stack gap={8}>
                     {orders.slice(0, 8).map((o: any) => (
@@ -737,28 +776,26 @@ export function AtendimentoClinico() {
                   </Stack>
                 </Paper>
               )}
-              <Textarea mt="sm" label="Pedidos (texto livre)" value={form.examRequests} onChange={(e) => { const value = e.currentTarget.value; setFormField('examRequests', value); }} />
+              <Textarea className="atendimento-field atendimento-field--wide" label="Pedidos (texto livre)" value={form.examRequests} onChange={(e) => { const value = e.currentTarget.value; setFormField('examRequests', value); }} />
             </Tabs.Panel>
-            <Tabs.Panel value="receita" pt="md">
-              <Textarea label="Conduta/tratamento" autosize minRows={4} maxRows={12} value={form.treatment} onChange={(e) => { const value = e.currentTarget.value; setFormField('treatment', value); }} />
-              <Group justify="space-between" mt="sm"><Text fw={600}>Receituário</Text><Button size="xs" variant="light" leftSection={<Printer size={14} />} onClick={handlePrintPrescription}>Imprimir receituario</Button></Group>
-              <Textarea mt="xs" autosize minRows={4} maxRows={12} value={form.prescriptions} onChange={(e) => { const value = e.currentTarget.value; setFormField('prescriptions', value); }} />
+            <Tabs.Panel className="atendimento-tab-panel" value="receita">
+              <Box className="atendimento-panel-heading"><Box><Text className="atendimento-panel-title">Receituário e conduta</Text><Text className="atendimento-panel-description">Registre a orientação clínica e a prescrição do paciente.</Text></Box><Button size="sm" variant="light" leftSection={<Printer size={14} />} onClick={handlePrintPrescription}>Imprimir receituário</Button></Box>
+              <Textarea className="atendimento-field atendimento-field--wide" label="Conduta / tratamento" autosize minRows={4} maxRows={12} value={form.treatment} onChange={(e) => { const value = e.currentTarget.value; setFormField('treatment', value); }} />
+              <Textarea className="atendimento-field atendimento-field--wide" label="Prescrição" autosize minRows={4} maxRows={12} value={form.prescriptions} onChange={(e) => { const value = e.currentTarget.value; setFormField('prescriptions', value); }} />
             </Tabs.Panel>
-            <Tabs.Panel value="historia" pt="md">
+            <Tabs.Panel className="atendimento-tab-panel" value="historia">
+              <Box className="atendimento-panel-heading"><Box><Text className="atendimento-panel-title">Histórico clínico</Text><Text className="atendimento-panel-description">Consulte os registros anteriores deste paciente.</Text></Box><Badge variant="light">{historyRecords.length} {historyRecords.length === 1 ? 'registro' : 'registros'}</Badge></Box>
               {historyRecords.length === 0 ? (
-                <Text c="dimmed">Nenhum histórico encontrado.</Text>
+                <Box className="atendimento-empty-history"><History size={25} /><Text>Nenhum histórico encontrado.</Text><Text size="sm">Registros anteriores deste paciente aparecerão aqui.</Text></Box>
               ) : (
-                <Stack gap="sm">
+                <Stack className="atendimento-history-list" gap="sm">
                   {historyRecords.map((r: any) => (
                     <Paper
                       key={r.id}
                       p="md"
                       radius="md"
                       withBorder
-                      style={{
-                        borderColor: 'rgba(99, 146, 255, 0.35)',
-                        background: 'linear-gradient(180deg, rgba(18,33,78,0.35) 0%, rgba(8,18,52,0.2) 100%)',
-                      }}
+                      className="atendimento-history-card"
                     >
                       <Group justify="space-between" align="flex-start" mb="sm">
                         <Box>
@@ -767,28 +804,28 @@ export function AtendimentoClinico() {
                         </Box>
                         <Badge variant="light" color="blue">{formatRecordDate(r.recordDate || r.createdAt)}</Badge>
                       </Group>
-                      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                        <Box style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' }}>
+                      <SimpleGrid className="atendimento-history-grid" cols={{ base: 1, md: 2 }} spacing="md">
+                        <Box className="atendimento-history-field">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>Queixa principal</Text>
                           <Text size="sm">{formatClinicalField(r.chiefComplaint)}</Text>
                         </Box>
-                        <Box style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' }}>
+                        <Box className="atendimento-history-field">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>Doença atual</Text>
                           <Text size="sm">{formatClinicalField(r.historyOfPresentIllness)}</Text>
                         </Box>
-                        <Box style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' }}>
+                        <Box className="atendimento-history-field">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>Conduta</Text>
                           <Text size="sm">{formatClinicalField(r.treatment)}</Text>
                         </Box>
-                        <Box style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' }}>
+                        <Box className="atendimento-history-field">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>Receituário</Text>
                           <Text size="sm">{formatClinicalField(r.prescriptions)}</Text>
                         </Box>
-                        <Box style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' }}>
+                        <Box className="atendimento-history-field">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>Pedidos</Text>
                           <Text size="sm">{formatClinicalField(r.examRequests)}</Text>
                         </Box>
-                        <Box style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px' }}>
+                        <Box className="atendimento-history-field">
                           <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb={4}>Observações</Text>
                           <Text size="sm">{formatClinicalField(r.notes)}</Text>
                         </Box>
@@ -800,9 +837,8 @@ export function AtendimentoClinico() {
             </Tabs.Panel>
           </Tabs>
         </Paper>
-        <Group justify="space-between" mt="md"><Text size="sm" c="dimmed">Última atualização: {new Date(consultation?.updatedAt || Date.now()).toLocaleString('pt-BR')}</Text><Group>{status === CALLED_STATUS && <Button variant="light" color="green" leftSection={<Play size={14} />} onClick={async () => { await consultationService.update(consultationId, { queue: IN_PROGRESS_STATUS }); await loadData(); }}>Marcar em atendimento</Button>}<Button color={hasPendingRecordSave ? 'orange' : 'blue'} leftSection={<Save size={14} />} onClick={saveMedicalRecord} loading={saving}>{hasPendingRecordSave ? 'Salvar no prontuário*' : 'Salvar no prontuário'}</Button>{!isDone && <Button color="teal" variant="light" leftSection={<CheckCircle2 size={14} />} onClick={finishConsultation} loading={saving}>Finalizar atendimento</Button>}</Group></Group>
+        <Box className="atendimento-footer"><Text size="sm" c="dimmed">Última atualização: {new Date(consultation?.updatedAt || Date.now()).toLocaleString('pt-BR')}</Text><Group className="atendimento-footer-actions">{status === CALLED_STATUS && <Button variant="light" color="green" leftSection={<Play size={14} />} onClick={async () => { await consultationService.update(consultationId, { queue: IN_PROGRESS_STATUS }); await loadData(); }}>Marcar em atendimento</Button>}<Button color={hasPendingRecordSave ? 'orange' : 'blue'} leftSection={<Save size={14} />} onClick={saveMedicalRecord} loading={saving}>{hasPendingRecordSave ? 'Salvar no prontuário*' : 'Salvar no prontuário'}</Button>{!isDone && <Button color="teal" variant="light" leftSection={<CheckCircle2 size={14} />} onClick={finishConsultation} loading={saving}>Finalizar atendimento</Button>}</Group></Box>
       </Box>
     </Box>
   );
 }
-
