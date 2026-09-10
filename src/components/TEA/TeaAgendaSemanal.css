@@ -51,6 +51,34 @@
   border: 1px solid var(--ui-border);
 }
 
+.tea-agenda-day-picker {
+  width: 11rem;
+  min-width: 11rem;
+  align-self: stretch;
+}
+
+.tea-agenda-day-picker .ui-field-label {
+  color: var(--ui-muted);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tea-agenda-day-picker .ui-input {
+  min-height: 2rem;
+  padding: .4rem 2.45rem .4rem .65rem;
+  border-radius: .5rem;
+  font-size: .82rem;
+}
+
+.tea-agenda-day-picker .ui-calendar-trigger {
+  width: 1.75rem;
+  height: 1.75rem;
+  right: .35rem;
+}
+
 .tea-agenda-search {
   width: 20rem;
   max-width: 100%;
@@ -243,5 +271,10 @@
 
   .tea-agenda-search {
     width: 100%;
+  }
+
+  .tea-agenda-day-picker {
+    width: 10.5rem;
+    min-width: 10.5rem;
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Box, Button, Divider, Group, MultiSelect, Paper, Skeleton, Stack, Text, TextInput, Tooltip } from '@/components/ui';
+import { Badge, Box, Button, DateInput, Divider, Group, MultiSelect, Paper, Skeleton, Stack, Text, TextInput, Tooltip } from '@/components/ui';
 import { useElementSize, useMediaQuery } from '@/components/ui';
 import { showNotification } from '@/components/ui';
 import { ChevronLeft, ChevronRight, Clock3, Search } from 'lucide-react';
@@ -58,6 +58,10 @@ const createMockAppointments = (weekStart: dayjs.Dayjs): TeaAgendaItem[] => {
 };
 
 const toWeekStartMonday = (value: dayjs.Dayjs) => value.subtract((value.day() + 6) % 7, 'day').startOf('day');
+const isoDateToLocalDate = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return year && month && day ? new Date(year, month - 1, day, 12) : null;
+};
 const roomUnit = (room: string) => room.match(/\(([^)]+)\)/)?.[1] || 'Unidade não informada';
 const roomDisplay = (room: string) => ({ name: room.replace(/\s*\([^)]*\)\s*$/, '').trim() || room, unit: roomUnit(room) });
 const isCanceledStatus = (value?: string) => ['CANCELED', 'CANCELADO'].includes(String(value || '').toUpperCase());
@@ -328,6 +332,17 @@ export function TeaAgendaSemanal() {
                       <Button size="xs" variant="default" onClick={() => moveDay(-1)} leftSection={<ChevronLeft size={14} />}>Dia anterior</Button>
                       <Button size="xs" variant="light" onClick={setToday}>Hoje</Button>
                       <Button size="xs" variant="default" onClick={() => moveDay(1)} rightSection={<ChevronRight size={14} />}>Próximo dia</Button>
+                      <DateInput
+                        className="tea-agenda-day-picker"
+                        label="Selecionar data"
+                        value={isoDateToLocalDate(selectedDate)}
+                        onChange={(date) => {
+                          if (!date) return;
+                          const next = dayjs(date);
+                          setSelectedDate(next.format('YYYY-MM-DD'));
+                          setWeekStart(toWeekStartMonday(next));
+                        }}
+                      />
                       <Divider orientation="vertical" my={4} />
                       <Group gap={2} wrap="nowrap">
                         {WEEKDAY_LABELS.map((label, index) => {
