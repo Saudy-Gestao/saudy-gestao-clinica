@@ -34,7 +34,7 @@ import { Header } from '../Header/Header';
 import './CadastroMedicoHub.css';
 import './CadastroMedicoForm.css';
 import './CadastroMedicoList.css';
-import { onlyDigits, formatCPF, formatCEP, formatPhone, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
+import { onlyDigits, formatCPF, formatCEP, formatPhone, formatTimeInput, isValidTime, isValidCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import doctorService from '../../services/doctorService';
 import cepService from '../../services/cepService';
@@ -69,6 +69,46 @@ const isRecord = (value: unknown): value is ApiRecord => typeof value === 'objec
 const ALL_BRANCHES_VALUE = '__ALL_BRANCHES__';
 
 const getString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+const getEspecialidadeIds = (group: { especialidadeId?: unknown; especialidadeIds?: unknown }) => {
+  const source = Array.isArray(group.especialidadeIds)
+    ? group.especialidadeIds
+    : [group.especialidadeId];
+  return Array.from(new Set(
+    source.map((id) => getString(id).trim()).filter(Boolean),
+  ));
+};
+
+const getProcedureEspecialidadeLabel = (procedure: ApiRecord | undefined, especialidades: ApiRecord[]) => {
+  if (!procedure) return 'Especialidade não informada';
+
+  const relation = isRecord(procedure.especialidade) ? procedure.especialidade : null;
+  const relationNames = [
+    getString(relation?.name),
+    ...(Array.isArray(procedure.especialidades)
+      ? procedure.especialidades
+        .filter(isRecord)
+        .map((item) => getString(item.name))
+      : []),
+  ].filter(Boolean);
+  if (relationNames.length > 0) return Array.from(new Set(relationNames)).join(', ');
+
+  const directName = getString(procedure.especialidadeName);
+  if (directName) return directName;
+
+  const ids = [
+    getString(procedure.especialidadeId),
+    ...(Array.isArray(procedure.especialidadeIds)
+      ? procedure.especialidadeIds.map((id) => getString(id))
+      : []),
+  ].filter(Boolean);
+  const names = ids
+    .map((id) => especialidades.find((item) => getString(item.id) === id)?.name)
+    .map((name) => getString(name))
+    .filter(Boolean);
+
+  return Array.from(new Set(names)).join(', ') || 'Especialidade não informada';
+};
 
 const getDate = (value: unknown): Date | null => {
   if (!value) return null;
@@ -132,6 +172,8 @@ interface DoctorProcedureDuration {
   procedureId: string;
   procedureName?: string;
   modalidadeId?: string | null;
+  especialidadeId?: string | null;
+  especialidadeName?: string;
   durationMinutes: number;
 }
 
@@ -248,8 +290,8 @@ const getWorkingSchedulesFromRaw = (raw: ApiRecord): WorkingSchedule[] => {
             days: Array.isArray(scheduleRecord.days)
               ? (scheduleRecord.days as unknown[]).map((d) => getString(d)).filter(Boolean)
               : [],
-            hoursStart: getString(scheduleRecord.hoursStart),
-            hoursEnd: getString(scheduleRecord.hoursEnd),
+            hoursStart: formatTimeInput(getString(scheduleRecord.hoursStart)),
+            hoursEnd: formatTimeInput(getString(scheduleRecord.hoursEnd)),
           };
         })
         .filter((schedule) => schedule.days.length > 0 || schedule.hoursStart || schedule.hoursEnd)
@@ -262,8 +304,8 @@ const getWorkingSchedulesFromRaw = (raw: ApiRecord): WorkingSchedule[] => {
   const workingDays = Array.isArray(raw.workingDays)
     ? (raw.workingDays as unknown[]).map((day) => getString(day)).filter(Boolean)
     : [];
-  const workingHoursStart = getString(raw.workingHoursStart);
-  const workingHoursEnd = getString(raw.workingHoursEnd);
+  const workingHoursStart = formatTimeInput(getString(raw.workingHoursStart));
+  const workingHoursEnd = formatTimeInput(getString(raw.workingHoursEnd));
 
   if (workingDays.length > 0 || workingHoursStart || workingHoursEnd) {
     return [
@@ -497,9 +539,7 @@ export function CadastroMedico() {
   const openEditGroupModal = (index: number) => {
     setEditingGroupIndex(index);
     const group = form.especialidadeGroups[index];
-    const especialidadeIds = group.especialidadeIds?.length
-      ? group.especialidadeIds
-      : (group.especialidadeId ? [group.especialidadeId] : []);
+    const especialidadeIds = getEspecialidadeIds(group);
     setGroupDraft({
       ...group,
       especialidadeIds,
@@ -534,10 +574,16 @@ export function CadastroMedico() {
       setGroupModalidadeError('Preencha o tipo, número e UF do registro');
       return;
     }
+    const especialidadeIds = getEspecialidadeIds(groupDraft);
+    const normalizedGroup = {
+      ...groupDraft,
+      especialidadeId: especialidadeIds[0] || null,
+      especialidadeIds,
+    };
     setForm((prev) => {
       const especialidadeGroups = editingGroupIndex === null
-        ? [...prev.especialidadeGroups, groupDraft]
-        : prev.especialidadeGroups.map((group, i) => (i === editingGroupIndex ? groupDraft : group));
+        ? [...prev.especialidadeGroups, normalizedGroup]
+        : prev.especialidadeGroups.map((group, i) => (i === editingGroupIndex ? normalizedGroup : group));
       return { ...prev, especialidadeGroups };
     });
     setGroupModalOpen(false);
@@ -564,6 +610,10 @@ export function CadastroMedico() {
           modalidadeId: procedure?.especialidade?.modalidadeId || procedure?.modalidadeId
             ? String(procedure.especialidade?.modalidadeId || procedure?.modalidadeId)
             : null,
+          especialidadeId: procedure?.especialidadeId || procedure?.especialidade?.id
+            ? String(procedure.especialidadeId || procedure?.especialidade?.id)
+            : null,
+          especialidadeName: getProcedureEspecialidadeLabel(procedure as ApiRecord, especialidadeList),
           durationMinutes: Number.isFinite(defaultDuration) && defaultDuration > 0 ? Math.round(defaultDuration) : 0,
         };
       });
@@ -594,7 +644,13 @@ export function CadastroMedico() {
       return {
         procedureId: option.value,
         procedureName: option.label,
-        modalidadeId: procedure?.modalidadeId ? String(procedure.modalidadeId) : null,
+        modalidadeId: procedure?.especialidade?.modalidadeId || procedure?.modalidadeId
+          ? String(procedure?.especialidade?.modalidadeId || procedure?.modalidadeId)
+          : null,
+        especialidadeId: procedure?.especialidadeId || procedure?.especialidade?.id
+          ? String(procedure.especialidadeId || procedure?.especialidade?.id)
+          : null,
+        especialidadeName: getProcedureEspecialidadeLabel(procedure as ApiRecord, especialidadeList),
         durationMinutes: Number.isFinite(defaultDuration) && defaultDuration > 0 ? Math.round(defaultDuration) : 0,
       };
     });
@@ -620,6 +676,17 @@ export function CadastroMedico() {
       delete next[field];
       return next;
     });
+  };
+
+  const updateWorkingScheduleTime = (index: number, field: 'hoursStart' | 'hoursEnd', value: string) => {
+    const formattedValue = formatTimeInput(value);
+    setForm((prev) => ({
+      ...prev,
+      workingSchedules: prev.workingSchedules.map((schedule, scheduleIndex) => (
+        scheduleIndex === index ? { ...schedule, [field]: formattedValue } : schedule
+      )),
+    }));
+    clearFieldError(`workingSchedules.${index}.${field}`);
   };
 
   const validateCpfUniqueness = async (cpfValue: string, notify = true) => {
@@ -763,9 +830,7 @@ export function CadastroMedico() {
           return {
             modalidadeId: getString(groupRecord.modalidadeId) || null,
             especialidadeId: getString(groupRecord.especialidadeId) || null,
-            especialidadeIds: Array.isArray(groupRecord.especialidadeIds)
-              ? (groupRecord.especialidadeIds as unknown[]).map((v) => getString(v)).filter(Boolean)
-              : (getString(groupRecord.especialidadeId) ? [getString(groupRecord.especialidadeId)] : []),
+            especialidadeIds: getEspecialidadeIds(groupRecord),
             registrationType: getString(groupRecord.registrationType) || getString(raw.crmType) || 'CRM',
             registrationNumber: getString(groupRecord.registrationNumber) || getString(raw.crm),
             registrationState: getString(groupRecord.registrationState) || getString(raw.crmState ?? raw.ufCrm),
@@ -786,6 +851,8 @@ export function CadastroMedico() {
             procedureId: getString(record.procedureId),
             procedureName: getString(record.procedureName),
             modalidadeId: getString(record.modalidadeId) || null,
+            especialidadeId: getString(record.especialidadeId) || null,
+            especialidadeName: getString(record.especialidadeName),
             durationMinutes: Number(record.durationMinutes),
           };
         }).filter((item) => item.procedureId && Number.isFinite(item.durationMinutes) && item.durationMinutes > 0)
@@ -873,8 +940,8 @@ export function CadastroMedico() {
     if (data.workingSchedules.length > 0) {
       data.workingSchedules.forEach((schedule, idx) => {
         if (!schedule.days.length) errors[`workingSchedules.${idx}.days`] = 'Selecione pelo menos um dia';
-        if (schedule.hoursStart && !/^\d{2}:\d{2}$/.test(schedule.hoursStart)) errors[`workingSchedules.${idx}.hoursStart`] = 'Formato inválido (HH:MM)';
-        if (schedule.hoursEnd && !/^\d{2}:\d{2}$/.test(schedule.hoursEnd)) errors[`workingSchedules.${idx}.hoursEnd`] = 'Formato inválido (HH:MM)';
+        if (schedule.hoursStart && !isValidTime(schedule.hoursStart)) errors[`workingSchedules.${idx}.hoursStart`] = 'Informe um horário válido (HH:mm)';
+        if (schedule.hoursEnd && !isValidTime(schedule.hoursEnd)) errors[`workingSchedules.${idx}.hoursEnd`] = 'Informe um horário válido (HH:mm)';
       });
     }
     return errors;
@@ -959,7 +1026,7 @@ export function CadastroMedico() {
       // das especialidades vinculadas pra manter os consumidores legados (busca, BI) funcionando.
       const derivedSpecialty = form.especialidadeGroups
         .flatMap((group) => {
-          const ids = group.especialidadeIds?.length ? group.especialidadeIds : (group.especialidadeId ? [group.especialidadeId] : []);
+          const ids = getEspecialidadeIds(group);
           return ids.map((id) => especialidadeList.find((e: any) => e.id === id)?.name);
         })
         .filter(Boolean)
@@ -998,15 +1065,20 @@ export function CadastroMedico() {
         workingHoursEnd: validSchedules.length > 0 ? validSchedules[0].hoursEnd : undefined,
         especialidadeGroups: form.especialidadeGroups
           .filter((group) => group.modalidadeId)
-          .map((group) => ({
-            ...group,
-            registrationType: group.registrationType || form.crmType || 'CRM',
-            registrationNumber: group.registrationNumber.trim() || form.crm.trim(),
-            registrationState: group.registrationState || form.crmState.trim().toUpperCase(),
-            branchIds: (group.branchIds || []).length === 0 || (group.branchIds || []).includes(ALL_BRANCHES_VALUE)
-              ? branchOptions.map((option) => option.value)
-              : group.branchIds,
-          })),
+          .map((group) => {
+            const especialidadeIds = getEspecialidadeIds(group);
+            return {
+              ...group,
+              especialidadeId: especialidadeIds[0] || null,
+              especialidadeIds,
+              registrationType: group.registrationType || form.crmType || 'CRM',
+              registrationNumber: group.registrationNumber.trim() || form.crm.trim(),
+              registrationState: group.registrationState || form.crmState.trim().toUpperCase(),
+              branchIds: (group.branchIds || []).length === 0 || (group.branchIds || []).includes(ALL_BRANCHES_VALUE)
+                ? branchOptions.map((option) => option.value)
+                : group.branchIds,
+            };
+          }),
         appointmentDurations: form.appointmentDurations,
         procedureDurations: form.procedureDurations.map((item) => ({
           procedureId: item.procedureId,
@@ -1308,7 +1380,7 @@ export function CadastroMedico() {
                         </Table.Thead>
                         <Table.Tbody>
                           {form.especialidadeGroups.map((group, index) => {
-                            const especialidadeIds = group.especialidadeIds?.length ? group.especialidadeIds : (group.especialidadeId ? [group.especialidadeId] : []);
+                            const especialidadeIds = getEspecialidadeIds(group);
                             const especialidadeNames = especialidadeIds
                               .map((id) => especialidadeList.find((item: any) => item.id === id)?.name)
                               .filter(Boolean);
@@ -1507,7 +1579,8 @@ export function CadastroMedico() {
                               >
                                 <Text size="sm" fw={500}>{option.label}</Text>
                                 <Text size="xs" c="dimmed">
-                                  {procedure?.durationMinutes ? `${procedure.durationMinutes} min padrão` : 'Sem duração padrão'}
+                                  {getProcedureEspecialidadeLabel(procedure as ApiRecord | undefined, especialidadeList)}
+                                  {procedure?.durationMinutes ? ` · ${procedure.durationMinutes} min padrão` : ' · Sem duração padrão'}
                                 </Text>
                               </Paper>
                             );
@@ -1607,7 +1680,9 @@ export function CadastroMedico() {
                                 <Group justify="space-between" align="center" wrap={isMobile ? 'wrap' : 'nowrap'} gap="sm">
                                   <Box style={{ minWidth: 0, flex: '1 1 140px' }}>
                                     <Text size="sm" fw={500} truncate>{item.procedureName || procedure?.name || 'Procedimento'}</Text>
-                                    <Text size="xs" c="dimmed">{procedure?.modalidade?.name || 'Modalidade não informada'}</Text>
+                                    <Text size="xs" c="dimmed">
+                                      {item.especialidadeName || getProcedureEspecialidadeLabel(procedure as ApiRecord | undefined, especialidadeList)}
+                                    </Text>
                                   </Box>
                                     <Box
                                       className={cn('cadastro-medico-form-duration-box', invalidDuration && 'cadastro-medico-form-duration-box-invalid')}
@@ -1798,22 +1873,20 @@ export function CadastroMedico() {
                         <TextInput
                           label="Horário início"
                           placeholder="08:00"
+                          inputMode="numeric"
+                          maxLength={5}
                           value={schedule.hoursStart}
-                          onChange={(e) => {
-                            const updated = [...form.workingSchedules];
-                            updated[idx].hoursStart = e.currentTarget.value;
-                            setForm({ ...form, workingSchedules: updated });
-                          }}
+                          error={fieldErrors[`workingSchedules.${idx}.hoursStart`]}
+                          onChange={(e) => updateWorkingScheduleTime(idx, 'hoursStart', e.currentTarget.value)}
                         />
                         <TextInput
                           label="Horário fim"
                           placeholder="18:00"
+                          inputMode="numeric"
+                          maxLength={5}
                           value={schedule.hoursEnd}
-                          onChange={(e) => {
-                            const updated = [...form.workingSchedules];
-                            updated[idx].hoursEnd = e.currentTarget.value;
-                            setForm({ ...form, workingSchedules: updated });
-                          }}
+                          error={fieldErrors[`workingSchedules.${idx}.hoursEnd`]}
+                          onChange={(e) => updateWorkingScheduleTime(idx, 'hoursEnd', e.currentTarget.value)}
                         />
                       </SimpleGrid>
                     </Paper>

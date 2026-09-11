@@ -182,7 +182,10 @@ export function CadastroAgendaEscalaForm({
       const doctorSpecialtyIds = new Set(getDoctorEspecialidadeIds(
         Array.isArray(item.especialidadeGroups) ? item.especialidadeGroups : [],
       ));
-      return especialidadeIds.some((id) => doctorSpecialtyIds.has(id));
+      // A professional must support every selected specialty. Using `some`
+      // made an incompatible professional appear in the list and the change
+      // handler then silently removed the remaining specialties.
+      return especialidadeIds.every((id) => doctorSpecialtyIds.has(id));
     })
     .map((item) => ({ value: item.id, label: item.name })), [doctors, branchId, especialidadeIds]);
 
@@ -210,15 +213,10 @@ export function CadastroAgendaEscalaForm({
     const nextId = nextDoctorId || '';
     setDoctorId(nextId);
 
-    // Preserve the unit-first/specialty-first flow. When a professional is
-    // selected, keep only specialties that professional actually supports.
-    if (nextId) {
-      const nextDoctor = doctors.find((item) => item.id === nextId);
-      const nextDoctorSpecialtyIds = new Set(getDoctorEspecialidadeIds(
-        Array.isArray(nextDoctor?.especialidadeGroups) ? nextDoctor.especialidadeGroups : [],
-      ));
-      setEspecialidadeIds((current) => current.filter((id) => nextDoctorSpecialtyIds.has(id)));
-    }
+    // Do not mutate the user's specialty selection here. `doctorOptions`
+    // already guarantees that the selected professional supports all of it.
+    // Keeping this state untouched prevents one specialty from disappearing
+    // when a professional is selected.
     setInternIds([]);
   };
 

@@ -36,6 +36,7 @@ export interface CreateDoctorPayload {
   especialidadeGroups?: Array<{
     modalidadeId: string | null;
     especialidadeId: string | null;
+    especialidadeIds?: string[];
     registrationType: string;
     registrationNumber: string;
     registrationState: string;
@@ -49,6 +50,8 @@ export interface CreateDoctorPayload {
     procedureId: string;
     procedureName?: string;
     modalidadeId?: string | null;
+    especialidadeId?: string | null;
+    especialidadeName?: string;
     durationMinutes: number;
   }>;
 }

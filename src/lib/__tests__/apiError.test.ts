@@ -43,6 +43,18 @@ describe('apiError utilities', () => {
     }, 'Fallback')).toBe('O servidor encontrou um erro. Tente novamente em instantes.');
   });
 
+  it('prefers actionable field errors over a generic validation envelope', () => {
+    expect(resolveApiErrorMessage({
+      response: {
+        status: 400,
+        data: {
+          error: 'Validation failed',
+          fields: { email: 'Este e-mail já está cadastrado.' },
+        },
+      },
+    }, 'Falha ao salvar')).toBe('Este e-mail já está cadastrado.');
+  });
+
   it('keeps frontend runtime errors and hides likely English API messages', () => {
     expect(resolveApiErrorMessage(new Error('Cannot read properties of undefined'), 'Fallback')).toBe(
       'Cannot read properties of undefined',

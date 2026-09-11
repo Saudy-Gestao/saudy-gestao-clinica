@@ -9,6 +9,8 @@ import {
   formatCEP,
   formatPhone,
   formatDateInput,
+  formatTimeInput,
+  isValidTime,
   parseApiDateToLocalDate,
 } from '../formatters';
 
@@ -33,6 +35,21 @@ describe('isValidCPF', () => {
   it('returns false for all same digits', () => expect(isValidCPF('111.111.111-11')).toBe(false));
   it('returns false for wrong length', () => expect(isValidCPF('12345')).toBe(false));
   it('returns false for invalid check digits', () => expect(isValidCPF('123.456.789-00')).toBe(false));
+});
+
+describe('formatTimeInput', () => {
+  it('formats digits as HH:mm while typing', () => {
+    expect(formatTimeInput('20000')).toBe('20:00');
+    expect(formatTimeInput('8')).toBe('8');
+    expect(formatTimeInput('08:30')).toBe('08:30');
+  });
+
+  it('validates a real 24-hour time', () => {
+    expect(isValidTime('08:30')).toBe(true);
+    expect(isValidTime('23:59')).toBe(true);
+    expect(isValidTime('24:00')).toBe(false);
+    expect(isValidTime('20:99')).toBe(false);
+  });
 });
 
 describe('formatCPF', () => {
@@ -89,4 +106,3 @@ describe('parseApiDateToLocalDate', () => {
   });
   it('returns null for invalid', () => expect(parseApiDateToLocalDate('not-a-date')).toBeNull());
 });
-

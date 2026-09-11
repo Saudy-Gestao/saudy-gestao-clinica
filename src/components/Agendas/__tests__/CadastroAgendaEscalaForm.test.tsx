@@ -32,8 +32,11 @@ const baseProps = {
       name: 'Dra. Camila',
       branchIds: ['branch-1'],
       especialidadeGroups: [
-        { especialidadeId: 'specialty-1', modalidadeId: 'modality-1' },
-        { especialidadeId: 'specialty-2', modalidadeId: 'modality-2' },
+        {
+          especialidadeId: 'specialty-1',
+          especialidadeIds: ['specialty-1', 'specialty-2'],
+          modalidadeId: 'modality-1',
+        },
       ],
     },
   ],
@@ -99,6 +102,7 @@ describe('CadastroAgendaEscalaForm', () => {
     await user.click(screen.getByRole('option', { name: 'Psicologia', exact: true }));
 
     await user.click(screen.getByRole('button', { name: 'Profissional', exact: true }));
+    expect(screen.queryByRole('option', { name: 'Dra. Ana', exact: true })).not.toBeInTheDocument();
     await user.click(screen.getByRole('option', { name: 'Dra. Camila', exact: true }));
 
     await user.click(screen.getByRole('button', { name: /Novo bloco/ }));

@@ -38,9 +38,12 @@ export function PaginatedGrid({
 
   return (
     <Stack gap="sm">
-      <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }}>
+      <Box style={{ minWidth: 0, maxWidth: '100%', overflow: 'hidden', border: '1px solid var(--mantine-color-default-border)', borderRadius: 6 }}>
         <Box
           style={{
+            width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
             maxHeight,
             overflowX: 'auto',
             overflowY: 'auto',

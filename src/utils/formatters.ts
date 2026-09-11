@@ -82,6 +82,18 @@ export const formatDateInput = (s: string) => {
   return `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;
 };
 
+// Keep time fields consistent across browsers and with the API's HH:mm format.
+// It also repairs legacy values such as "20000" when an existing professional
+// is opened for editing.
+export const formatTimeInput = (s: string) => {
+  const digits = onlyDigits(s).slice(0, 4);
+  if (!digits) return '';
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
+
+export const isValidTime = (s: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(s || ''));
+
 // Parses API date values into local dates without UTC day shifting.
 export const parseApiDateToLocalDate = (value?: string | null): Date | null => {
   if (!value) return null;

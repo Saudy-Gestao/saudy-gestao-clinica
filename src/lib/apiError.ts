@@ -6,6 +6,9 @@ type ErrorTranslation = {
 };
 
 const ERROR_MESSAGE_TRANSLATIONS: ErrorTranslation[] = [
+  { pattern: /unique.*email|email.*(?:already|exists|duplicate)/i, message: 'Este e-mail já está cadastrado.' },
+  { pattern: /unique.*cpf|cpf.*(?:already|exists|duplicate)/i, message: 'Este CPF já está cadastrado.' },
+  { pattern: /unique.*crm|crm.*(?:already|exists|duplicate)/i, message: 'Este registro profissional já está cadastrado.' },
   { pattern: /operator reached active conversation limit/i, message: 'Você atingiu o limite de atendimentos ativos.' },
   { pattern: /already assigned to (another )?operator/i, message: 'Essa conversa já foi assumida por outro atendente.' },
   { pattern: /already assigned/i, message: 'Essa conversa já está atribuída.' },
@@ -120,6 +123,18 @@ const resolveRequiredFieldsMessage = (error: any): string | null => {
   return `Preencha os campos obrigatórios: ${list}.`;
 };
 
+const resolveFieldErrorsMessage = (error: any): string | null => {
+  const fields = error?.response?.data?.fields;
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
+
+  const messages = Object.values(fields)
+    .map((value) => toStringValue(value))
+    .filter(Boolean);
+  if (messages.length === 0) return null;
+
+  return messages.slice(0, 3).join(' ');
+};
+
 const isLikelyEnglishError = (value: string) => {
   if (!value) return false;
 
@@ -131,6 +146,12 @@ const isLikelyEnglishError = (value: string) => {
 export const resolveApiErrorMessage = (error: any, fallback: string) => {
   const requiredFieldsMessage = resolveRequiredFieldsMessage(error);
   if (requiredFieldsMessage) return requiredFieldsMessage;
+
+  // Field-level API errors contain the actionable reason (for example,
+  // "Este e-mail já está cadastrado"). Prefer them over the route-level
+  // "Validation failed" envelope so every screen can show a useful message.
+  const fieldErrorsMessage = resolveFieldErrorsMessage(error);
+  if (fieldErrorsMessage) return fieldErrorsMessage;
 
   const raw = toStringValue(
     error?.response?.data?.originalError
