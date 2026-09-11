@@ -23,6 +23,40 @@ import './CadastroAgendas.css';
 
 type Option = { value: string; label: string };
 
+type DoctorSpecialtyGroup = {
+  especialidadeId?: string | null;
+  modalidadeId?: string | null;
+};
+
+type AgendaDoctor = {
+  id: string;
+  name: string;
+  branchId?: string | null;
+  branchIds?: string[];
+  especialidadeGroups?: DoctorSpecialtyGroup[];
+};
+
+type AgendaEspecialidade = {
+  id: string;
+  name: string;
+  branchId?: string | null;
+};
+
+type AgendaRoom = {
+  id: string;
+  name: string;
+  description?: string | null;
+  branchId?: string | null;
+  modalidadeId?: string | null;
+};
+
+type AgendaIntern = {
+  id: string;
+  name: string;
+  branchId?: string | null;
+  isActive?: boolean;
+};
+
 type ScaleSlot = {
   key: string;
   shiftStart: string;
@@ -101,10 +135,10 @@ const formatISODate = (date: Date | null): string => {
 
 interface CadastroAgendaEscalaFormProps {
   branchOptions: Option[];
-  doctors: any[];
-  especialidades: any[];
-  rooms: any[];
-  interns: any[];
+  doctors: AgendaDoctor[];
+  especialidades: AgendaEspecialidade[];
+  rooms: AgendaRoom[];
+  interns: AgendaIntern[];
   isMobile: boolean;
   onCancel: () => void;
   onSaved: () => Promise<void> | void;
@@ -135,22 +169,61 @@ export function CadastroAgendaEscalaForm({
 
   const doctorOptions = useMemo(() => doctors
     .filter((item) => !branchId || (Array.isArray(item.branchIds) && item.branchIds.includes(branchId)) || item.branchId === branchId)
-    .map((item) => ({ value: item.id, label: item.name })), [doctors, branchId]);
+    .filter((item) => {
+      if (especialidadeIds.length === 0) return true;
+      const doctorSpecialtyIds = new Set(
+        (Array.isArray(item.especialidadeGroups) ? item.especialidadeGroups : [])
+          .map((group: DoctorSpecialtyGroup) => group.especialidadeId)
+          .filter(Boolean),
+      );
+      return especialidadeIds.some((id) => doctorSpecialtyIds.has(id));
+    })
+    .map((item) => ({ value: item.id, label: item.name })), [doctors, branchId, especialidadeIds]);
 
   const doctorSpecialtyIds = useMemo(() => new Set(
     (Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [])
-      .map((group: any) => group?.especialidadeId)
+      .map((group: DoctorSpecialtyGroup) => group.especialidadeId)
       .filter(Boolean),
   ), [doctor]);
 
   const specialtyOptions = useMemo(() => especialidades
-    .filter((item) => item?.id && (doctorSpecialtyIds.size === 0 || doctorSpecialtyIds.has(item.id)))
-    .map((item) => ({ value: item.id, label: item.name })), [especialidades, doctorSpecialtyIds]);
+    .filter((item) => item?.id)
+    .filter((item) => !branchId || !item.branchId || item.branchId === branchId)
+    .filter((item) => !doctorId || doctorSpecialtyIds.size === 0 || doctorSpecialtyIds.has(item.id))
+    .map((item) => ({ value: item.id, label: item.name })), [especialidades, branchId, doctorId, doctorSpecialtyIds]);
+
+  const handleSpecialtyChange = (nextIds: string[]) => {
+    setEspecialidadeIds(nextIds);
+
+    // If the current professional no longer matches the selected specialties,
+    // clear only the incompatible professional and let the user choose another.
+    if (doctorId && nextIds.length > 0 && !nextIds.some((id) => doctorSpecialtyIds.has(id))) {
+      setDoctorId('');
+    }
+  };
+
+  const handleDoctorChange = (nextDoctorId: string | null) => {
+    const nextId = nextDoctorId || '';
+    setDoctorId(nextId);
+
+    // Preserve the unit-first/specialty-first flow. When a professional is
+    // selected, keep only specialties that professional actually supports.
+    if (nextId) {
+      const nextDoctor = doctors.find((item) => item.id === nextId);
+      const nextDoctorSpecialtyIds = new Set(
+        (Array.isArray(nextDoctor?.especialidadeGroups) ? nextDoctor.especialidadeGroups : [])
+          .map((group: DoctorSpecialtyGroup) => group.especialidadeId)
+          .filter(Boolean),
+      );
+      setEspecialidadeIds((current) => current.filter((id) => nextDoctorSpecialtyIds.has(id)));
+    }
+    setInternIds([]);
+  };
 
   const roomOptions = useMemo(() => {
     const modalityIds = new Set(
       (Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [])
-        .map((group: any) => group?.modalidadeId)
+        .map((group: DoctorSpecialtyGroup) => group.modalidadeId)
         .filter(Boolean),
     );
     return rooms
@@ -277,9 +350,9 @@ export function CadastroAgendaEscalaForm({
               status: slot.status,
             });
             successCount += 1;
-          } catch (err: any) {
+          } catch (err: unknown) {
             if (!firstError) {
-              const errorCode = err?.response?.data?.error;
+              const errorCode = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
               firstError = errorCode === 'AGENDA_OVERLAP'
                 ? 'Existe uma agenda ativa sobrepondo um dos horários informados.'
                 : resolveApiErrorMessage(err, 'Não foi possível salvar a escala.');
@@ -343,7 +416,7 @@ export function CadastroAgendaEscalaForm({
       <Box className="cadastro-agenda-form-section">
         <Box className="cadastro-agenda-form-section-heading">
           <Text className="cadastro-agenda-form-section-title" fw={700}>Filtros</Text>
-          <Text size="sm" c="dimmed">Selecione a unidade, o profissional e uma ou mais especialidades.</Text>
+          <Text size="sm" c="dimmed">Selecione a unidade, uma ou mais especialidades e o profissional.</Text>
         </Box>
         <Box className="cadastro-agenda-filter-grid">
           <Select
@@ -359,18 +432,18 @@ export function CadastroAgendaEscalaForm({
             label="Especialidade"
             data={specialtyOptions}
             value={especialidadeIds}
-            onChange={setEspecialidadeIds}
+            onChange={handleSpecialtyChange}
             placeholder="Selecione uma ou mais"
             searchable
             clearable
-            disabled={!doctorId}
+            disabled={!branchId}
           />
           <Select
             label="Profissional"
             required
             data={doctorOptions}
             value={doctorId || null}
-            onChange={(value) => { setDoctorId(value || ''); setEspecialidadeIds([]); setInternIds([]); }}
+            onChange={handleDoctorChange}
             placeholder={branchId ? 'Selecione' : 'Selecione uma unidade primeiro'}
             searchable
             disabled={!branchId}
