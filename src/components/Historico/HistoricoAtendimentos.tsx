@@ -186,7 +186,7 @@ export function HistoricoAtendimentos() {
     <>
       <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
       <Box className="historico-page">
-        <Box className="historico-hero">
+        <Box className="historico-hero ui-page-intro">
           <Box className="historico-hero-copy">
             <Box className="historico-hero-icon"><CalendarDays size={22} /></Box>
             <Box>

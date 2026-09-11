@@ -1854,7 +1854,7 @@ export function LaudoExames() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=operacao-clinica') }} />
 
       <Box className="laudo-exames-shell" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Group className="laudo-exames-hero" justify="space-between" align="flex-end" wrap="wrap">
+        <Group className="laudo-exames-hero ui-page-intro" justify="space-between" align="flex-end" wrap="wrap">
           <Box>
             <Text className="laudo-exames-eyebrow">OPERAÇÃO CLÍNICA · DIAGNÓSTICO</Text>
             <Title order={1} className="laudo-exames-page-title">

@@ -155,7 +155,7 @@ export function CadastroEstagiario() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="cadastro-estagiario-hero">
+        <Box className="cadastro-estagiario-hero ui-page-intro">
           <Text className="cadastro-estagiario-eyebrow">CADASTROS CLÍNICOS</Text>
           <Text className="cadastro-estagiario-title" fw={700} size="2xl">Cadastro de Estagiários</Text>
           <Text className="cadastro-estagiario-subtitle" size="sm">Gerencie estagiários e seus profissionais responsáveis.</Text>

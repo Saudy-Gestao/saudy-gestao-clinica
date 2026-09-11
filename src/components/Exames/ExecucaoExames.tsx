@@ -590,7 +590,7 @@ export function ExecucaoExames() {
       />
 
       <Box className="execucao-exames-content" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : '1400px'} mx="auto">
-        <Group className="execucao-exames-hero" mb="xl" justify="space-between" align="flex-end" wrap="wrap">
+        <Group className="execucao-exames-hero ui-page-intro" mb="xl" justify="space-between" align="flex-end" wrap="wrap">
           <Box>
             <Text className="execucao-exames-eyebrow">OPERAÇÃO CLÍNICA</Text>
             <Text className="execucao-exames-title" fw={700} size={isMobile ? 'xl' : '2xl'}>

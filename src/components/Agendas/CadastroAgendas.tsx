@@ -356,7 +356,7 @@ export function CadastroAgendas() {
           </>
         ) : (
           <>
-            <Box className="cadastro-agendas-hero">
+            <Box className="cadastro-agendas-hero ui-page-intro">
               <Text className="cadastro-agendas-eyebrow">CADASTROS CLÍNICOS</Text>
               <Text className="cadastro-agendas-title" fw={700} size="2xl">Agendas</Text>
               <Text className="cadastro-agendas-subtitle" size="sm">Agendas de profissionais por unidade, dia e turno.</Text>

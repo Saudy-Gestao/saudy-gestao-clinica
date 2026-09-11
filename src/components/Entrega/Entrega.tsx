@@ -403,7 +403,7 @@ export function Entrega() {
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Group justify="space-between" align="flex-start" wrap="wrap" mb="md">
-          <Box className="entrega-hero">
+          <Box className="entrega-hero ui-page-intro">
             <Text className="entrega-eyebrow">GESTÃO E APOIO</Text>
             <Text className="entrega-title" fw={700} size="2xl">Entrega</Text>
             <Text className="entrega-subtitle" size="sm">Controle de entregas de exames, laudos e documentos aos pacientes.</Text>

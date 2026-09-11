@@ -952,7 +952,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
             </>
           ) : activeSubmodule === 'pacientes' ? (
             <>
-              <Group className="tea-view-hero" justify="space-between" align="flex-end" wrap="wrap">
+              <Group className="tea-view-hero ui-page-intro" justify="space-between" align="flex-end" wrap="wrap">
                 <Box>
                   <Text className="tea-view-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
                   <Text className="tea-view-title" fw={700} size="2xl">Pacientes de Terapias</Text>
@@ -1054,7 +1054,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
             </>
           ) : activeSubmodule === 'plano' ? (
             <>
-              <Group className="tea-view-hero" justify="space-between" align="flex-end" wrap="wrap">
+              <Group className="tea-view-hero ui-page-intro" justify="space-between" align="flex-end" wrap="wrap">
                 <Box>
                   <Text className="tea-view-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
                   <Text className="tea-view-title" fw={700} size="2xl">Plano Terapêutico</Text>

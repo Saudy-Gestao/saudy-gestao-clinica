@@ -355,7 +355,7 @@ export function CadastroSala() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeView === 'hub' ? (
           <>
-            <Box className="cadastro-sala-hero">
+            <Box className="cadastro-sala-hero ui-page-intro">
               <Text className="cadastro-sala-eyebrow">CADASTROS CLÍNICOS</Text>
               <Text className="cadastro-sala-title" fw={700} size="2xl">Salas</Text>
               <Text className="cadastro-sala-subtitle" size="sm">Cadastro de salas por filial</Text>

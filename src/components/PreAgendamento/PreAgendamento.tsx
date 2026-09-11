@@ -420,7 +420,7 @@ export function PreAgendamento() {
       />
 
       <Box className="pre-agendamento-content" p="xl" maw={1400} mx="auto">
-        <Group className="pre-agendamento-hero" justify="space-between" align="flex-end" mb="xl" wrap="wrap">
+        <Group className="pre-agendamento-hero ui-page-intro" justify="space-between" align="flex-end" mb="xl" wrap="wrap">
           <Box>
             <Text className="pre-agendamento-eyebrow">OPERAÇÃO CLÍNICA · PRÉ-AGENDAMENTO</Text>
             <Text className="pre-agendamento-title" fw={700} size="2xl">Pré-atendimento</Text>

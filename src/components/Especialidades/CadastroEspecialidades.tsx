@@ -388,7 +388,7 @@ export function CadastroEspecialidades() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="cadastro-especialidades-hero">
+        <Box className="cadastro-especialidades-hero ui-page-intro">
           <Text className="cadastro-especialidades-eyebrow">CADASTROS CLÍNICOS</Text>
           <Text className="cadastro-especialidades-title" fw={700} size="2xl">Especialidades</Text>
           <Text className="cadastro-especialidades-subtitle" size="sm">Especialidades e métodos por modalidade</Text>

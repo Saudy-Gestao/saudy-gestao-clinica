@@ -991,7 +991,7 @@ export function CadastroPaciente() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeTab === 'hub' ? (
           <>
-            <Box className="cadastro-paciente-hub-hero">
+            <Box className="cadastro-paciente-hub-hero ui-page-intro">
               <Text className="cadastro-paciente-hub-eyebrow">CADASTROS CLÍNICOS</Text>
               <Text className="cadastro-paciente-hub-title" fw={700} size="2xl">Cadastro de Paciente</Text>
               <Text className="cadastro-paciente-hub-subtitle" size="sm">Registro de pacientes</Text>

@@ -165,7 +165,7 @@ export function CadastroConvenio() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeTab === 'hub' ? (
           <>
-            <Box className="cadastro-convenio-hub-hero">
+            <Box className="cadastro-convenio-hub-hero ui-page-intro">
               <Text className="cadastro-convenio-hub-eyebrow">CADASTROS CLÍNICOS</Text>
               <Text className="cadastro-convenio-hub-title" fw={700} size="2xl">Convênios</Text>
               <Text className="cadastro-convenio-hub-subtitle" size="sm">Gestão de convênios</Text>

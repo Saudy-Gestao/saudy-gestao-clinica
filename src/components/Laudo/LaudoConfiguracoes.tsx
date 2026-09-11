@@ -610,7 +610,7 @@ export function LaudoConfiguracoes() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeTab === 'hub' ? (
           <>
-            <Box className="laudo-config-hero">
+            <Box className="laudo-config-hero ui-page-intro">
               <Text className="laudo-config-eyebrow">CADASTROS CLÍNICOS</Text>
               <Text className="laudo-config-title" fw={700} size="2xl">Configurações de Laudo</Text>
               <Text className="laudo-config-subtitle" size="sm">Cadastre padrões, frases e fila manual para preparação da integração DICOM.</Text>

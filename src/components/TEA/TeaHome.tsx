@@ -232,7 +232,7 @@ export function TeaHome() {
       <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
 
       <Box className="tea-home-content" p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
-        <Box className="tea-home-hero">
+        <Box className="tea-home-hero ui-page-intro">
           <Text className="tea-home-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-home-title" fw={700} size="2xl">Módulo Terapias</Text>
           <Text className="tea-home-subtitle" size="sm">Subsistema clínico de acompanhamento de Terapias</Text>

@@ -472,7 +472,7 @@ export function CadastroEquipamento() {
       <Box p={isMobile ? 'sm' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeTab === 'hub' ? (
           <>
-            <Box className="cadastro-equipamento-hero">
+            <Box className="cadastro-equipamento-hero ui-page-intro">
               <Text className="cadastro-equipamento-eyebrow">CADASTROS CLÍNICOS</Text>
               <Text className="cadastro-equipamento-title" fw={700} size="2xl">Equipamentos</Text>
               <Text className="cadastro-equipamento-subtitle" size="sm">Equipamentos de exame com dados operacionais, modalidade e integração DICOM.</Text>

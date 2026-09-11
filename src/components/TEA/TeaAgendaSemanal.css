@@ -41,6 +41,27 @@
   gap: .75rem;
 }
 
+.tea-agenda-filters .ui-field-label {
+  white-space: nowrap;
+}
+
+.tea-agenda-filters .ui-multi-select-trigger {
+  height: 2.5rem;
+  min-height: 2.5rem;
+}
+
+.tea-agenda-filters .ui-multi-select-values {
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.tea-agenda-filters .ui-multi-select-placeholder .ui-multi-select-values > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tea-agenda-toolbar {
   min-width: 0;
   max-width: 100%;
@@ -51,10 +72,74 @@
   border: 1px solid var(--ui-border);
 }
 
+.tea-agenda-controls-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: end;
+  gap: .75rem;
+}
+
+.tea-agenda-controls-row > .tea-agenda-toolbar {
+  width: max-content;
+}
+
+.tea-agenda-search-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: .45rem;
+  width: min(100%, 42rem);
+  min-width: 0;
+  margin-left: auto;
+  padding: .3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: .7rem;
+  background: color-mix(in srgb, var(--ui-primary) 6%, var(--ui-surface));
+}
+
+.tea-agenda-search-panel--with-range {
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.tea-agenda-date-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 12rem;
+  max-width: 15rem;
+  min-height: 2.5rem;
+  padding: 0 .7rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 18%, var(--ui-border));
+  border-radius: .55rem;
+  background: color-mix(in srgb, var(--ui-primary) 7%, var(--ui-background));
+}
+
+.tea-agenda-day-toolbar {
+  display: grid;
+  grid-template-columns: max-content minmax(12rem, 13rem);
+  grid-template-areas:
+    "actions date"
+    "divider divider"
+    "weekdays weekdays";
+  align-items: end;
+  column-gap: .65rem;
+  row-gap: .55rem;
+  min-width: max-content;
+}
+
+.tea-agenda-day-actions {
+  grid-area: actions;
+  align-self: end;
+}
+
 .tea-agenda-day-picker {
-  width: 11rem;
-  min-width: 11rem;
-  align-self: stretch;
+  grid-area: date;
+  width: 12rem;
+  min-width: 12rem;
+  max-width: 13rem;
+  align-self: end;
 }
 
 .tea-agenda-day-picker .ui-field-label {
@@ -62,26 +147,64 @@
   font-size: .68rem;
   font-weight: 700;
   letter-spacing: .04em;
-  line-height: 1;
+  line-height: 1.15;
+  margin-bottom: .05rem;
   text-transform: uppercase;
 }
 
 .tea-agenda-day-picker .ui-input {
-  min-height: 2rem;
-  padding: .4rem 2.45rem .4rem .65rem;
+  min-height: 2.2rem;
+  padding: .45rem 2.4rem .45rem .7rem;
   border-radius: .5rem;
-  font-size: .82rem;
+  font-size: .84rem;
 }
 
 .tea-agenda-day-picker .ui-calendar-trigger {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.8rem;
+  height: 1.8rem;
   right: .35rem;
 }
 
+.tea-agenda-day-divider {
+  grid-area: divider;
+  margin: 0;
+}
+
+.tea-agenda-weekday-tabs {
+  grid-area: weekdays;
+  min-width: 0;
+}
+
 .tea-agenda-search {
-  width: 20rem;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+}
+
+.tea-agenda-search .ui-input-wrap {
+  position: relative;
+}
+
+.tea-agenda-search .ui-input {
+  padding-left: 2.35rem;
+}
+
+.tea-agenda-search .ui-input-wrap > svg {
+  position: absolute;
+  left: .75rem;
+  z-index: 1;
+  color: var(--ui-muted);
+  pointer-events: none;
+}
+
+.tea-agenda-date-range {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .tea-agenda-stats {
@@ -273,8 +396,64 @@
     width: 100%;
   }
 
+  .tea-agenda-controls-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .tea-agenda-controls-row > .tea-agenda-toolbar {
+    width: 100%;
+  }
+
+  .tea-agenda-search-panel {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .tea-agenda-date-summary {
+    width: 100%;
+    max-width: none;
+  }
+
+  .tea-agenda-date-range {
+    max-width: 100%;
+  }
+
   .tea-agenda-day-picker {
-    width: 10.5rem;
-    min-width: 10.5rem;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .tea-agenda-day-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "actions"
+      "date"
+      "divider"
+      "weekdays";
+    min-width: 0;
+  }
+
+  .tea-agenda-day-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .tea-agenda-day-actions .ui-button {
+    min-width: 0;
+    padding-inline: .45rem;
+  }
+
+  .tea-agenda-weekday-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .tea-agenda-weekday-tabs .ui-button {
+    width: 100%;
   }
 }

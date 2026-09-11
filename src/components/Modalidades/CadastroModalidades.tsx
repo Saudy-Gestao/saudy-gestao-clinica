@@ -248,7 +248,7 @@ export function CadastroModalidades() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="cadastro-modalidades-hero">
+        <Box className="cadastro-modalidades-hero ui-page-intro">
           <Text className="cadastro-modalidades-eyebrow">CADASTROS CLÍNICOS</Text>
           <Text className="cadastro-modalidades-title" fw={700} size="2xl">Modalidades</Text>
           <Text className="cadastro-modalidades-subtitle" size="sm">Tipos de exame (Tomografia, Ressonância, Ultrassonografia...)</Text>

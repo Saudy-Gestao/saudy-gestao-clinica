@@ -1357,7 +1357,7 @@ export function SettingsPage() {
 
   return (
     <PageContainer>
-      <header className="settings-page-header">
+      <header className="settings-page-header ui-page-intro">
         <Group gap="sm" align="center" wrap="nowrap">
           <ActionIcon className="settings-back-button" variant="default" size="xl" onClick={() => navigate(-1)} aria-label="Voltar">
             <ChevronLeft size={28} />
@@ -1365,7 +1365,7 @@ export function SettingsPage() {
           <Box className="settings-page-header__copy">
             <Text className="settings-eyebrow">PAINEL DE GESTÃO · ADMINISTRAÇÃO</Text>
             <Title order={1}>Configurações</Title>
-            <Text>Gerencie a estrutura e as preferências da sua operação.</Text>
+            <Text className="settings-page-header__subtitle">Gerencie a estrutura e as preferências da sua operação.</Text>
           </Box>
         </Group>
         <Text className="settings-page-header__company" title={selectedCompany?.legalName || undefined}>{selectedCompany?.legalName || 'Organização não selecionada'}</Text>

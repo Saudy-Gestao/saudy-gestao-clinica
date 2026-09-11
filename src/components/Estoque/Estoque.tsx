@@ -988,7 +988,7 @@ export function Estoque() {
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
         {activeTab === 'hub' ? (
           <>
-            <Box className="estoque-hero">
+            <Box className="estoque-hero ui-page-intro">
               <Text className="estoque-eyebrow">GESTÃO E APOIO</Text>
               <Text className="estoque-title" fw={700} size="2xl">Estoque</Text>
               <Text className="estoque-subtitle" size="sm">Materiais e insumos com controle de quantidade, validade e movimentação.</Text>

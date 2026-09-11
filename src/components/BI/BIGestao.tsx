@@ -367,7 +367,7 @@ function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onEdit }:
   const allRows = [...baseMatrix, Array(MAX_PER_ROW).fill(null)];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="bi-widget-grid" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {allRows.map((row, rowIdx) => {
         const cardIds = (row as (string | null)[]).filter((id): id is string => !!id);
         const isEmptyRow = cardIds.length === 0;
@@ -382,7 +382,7 @@ function StaticWidgetGrid({ cards, rowsLayout, isDragActive, onDelete, onEdit }:
         const showInserts = isDragActive;
         const previewPercent = 100 / Math.min(MAX_PER_ROW, cardIds.length + 1);
         return (
-          <div key={rowIdx} style={{ display: 'flex', alignItems: 'stretch', gap: showInserts ? 0 : 12 }}>
+          <div className="bi-widget-grid__row" key={rowIdx} style={{ display: 'flex', alignItems: 'stretch', gap: showInserts ? 0 : 12 }}>
             {showInserts && <InsertZone id={`grid-insert-${rowIdx}-0`} previewPercent={previewPercent} />}
             {cardIds.map((id, i) => (
               <React.Fragment key={id}>
@@ -1400,9 +1400,9 @@ export function BIGestao() {
     const draft = customPromptDraft[tabId] ?? ps.prompt;
     const layout = getTabLayout(tabId);
     return (
-      <Stack gap="md" mt="xl">
+      <Stack gap="md" className="bi-ai-section">
         <Paper p="md" withBorder className="bi-ai-panel">
-          <Group justify="space-between" align="flex-start" mb="xs" wrap="wrap">
+          <Group className="bi-ai-panel__header" justify="space-between" align="flex-start" mb="xs" wrap="wrap">
             <Group gap="xs">
               <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={28}>
                 <Sparkles size={14} />
@@ -1418,12 +1418,11 @@ export function BIGestao() {
               </Button>
             </Group>
           </Group>
-          <Text size="xs" c="dimmed" mb="sm">
+          <Text className="bi-ai-panel__description" size="xs" c="dimmed" mb="sm">
             Gere cards e análises personalizados para complementar os dados desta aba.
           </Text>
-          <Group gap="xs" align="stretch">
+          <Group className="bi-ai-panel__composer" gap="xs" align="stretch">
             <Textarea
-              style={{ flex: 1 }}
               placeholder="Ex: Quero ver um ranking dos 5 médicos com mais atendimentos e a taxa de cancelamento..."
               value={draft}
               onChange={(e) => { const val = e.currentTarget.value; setCustomPromptDraft((p) => ({ ...p, [tabId]: val })); }}
@@ -1433,11 +1432,12 @@ export function BIGestao() {
             />
             <Tooltip label="Gerar (Ctrl+Enter)">
               <ActionIcon
+                aria-label="Gerar widgets com IA"
+                className="bi-ai-panel__send"
                 size="xl"
                 variant="gradient"
                 gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
                 radius="md"
-                style={{ alignSelf: 'stretch', height: 'auto' }}
                 loading={ps.loading}
                 disabled={!draft.trim()}
                 onClick={() => handleGenerateWidgets(tabId, tabLabel, draft)}
@@ -2169,15 +2169,14 @@ export function BIGestao() {
           </Group>
         </Stack>
       </Modal>
-      <Box maw={1500} mx="auto" px={{ base: 'md', md: 'xl' }} py="xl">
-        <Paper className="bi-hero" p={{ base: 'md', md: 'lg' }} mb="xl" withBorder>
+      <Box className="bi-page-content" maw={1500} mx="auto" px={{ base: 'md', md: 'xl' }} py="xl">
+        <Paper className="bi-hero" withBorder>
           <Stack gap="sm">
-            <Group gap="md" align="center" justify="space-between" wrap="wrap">
+            <Group className="bi-hero-header" gap="md" align="center" justify="space-between" wrap="wrap">
               <Title
                 order={2}
                 fw={750}
                 className="bi-hero-title"
-                style={{ fontSize: 'clamp(1.5rem, 2.3vw, 2.2rem)', letterSpacing: 0 }}
               >
                 Cockpit executivo da clínica
               </Title>
@@ -2186,6 +2185,7 @@ export function BIGestao() {
                 variant="gradient"
                 gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
                 size="sm"
+                className="bi-hero-action"
                 onClick={handleOpenInsights}
               >
                 Visualizar Insights
@@ -2193,7 +2193,7 @@ export function BIGestao() {
             </Group>
             <Group className="bi-hero-filters" align="flex-end" gap="sm" wrap="wrap">
               <Select
-                w={190}
+                className="bi-hero-filter"
                 label="Período"
                 leftSection={<Filter size={16} />}
                 data={[
@@ -2205,10 +2205,10 @@ export function BIGestao() {
                 value={period}
                 onChange={(value) => setPeriod((value || '30d') as PeriodKey)}
               />
-              <Select w={190} label="Médico" placeholder="Todos" searchable clearable value={doctorFilter} onChange={setDoctorFilter} data={doctorOptions} />
-              <Select w={190} label="Convênio" placeholder="Todos" searchable clearable value={insuranceFilter} onChange={setInsuranceFilter} data={insuranceOptions} />
-              <Select w={190} label="Procedimento" placeholder="Todos" searchable clearable value={procedureFilter} onChange={setProcedureFilter} data={procedureOptions} />
-              <Select w={190} label="Setor" placeholder="Todos" searchable clearable value={sectorFilter} onChange={setSectorFilter} data={sectorOptions} />
+              <Select className="bi-hero-filter" label="Médico" placeholder="Todos" searchable clearable value={doctorFilter} onChange={setDoctorFilter} data={doctorOptions} />
+              <Select className="bi-hero-filter" label="Convênio" placeholder="Todos" searchable clearable value={insuranceFilter} onChange={setInsuranceFilter} data={insuranceOptions} />
+              <Select className="bi-hero-filter" label="Procedimento" placeholder="Todos" searchable clearable value={procedureFilter} onChange={setProcedureFilter} data={procedureOptions} />
+              <Select className="bi-hero-filter" label="Setor" placeholder="Todos" searchable clearable value={sectorFilter} onChange={setSectorFilter} data={sectorOptions} />
             </Group>
           </Stack>
         </Paper>
@@ -2347,8 +2347,8 @@ export function BIGestao() {
         })()}
 
         {/* Navbar colorida */}
-        <ScrollArea mb="xl" scrollbarSize={4} type="hover">
-          <Group gap={6} wrap="nowrap" pb={4}>
+        <ScrollArea className="bi-tab-nav" scrollbarSize={4} type="hover">
+          <Group className="bi-tab-nav-list" gap={6} wrap="nowrap" pb={4}>
             {([
               { value: 'executivo',   label: 'Executivo' },
               { value: 'operacao',    label: 'Operação' },
@@ -2461,18 +2461,17 @@ export function BIGestao() {
           return (
             <Stack gap="lg">
               <Paper p="md" withBorder className="bi-ai-panel">
-                <Group gap="xs" mb="xs">
+                <Group className="bi-ai-panel__header" gap="xs" mb="xs">
                   <ThemeIcon variant="gradient" gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }} radius="md" size={30}>
                     <Sparkles size={15} />
                   </ThemeIcon>
                   <Text fw={700} size="sm">Descreva o que quer ver em "{panelLabel}"</Text>
                 </Group>
-                <Text size="xs" c="dimmed" mb="sm">
+                <Text className="bi-ai-panel__description" size="xs" c="dimmed" mb="sm">
                   A IA vai gerar cards, gráficos e análises com base nos dados reais do BI.
                 </Text>
-                <Group gap="xs" align="stretch">
+                <Group className="bi-ai-panel__composer" gap="xs" align="stretch">
                   <Textarea
-                    style={{ flex: 1 }}
                     placeholder="Ex: Quero ver a receita por convênio em gráfico de pizza, os 5 médicos com mais atendimentos e o ticket médio."
                     value={draft}
                     onChange={(e) => { const val = e.currentTarget.value; setCustomPromptDraft((p) => ({ ...p, [panelId]: val })); }}
@@ -2482,11 +2481,12 @@ export function BIGestao() {
                   />
                   <Tooltip label="Gerar (Ctrl+Enter)">
                     <ActionIcon
+                      aria-label="Gerar widgets com IA"
+                      className="bi-ai-panel__send"
                       size="xl"
                       variant="gradient"
                       gradient={{ from: '#0A2568', to: '#0f766e', deg: 135 }}
                       radius="md"
-                      style={{ alignSelf: 'stretch', height: 'auto' }}
                       loading={ps.loading}
                       disabled={!draft.trim()}
                       onClick={() => handleGenerateWidgets(panelId, panelLabel, draft)}
@@ -3278,10 +3278,6 @@ export function BIGestao() {
     </>
   );
 }
-
-
-
-
 
 
 

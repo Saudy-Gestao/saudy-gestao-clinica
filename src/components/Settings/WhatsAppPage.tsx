@@ -30,7 +30,7 @@ export function WhatsAppPage() {
     <Box bg="var(--ui-background)" style={{ minHeight: '100vh' }}>
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=comunicacao') }} />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
-        <Box className="whatsapp-page-hero">
+        <Box className="whatsapp-page-hero ui-page-intro">
           <Text className="whatsapp-page-eyebrow">COMUNICAÇÃO</Text>
           <Text className="whatsapp-page-title" fw={700} size="2xl">WhatsApp</Text>
           <Text className="whatsapp-page-subtitle" size="sm">Mensagens, templates e configuração do canal.</Text>

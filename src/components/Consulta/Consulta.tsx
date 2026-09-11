@@ -329,7 +329,7 @@ export function Consulta() {
       <Header back={{ label: 'Voltar', onClick: () => navigate(-1) }} />
 
       <Box className="consulta-container" maw={1500} mx="auto">
-        <Box className="consulta-hero">
+        <Box className="consulta-hero ui-page-intro">
           <Box>
             <Text className="consulta-eyebrow">OPERAÇÃO CLÍNICA</Text>
             <Text component="h1" className="consulta-title">Fila de consultas</Text>

@@ -404,7 +404,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
       {!embedded && <Header back={{ label: 'Voltar', onClick: () => navigate('/cadastro-sala') }} />}
       <Box p={embedded ? 0 : isMobile ? 'sm' : 'xl'} maw={embedded ? 'none' : 1500} mx={embedded ? 0 : 'auto'} w="100%">
         {!embedded && (
-          <Box className="mapa-salas-hero">
+          <Box className="mapa-salas-hero ui-page-intro">
             <Text className="mapa-salas-eyebrow">CADASTROS CLÍNICOS</Text>
             <Group gap="xs" align="center">
               <Text className="mapa-salas-title" fw={700} size="2xl">Mapa de salas</Text>

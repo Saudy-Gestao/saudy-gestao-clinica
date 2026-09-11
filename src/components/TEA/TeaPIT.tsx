@@ -456,7 +456,7 @@ export function TeaPIT() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
       <Box className="tea-pit-content" p={isMobile ? 'sm' : 'xl'} maw={1400} mx="auto" w="100%">
-        <Box className="tea-pit-hero">
+        <Box className="tea-pit-hero ui-page-intro">
           <Text className="tea-pit-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-pit-title" fw={700} size="2xl">PIT de Terapias</Text>
           <Text className="tea-pit-subtitle" size="sm">Plano integrado de terapias por paciente</Text>

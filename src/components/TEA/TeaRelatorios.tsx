@@ -134,7 +134,7 @@ export function TeaRelatorios() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-relatorios-shell">
-        <Box className="tea-relatorios-hero">
+        <Box className="tea-relatorios-hero ui-page-intro">
           <Text className="tea-relatorios-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-relatorios-title" fw={700} size="2xl">Relatórios</Text>
           <Text className="tea-relatorios-subtitle" size="sm">Consolidado clínico por paciente de Terapias</Text>

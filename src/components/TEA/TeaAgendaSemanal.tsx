@@ -277,7 +277,8 @@ export function TeaAgendaSemanal() {
   const showWeeklyCardDetails = getScheduleCellWidth() >= AGENDA_CARD_DENSITY.summaryMinWidth;
   const weekTotal = filtered.filter((item) => item.date >= weekStart.format('YYYY-MM-DD') && item.date <= weekStart.add(4, 'day').format('YYYY-MM-DD')).length;
   const activeAppointmentsCount = filtered.filter((item) => !isCanceledStatus(item.status)).length;
-  const dateLabel = dayjs(selectedDate).locale('pt-br').format('dddd, DD [de] MMMM [de] YYYY');
+  const dateRangeLabel = `${weekStart.format('DD/MM/YYYY')} – ${weekStart.add(4, 'day').format('DD/MM/YYYY')}`;
+  const dateRangeAccessibleLabel = `Período exibido: ${weekStart.format('DD/MM/YYYY')} até ${weekStart.add(4, 'day').format('DD/MM/YYYY')}`;
 
   useEffect(() => { dayjs.locale('pt-br'); }, []);
   useEffect(() => {
@@ -301,7 +302,7 @@ export function TeaAgendaSemanal() {
     <Box className="tea-agenda-page">
       <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-agenda-shell">
-        <Box className="tea-agenda-hero">
+        <Box className="tea-agenda-hero ui-page-intro">
           <Text className="tea-agenda-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-agenda-title" fw={700} size="2xl">Agenda semanal de Terapias</Text>
           <Text className="tea-agenda-subtitle" size="sm">Acompanhe os atendimentos por paciente, terapeuta e sala</Text>
@@ -324,60 +325,62 @@ export function TeaAgendaSemanal() {
               <MultiSelect label="Paciente" placeholder="Todos os pacientes" data={options.patients} value={patientFilter} onChange={setPatientFilter} searchable clearable />
             </Box>
 
-            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+            <Box className="tea-agenda-controls-row">
               <Box className="tea-agenda-toolbar">
-                <Group gap="xs" wrap="wrap">
-                  {mode === 'day' ? (
-                    <>
+                {mode === 'day' ? (
+                  <Box className="tea-agenda-day-toolbar">
+                    <Group gap="xs" wrap="nowrap" className="tea-agenda-day-actions">
                       <Button size="xs" variant="default" onClick={() => moveDay(-1)} leftSection={<ChevronLeft size={14} />}>Dia anterior</Button>
                       <Button size="xs" variant="light" onClick={setToday}>Hoje</Button>
                       <Button size="xs" variant="default" onClick={() => moveDay(1)} rightSection={<ChevronRight size={14} />}>Próximo dia</Button>
-                      <DateInput
-                        className="tea-agenda-day-picker"
-                        label="Selecionar data"
-                        value={isoDateToLocalDate(selectedDate)}
-                        onChange={(date) => {
-                          if (!date) return;
-                          const next = dayjs(date);
-                          setSelectedDate(next.format('YYYY-MM-DD'));
-                          setWeekStart(toWeekStartMonday(next));
-                        }}
-                      />
-                      <Divider orientation="vertical" my={4} />
-                      <Group gap={2} wrap="nowrap">
-                        {WEEKDAY_LABELS.map((label, index) => {
-                          const day = weekStart.add(index, 'day');
-                          const selected = selectedDate === day.format('YYYY-MM-DD');
-                          return (
-                            <Button key={label} size="xs" variant={selected ? 'filled' : 'subtle'} px={10} onClick={() => setSelectedDate(day.format('YYYY-MM-DD'))} aria-label={`Selecionar ${label}`}>
-                              {label}
-                            </Button>
-                          );
-                        })}
-                      </Group>
-                    </>
-                  ) : (
-                    <>
-                      <Button size="xs" variant="default" onClick={() => setWeekStart((prev) => prev.subtract(7, 'day'))} leftSection={<ChevronLeft size={14} />}>Semana anterior</Button>
-                      <Button size="xs" variant="light" onClick={setToday}>Hoje</Button>
-                      <Button size="xs" variant="default" onClick={() => setWeekStart((prev) => prev.add(7, 'day'))} rightSection={<ChevronRight size={14} />}>Próxima semana</Button>
-                    </>
-                  )}
-                </Group>
+                    </Group>
+                    <DateInput
+                      className="tea-agenda-day-picker"
+                      label="Selecionar data"
+                      value={isoDateToLocalDate(selectedDate)}
+                      onChange={(date) => {
+                        if (!date) return;
+                        const next = dayjs(date);
+                        setSelectedDate(next.format('YYYY-MM-DD'));
+                        setWeekStart(toWeekStartMonday(next));
+                      }}
+                    />
+                    <Divider className="tea-agenda-day-divider" />
+                    <Group gap={2} wrap="nowrap" className="tea-agenda-weekday-tabs">
+                      {WEEKDAY_LABELS.map((label, index) => {
+                        const day = weekStart.add(index, 'day');
+                        const selected = selectedDate === day.format('YYYY-MM-DD');
+                        return (
+                          <Button key={label} size="xs" variant={selected ? 'filled' : 'subtle'} px={10} onClick={() => setSelectedDate(day.format('YYYY-MM-DD'))} aria-label={`Selecionar ${label}`}>
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </Group>
+                  </Box>
+                ) : (
+                  <Group gap="xs" wrap="wrap">
+                    <Button size="xs" variant="default" onClick={() => setWeekStart((prev) => prev.subtract(7, 'day'))} leftSection={<ChevronLeft size={14} />}>Semana anterior</Button>
+                    <Button size="xs" variant="light" onClick={setToday}>Hoje</Button>
+                    <Button size="xs" variant="default" onClick={() => setWeekStart((prev) => prev.add(7, 'day'))} rightSection={<ChevronRight size={14} />}>Próxima semana</Button>
+                  </Group>
+                )}
               </Box>
-              <Group gap="xs" align="center" wrap="wrap">
+              <Box className={`tea-agenda-search-panel${mode === 'week' ? ' tea-agenda-search-panel--with-range' : ''}`}>
                 <TextInput
                   placeholder="Buscar por paciente, sala, terapeuta ou horário"
                   value={search}
                   onChange={(event) => setSearch(event.currentTarget.value)}
-                  rightSection={<Search size={17} />}
+                  leftSection={<Search size={17} />}
                   className="tea-agenda-search"
                 />
-                <Text size="sm" c="dimmed">
-                  {mode === 'day' ? dateLabel : `${weekStart.format('DD/MM/YYYY')} até ${weekStart.add(4, 'day').format('DD/MM/YYYY')}`}
-                </Text>
-              </Group>
-            </Group>
+                {mode === 'week' && (
+                  <Box className="tea-agenda-date-summary" aria-label={dateRangeAccessibleLabel}>
+                    <Text size="sm" c="dimmed" className="tea-agenda-date-range">{dateRangeLabel}</Text>
+                  </Box>
+                )}
+              </Box>
+            </Box>
 
             <Box className="tea-agenda-stats">
               <Paper withBorder radius="md" p="sm" className="tea-agenda-stat-card">

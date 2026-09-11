@@ -326,7 +326,7 @@ export function AutorizacaoConvenio() {
       </Modal>
 
       <Box className="autorizacao-convenio-content" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto" w="100%">
-        <Group className="autorizacao-convenio-hero" justify="space-between" align="flex-end" mb="xl" wrap="wrap">
+      <Group className="autorizacao-convenio-hero ui-page-intro" justify="space-between" align="flex-end" mb="xl" wrap="wrap">
           <Box>
             <Text className="autorizacao-convenio-eyebrow">OPERAÇÃO CLÍNICA · CONVÊNIOS</Text>
             <Text className="autorizacao-convenio-title" fw={700} size="2xl">Autorização de Convênio</Text>

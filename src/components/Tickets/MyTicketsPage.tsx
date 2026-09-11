@@ -146,7 +146,7 @@ export function MyTicketsPage() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=gestao-e-apoio') }} />
       <Box p={isMobile ? 'sm' : 'md'} maw={isMobile ? '100%' : 1400} mx="auto">
         <Stack gap="xl">
-          <Box className="my-tickets-hero">
+          <Box className="my-tickets-hero ui-page-intro">
             <Text className="my-tickets-eyebrow">GESTÃO E APOIO</Text>
             <Text className="my-tickets-title" fw={700} size="2xl">Meus Chamados</Text>
             <Text className="my-tickets-subtitle" size="sm">Acompanhe os tickets que você abriu e os status da análise interna.</Text>

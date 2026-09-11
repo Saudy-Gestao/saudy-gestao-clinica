@@ -669,7 +669,7 @@ export function AtendimentoClinico() {
     <Box className="atendimento-page">
       <Header back={{ label: 'Voltar', onClick: () => navigate('/consulta') }} />
       <Box className="atendimento-container">
-        <Box className="atendimento-hero">
+        <Box className="atendimento-hero ui-page-intro">
           <Box className="atendimento-hero-main">
             <Box className="atendimento-hero-icon"><Stethoscope size={23} /></Box>
             <Box>

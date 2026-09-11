@@ -4454,7 +4454,7 @@ export function TeaPreReserva() {
       </Modal>
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-pre-reserva-shell">
-        <Box className="tea-pre-reserva-hero">
+        <Box className="tea-pre-reserva-hero ui-page-intro">
           <Text className="tea-pre-reserva-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-pre-reserva-title" fw={700} size="2xl">Pré-reserva de Terapias</Text>
           <Text className="tea-pre-reserva-subtitle" size="sm">Pendências de marcação com base no PIT</Text>

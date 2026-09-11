@@ -325,7 +325,7 @@ export function TeaDesmarcacaoLote() {
       </Modal>
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-desmarcacao-shell">
-        <Box className="tea-desmarcacao-hero">
+        <Box className="tea-desmarcacao-hero ui-page-intro">
           <Text className="tea-desmarcacao-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-desmarcacao-title" fw={700} size="2xl">Desmarcação em lote</Text>
           <Text className="tea-desmarcacao-subtitle" size="sm">Cancelar terapias recorrentes de um paciente de Terapias</Text>

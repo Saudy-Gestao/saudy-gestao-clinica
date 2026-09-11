@@ -374,7 +374,7 @@ export function CadastroProcedimento() {
         <Stack gap="md">
           {activeTab === 'hub' ? (
             <>
-              <Box className="cadastro-procedimento-hub-hero">
+              <Box className="cadastro-procedimento-hub-hero ui-page-intro">
                 <Text className="cadastro-procedimento-hub-eyebrow">CADASTROS CLÍNICOS</Text>
                 <Text className="cadastro-procedimento-hub-title" fw={700} size="2xl">Cadastro de Procedimentos</Text>
                 <Text className="cadastro-procedimento-hub-subtitle" size="sm">Procedimentos, modalidades, preços e convênios aceitos.</Text>

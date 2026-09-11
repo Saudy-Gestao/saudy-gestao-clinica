@@ -434,7 +434,7 @@ export function TeaEvolucao() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-evolucao-shell">
-        <Box className="tea-evolucao-hero">
+        <Box className="tea-evolucao-hero ui-page-intro">
           <Text className="tea-evolucao-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-evolucao-title" fw={700} size="2xl">Evolução</Text>
           <Text className="tea-evolucao-subtitle" size="sm">Registro por sessão do paciente de Terapias</Text>

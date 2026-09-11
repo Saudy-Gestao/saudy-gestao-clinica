@@ -159,7 +159,7 @@ export function TeaEvolucaoTemplates() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/tea') }} />
 
       <Box p={isMobile ? 'sm' : 'xl'} w="100%" className="tea-evotemplates-shell">
-        <Box className="tea-evotemplates-hero">
+        <Box className="tea-evotemplates-hero ui-page-intro">
           <Text className="tea-evotemplates-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-evotemplates-title" fw={700} size="2xl">Templates da Evolução de Terapias</Text>
           <Text className="tea-evotemplates-subtitle" size="sm">Padronize campos por procedimento</Text>

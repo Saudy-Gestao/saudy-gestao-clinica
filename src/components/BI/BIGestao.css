@@ -1,28 +1,165 @@
+.bi-page-content {
+  padding-top: clamp(1rem, 2vw, 1.5rem) !important;
+  padding-inline: clamp(0.75rem, 1.5vw, 1.5rem) !important;
+  padding-bottom: 2rem !important;
+}
+
 .bi-hero {
   overflow: hidden;
+  padding: clamp(1rem, 1.8vw, 1.35rem) !important;
+  margin-bottom: 1rem !important;
   border-color: color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border)) !important;
-  background: linear-gradient(135deg, #f7fbff 0%, #eef7f4 52%, #fff7ed 100%);
-  --bi-hero-fg: #1f2937;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--ui-primary) 8%, var(--ui-surface)), var(--ui-surface) 62%, color-mix(in srgb, #0f766e 5%, var(--ui-surface))) !important;
+  --bi-hero-fg: var(--ui-foreground);
 }
 
 [data-color-scheme='dark'] .bi-hero {
-  background: linear-gradient(135deg, rgba(10, 37, 104, 0.55), rgba(15, 118, 110, 0.2));
-  --bi-hero-fg: #fff;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--ui-primary) 12%, var(--ui-surface)), var(--ui-surface) 64%, color-mix(in srgb, #0f766e 7%, var(--ui-surface))) !important;
+}
+
+.bi-hero-header {
+  align-items: center !important;
+  gap: 1rem !important;
 }
 
 .bi-hero-title {
   color: var(--bi-hero-fg) !important;
+  font-size: clamp(1.45rem, 2.1vw, 1.9rem) !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.bi-hero-action {
+  flex-shrink: 0;
+}
+
+.bi-hero-filters {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end !important;
+  width: 100%;
+  gap: 0.75rem !important;
+}
+
+.bi-hero-filters > *,
+.bi-hero-filter {
+  min-width: 0 !important;
+  width: 100% !important;
 }
 
 .bi-hero-filters .ui-field-label {
   color: var(--bi-hero-fg) !important;
 }
 
+.bi-tab-nav {
+  margin-bottom: 1rem !important;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.bi-tab-nav-list {
+  width: max-content;
+  min-width: 100%;
+  padding: 0.3rem !important;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--ui-surface) 92%, var(--ui-primary));
+}
+
+.bi-ai-section {
+  margin-top: 0 !important;
+}
+
 .bi-ai-panel {
+  display: grid;
+  gap: 0.65rem;
+  padding: clamp(0.9rem, 1.5vw, 1.15rem) !important;
   border-color: color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border)) !important;
+  background: color-mix(in srgb, var(--ui-primary) 4%, var(--ui-surface)) !important;
+}
+
+.bi-ai-panel__header,
+.bi-ai-panel__description {
+  margin-bottom: 0 !important;
+}
+
+.bi-ai-panel__header {
+  gap: 0.65rem !important;
+}
+
+.bi-ai-panel__composer {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center !important;
+  width: 100%;
+  gap: 0.65rem !important;
+}
+
+.bi-ai-panel__composer > *,
+.bi-ai-panel__composer .ui-field {
+  min-width: 0;
+}
+
+.bi-ai-panel__composer .ui-field,
+.bi-ai-panel__composer .ui-textarea {
+  width: 100%;
+}
+
+.bi-ai-panel__composer .ui-textarea {
+  min-height: 3.25rem;
+}
+
+.bi-ai-panel__send {
+  width: 3rem !important;
+  min-width: 3rem !important;
+  height: 3rem !important;
+  min-height: 3rem !important;
+  align-self: center !important;
+}
+
+.bi-widget-grid,
+.bi-widget-grid__row {
+  min-width: 0;
 }
 
 .bi-summary-panel {
   border-color: color-mix(in srgb, var(--ui-primary) 20%, var(--ui-border)) !important;
   background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-surface)) !important;
+}
+
+@media (max-width: 1050px) {
+  .bi-hero-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .bi-hero-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bi-hero-header {
+    align-items: flex-start !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .bi-hero-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .bi-ai-panel__composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .bi-widget-grid__row {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  .bi-widget-grid__row > * {
+    width: 100%;
+  }
 }

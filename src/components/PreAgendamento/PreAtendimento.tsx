@@ -1384,7 +1384,7 @@ export function PreAtendimento() {
         back={{ label: 'Voltar', onClick: () => navigate(-1) }}
       />
       <Box className="pre-atendimento-content" p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="pre-atendimento-hero" mb={isMobile ? 'md' : 'xl'}>
+        <Box className="pre-atendimento-hero ui-page-intro" mb={isMobile ? 'md' : 'xl'}>
           <Text className="pre-atendimento-eyebrow">OPERAÇÃO CLÍNICA · RECEPÇÃO</Text>
           <Text className="pre-atendimento-title" fw={700} size={isMobile ? 'xl' : '2xl'}>
             Autorização e Recepção

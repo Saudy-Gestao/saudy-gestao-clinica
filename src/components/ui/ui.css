@@ -285,3 +285,42 @@ select.ui-input option { padding: .5rem .65rem; background: var(--ui-background)
 .ui-calendar-footer button { border: 0; background: transparent; color: var(--ui-primary); font: inherit; font-size: .82rem; font-weight: 650; cursor: pointer; padding: .3rem .4rem; }
 .ui-calendar-footer button:hover:not(:disabled) { text-decoration: underline; }
 .ui-calendar-footer button:disabled { color: var(--ui-muted); cursor: not-allowed; text-decoration: none; }
+
+/* Shared page intro: the global header already identifies the module. Keep
+   the local intro focused on the current screen and its immediate action. */
+.ui-page-intro {
+  min-height: 0 !important;
+  padding: .4rem 0 1rem !important;
+}
+
+.ui-page-intro [class*="eyebrow"] {
+  display: none !important;
+}
+
+.ui-page-intro [class*="title"] {
+  font-size: clamp(1.45rem, 2.15vw, 1.9rem) !important;
+  line-height: 1.15 !important;
+  letter-spacing: -.025em !important;
+}
+
+.ui-page-intro [class*="subtitle"],
+.ui-page-intro [class*="description"] {
+  margin-top: .25rem !important;
+  font-size: .9rem !important;
+  line-height: 1.4 !important;
+}
+
+@media (max-width: 640px) {
+  .ui-page-intro {
+    padding-block: .25rem .75rem !important;
+  }
+
+  .ui-page-intro [class*="title"] {
+    font-size: 1.5rem !important;
+  }
+
+  .ui-page-intro [class*="subtitle"],
+  .ui-page-intro [class*="description"] {
+    font-size: .875rem !important;
+  }
+}

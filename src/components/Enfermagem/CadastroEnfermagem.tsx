@@ -384,7 +384,7 @@ export function CadastroEnfermagem() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
 
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="cadastro-enfermagem-hero">
+        <Box className="cadastro-enfermagem-hero ui-page-intro">
           <Text className="cadastro-enfermagem-eyebrow">CADASTROS CLÍNICOS</Text>
           <Text className="cadastro-enfermagem-title" fw={700} size="2xl">Cadastro de Enfermagem</Text>
           <Text className="cadastro-enfermagem-subtitle" size="sm">Triagens e preparos por procedimento para exames.</Text>

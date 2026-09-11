@@ -349,7 +349,7 @@ export function CadastroAnamnese() {
     <Box bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
       <Header back={{ label: 'Voltar', onClick: () => navigate('/dashboard?secao=cadastros-clinicos') }} />
       <Box p={isMobile ? 'sm' : isTablet ? 'md' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="cadastro-anamnese-hero">
+        <Box className="cadastro-anamnese-hero ui-page-intro">
           <Text className="cadastro-anamnese-eyebrow">CADASTROS CLÍNICOS</Text>
           <Text className="cadastro-anamnese-title" fw={700} size="2xl">Cadastro de Anamnese</Text>
           <Text className="cadastro-anamnese-subtitle" size="sm">Perguntas estruturadas por procedimento</Text>

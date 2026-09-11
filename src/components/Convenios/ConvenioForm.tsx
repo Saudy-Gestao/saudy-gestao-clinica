@@ -739,7 +739,7 @@ export function ConvenioForm() {
       <Header back={{ label: 'Voltar', onClick: () => navigate('/cadastro-convenio') }} />
 
       <Box p={isMobile ? 'sm' : 'xl'} maw={isMobile ? '100%' : 1400} mx="auto">
-        <Box className="convenio-form-hero">
+        <Box className="convenio-form-hero ui-page-intro">
           <Text className="convenio-form-eyebrow">CADASTROS CLÍNICOS</Text>
           <Text className="convenio-form-title" fw={700} size="2xl">
             {isNew ? 'Novo convênio' : (form.name || 'Convênio')}
