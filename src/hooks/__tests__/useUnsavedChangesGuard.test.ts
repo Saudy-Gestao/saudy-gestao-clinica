@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
-import { renderHook } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { UnsavedChangesGuard, useUnsavedChangesGuard } from '../useUnsavedChangesGuard';
 
@@ -8,16 +8,6 @@ const wrapper = ({ children, path = '/cadastro-cliente' }: { children: React.Rea
   createElement(MemoryRouter, { initialEntries: [path] }, children);
 
 describe('useUnsavedChangesGuard', () => {
-  let confirmSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-  });
-
-  afterEach(() => {
-    confirmSpy.mockRestore();
-  });
-
   it('renders without crashing on a protected route', () => {
     const { unmount } = renderHook(() => useUnsavedChangesGuard(), {
       wrapper: (props) => wrapper({ ...props, path: '/cadastro-cliente' }),
@@ -34,13 +24,36 @@ describe('useUnsavedChangesGuard', () => {
     const input = document.createElement('input');
     input.name = 'nome';
     document.body.appendChild(input);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    act(() => input.dispatchEvent(new Event('input', { bubbles: true })));
 
     const beforeUnloadEvent = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
     window.dispatchEvent(beforeUnloadEvent);
     expect(beforeUnloadEvent.defaultPrevented).toBe(true);
 
-    window.history.pushState({ idx: 1 }, '', '/cadastro-cliente');
+    document.body.removeChild(input);
+  });
+
+  it('opens the Saudy prompt and resolves internal navigation from its actions', () => {
+    window.history.pushState({}, '', '/cadastro-cliente');
+    render(
+      createElement(MemoryRouter, { initialEntries: ['/cadastro-cliente'] }, createElement(UnsavedChangesGuard)),
+    );
+
+    const input = document.createElement('input');
+    input.name = 'nome';
+    document.body.appendChild(input);
+    act(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+    act(() => window.history.pushState({ idx: 1 }, '', '/dashboard'));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Este formulário tem dados pendentes')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar editando' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    act(() => window.history.pushState({ idx: 2 }, '', '/dashboard-2'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sair sem salvar' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     document.body.removeChild(input);
   });
@@ -87,9 +100,9 @@ describe('useUnsavedChangesGuard', () => {
     document.body.removeChild(input);
   });
 
-  it('UnsavedChangesGuard component renders null', () => {
+  it('UnsavedChangesGuard renders the prompt host without crashing', () => {
     const { result, unmount } = renderHook(() => UnsavedChangesGuard(), { wrapper });
-    expect(result.current).toBeNull();
+    expect(result.current).toBeTruthy();
     unmount();
   });
 });

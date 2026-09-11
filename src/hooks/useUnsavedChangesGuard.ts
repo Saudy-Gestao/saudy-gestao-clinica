@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 
-const UNSAVED_MESSAGE = 'Existem dados preenchidos que ainda não foram salvos. Deseja sair desta tela mesmo assim?';
+const UNSAVED_MESSAGE = 'Há alterações não salvas nesta tela.';
 
 const isProtectedRoute = (pathname: string) => (
   pathname === '/cadastro'
@@ -30,15 +31,25 @@ const isIgnoredField = (target: EventTarget | null) => {
 
 export function useUnsavedChangesGuard() {
   const { pathname } = useLocation();
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const dirtyRef = useRef(false);
   const pathnameRef = useRef(pathname);
   const historyIndexRef = useRef<number | null>(typeof window !== 'undefined' ? window.history.state?.idx ?? null : null);
+  const currentHrefRef = useRef(typeof window !== 'undefined' ? window.location.href : '');
+  const currentStateRef = useRef(typeof window !== 'undefined' ? window.history.state : null);
+  const pendingNavigationRef = useRef<PendingNavigation | null>(null);
+  const restoringHistoryRef = useRef(false);
+  const resolutionRef = useRef<NavigationResolution | null>(null);
 
   useEffect(() => {
     if (pathnameRef.current !== pathname) {
       pathnameRef.current = pathname;
-      dirtyRef.current = false;
+      if (!pendingNavigationRef.current && !restoringHistoryRef.current) {
+        dirtyRef.current = false;
+      }
       historyIndexRef.current = window.history.state?.idx ?? null;
+      currentHrefRef.current = window.location.href;
+      currentStateRef.current = window.history.state;
     }
   }, [pathname]);
 
@@ -57,56 +68,145 @@ export function useUnsavedChangesGuard() {
 
     const originalPushState = window.history.pushState.bind(window.history);
     const originalReplaceState = window.history.replaceState.bind(window.history);
-    let restoringHistory = false;
+    const originalGo = window.history.go.bind(window.history);
 
-    const confirmNavigation = () => {
-      if (!dirtyRef.current) return true;
-      const shouldLeave = window.confirm(UNSAVED_MESSAGE);
-      if (shouldLeave) dirtyRef.current = false;
-      return shouldLeave;
+    const clearPendingNavigation = () => {
+      pendingNavigationRef.current = null;
+      setPendingNavigation(null);
+    };
+
+    const requestNavigationConfirmation = (navigation: PendingNavigation) => {
+      if (pendingNavigationRef.current) return false;
+      pendingNavigationRef.current = navigation;
+      setPendingNavigation(navigation);
+      return false;
+    };
+
+    const acceptPendingNavigation = () => {
+      const navigation = pendingNavigationRef.current;
+      if (!navigation) return;
+
+      dirtyRef.current = false;
+      clearPendingNavigation();
+
+      if (navigation.kind === 'history') {
+        if (navigation.method === 'pushState') {
+          originalPushState(navigation.state, navigation.unused, navigation.url);
+        } else {
+          originalReplaceState(navigation.state, navigation.unused, navigation.url);
+        }
+        historyIndexRef.current = navigation.state && typeof navigation.state === 'object' && 'idx' in navigation.state
+          ? Number((navigation.state as { idx?: unknown }).idx)
+          : historyIndexRef.current;
+        currentHrefRef.current = window.location.href;
+        currentStateRef.current = window.history.state;
+        return;
+      }
+
+      if (navigation.targetIndex !== null && navigation.currentIndex !== null) {
+        originalGo(navigation.targetIndex - navigation.currentIndex);
+        return;
+      }
+
+      // Browser history entries created outside the router may not have an idx.
+      // Recreate the accepted transition and notify the router explicitly.
+      originalPushState(navigation.state, '', navigation.targetHref);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: navigation.state }));
+    };
+
+    const cancelPendingNavigation = () => {
+      const navigation = pendingNavigationRef.current;
+      if (!navigation) return;
+
+      if (navigation.kind === 'history') {
+        clearPendingNavigation();
+        return;
+      }
+
+      // The browser already moved to the requested entry before firing
+      // popstate. Move back while the prompt is open so the form stays visible.
+      if (navigation.targetIndex !== null && navigation.currentIndex !== null) {
+        restoringHistoryRef.current = true;
+        originalGo(navigation.currentIndex - navigation.targetIndex);
+        return;
+      }
+
+      restoringHistoryRef.current = true;
+      originalReplaceState(currentStateRef.current, '', navigation.currentHref);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: currentStateRef.current }));
+    };
+
+    resolutionRef.current = {
+      accept: acceptPendingNavigation,
+      cancel: cancelPendingNavigation,
     };
 
     const guardedPushState = (state: unknown, unused: string, url?: string | URL | null) => {
-      if (!confirmNavigation()) return;
+      if (pendingNavigationRef.current) return;
+      if (dirtyRef.current) {
+        requestNavigationConfirmation({ kind: 'history', method: 'pushState', state, unused, url });
+        return;
+      }
       originalPushState(state, unused, url);
       historyIndexRef.current = state && typeof state === 'object' && 'idx' in state
         ? Number((state as { idx?: unknown }).idx)
         : historyIndexRef.current;
+      currentHrefRef.current = window.location.href;
+      currentStateRef.current = window.history.state;
     };
 
     const guardedReplaceState = (state: unknown, unused: string, url?: string | URL | null) => {
-      if (!confirmNavigation()) return;
+      if (pendingNavigationRef.current) return;
+      if (dirtyRef.current) {
+        requestNavigationConfirmation({ kind: 'history', method: 'replaceState', state, unused, url });
+        return;
+      }
       originalReplaceState(state, unused, url);
       historyIndexRef.current = state && typeof state === 'object' && 'idx' in state
         ? Number((state as { idx?: unknown }).idx)
         : historyIndexRef.current;
+      currentHrefRef.current = window.location.href;
+      currentStateRef.current = window.history.state;
     };
 
     const handlePopState = (event: PopStateEvent) => {
-      if (restoringHistory) {
-        restoringHistory = false;
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false;
         historyIndexRef.current = event.state?.idx ?? historyIndexRef.current;
+        currentHrefRef.current = window.location.href;
+        currentStateRef.current = event.state;
+        clearPendingNavigation();
         return;
       }
+      if (pendingNavigationRef.current) return;
       if (!dirtyRef.current) {
         historyIndexRef.current = event.state?.idx ?? historyIndexRef.current;
-        return;
-      }
-
-      if (window.confirm(UNSAVED_MESSAGE)) {
-        dirtyRef.current = false;
-        historyIndexRef.current = event.state?.idx ?? historyIndexRef.current;
+        currentHrefRef.current = window.location.href;
+        currentStateRef.current = event.state;
         return;
       }
 
       const nextIndex = typeof event.state?.idx === 'number' ? event.state.idx : null;
       const currentIndex = historyIndexRef.current;
+      const navigation: PendingNavigation = {
+        kind: 'popstate',
+        state: event.state,
+        targetIndex: nextIndex,
+        currentIndex,
+        targetHref: window.location.href,
+        currentHref: currentHrefRef.current,
+        currentState: currentStateRef.current,
+      };
+      requestNavigationConfirmation(navigation);
+
       if (nextIndex !== null && currentIndex !== null && nextIndex !== currentIndex) {
-        restoringHistory = true;
-        window.history.go(nextIndex < currentIndex ? 1 : -1);
+        restoringHistoryRef.current = true;
+        originalGo(currentIndex - nextIndex);
       } else {
-        restoringHistory = true;
-        originalPushState(window.history.state, '', window.location.href);
+        // Keep the current form mounted when the entry has no router index.
+        restoringHistoryRef.current = true;
+        originalReplaceState(currentStateRef.current, '', currentHrefRef.current);
+        window.dispatchEvent(new PopStateEvent('popstate', { state: currentStateRef.current }));
       }
     };
 
@@ -124,11 +224,49 @@ export function useUnsavedChangesGuard() {
       window.removeEventListener('popstate', handlePopState);
       window.history.pushState = originalPushState;
       window.history.replaceState = originalReplaceState;
+      resolutionRef.current = null;
+      pendingNavigationRef.current = null;
     };
   }, []);
+
+  return {
+    pendingNavigation,
+    acceptPendingNavigation: () => resolutionRef.current?.accept(),
+    cancelPendingNavigation: () => resolutionRef.current?.cancel(),
+  };
 }
 
 export function UnsavedChangesGuard() {
-  useUnsavedChangesGuard();
-  return null;
+  const { pendingNavigation, acceptPendingNavigation, cancelPendingNavigation } = useUnsavedChangesGuard();
+
+  return createElement(UnsavedChangesDialog, {
+    opened: Boolean(pendingNavigation),
+    onStay: cancelPendingNavigation,
+    onLeave: acceptPendingNavigation,
+  });
 }
+
+type HistoryNavigation = {
+  kind: 'history';
+  method: 'pushState' | 'replaceState';
+  state: unknown;
+  unused: string;
+  url?: string | URL | null;
+};
+
+type PopstateNavigation = {
+  kind: 'popstate';
+  state: unknown;
+  targetIndex: number | null;
+  currentIndex: number | null;
+  targetHref: string;
+  currentHref: string;
+  currentState: unknown;
+};
+
+type PendingNavigation = HistoryNavigation | PopstateNavigation;
+
+type NavigationResolution = {
+  accept: () => void;
+  cancel: () => void;
+};
