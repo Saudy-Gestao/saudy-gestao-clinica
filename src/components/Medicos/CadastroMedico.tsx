@@ -227,6 +227,16 @@ const INITIAL_DOCTOR_FORM: DoctorForm = {
   procedureDurations: [],
 };
 
+const createInitialDoctorForm = (): DoctorForm => ({
+  ...INITIAL_DOCTOR_FORM,
+  specialties: [],
+  workingSchedules: [],
+  especialidadeGroups: [],
+  branchIds: [],
+  appointmentDurations: [],
+  procedureDurations: [],
+});
+
 const TELECONSULTATION_SPECIALTY_FLAG = '__TELECONSULTA__';
 
 const getWorkingSchedulesFromRaw = (raw: ApiRecord): WorkingSchedule[] => {
@@ -313,7 +323,7 @@ export function CadastroMedico() {
     reader.readAsDataURL(file);
   };
 
-  const [form, setForm] = useState<DoctorForm>({ ...INITIAL_DOCTOR_FORM });
+  const [form, setForm] = useState<DoctorForm>(createInitialDoctorForm);
   const [activeTab, setActiveTab] = useState<'hub' | 'cadastro' | 'lista'>('hub');
   const [doctors, setDoctors] = useState<DoctorListItem[]>([]);
   const [doctorsLoading, setDoctorsLoading] = useState(false);
@@ -336,6 +346,9 @@ export function CadastroMedico() {
   const [zipLoading, setZipLoading] = useState(false);
   const [lastZipLookup, setLastZipLookup] = useState('');
   const lastValidatedCpfRef = useRef<string>('');
+  useEffect(() => {
+    if (!form.cpf) lastValidatedCpfRef.current = '';
+  }, [form.cpf]);
   const doctorsQuery = useDoctorsAdminQuery();
   const especialidadesQuery = useEspecialidadesAdminQuery();
   const modalidadesQuery = useModalidadesAdminQuery();
@@ -1004,7 +1017,7 @@ export function CadastroMedico() {
       if (editingDoctorId) {
         await doctorService.updateDoctor(editingDoctorId, payload);
         setEditingDoctorId(null);
-        setForm({ ...INITIAL_DOCTOR_FORM });
+        setForm(createInitialDoctorForm());
         setFieldErrors({});
         setActiveTab('lista');
         showNotification({ title: 'Profissional atualizado', message: 'Dados atualizados com sucesso.', color: 'green' });
@@ -1043,7 +1056,7 @@ export function CadastroMedico() {
   const handleCancel = () => {
     if (editingDoctorId) {
       setEditingDoctorId(null);
-      setForm({ ...INITIAL_DOCTOR_FORM });
+      setForm(createInitialDoctorForm());
       setFieldErrors({});
       setActiveTab('cadastro');
       return;
@@ -1094,11 +1107,28 @@ export function CadastroMedico() {
     setActiveTab('cadastro');
   };
 
-  const handleNewDoctor = () => {
+  const resetProfessionalForm = () => {
     setEditingDoctorId(null);
-    setForm({ ...INITIAL_DOCTOR_FORM });
+    setForm(createInitialDoctorForm());
+    setSelectedDoctor(null);
+    setDetailsOpen(false);
+    setFieldErrors({});
+    setErrorMessage(null);
+    setLastCreatedName(null);
+    setShowSuccessModal(false);
+    setShowErrorModal(false);
+    setGroupModalOpen(false);
+    setEditingGroupIndex(null);
+    setGroupModalidadeError(null);
+    setAvailableProcedureSearch('');
+    setLinkedProcedureSearch('');
+    setSelectedAvailableProcedureIds([]);
+    setSelectedLinkedProcedureIds([]);
+    setLastZipLookup('');
     setActiveTab('cadastro');
   };
+
+  const handleNewDoctor = resetProfessionalForm;
 
   return (
     <Box className="cadastro-medico-hub-page" bg="var(--mantine-color-body)" style={{ minHeight: '100vh' }}>
@@ -1120,7 +1150,7 @@ export function CadastroMedico() {
                   icon: UserPlus,
                   title: 'Cadastrar profissional',
                   desc: 'Registrar profissional com dados profissionais, contatos e turnos de atendimento.',
-                  onClick: () => setActiveTab('cadastro'),
+                  onClick: handleNewDoctor,
                 },
                 {
                   key: 'lista',
@@ -2133,11 +2163,11 @@ export function CadastroMedico() {
 
         <ResultModal
           opened={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
+          onClose={resetProfessionalForm}
           variant="success"
           title="Profissional cadastrado"
           message={lastCreatedName ? `${lastCreatedName} foi cadastrado com sucesso.` : 'Profissional cadastrado com sucesso.'}
-          primary={{ label: 'Cadastrar novo', onClick: () => { setForm({ ...INITIAL_DOCTOR_FORM }); setShowSuccessModal(false); } }}
+          primary={{ label: 'Cadastrar novo', onClick: resetProfessionalForm }}
           secondary={{ label: 'Voltar para Cadastros Clínicos', onClick: () => { setShowSuccessModal(false); navigate('/dashboard?secao=cadastros-clinicos'); } }}
         />
 
