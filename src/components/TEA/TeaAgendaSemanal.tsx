@@ -92,7 +92,7 @@ function AppointmentCard({ item, compact = false, detailLevel = 'minimal', patie
       <Text size="xs" c="dimmed" mb={4}>{item.roomName || 'Sala não vinculada'}</Text>
       <Stack gap={3}>
         <Text size="sm" fw={600}>{item.specialty || 'Terapia não informada'}</Text>
-        <Text size="xs">Terapeuta: {item.doctorName || 'Não informado'}</Text>
+        <Text size="xs">Profissional: {item.doctorName || 'Não informado'}</Text>
         <Text size="xs" c="dimmed">Status: {statusLabel(item.status)}</Text>
       </Stack>
     </Box>
@@ -103,7 +103,7 @@ function AppointmentCard({ item, compact = false, detailLevel = 'minimal', patie
         <Badge size="sm" variant="light" color={statusColor(item.status)}>{item.time}</Badge>
       </Group>
       <Text size="xs" c="dimmed" mb={4}>{item.roomName || 'Sala não vinculada'}</Text>
-      <Text size="xs">Terapeuta: {item.doctorName || 'Não informado'}</Text>
+      <Text size="xs">Profissional: {item.doctorName || 'Não informado'}</Text>
       <Text size="xs" c="dimmed">Status: {statusLabel(item.status)}</Text>
     </Box>
   ) : (
@@ -135,7 +135,7 @@ function AppointmentCard({ item, compact = false, detailLevel = 'minimal', patie
                   {showInitials ? formatCardInitials(item.patientName) : (item.patientName || statusLabel(item.status))}
                 </Text>
                 {!patientOnly && <Text size="xs" c="dimmed" truncate>{item.specialty || 'Terapia não informada'}</Text>}
-                {!patientOnly && detailLevel === 'full' && <Text size="xs" c="dimmed" truncate>{item.doctorName || 'Terapeuta não informado'}</Text>}
+                {!patientOnly && detailLevel === 'full' && <Text size="xs" c="dimmed" truncate>{item.doctorName || 'Profissional não informado'}</Text>}
               </>
             )}
           </Box>
@@ -148,7 +148,7 @@ function AppointmentCard({ item, compact = false, detailLevel = 'minimal', patie
           {item.patientName ? (
             <>
               <Text size="xs" c="dimmed" className="tea-agenda-card__meta" truncate>{item.specialty || 'Terapia não informada'}</Text>
-              <Text size="xs" c="dimmed" className="tea-agenda-card__meta" truncate>{item.doctorName || 'Terapeuta não informado'}</Text>
+              <Text size="xs" c="dimmed" className="tea-agenda-card__meta" truncate>{item.doctorName || 'Profissional não informado'}</Text>
             </>
           ) : (
             <Text size="xs" c="dimmed" className="tea-agenda-card__meta" truncate>Indisponível para atendimento</Text>
@@ -305,7 +305,7 @@ export function TeaAgendaSemanal() {
         <Box className="tea-agenda-hero ui-page-intro">
           <Text className="tea-agenda-eyebrow">OPERAÇÃO CLÍNICA · TERAPIAS</Text>
           <Text className="tea-agenda-title" fw={700} size="2xl">Agenda semanal de Terapias</Text>
-          <Text className="tea-agenda-subtitle" size="sm">Acompanhe os atendimentos por paciente, terapeuta e sala</Text>
+          <Text className="tea-agenda-subtitle" size="sm">Acompanhe os atendimentos por paciente, profissional e sala</Text>
         </Box>
 
         <Paper p={isMobile ? 'sm' : 'md'} withBorder className="tea-agenda-panel">
@@ -320,7 +320,7 @@ export function TeaAgendaSemanal() {
             <Box className="tea-agenda-filters">
               <MultiSelect label="Unidade" placeholder="Todas as unidades" data={options.units} value={unitFilter} onChange={setUnitFilter} searchable clearable />
               <MultiSelect label="Especialidade" placeholder="Todas as especialidades" data={options.specialties} value={specialtyFilter} onChange={setSpecialtyFilter} searchable clearable />
-              <MultiSelect label="Terapeuta" placeholder="Todos os terapeutas" data={options.doctors} value={doctorFilter} onChange={setDoctorFilter} searchable clearable />
+              <MultiSelect label="Profissional" placeholder="Todos os profissionais" data={options.doctors} value={doctorFilter} onChange={setDoctorFilter} searchable clearable />
               <MultiSelect label="Sala" placeholder="Todas as salas" data={options.rooms} value={roomFilter} onChange={setRoomFilter} searchable clearable />
               <MultiSelect label="Paciente" placeholder="Todos os pacientes" data={options.patients} value={patientFilter} onChange={setPatientFilter} searchable clearable />
             </Box>
@@ -368,7 +368,7 @@ export function TeaAgendaSemanal() {
               </Box>
               <Box className={`tea-agenda-search-panel${mode === 'week' ? ' tea-agenda-search-panel--with-range' : ''}`}>
                 <TextInput
-                  placeholder="Buscar por paciente, sala, terapeuta ou horário"
+                  placeholder="Buscar por paciente, sala, profissional ou horário"
                   value={search}
                   onChange={(event) => setSearch(event.currentTarget.value)}
                   leftSection={<Search size={17} />}

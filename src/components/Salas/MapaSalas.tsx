@@ -427,11 +427,11 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
               <MultiSelect label="Unidade" placeholder="Todas" data={units.map((value) => ({ value, label: value }))} value={unitFilter} onChange={setUnitFilter} searchable clearable />
               <MultiSelect label="Especialidade" placeholder="Todas" data={specialties.map((value) => ({ value, label: value }))} value={specialtyFilter} onChange={setSpecialtyFilter} searchable clearable />
               <MultiSelect label="Sala" placeholder="Todas" data={roomNames.map((value) => ({ value, label: value }))} value={roomFilter} onChange={setRoomFilter} searchable clearable />
-              <MultiSelect label="Terapeuta" placeholder="Todos" data={doctors.map((value) => ({ value, label: value }))} value={doctorFilter} onChange={setDoctorFilter} searchable clearable />
+              <MultiSelect label="Profissional" placeholder="Todos" data={doctors.map((value) => ({ value, label: value }))} value={doctorFilter} onChange={setDoctorFilter} searchable clearable />
             </SimpleGrid>
 
             <TextInput
-              placeholder="Buscar por sala, especialidade, terapeuta ou horário"
+              placeholder="Buscar por sala, especialidade, profissional ou horário"
               value={search}
               onChange={(event) => setSearch(event.currentTarget.value)}
               leftSection={<Search size={14} aria-hidden="true" />}
