@@ -10,6 +10,7 @@ export interface Agenda {
   shiftStart: string;
   shiftEnd: string;
   especialidadeId?: string | null;
+  especialidadeIds?: string[];
   especialidade?: { id: string; name: string; modalidadeId: string } | null;
   roomId?: string | null;
   room?: { id: string; name: string } | null;
@@ -27,6 +28,7 @@ export interface AgendaPayload {
   shiftStart: string;
   shiftEnd: string;
   especialidadeId?: string | null;
+  especialidadeIds?: string[];
   roomId?: string | null;
   startDate?: string | null;
   endDate?: string | null;

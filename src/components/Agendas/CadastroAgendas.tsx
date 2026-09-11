@@ -10,6 +10,7 @@ import {
   Group,
   Menu,
   Modal,
+  MultiSelect,
   Paper,
   Select,
   Skeleton,
@@ -56,6 +57,18 @@ const STATUS_OPTIONS = [
 
 const STATUS_COLOR: Record<string, string> = { ATIVA: 'green', INATIVA: 'gray', BLOQUEADA: 'red' };
 
+type AgendaSpecialtyGroup = {
+  especialidadeId?: string | null;
+  especialidadeIds?: string[];
+  modalidadeId?: string | null;
+};
+
+type SpecialtyRecord = {
+  id?: string;
+  branchId?: string | null;
+  name?: string;
+};
+
 const getApiList = (data: any): any[] => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.items)) return data.items;
@@ -100,6 +113,7 @@ interface AgendaFormState {
   shiftStart: string;
   shiftEnd: string;
   especialidadeId: string;
+  especialidadeIds: string[];
   roomId: string;
   startDate: string;
   endDate: string;
@@ -113,6 +127,7 @@ const EMPTY_FORM: AgendaFormState = {
   shiftStart: '',
   shiftEnd: '',
   especialidadeId: '',
+  especialidadeIds: [],
   roomId: '',
   startDate: '',
   endDate: '',
@@ -160,7 +175,7 @@ export function CadastroAgendas() {
     .filter((d: any) => (Array.isArray(d.branchIds) && d.branchIds.includes(branchId)) || d.branchId === branchId)
     .map((d: any) => ({ value: d.id, label: d.name }));
 
-  const especialidadeGroupsForDoctor = (doctorId: string): any[] => {
+  const especialidadeGroupsForDoctor = (doctorId: string): AgendaSpecialtyGroup[] => {
     const doctor = doctorList.find((d: any) => d.id === doctorId);
     return Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [];
   };
@@ -179,13 +194,27 @@ export function CadastroAgendas() {
       .map((r: any) => ({ value: r.id, label: r.name }));
   };
 
+  const especialidadeOptionsForDoctor = (branchId: string, doctorId: string) => {
+    const groups = especialidadeGroupsForDoctor(doctorId);
+    const doctorEspecialidadeIds = new Set(groups.flatMap((group) => [
+      group?.especialidadeId,
+      ...(Array.isArray(group?.especialidadeIds) ? group.especialidadeIds : []),
+    ].filter((id): id is string => Boolean(id))));
+    return (getApiList(especialidadesQuery.data) as SpecialtyRecord[])
+      .filter((item): item is SpecialtyRecord & { id: string } => Boolean(item.id))
+      .filter((item) => !branchId || !item.branchId || item.branchId === branchId)
+      .filter((item) => doctorEspecialidadeIds.size === 0 || doctorEspecialidadeIds.has(item.id))
+      .map((item) => ({ value: item.id, label: item.name || 'Especialidade sem nome' }));
+  };
+
   const deriveEspecialidadeForRoom = (doctorId: string, roomId: string): { especialidadeId: string | null; especialidadeName: string | null } => {
     const room = roomList.find((r: any) => r.id === roomId);
     if (!room?.modalidadeId) return { especialidadeId: null, especialidadeName: null };
     const group = especialidadeGroupsForDoctor(doctorId).find((g: any) => g.modalidadeId === room.modalidadeId);
-    if (!group) return { especialidadeId: null, especialidadeName: null };
-    const esp = especialidadeById.get(group.especialidadeId);
-    return { especialidadeId: group.especialidadeId || null, especialidadeName: esp?.name || null };
+    const especialidadeId = group?.especialidadeId;
+    if (!especialidadeId) return { especialidadeId: null, especialidadeName: null };
+    const esp = especialidadeById.get(especialidadeId);
+    return { especialidadeId, especialidadeName: esp?.name || null };
   };
 
   const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
@@ -194,15 +223,20 @@ export function CadastroAgendas() {
     const q = query.trim().toLowerCase();
     return items.filter((it: Agenda) => {
       if (filterBranchId && it.branchId !== filterBranchId) return false;
+      const agendaEspecialidadeNames = (it.especialidadeIds?.length
+        ? it.especialidadeIds
+        : (it.especialidadeId ? [it.especialidadeId] : []))
+        .map((id) => especialidadeById.get(id)?.name || '')
+        .filter(Boolean);
       if (!q) return true;
       return (
         (it.doctor?.name || '').toLowerCase().includes(q)
         || (it.branch?.tradeName || '').toLowerCase().includes(q)
-        || (it.especialidade?.name || '').toLowerCase().includes(q)
+        || agendaEspecialidadeNames.some((name) => name.toLowerCase().includes(q))
         || (it.room?.name || '').toLowerCase().includes(q)
       );
     });
-  }, [items, query, filterBranchId]);
+  }, [items, query, filterBranchId, especialidadeById]);
 
   const paginatedItems = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -240,6 +274,9 @@ export function CadastroAgendas() {
       shiftStart: item.shiftStart,
       shiftEnd: item.shiftEnd,
       especialidadeId: item.especialidadeId || '',
+      especialidadeIds: item.especialidadeIds?.length
+        ? item.especialidadeIds
+        : (item.especialidadeId ? [item.especialidadeId] : []),
       roomId: item.roomId || '',
       startDate: toDateInputValue(item.startDate),
       endDate: toDateInputValue(item.endDate),
@@ -250,16 +287,23 @@ export function CadastroAgendas() {
   };
 
   const handleBranchChange = (branchId: string | null) => {
-    setForm((prev) => ({ ...prev, branchId: branchId || '', doctorId: '', especialidadeId: '', roomId: '' }));
+    setForm((prev) => ({ ...prev, branchId: branchId || '', doctorId: '', especialidadeId: '', especialidadeIds: [], roomId: '' }));
   };
 
   const handleDoctorChange = (doctorId: string | null) => {
-    setForm((prev) => ({ ...prev, doctorId: doctorId || '', especialidadeId: '', roomId: '' }));
+    setForm((prev) => ({ ...prev, doctorId: doctorId || '', especialidadeId: '', especialidadeIds: [], roomId: '' }));
   };
 
   const handleFormRoomChange = (roomId: string | null) => {
     const { especialidadeId } = deriveEspecialidadeForRoom(form.doctorId, roomId || '');
-    setForm((prev) => ({ ...prev, roomId: roomId || '', especialidadeId: especialidadeId || '' }));
+    setForm((prev) => ({
+      ...prev,
+      roomId: roomId || '',
+      especialidadeId: prev.especialidadeIds[0] || especialidadeId || '',
+      especialidadeIds: prev.especialidadeIds.length > 0
+        ? prev.especialidadeIds
+        : (especialidadeId ? [especialidadeId] : []),
+    }));
   };
 
   const handleSave = async () => {
@@ -281,7 +325,8 @@ export function CadastroAgendas() {
         weekday: form.weekday,
         shiftStart: form.shiftStart,
         shiftEnd: form.shiftEnd,
-        especialidadeId: form.especialidadeId || null,
+        especialidadeId: form.especialidadeIds[0] || form.especialidadeId || null,
+        especialidadeIds: form.especialidadeIds,
         roomId: form.roomId || null,
         startDate: form.startDate || null,
         endDate: form.endDate || null,
@@ -421,6 +466,12 @@ export function CadastroAgendas() {
                               <Text fw={600} size="sm">{it.doctor?.name || '—'}</Text>
                               <Text size="xs" c="dimmed">{it.branch?.tradeName || '—'} · {WEEKDAY_LABEL[it.weekday] || it.weekday}</Text>
                               <Text size="xs" c="dimmed">{it.shiftStart} - {it.shiftEnd}</Text>
+                              <Text size="xs" c="dimmed">
+                                {((it.especialidadeIds?.length ? it.especialidadeIds : (it.especialidadeId ? [it.especialidadeId] : []))
+                                  .map((id) => especialidadeById.get(id)?.name)
+                                  .filter(Boolean)
+                                  .join(', ')) || it.especialidade?.name || 'Sem especialidade definida'}
+                              </Text>
                               <Text size="xs" c="dimmed">{it.room?.name || 'Sem sala definida'}</Text>
                               {renderVigencia(it)}
                             </Stack>
@@ -463,6 +514,7 @@ export function CadastroAgendas() {
                           <Table.Th className="cadastro-agendas-th">Unidade</Table.Th>
                           <Table.Th className="cadastro-agendas-th">Dia</Table.Th>
                           <Table.Th className="cadastro-agendas-th">Turno</Table.Th>
+                          {!isTablet && <Table.Th className="cadastro-agendas-th">Especialidade(s)</Table.Th>}
                           {!isTablet && <Table.Th className="cadastro-agendas-th">Sala</Table.Th>}
                           {!isTablet && <Table.Th className="cadastro-agendas-th">Vigência</Table.Th>}
                           <Table.Th className="cadastro-agendas-th">Status</Table.Th>
@@ -474,7 +526,7 @@ export function CadastroAgendas() {
                       <Table.Tbody>
                         {filteredItems.length === 0 ? (
                           <Table.Tr>
-                            <Table.Td colSpan={isTablet ? 6 : 8}>
+                            <Table.Td colSpan={isTablet ? 6 : 9}>
                               <Text size="sm" c="dimmed" ta="center">
                                 Nenhuma agenda encontrada. Ajuste os filtros ou cadastre uma nova agenda.
                               </Text>
@@ -487,6 +539,16 @@ export function CadastroAgendas() {
                               <Table.Td><Text size="sm" c="dimmed">{it.branch?.tradeName || '—'}</Text></Table.Td>
                               <Table.Td><Text size="sm" c="dimmed">{WEEKDAY_LABEL[it.weekday] || it.weekday}</Text></Table.Td>
                               <Table.Td><Text size="sm" c="dimmed">{it.shiftStart} - {it.shiftEnd}</Text></Table.Td>
+                              {!isTablet && (
+                                <Table.Td>
+                                  <Text size="sm" c="dimmed">
+                                    {((it.especialidadeIds?.length ? it.especialidadeIds : (it.especialidadeId ? [it.especialidadeId] : []))
+                                      .map((id) => especialidadeById.get(id)?.name)
+                                      .filter(Boolean)
+                                      .join(', ')) || it.especialidade?.name || '—'}
+                                  </Text>
+                                </Table.Td>
+                              )}
                               {!isTablet && <Table.Td><Text size="sm" c="dimmed">{it.room?.name || '—'}</Text></Table.Td>}
                               {!isTablet && <Table.Td>{renderVigencia(it)}</Table.Td>}
                               <Table.Td>
@@ -558,6 +620,16 @@ export function CadastroAgendas() {
             disabled={!form.branchId}
             searchable
             onChange={handleDoctorChange}
+          />
+          <MultiSelect
+            label="Especialidades"
+            placeholder={form.doctorId ? 'Selecione uma ou mais' : 'Selecione o profissional primeiro'}
+            data={especialidadeOptionsForDoctor(form.branchId, form.doctorId)}
+            value={form.especialidadeIds}
+            disabled={!form.branchId || !form.doctorId}
+            searchable
+            clearable
+            onChange={(values) => setForm((prev) => ({ ...prev, especialidadeIds: values, especialidadeId: values[0] || '' }))}
           />
           <Select
             label="Dia da semana"

@@ -25,6 +25,7 @@ type Option = { value: string; label: string };
 
 type DoctorSpecialtyGroup = {
   especialidadeId?: string | null;
+  especialidadeIds?: string[];
   modalidadeId?: string | null;
 };
 
@@ -104,6 +105,13 @@ const DURATION_OPTIONS = Array.from({ length: 60 }, (_, index) => ({
 
 const makeKey = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
+const getDoctorEspecialidadeIds = (groups: DoctorSpecialtyGroup[] = []) => Array.from(new Set(
+  groups.flatMap((group) => [
+    group.especialidadeId,
+    ...(Array.isArray(group.especialidadeIds) ? group.especialidadeIds : []),
+  ]).map((id) => String(id || '').trim()).filter(Boolean),
+));
+
 const makeSlot = (especialidadeIds: string[] = []): ScaleSlot => ({
   key: makeKey(),
   shiftStart: '08:00',
@@ -171,20 +179,16 @@ export function CadastroAgendaEscalaForm({
     .filter((item) => !branchId || (Array.isArray(item.branchIds) && item.branchIds.includes(branchId)) || item.branchId === branchId)
     .filter((item) => {
       if (especialidadeIds.length === 0) return true;
-      const doctorSpecialtyIds = new Set(
-        (Array.isArray(item.especialidadeGroups) ? item.especialidadeGroups : [])
-          .map((group: DoctorSpecialtyGroup) => group.especialidadeId)
-          .filter(Boolean),
-      );
+      const doctorSpecialtyIds = new Set(getDoctorEspecialidadeIds(
+        Array.isArray(item.especialidadeGroups) ? item.especialidadeGroups : [],
+      ));
       return especialidadeIds.some((id) => doctorSpecialtyIds.has(id));
     })
     .map((item) => ({ value: item.id, label: item.name })), [doctors, branchId, especialidadeIds]);
 
-  const doctorSpecialtyIds = useMemo(() => new Set(
-    (Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [])
-      .map((group: DoctorSpecialtyGroup) => group.especialidadeId)
-      .filter(Boolean),
-  ), [doctor]);
+  const doctorSpecialtyIds = useMemo(() => new Set(getDoctorEspecialidadeIds(
+    Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [],
+  )), [doctor]);
 
   const specialtyOptions = useMemo(() => especialidades
     .filter((item) => item?.id)
@@ -210,11 +214,9 @@ export function CadastroAgendaEscalaForm({
     // selected, keep only specialties that professional actually supports.
     if (nextId) {
       const nextDoctor = doctors.find((item) => item.id === nextId);
-      const nextDoctorSpecialtyIds = new Set(
-        (Array.isArray(nextDoctor?.especialidadeGroups) ? nextDoctor.especialidadeGroups : [])
-          .map((group: DoctorSpecialtyGroup) => group.especialidadeId)
-          .filter(Boolean),
-      );
+      const nextDoctorSpecialtyIds = new Set(getDoctorEspecialidadeIds(
+        Array.isArray(nextDoctor?.especialidadeGroups) ? nextDoctor.especialidadeGroups : [],
+      ));
       setEspecialidadeIds((current) => current.filter((id) => nextDoctorSpecialtyIds.has(id)));
     }
     setInternIds([]);
@@ -336,14 +338,17 @@ export function CadastroAgendaEscalaForm({
       for (const day of block.days) {
         for (const slot of block.slots) {
           try {
+            const selectedEspecialidadeIds = Array.from(new Set(
+              (slot.especialidadeIds.length > 0 ? slot.especialidadeIds : especialidadeIds).filter(Boolean),
+            ));
             await agendaService.createAgenda({
               branchId,
               doctorId,
               weekday: day,
               shiftStart: slot.shiftStart,
               shiftEnd: slot.shiftEnd,
-              // The current Agenda API stores one specialty per schedule slot.
-              especialidadeId: slot.especialidadeIds[0] || especialidadeIds[0] || null,
+              especialidadeId: selectedEspecialidadeIds[0] || null,
+              especialidadeIds: selectedEspecialidadeIds,
               roomId: slot.roomId || null,
               startDate: slot.startDate || null,
               endDate: slot.endDate || null,
