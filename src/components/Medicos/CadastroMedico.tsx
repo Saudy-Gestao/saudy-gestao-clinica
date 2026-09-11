@@ -47,6 +47,7 @@ import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { getProfessionalProcedureOptions } from '../../utils/professionalProcedureOptions';
 
 type Gender = 'male' | 'female' | 'other' | '';
 
@@ -366,33 +367,25 @@ export function CadastroMedico() {
     )
   ), [form.especialidadeGroups]);
 
-  const procedureOptions = useMemo(() => (
-    procedureList
-      .filter((procedure: any) => {
-        const procedureModalidadeId = String(
-          procedure.especialidade?.modalidadeId
-            || procedure.especialidade?.modalidade?.id
-            || procedure.modalidadeId
-            || procedure.modalidade?.id
-            || '',
-        ).trim();
-        if (procedureModalidadeId && selectedModalidadeIds.has(procedureModalidadeId)) return true;
+  const selectedEspecialidadeIds = useMemo(() => (
+    new Set(
+      form.especialidadeGroups.flatMap((group) => (
+        group.especialidadeIds?.length
+          ? group.especialidadeIds
+          : (group.especialidadeId ? [group.especialidadeId] : [])
+      )).filter(Boolean),
+    )
+  ), [form.especialidadeGroups]);
 
-        const selectedModalidades = modalidadeOptions.filter((option) => selectedModalidadeIds.has(option.value));
-        const legacyModalidades = Array.isArray(procedure.modalidades)
-          ? procedure.modalidades.map((value: unknown) => String(value).trim().toLowerCase())
-          : [];
-        return selectedModalidades.some((option) => (
-          legacyModalidades.includes(String(option.value).toLowerCase())
-          || legacyModalidades.includes(String(option.label).trim().toLowerCase())
-        ));
-      })
-      .map((procedure: any) => ({
-        value: String(procedure.id),
-        label: String(procedure.name || 'Procedimento sem nome'),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
-  ), [modalidadeOptions, procedureList, selectedModalidadeIds]);
+  const procedureOptions = useMemo(
+    () => getProfessionalProcedureOptions(
+      procedureList,
+      selectedModalidadeIds,
+      modalidadeOptions,
+      selectedEspecialidadeIds,
+    ),
+    [modalidadeOptions, procedureList, selectedEspecialidadeIds, selectedModalidadeIds],
+  );
 
   const especialidadesByModalidadeId = useMemo(() => {
     const map = new Map<string, any[]>();
