@@ -46,10 +46,12 @@ import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useAgendasAdminQuery } from '../../hooks/useAgendasAdminQuery';
 import { useMedicalEquipmentsQuery } from '../../hooks/useMedicalEquipmentsQuery';
+import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { queryKeys } from '../../lib/queryKeys';
 interface Agendamento {
   id: string;
+  branchId?: string;
   rescheduledFromAppointmentId?: string;
   patientId?: string;
   pacienteNome: string;
@@ -62,6 +64,7 @@ interface Agendamento {
   convenioNumber: string;
   convenioValidUntil: string;
   convenioStatus: string;
+  convenioPlano?: string;
   data: string;
   hora: string;
   tipoConsulta: string;
@@ -72,6 +75,7 @@ interface Agendamento {
   durationMinutes?: number | null;
 }
 interface NovoAgendamento {
+  branchId: string;
   pacienteId: string;
   pacienteNome: string;
   pacienteCPF: string;
@@ -80,6 +84,7 @@ interface NovoAgendamento {
   convenioNumber: string;
   convenioValidUntil: string;
   convenioStatus: string;
+  convenioPlano: string;
   data: Date | null;
   hora: string;
   profissional: string;
@@ -105,12 +110,14 @@ interface AgendaShiftWindow {
 }
 interface DoctorScheduleMeta {
   id?: string;
+  branchId?: string;
   name: string;
   roomIds: string[];
   workingDays: string[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
   specialties: string[];
+  gender?: string;
   agendaByWeekday?: Record<string, AgendaShiftWindow[]>;
 }
 interface ProcedureMeta {
@@ -162,6 +169,7 @@ interface PendingProfessionalSlotSelection {
   candidates?: string[];
 }
 const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
+  branchId: '',
   pacienteId: '',
   pacienteNome: '',
   pacienteCPF: '',
@@ -170,6 +178,7 @@ const INITIAL_NOVO_AGENDAMENTO: NovoAgendamento = {
   convenioNumber: '',
   convenioValidUntil: '',
   convenioStatus: 'Particular',
+  convenioPlano: '',
   data: null,
   hora: '',
   profissional: '',
@@ -582,8 +591,16 @@ export function Agendamento() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  const [, setSchedulingStep] = useState<number>(0);
-  const [activeSchedulePeriod, setActiveSchedulePeriod] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
+  const [schedulingStep, setSchedulingStep] = useState<number>(0);
+  const [activeSchedulePeriod, setActiveSchedulePeriod] = useState<'Todos' | 'Manhã' | 'Tarde' | 'Noite'>('Todos');
+  const [availabilityViewMode, setAvailabilityViewMode] = useState<'day' | 'week'>('day');
+  const [availabilitySearch, setAvailabilitySearch] = useState('');
+  const [availabilityGenderFilter, setAvailabilityGenderFilter] = useState<string | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [recurrenceEnabled, setRecurrenceEnabled] = useState(false);
+  const [recurrenceOccurrences, setRecurrenceOccurrences] = useState('4');
+  const [recurrenceIntervalWeeks, setRecurrenceIntervalWeeks] = useState('1');
+  const [simultaneousEnabled, setSimultaneousEnabled] = useState(false);
   const [novoAgendamento, setNovoAgendamento] = useState<NovoAgendamento>(INITIAL_NOVO_AGENDAMENTO);
   const [isEditing, setIsEditing] = useState(false);
   const [editingAgendamentoId, setEditingAgendamentoId] = useState<string | null>(null);
@@ -594,6 +611,7 @@ export function Agendamento() {
   const [layout, setLayout] = useState<'list' | 'grid' | 'calendar'>('grid');
   const [agendadosPage, setAgendadosPage] = useState(1);
   const [agendadosPageSize, setAgendadosPageSize] = useState(10);
+  const [availabilityAgendamentos, setAvailabilityAgendamentos] = useState<Agendamento[]>([]);
   // State to track expanded cards (ids)
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   // Calendar state
@@ -611,6 +629,7 @@ export function Agendamento() {
   const [doctorMetaByName, setDoctorMetaByName] = useState<Record<string, DoctorScheduleMeta>>({});
   const [doctorsLoading, setDoctorsLoading] = useState(false);
   const [insuranceOptions, setInsuranceOptions] = useState<{ value: string; label: string }[]>([]);
+  const [insurancePlanOptions, setInsurancePlanOptions] = useState<{ value: string; label: string; insuranceName: string }[]>([]);
   const [insurancesLoading, setInsurancesLoading] = useState(false);
   const [procedureOptions, setProcedureOptions] = useState<{ value: string; label: string }[]>([]);
   const [procedureMetaByName, setProcedureMetaByName] = useState<Record<string, ProcedureMeta>>({});
@@ -644,19 +663,28 @@ export function Agendamento() {
   const [statusFiltro, setStatusFiltro] = useState<string | null>(null);
   const [viewedDate, setViewedDate] = useState<Date>(new Date());
   const appointmentDateFilter = dataHoraFiltro ?formatDateForApi(dataHoraFiltro) : undefined;
+  const availabilityWeekStart = dayjs(viewedDate).startOf('week').toDate();
+  const availabilityWeekEnd = dayjs(viewedDate).endOf('week').toDate();
   const appointmentsQuery = useAppointmentsQuery({ date: appointmentDateFilter });
+  const availabilityAppointmentsQuery = useAppointmentsQuery({
+    startDate: formatDateForApi(availabilityViewMode === 'week' ? availabilityWeekStart : viewedDate),
+    endDate: formatDateForApi(availabilityViewMode === 'week' ? availabilityWeekEnd : viewedDate),
+    ...(selectedBranchId ? { branchId: selectedBranchId } : {}),
+  });
   const preSchedulingsQuery = usePreSchedulingsQuery({});
   const patientsQuery = usePatientsAdminQuery();
   const insurancesQuery = useInsurancesAdminQuery();
-  const doctorsQuery = useDoctorsAdminQuery();
+  const branchesQuery = useSettingsBranchesQuery();
+  const doctorsQuery = useDoctorsAdminQuery(selectedBranchId || undefined);
   const proceduresCatalogQuery = useProceduresAdminQuery();
   const roomsQuery = useRoomsAdminQuery();
-  const agendasQuery = useAgendasAdminQuery();
+  const agendasQuery = useAgendasAdminQuery(selectedBranchId || undefined);
   const medicalEquipmentsQuery = useMedicalEquipmentsQuery();
   dayjs.locale('pt-br');
   const resetSchedulingForm = (keepDate: Date | null = dataHoraFiltro || new Date()) => {
     setNovoAgendamento({
       ...INITIAL_NOVO_AGENDAMENTO,
+      branchId: selectedBranchId || '',
       convenio: PARTICULAR_INSURANCE_LABEL,
       convenioStatus: PARTICULAR_STATUS_LABEL,
       data: keepDate,
@@ -669,6 +697,8 @@ export function Agendamento() {
     setIsManualPatientFlow(false);
     setPendingPatient(INITIAL_PENDING_PATIENT);
     setViewedDate(keepDate || new Date());
+    setAvailabilityViewMode('day');
+    setActiveSchedulePeriod('Todos');
     setSuggestedOptions([]);
     setSelectedSuggestedOptionId(null);
     setRescheduleSourceId(null);
@@ -679,6 +709,12 @@ export function Agendamento() {
     setPendingProfessionalSlot(null);
     setReviewAttachments([]);
     setExistingAttachments([]);
+    setAvailabilitySearch('');
+    setAvailabilityGenderFilter(null);
+    setRecurrenceEnabled(false);
+    setRecurrenceOccurrences('4');
+    setRecurrenceIntervalWeeks('1');
+    setSimultaneousEnabled(false);
   };
   useEffect(() => {
     setManualProcedureSelections((prev) => {
@@ -692,9 +728,13 @@ export function Agendamento() {
       setSelectedSuggestedOptionId(null);
       setNovoAgendamento((prev) => ({ ...prev, profissional: '', hora: '' }));
     }
+    if (selectedSpecialties.length < 2) {
+      setSimultaneousEnabled(false);
+    }
   }, [selectedSpecialties]);
   const mapApiToAgendamento = (it: any): Agendamento => ({
     id: String(it.id),
+    branchId: it.branchId || it.branch_id || undefined,
     rescheduledFromAppointmentId: it.rescheduledFromAppointmentId || it.rescheduled_from_appointment_id || undefined,
     patientId: it.patientId || it.patient_id || it.patient?.id || undefined,
     pacienteNome: it.patientName || it.patient_name || it.patient?.name || it.pacienteNome || '',
@@ -715,6 +755,7 @@ export function Agendamento() {
     convenioNumber: it.convenioNumber || it.convenio_number || it.healthInsuranceNumber || it.insuranceCardNumber || '',
     convenioValidUntil: it.convenioValidUntil || it.convenio_valid_until || it.healthInsuranceExpiry || it.healthInsuranceValidity || '',
     convenioStatus: it.convenioStatus || it.convenio_status || '',
+    convenioPlano: it.insurancePlan || it.insurance_plan || it.convenioPlano || '',
     data: extractAppointmentDate(it),
     hora: extractAppointmentTime(it),
     tipoConsulta: it.type || it.appointmentType || it.appointment_type || it.procedure?.appointmentType || it.tipoConsulta || 'CONSULTA',
@@ -735,6 +776,7 @@ export function Agendamento() {
     convenioNumber: '',
     convenioValidUntil: '',
     convenioStatus: '',
+    convenioPlano: '',
     data: extractAppointmentDate(it),
     hora: extractAppointmentTime(it),
     tipoConsulta: it.type || it.appointmentType || it.appointment_type || 'CONSULTA',
@@ -743,6 +785,16 @@ export function Agendamento() {
     observacoes: '',
     durationMinutes: Number.isFinite(Number(it.durationMinutes)) ?Number(it.durationMinutes) : null,
   });
+  useEffect(() => {
+    const list = Array.isArray(availabilityAppointmentsQuery.data) ? availabilityAppointmentsQuery.data : [];
+    setAvailabilityAgendamentos(
+      sortAgendamentosByDateTime(
+        list
+          .map(mapApiToAgendamento)
+          .filter((item) => !isTeaReturnAppointment(item.tipoConsulta)),
+      ),
+    );
+  }, [availabilityAppointmentsQuery.data]);
   const getResumoLinha = (agendamento: Agendamento) => {
     const parts = [agendamento.tipoConsulta, agendamento.especialidade].filter(Boolean);
     const base = parts.length ?parts.join(' | ') : '—';
@@ -1034,6 +1086,21 @@ export function Agendamento() {
         return name ?{ value: name, label: name } : null;
       })
       .filter(Boolean) as { value: string; label: string }[];
+    const planOptions = list.flatMap((it: any) => {
+      if (it?.isActive === false) return [];
+      const insuranceName = String(it?.name || it?.nome || '').trim();
+      const subInsurances = Array.isArray(it?.subInsurances) ? it.subInsurances : [];
+      return subInsurances
+        .filter((plan: any) => plan?.isActive !== false)
+        .map((plan: any) => {
+          const name = String(plan?.name || plan?.nome || '').trim();
+          return name && insuranceName
+            ? { value: `${insuranceName}::${name}`, label: name, insuranceName }
+            : null;
+        })
+        .filter(Boolean);
+    }) as { value: string; label: string; insuranceName: string }[];
+    setInsurancePlanOptions(planOptions);
     // Keep the filter useful even when an appointment references an insurance
     // that is not returned by the current catalog response (for example, a
     // legacy or mock appointment).
@@ -1081,6 +1148,7 @@ export function Agendamento() {
       if (!name) return acc;
       acc[name] = {
         id: String(doctor.id ?? doctor.doctorId ?? '').trim() || undefined,
+        branchId: String(doctor.branchId ?? doctor.branch_id ?? '').trim() || undefined,
         name,
         roomIds: Array.from(new Set([
           ...(Array.isArray(doctor.roomIds) ?doctor.roomIds : []),
@@ -1094,6 +1162,7 @@ export function Agendamento() {
           ...(doctor.specialty ?[String(doctor.specialty)] : []),
           ...(Array.isArray(doctor.specialties) ?doctor.specialties.map((item: any) => String(item)) : []),
         ].filter(Boolean),
+        gender: String(doctor.gender || doctor.sexo || '').trim().toUpperCase() || undefined,
         agendaByWeekday: agendaByDoctorName[name],
       };
       return acc;
@@ -1246,7 +1315,9 @@ export function Agendamento() {
 
   const handleEditAgendamento = (agendamento: Agendamento) => {
     const appointmentDate = agendamento.data ?new Date(`${agendamento.data}T00:00:00`) : null;
+    setSelectedBranchId(agendamento.branchId || null);
     setNovoAgendamento({
+      branchId: agendamento.branchId || selectedBranchId || '',
       pacienteId: agendamento.patientId || '',
       pacienteNome: agendamento.pacienteNome || '',
       pacienteCPF: agendamento.pacienteCPF || '',
@@ -1255,6 +1326,7 @@ export function Agendamento() {
       convenioNumber: agendamento.convenioNumber || '',
       convenioValidUntil: agendamento.convenioValidUntil || '',
       convenioStatus: agendamento.convenioStatus || (isParticularInsurance(agendamento.convenio) ?PARTICULAR_STATUS_LABEL : 'Ativo'),
+      convenioPlano: agendamento.convenioPlano || '',
       data: appointmentDate,
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
@@ -1288,7 +1360,9 @@ export function Agendamento() {
   };
   const handleRescheduleAppointment = (agendamento: Agendamento) => {
     const appointmentDate = agendamento.data ?new Date(`${agendamento.data}T00:00:00`) : null;
+    setSelectedBranchId(agendamento.branchId || null);
     setNovoAgendamento({
+      branchId: agendamento.branchId || selectedBranchId || '',
       pacienteId: agendamento.patientId || '',
       pacienteNome: agendamento.pacienteNome || '',
       pacienteCPF: agendamento.pacienteCPF || '',
@@ -1297,6 +1371,7 @@ export function Agendamento() {
       convenioNumber: agendamento.convenioNumber || '',
       convenioValidUntil: agendamento.convenioValidUntil || '',
       convenioStatus: agendamento.convenioStatus || (isParticularInsurance(agendamento.convenio) ?PARTICULAR_STATUS_LABEL : 'Ativo'),
+      convenioPlano: agendamento.convenioPlano || '',
       data: appointmentDate,
       hora: agendamento.hora,
       profissional: agendamento.medicoNome,
@@ -1606,6 +1681,7 @@ export function Agendamento() {
       const current = agendamentos.find((a) => a.id === editingAgendamentoId);
       try {
         const basePayload = {
+          branchId: selectedBranchId || undefined,
           patientId: resolvedPatient.patientId || undefined,
           patientName: resolvedPatient.patientName || undefined,
           patientCpf: resolvedPatient.patientCpf || undefined,
@@ -1615,6 +1691,7 @@ export function Agendamento() {
           specialty: selectedSpecialties.join(', '),
           durationMinutes: selectedProcedureDuration,
           convenio: resolvedInsuranceName,
+          insurancePlan: novoAgendamento.convenioPlano || undefined,
           convenioNumber: novoAgendamento.convenioNumber || undefined,
           convenioValidUntil: novoAgendamento.convenioValidUntil || undefined,
           convenioStatus: novoAgendamento.convenioStatus || undefined,
@@ -1673,73 +1750,83 @@ export function Agendamento() {
       }
     } else {
       try {
-        const createdAppointmentIds: string[] = [];
-        if (isMultiProcedureFlow && hasSelectedSuggestedSchedules) {
-          for (const suggestion of selectedSuggestedSchedules) {
-            const suggestionType = deriveAppointmentType([suggestion.procedure], novoAgendamento.tipoConsulta);
-            const suggestionResource = suggestionType === 'EXAME'
-              ?findExamResourceForSlot({
-                  doctorName: suggestion.doctorName,
-                  procedureName: suggestion.procedure,
-                  date: suggestion.date,
-                  time: suggestion.time,
-                  durationMinutes: suggestion.durationMinutes,
+        const selectedScheduleItems: SuggestedProcedureSchedule[] = hasSelectedSuggestedSchedules
+          ? selectedSuggestedSchedules
+          : (manualProcedureSelections.length > 0
+            ? manualProcedureSelections
+            : [{
+                procedure: selectedSpecialties[0],
+                doctorName: novoAgendamento.profissional,
+                date: novoAgendamento.data,
+                time: novoAgendamento.hora,
+                durationMinutes: selectedProcedureDuration,
+              }]);
+        const recurrenceCount = recurrenceEnabled
+          ? Math.max(2, Math.min(12, Number(recurrenceOccurrences) || 4))
+          : 1;
+        const recurrenceWeeks = recurrenceEnabled
+          ? Math.max(1, Math.min(4, Number(recurrenceIntervalWeeks) || 1))
+          : 0;
+        const recurrenceSeriesId = recurrenceEnabled ? `series-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : undefined;
+        const baseDate = selectedScheduleItems[0]?.date || novoAgendamento.data;
+        const appointmentPayloads = selectedScheduleItems.flatMap((scheduleItem) => {
+          const dayOffset = baseDate ? dayjs(scheduleItem.date).diff(dayjs(baseDate), 'day') : 0;
+          return Array.from({ length: recurrenceCount }, (_, occurrenceIndex) => {
+            const occurrenceDate = baseDate
+              ? addDays(baseDate, dayOffset + (occurrenceIndex * recurrenceWeeks * 7))
+              : scheduleItem.date;
+            const scheduleType = deriveAppointmentType([scheduleItem.procedure], novoAgendamento.tipoConsulta);
+            const scheduleResource = scheduleType === 'EXAME'
+              ? findExamResourceForSlot({
+                  doctorName: scheduleItem.doctorName,
+                  procedureName: scheduleItem.procedure,
+                  date: occurrenceDate,
+                  time: scheduleItem.time,
+                  durationMinutes: scheduleItem.durationMinutes,
+                  preferredRoomId: novoAgendamento.roomId || undefined,
+                  preferredEquipmentId: novoAgendamento.medicalEquipmentId || undefined,
                 })
               : null;
-            if (suggestionType === 'EXAME' && !suggestionResource) {
-              throw new Error(`EXAM_RESOURCE_NOT_AVAILABLE::${suggestion.procedure}`);
+            if (scheduleType === 'EXAME' && !scheduleResource) {
+              throw new Error(`EXAM_RESOURCE_NOT_AVAILABLE::${scheduleItem.procedure}`);
             }
-            const created = await appointmentService.create({
+            return {
+              branchId: selectedBranchId || undefined,
               patientId: resolvedPatient.patientId || undefined,
               patientName: resolvedPatient.patientName || undefined,
               patientCpf: resolvedPatient.patientCpf || undefined,
-              doctorName: suggestion.doctorName,
-              roomId: suggestionResource?.roomId || undefined,
-              medicalEquipmentId: suggestionResource?.medicalEquipmentId || undefined,
-              specialty: suggestion.procedure,
-              durationMinutes: suggestion.durationMinutes,
+              doctorName: scheduleItem.doctorName || undefined,
+              roomId: scheduleResource?.roomId || (isExamAppointment ? novoAgendamento.roomId || undefined : undefined),
+              medicalEquipmentId: scheduleResource?.medicalEquipmentId || (isExamAppointment ? novoAgendamento.medicalEquipmentId || undefined : undefined),
+              specialty: scheduleItem.procedure,
+              durationMinutes: scheduleItem.durationMinutes,
               convenio: resolvedInsuranceName,
+              insurancePlan: novoAgendamento.convenioPlano || undefined,
               convenioNumber: novoAgendamento.convenioNumber || undefined,
               convenioValidUntil: novoAgendamento.convenioValidUntil || undefined,
               convenioStatus: novoAgendamento.convenioStatus || undefined,
               insurance: resolvedInsuranceName,
               healthInsuranceName: resolvedInsuranceName,
-              date: formatDateForApi(suggestion.date),
-              time: suggestion.time,
-              type: suggestionType,
+              date: formatDateForApi(occurrenceDate),
+              time: scheduleItem.time,
+              type: scheduleType,
               observations: buildAppointmentObservations(novoAgendamento.informacoes || '', novoAgendamento.modalidadeAtendimento),
               status: 'AGENDADO',
               totem: Math.floor(Math.random() * 100) + 1,
               rescheduledFromAppointmentId: rescheduleSourceId || undefined,
-            });
-            if (created?.id) createdAppointmentIds.push(String(created.id));
-          }
-        } else {
-          const created = await appointmentService.create({
-            patientId: resolvedPatient.patientId || undefined,
-            patientName: resolvedPatient.patientName || undefined,
-            patientCpf: resolvedPatient.patientCpf || undefined,
-            doctorName: novoAgendamento.profissional || undefined,
-            roomId: isExamAppointment ?(novoAgendamento.roomId || undefined) : undefined,
-            medicalEquipmentId: isExamAppointment ?(novoAgendamento.medicalEquipmentId || undefined) : undefined,
-            specialty: selectedSpecialties.join(', '),
-            durationMinutes: selectedProcedureDuration,
-            convenio: resolvedInsuranceName,
-            convenioNumber: novoAgendamento.convenioNumber || undefined,
-            convenioValidUntil: novoAgendamento.convenioValidUntil || undefined,
-            convenioStatus: novoAgendamento.convenioStatus || undefined,
-            insurance: resolvedInsuranceName,
-            healthInsuranceName: resolvedInsuranceName,
-            date: formatDateForApi(novoAgendamento.data),
-            time: novoAgendamento.hora,
-            type: resolvedAppointmentType,
-            observations: buildAppointmentObservations(novoAgendamento.informacoes || '', novoAgendamento.modalidadeAtendimento),
-            status: 'AGENDADO',
-            totem: Math.floor(Math.random() * 100) + 1,
-            rescheduledFromAppointmentId: rescheduleSourceId || undefined,
+              recurrenceSeriesId,
+              recurrenceIndex: recurrenceEnabled ? occurrenceIndex + 1 : undefined,
+              recurrenceTotal: recurrenceEnabled ? recurrenceCount : undefined,
+              simultaneousGroupId: simultaneousEnabled
+                ? `simultaneous-${recurrenceSeriesId || Date.now()}-${occurrenceIndex}`
+                : undefined,
+            };
           });
-          if (created?.id) createdAppointmentIds.push(String(created.id));
-        }
+        });
+        const batchResponse = await appointmentService.createBatch({ appointments: appointmentPayloads });
+        const createdAppointmentIds: string[] = (Array.isArray(batchResponse?.items) ? batchResponse.items : [])
+          .map((item: any) => String(item?.id || '').trim())
+          .filter(Boolean);
         if (reviewAttachments.length > 0 && createdAppointmentIds.length > 0) {
           for (const appointmentId of createdAppointmentIds) {
             for (const file of reviewAttachments) {
@@ -1755,8 +1842,10 @@ export function Agendamento() {
         await loadAgendamentos();
         showNotification({
           title: 'Agendamento criado',
-          message: isMultiProcedureFlow
-            ?`${selectedSuggestedSchedules.length} agendamentos criados${reviewAttachments.length > 0 ?' com anexos' : ''} com sucesso.`
+          message: recurrenceEnabled
+            ?`${recurrenceCount} ocorrência(s) criada(s)${simultaneousEnabled ? ' com marcação simultânea' : ''}${reviewAttachments.length > 0 ?' e anexos' : ''} com sucesso.`
+            : isMultiProcedureFlow
+              ?`${selectedScheduleItems.length} agendamentos criados${simultaneousEnabled ? ' simultaneamente' : ''}${reviewAttachments.length > 0 ?' com anexos' : ''} com sucesso.`
             : `Agendamento realizado${reviewAttachments.length > 0 ?' com anexos' : ''} com sucesso.`,
           color: 'green',
         });
@@ -1874,9 +1963,11 @@ export function Agendamento() {
       ?specialty.split(',').map((item: string) => item.trim()).filter(Boolean)
       : [];
     setSelectedPatientId(appt.patientId || null);
+    setSelectedBranchId(appt.branchId || null);
     setIsManualPatientFlow(false);
     setPendingPatient(INITIAL_PENDING_PATIENT);
     setNovoAgendamento({
+      branchId: String(appt.branchId || selectedBranchId || ''),
       pacienteId: appt.patientId || '',
       pacienteNome: appt.patientName || '',
       pacienteCPF: appt.patientCpf || '',
@@ -1885,6 +1976,7 @@ export function Agendamento() {
       convenioNumber: appt.convenioNumber || '',
       convenioValidUntil: appt.convenioValidUntil || '',
       convenioStatus: appt.convenioStatus || '',
+      convenioPlano: appt.insurancePlan || appt.insurance_plan || appt.convenioPlano || '',
       data: appt.date ?new Date(`${appt.date}T00:00:00`) : null,
       hora: appt.time || '',
       profissional: appt.doctorName || '',
@@ -1950,6 +2042,12 @@ export function Agendamento() {
       : totalSelectedProcedureDuration,
   );
   const filteredDoctorOptions = doctorOptions.filter((option) => {
+    const normalizedAvailabilitySearch = normalizeComparableText(availabilitySearch);
+    if (normalizedAvailabilitySearch && !normalizeComparableText(option.label).includes(normalizedAvailabilitySearch)) return false;
+    if (availabilityGenderFilter) {
+      const doctorGender = normalizeComparableText(doctorMetaByName[option.value]?.gender);
+      if (doctorGender !== normalizeComparableText(availabilityGenderFilter)) return false;
+    }
     if (selectedSpecialties.length === 0) return true;
     const meta = doctorMetaByName[option.value];
     const doctorId = String(meta?.id || '').trim();
@@ -1970,26 +2068,67 @@ export function Agendamento() {
     });
   });
   const isExamAppointment = resolvedAppointmentType === 'EXAME';
-  const selectedDoctorMeta = novoAgendamento.profissional ? doctorMetaByName[novoAgendamento.profissional] : undefined;
-  const selectedDoctorSupportsTeleconsultation = Boolean(
-    selectedDoctorMeta
-    && Array.isArray(selectedDoctorMeta.specialties)
-    && selectedDoctorMeta.specialties.some((item) => String(item) === TELECONSULTATION_SPECIALTY_FLAG),
+  const doctorSupportsTeleconsultation = (doctorName: string) => Boolean(
+    doctorName
+    && doctorMetaByName[doctorName]
+    && Array.isArray(doctorMetaByName[doctorName].specialties)
+    && doctorMetaByName[doctorName].specialties.some((item) => String(item) === TELECONSULTATION_SPECIALTY_FLAG),
   );
   const selectedProceduresSupportTeleconsultation = Boolean(
     selectedSpecialties.length > 0
     && selectedSpecialties.every((name) => Boolean(procedureMetaByName[name]?.supportsTeleconsultation)),
   );
+  const teleconsultationDoctorOptions = filteredDoctorOptions.filter((option) => (
+    doctorSupportsTeleconsultation(option.value)
+  ));
   const canScheduleAsTeleconsultation = Boolean(
     resolvedAppointmentType === 'CONSULTA'
     && selectedProceduresSupportTeleconsultation
-    && selectedDoctorSupportsTeleconsultation,
+    && teleconsultationDoctorOptions.length > 0,
   );
   useEffect(() => {
     if (!canScheduleAsTeleconsultation && novoAgendamento.modalidadeAtendimento === 'Teleconsulta') {
-      setNovoAgendamento((prev) => ({ ...prev, modalidadeAtendimento: 'Presencial' }));
+      setNovoAgendamento((prev) => ({ ...prev, modalidadeAtendimento: 'Presencial', hora: '' }));
+      setManualProcedureSelections([]);
+      setSuggestedOptions([]);
+      setSelectedSuggestedOptionId(null);
     }
   }, [canScheduleAsTeleconsultation, novoAgendamento.modalidadeAtendimento]);
+  const availableDoctorOptions = novoAgendamento.modalidadeAtendimento === 'Teleconsulta'
+    ? teleconsultationDoctorOptions
+    : filteredDoctorOptions;
+  const branchList = Array.isArray(branchesQuery.data)
+    ? branchesQuery.data
+    : (Array.isArray((branchesQuery.data as any)?.items) ? (branchesQuery.data as any).items : []);
+  const branchOptions = branchList
+    .map((branch: any) => {
+      const value = String(branch?.id || '').trim();
+      const label = String(branch?.tradeName || branch?.name || '').trim();
+      return value && label ? { value, label } : null;
+    })
+    .filter(Boolean) as { value: string; label: string }[];
+  const appointmentModalityOptions = [
+    { value: 'Presencial', label: 'Presencial' },
+    ...(canScheduleAsTeleconsultation ? [{ value: 'Teleconsulta', label: 'Teleconsulta' }] : []),
+  ];
+  const handleModalityChange = (value: string | null) => {
+    const nextModality = value === 'Teleconsulta' && canScheduleAsTeleconsultation
+      ? 'Teleconsulta'
+      : 'Presencial';
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      modalidadeAtendimento: nextModality,
+      profissional: nextModality === 'Teleconsulta'
+        && prev.profissional
+        && !teleconsultationDoctorOptions.some((option) => option.value === prev.profissional)
+        ? ''
+        : prev.profissional,
+      hora: '',
+    }));
+    setManualProcedureSelections([]);
+    setSuggestedOptions([]);
+    setSelectedSuggestedOptionId(null);
+  };
   const examProcedureIds = selectedSpecialties
     .filter((name) => normalizeProcedureAppointmentType(procedureMetaByName[name]?.appointmentType) === 'EXAME')
     .map((name) => String(procedureMetaByName[name]?.id || '').trim())
@@ -1999,7 +2138,9 @@ export function Agendamento() {
       .map((item) => String(item || '').trim())
       .filter(Boolean),
   ));
-  const roomsList = (Array.isArray(roomsQuery.data) ?roomsQuery.data : []).filter((item: any) => isRoomSector(item));
+  const roomsList = (Array.isArray(roomsQuery.data) ?roomsQuery.data : [])
+    .filter((item: any) => isRoomSector(item))
+    .filter((item: any) => !selectedBranchId || String(item?.branchId || '').trim() === selectedBranchId);
   const roomLabelById = roomsList.reduce<Record<string, string>>((acc, room: any) => {
     const id = String(room?.id || '').trim();
     if (!id) return acc;
@@ -2132,14 +2273,20 @@ export function Agendamento() {
     if (isMultiProcedureFlow && manualProcedureSelections.length > 0) {
       return Array.from(new Set([
         ...manualProcedureSelections.map((item) => item.doctorName),
-        ...filteredDoctorOptions.map((item) => item.value),
+        ...availableDoctorOptions.map((item) => item.value),
       ]));
     }
-    return filteredDoctorOptions.map((item) => item.value);
+    return availableDoctorOptions.map((item) => item.value);
   })();
-  const getAppointmentsForDate = (date: Date) => agendamentos.filter(
-    (item) => item.data === dayjs(date).format('YYYY-MM-DD') && item.status !== 'CANCELADO',
-  );
+  const getAppointmentsForDate = (date: Date) => {
+    const dateKey = dayjs(date).format('YYYY-MM-DD');
+    const merged = [...agendamentos, ...availabilityAgendamentos];
+    return merged.filter((item, index, all) => (
+      item.data === dateKey
+      && item.status !== 'CANCELADO'
+      && all.findIndex((candidate) => candidate.id === item.id) === index
+    ));
+  };
   const selectedProcedureSummary = Array.isArray(selectedSpecialties) ?selectedSpecialties : [];
   const selectedDayKey = selectedDay ?dayjs(selectedDay).format('YYYY-MM-DD') : null;
   const selectedDayAppointments = selectedDayKey ?(agendamentosByDate[selectedDayKey] || []) : [];
@@ -2154,7 +2301,11 @@ export function Agendamento() {
   const safeSuggestedOptions = Array.isArray(suggestedOptions) ?suggestedOptions : [];
   const selectedSuggestedOption = safeSuggestedOptions.find((option) => option.id === selectedSuggestedOptionId) || null;
   const selectedSuggestedSchedules = selectedSuggestedOption?.items || [];
-  const hasSelectedSuggestedSchedules = isMultiProcedureFlow && selectedSuggestedSchedules.length === selectedProcedureSummary.length;
+  const hasSelectedSuggestedSchedules = !simultaneousEnabled && isMultiProcedureFlow && selectedSuggestedSchedules.length === selectedProcedureSummary.length;
+  const hasSelectedSimultaneousSchedules = simultaneousEnabled
+    && selectedProcedureSummary.length > 1
+    && manualProcedureSelections.length === selectedProcedureSummary.length
+    && manualProcedureSelections.every((item) => dayjs(item.date).isSame(dayjs(manualProcedureSelections[0]?.date), 'day') && item.time === manualProcedureSelections[0]?.time);
   const selectedSuggestedOptionLabel = selectedSuggestedOption
     ?`Opção ${safeSuggestedOptions.findIndex((option) => option.id === selectedSuggestedOption.id) + 1}`
     : null;
@@ -2180,6 +2331,13 @@ export function Agendamento() {
   const hasManualScheduleSelection = Boolean(
     novoAgendamento.hora && (isExamAppointment || Boolean(novoAgendamento.profissional)),
   );
+  const selectedScheduleCount = hasSelectedSuggestedSchedules
+    ? selectedSuggestedSchedules.length
+    : hasSelectedSimultaneousSchedules
+      ? manualProcedureSelections.length
+      : manualProcedureSelections.length || (hasManualScheduleSelection ? 1 : 0);
+  const selectedScheduleDateLabel = reviewDateValue ? dayjs(reviewDateValue).format('DD/MM/YYYY') : '';
+  const selectedScheduleTimeLabel = reviewTimeValue || '';
   useEffect(() => {
     if (!isExamAppointment) {
       if (novoAgendamento.roomId || novoAgendamento.medicalEquipmentId) {
@@ -2274,7 +2432,7 @@ export function Agendamento() {
     selectedProcedureSummary.length > 0 &&
     novoAgendamento.data &&
     (
-      (isMultiProcedureFlow && hasSelectedSuggestedSchedules)
+      ((isMultiProcedureFlow && hasSelectedSuggestedSchedules) || hasSelectedSimultaneousSchedules)
       || (!isMultiProcedureFlow && hasManualScheduleSelection)
     ) &&
     (
@@ -2284,12 +2442,87 @@ export function Agendamento() {
     ) &&
     (!isManualPatientFlow || pendingPatientReadyForCreation),
   );
+  const canAdvanceToAvailability = Boolean(
+    hasPatientContext
+    && novoAgendamento.convenio
+    && selectedProcedureSummary.length > 0
+    && (!isManualPatientFlow || pendingPatientReadyForCreation),
+  );
+  const canAdvanceToReview = Boolean(
+    novoAgendamento.data
+    && (
+      ((isMultiProcedureFlow && hasSelectedSuggestedSchedules) || hasSelectedSimultaneousSchedules)
+      || (!isMultiProcedureFlow && hasManualScheduleSelection)
+    )
+    && (
+      !isExamAppointment
+      || isMultiProcedureFlow
+      || (novoAgendamento.roomId && novoAgendamento.medicalEquipmentId)
+    ),
+  );
+  const goToSchedulingStep = (step: number) => {
+    const nextStep = Math.max(0, Math.min(2, step));
+    setSchedulingStep(nextStep);
+    window.requestAnimationFrame(() => {
+      schedulerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+  const handleContinueToAvailability = () => {
+    if (!hasPatientContext) {
+      showNotification({
+        title: 'Paciente pendente',
+        message: 'Selecione um paciente ou preencha os dados mínimos do novo paciente para continuar.',
+        color: 'yellow',
+      });
+      return;
+    }
+    if (isManualPatientFlow && !pendingPatientReadyForCreation) {
+      showNotification({
+        title: 'Cadastro do paciente incompleto',
+        message: 'Informe data de nascimento, gênero e celular antes de escolher o horário.',
+        color: 'yellow',
+      });
+      return;
+    }
+    if (!novoAgendamento.convenio) {
+      showNotification({ title: 'Convênio pendente', message: 'Selecione o convênio antes de escolher o horário.', color: 'yellow' });
+      return;
+    }
+    if (selectedProcedureSummary.length === 0) {
+      showNotification({ title: 'Procedimento pendente', message: 'Selecione ao menos um procedimento antes de escolher o horário.', color: 'yellow' });
+      return;
+    }
+    goToSchedulingStep(1);
+  };
+  const handleContinueToReview = () => {
+    if (!canAdvanceToReview) {
+      showNotification({
+        title: 'Horário pendente',
+        message: isMultiProcedureFlow
+          ? 'Gere e selecione uma sugestão com todos os procedimentos antes de revisar.'
+          : 'Selecione um horário disponível antes de revisar o agendamento.',
+        color: 'yellow',
+      });
+      return;
+    }
+    goToSchedulingStep(2);
+  };
   
   const safeSchedulerDoctors = Array.isArray(schedulerDoctors) ?schedulerDoctors : [];
+  const schedulePeriods: Array<'Manhã' | 'Tarde' | 'Noite'> = activeSchedulePeriod === 'Todos'
+    ? ['Manhã', 'Tarde', 'Noite']
+    : [activeSchedulePeriod];
+  const getScheduleSlotsForResource = (resourceName: string, date: Date) => (
+    schedulePeriods
+      .flatMap((period) => (
+        isExamAppointment
+          ? buildRoomSlots(roomScheduleById[resourceName], period, date)
+          : buildDoctorSlots(doctorMetaByName[resourceName], period, date)
+      ))
+      .filter((slot, index, slots) => slots.indexOf(slot) === index)
+  );
   const doctorSlotsByName = safeSchedulerDoctors.reduce<Record<string, string[]>>((acc, doctorName) => {
-    acc[doctorName] = isExamAppointment
-      ?buildRoomSlots(roomScheduleById[doctorName], activeSchedulePeriod, schedulingDate)
-      : buildDoctorSlots(doctorMetaByName[doctorName], activeSchedulePeriod, schedulingDate);
+    acc[doctorName] = getScheduleSlotsForResource(doctorName, schedulingDate);
     return acc;
   }, {});
   const findOverlappingAppointment = (
@@ -2348,7 +2581,7 @@ export function Agendamento() {
     const slotStartMinute = parseTimeToMinutes(slot);
     if (slotStartMinute === null) return false;
     const slotEndMinute = slotStartMinute + durationMinutes;
-    const period = resolveTurnoFromTime(slot) || activeSchedulePeriod;
+    const period = resolveTurnoFromTime(slot) || 'Manhã';
     const [, periodEnd] = PERIOD_RANGES[period];
     if (slotEndMinute > periodEnd) return false;
     if (isExamAppointment) {
@@ -2372,7 +2605,10 @@ export function Agendamento() {
     if (selectableProcedures.length === 0) return [];
     const candidateDoctors = doctorName
       ?[doctorName]
-      : safeSchedulerDoctors.filter((candidateDoctor) => (doctorSlotsByName[candidateDoctor] || []).includes(time));
+      : safeSchedulerDoctors.filter((candidateDoctor) => {
+        const candidateSlots = getScheduleSlotsForResource(candidateDoctor, date);
+        return candidateSlots.includes(time);
+      });
     return selectableProcedures.filter((procedureName) => {
       const durationMinutes = getProcedureDuration(procedureName);
       return candidateDoctors.some((candidateDoctor) => (
@@ -2472,6 +2708,58 @@ export function Agendamento() {
           };
         })
         .sort((a, b) => (a.minute - b.minute));
+  const normalizedAvailabilitySearch = normalizeComparableText(availabilitySearch);
+  const matchesAvailabilitySearchForSlot = (slotItem: { slot: string; doctor?: string; doctorLabel?: string; schedulableProcedures?: string[] }) => {
+    if (!normalizedAvailabilitySearch) return true;
+    return [
+      slotItem.slot,
+      slotItem.doctor,
+      slotItem.doctorLabel,
+      ...(slotItem.schedulableProcedures || []),
+    ].some((value) => normalizeComparableText(value).includes(normalizedAvailabilitySearch));
+  };
+  const filteredDisplayScheduleSlots = displayScheduleSlots.filter(matchesAvailabilitySearchForSlot);
+  const getAvailableScheduleSlotsForDate = (date: Date) => {
+    const rawSlots = safeSchedulerDoctors
+    .flatMap((doctor) => {
+      const slots = getScheduleSlotsForResource(doctor, date);
+      return slots
+        .filter((slot) => {
+          const procedures = getSchedulableProceduresForSlot(doctor, slot, date);
+          return isMultiProcedureFlow
+            ? procedures.some((procedureName) => slotSupportsDuration(doctor, slot, getProcedureDuration(procedureName), date, editingAgendamentoId))
+            : slotSupportsProcedureDuration(doctor, slot, date);
+        })
+        .map((slot) => ({
+          key: `${doctor}-${formatDateForApi(date)}-${slot}`,
+          doctor,
+          doctorLabel: isExamAppointment ? (roomLabelById[doctor] || 'Sala') : doctor,
+          slot,
+          schedulableProcedures: getSchedulableProceduresForSlot(doctor, slot, date),
+          availableDoctorsForSlot: [doctor],
+        }));
+    })
+    .filter(matchesAvailabilitySearchForSlot)
+    .sort((a, b) => (parseTimeToMinutes(a.slot) || 0) - (parseTimeToMinutes(b.slot) || 0));
+    if (novoAgendamento.profissional || isExamAppointment) return rawSlots;
+    return Object.values(rawSlots.reduce<Record<string, typeof rawSlots>>((acc, item) => {
+      if (!acc[item.slot]) acc[item.slot] = [];
+      acc[item.slot].push(item);
+      return acc;
+    }, {})).map((items) => ({
+      ...items[0],
+      key: `week-time-${formatDateForApi(date)}-${items[0].slot}`,
+      doctor: '',
+      doctorLabel: items.length === 1 ? '1 profissional disponível' : `${items.length} profissionais disponíveis`,
+      availableDoctorsForSlot: items.map((item) => item.doctor),
+    }));
+  };
+  const weekDates = Array.from({ length: 7 }, (_, index) => addDays(availabilityWeekStart, index));
+  const weekAvailabilitySlots = weekDates.reduce<Record<string, ReturnType<typeof getAvailableScheduleSlotsForDate>>>((acc, date) => {
+    acc[formatDateForApi(date)] = getAvailableScheduleSlotsForDate(date);
+    return acc;
+  }, {});
+  const weekAvailabilityCount = Object.values(weekAvailabilitySlots).reduce((total, slots) => total + slots.length, 0);
   const getProfessionalOptionsForSlot = (
     time: string,
     date: Date,
@@ -2489,15 +2777,13 @@ export function Agendamento() {
               ?[novoAgendamento.profissional]
               : normalizedProcedure
                 ?getCompatibleDoctorsForProcedure(normalizedProcedure)
-                : filteredDoctorOptions.map((option) => option.value)
+                : availableDoctorOptions.map((option) => option.value)
           )
       );
     return Array.from(new Set(candidateDoctors))
       .filter(Boolean)
       .filter((doctor) => {
-        const doctorSlots = isExamAppointment
-          ?buildRoomSlots(roomScheduleById[doctor], activeSchedulePeriod, date)
-          : buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
+        const doctorSlots = getScheduleSlotsForResource(doctor, date);
         if (!doctorSlots.includes(time)) return false;
         if (normalizedProcedure) {
           return getSelectableProceduresForSlot(doctor, time, date).includes(normalizedProcedure)
@@ -2554,7 +2840,7 @@ export function Agendamento() {
       return roomSlots.some((slot) => slotSupportsDuration(novoAgendamento.roomId, slot, selectedProcedureDuration, date, editingAgendamentoId));
     }
     return schedulerDoctors.some((doctor) => {
-      const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], activeSchedulePeriod, date);
+      const doctorSlots = getScheduleSlotsForResource(doctor, date);
       return doctorSlots.some((slot) => (
         isMultiProcedureFlow
           ?getSelectableProceduresForSlot(doctor, slot, date).some((procedureName) => (
@@ -2603,7 +2889,7 @@ export function Agendamento() {
     const procedureMeta = procedureMetaByName[procedureName];
     const linkedDoctorIds = (procedureMeta?.doctorIds || []).map((item) => String(item).trim()).filter(Boolean);
     const linkedDoctorNames = (procedureMeta?.doctorNames || []).map(normalizeComparableText);
-    return doctorOptions
+    return availableDoctorOptions
       .filter((option) => {
         if (novoAgendamento.profissional && option.value !== novoAgendamento.profissional) return false;
         const meta = doctorMetaByName[option.value];
@@ -2903,7 +3189,61 @@ export function Agendamento() {
     setPendingAnchorSlot({ doctorName, time, date });
     setAnchorProcedureModalOpen(true);
   };
+  const handleSelectSimultaneousSlot = (slot: { doctor?: string; slot: string; availableDoctorsForSlot?: string[] }, date: Date) => {
+    if (selectedSpecialties.length < 2) return;
+    if (isExamAppointment) {
+      showNotification({
+        title: 'Simultaneidade indisponível para exames',
+        message: 'Para exames, selecione os recursos de cada procedimento em horários compatíveis.',
+        color: 'yellow',
+      });
+      return;
+    }
+    const candidates = slot.availableDoctorsForSlot?.length
+      ? slot.availableDoctorsForSlot
+      : availableDoctorOptions.map((option) => option.value);
+    const assignedDoctors = new Set<string>();
+    const selections: ProcedureAnchorSelection[] = [];
+    for (const procedureName of selectedSpecialties) {
+      const compatible = getProfessionalOptionsForSlot(slot.slot, date, procedureName, candidates)
+        .map((item) => item.doctor)
+        .filter((doctorName) => !assignedDoctors.has(doctorName));
+      const doctorName = compatible[0];
+      if (!doctorName) {
+        showNotification({
+          title: 'Não há profissionais suficientes',
+          message: 'A marcação simultânea precisa de um profissional disponível para cada procedimento no mesmo horário.',
+          color: 'yellow',
+        });
+        return;
+      }
+      assignedDoctors.add(doctorName);
+      selections.push({
+        procedure: procedureName,
+        doctorName,
+        date,
+        time: slot.slot,
+        durationMinutes: getProcedureDuration(procedureName),
+        selectionOrder: selections.length,
+      });
+    }
+    setManualProcedureSelections(selections);
+    setSuggestedOptions([]);
+    setSelectedSuggestedOptionId(null);
+    setViewedDate(date);
+    setActiveSchedulePeriod(resolveTurnoFromTime(slot.slot) || 'Manhã');
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      profissional: selections[0]?.doctorName || '',
+      hora: slot.slot,
+      data: date,
+    }));
+  };
   const handleSelectGridSlot = (slot: { doctor?: string; slot: string; availableDoctorsForSlot?: string[] }, date: Date) => {
+    if (simultaneousEnabled) {
+      handleSelectSimultaneousSlot(slot, date);
+      return;
+    }
     if (isExamAppointment && !isMultiProcedureFlow) {
       setSelectedSuggestedOptionId(null);
       setNovoAgendamento((prev) => ({
@@ -3014,7 +3354,7 @@ export function Agendamento() {
   useEffect(() => {
     if (isExamAppointment) return;
     if (!novoAgendamento.profissional) return;
-    const stillAvailable = filteredDoctorOptions.some((option) => option.value === novoAgendamento.profissional);
+    const stillAvailable = availableDoctorOptions.some((option) => option.value === novoAgendamento.profissional);
     if (!stillAvailable) {
       setNovoAgendamento((prev) => ({
         ...prev,
@@ -3022,7 +3362,7 @@ export function Agendamento() {
         hora: '',
       }));
     }
-  }, [filteredDoctorOptions, novoAgendamento.profissional, isExamAppointment]);
+  }, [availableDoctorOptions, novoAgendamento.profissional, isExamAppointment]);
   useEffect(() => {
     setSuggestedOptions([]);
     setSelectedSuggestedOptionId(null);
@@ -3044,7 +3384,10 @@ export function Agendamento() {
                   icon: Plus,
                   title: 'Realizar marcação',
                   desc: 'Cadastrar novo agendamento com paciente, procedimento, profissional e horário.',
-                  onClick: () => setActiveTab('marcacao'),
+                  onClick: () => {
+                    resetSchedulingForm(dataHoraFiltro || new Date());
+                    setActiveTab('marcacao');
+                  },
                 },
                 {
                   key: 'agendados',
@@ -3112,9 +3455,35 @@ export function Agendamento() {
                 <Box className="agendamento-scheduler-intro__status-dot" aria-hidden="true" />
                 <Box>
                   <Text className="agendamento-scheduler-intro__status-label">Fluxo guiado</Text>
-                  <Text className="agendamento-scheduler-intro__status-value">Dados ainda não confirmados</Text>
+                  <Text className="agendamento-scheduler-intro__status-value">Etapa {schedulingStep + 1} de 3</Text>
                 </Box>
               </Group>
+            </Box>
+            <Box className="agendamento-wizard-progress" aria-label="Progresso do agendamento">
+              {[
+                { index: 0, label: 'Dados', description: 'Paciente e atendimento' },
+                { index: 1, label: 'Horário', description: 'Disponibilidade' },
+                { index: 2, label: 'Revisão', description: 'Confirmação' },
+              ].map((step) => (
+                <UnstyledButton
+                  key={step.index}
+                  type="button"
+                  className={`agendamento-wizard-progress__step${schedulingStep === step.index ? ' is-active' : ''}${schedulingStep > step.index ? ' is-complete' : ''}`}
+                  onClick={() => {
+                    if (step.index < schedulingStep) goToSchedulingStep(step.index);
+                  }}
+                  disabled={step.index >= schedulingStep}
+                  aria-current={schedulingStep === step.index ? 'step' : undefined}
+                >
+                  <span className="agendamento-wizard-progress__index">
+                    {schedulingStep > step.index ? <Check size={15} strokeWidth={3} aria-hidden="true" /> : step.index + 1}
+                  </span>
+                  <span className="agendamento-wizard-progress__copy">
+                    <span className="agendamento-wizard-progress__label">{step.label}</span>
+                    <span className="agendamento-wizard-progress__description">{step.description}</span>
+                  </span>
+                </UnstyledButton>
+              ))}
             </Box>
             <Stack
               className="agendamento-scheduler-flow"
@@ -3125,40 +3494,30 @@ export function Agendamento() {
                 paddingRight: isMobile ?4 : 8,
               }}
             >
-              <Group className={`agendamento-step-heading agendamento-step-heading--patient${isManualPatientFlow ? ' agendamento-step-heading--manual' : ''}`} justify="space-between" align="center" wrap="wrap">
-	                <Group gap="xs">
-	                  <Badge circle color="blue" variant="filled" size="lg">1</Badge>
-                  <Box className="agendamento-step-heading__copy">
-	                    <Text fw={700} size="lg">Dados cadastrais</Text>
-	                    <Text size="sm" c="dimmed">Dados do paciente</Text>
-	                  </Box>
-	                </Group>
-	
-                  <Group className="agendamento-step-actions" gap="sm" justify="flex-end">
-                    {isManualPatientFlow ?(
-                      <>
-                        <Badge variant="light" color="blue" size="lg">
-                          Novo paciente em cadastro
-                        </Badge>
-                        <Button
-                          variant="default"
-                          onClick={handleDisableManualPatientFlow}
-                        >
-                          Voltar para paciente cadastrado
-                        </Button>
-                      </>
-                    ) : (
-		                  <Button
-		                    leftSection={<Plus size={14} />}
-		                    onClick={handleEnableManualPatientFlow}
-		                  >
-		                    Novo paciente
-		                  </Button>
-                    )}
-                  </Group>
-              </Group>
-              <Box className="agendamento-step-connector" aria-hidden="true" />
+              <Box className={`agendamento-wizard-step agendamento-wizard-step--details${schedulingStep === 0 ? ' is-active' : ''}`}>
               <Box className="agendamento-stage-panel agendamento-stage-panel--details">
+              <Group className="agendamento-patient-panel-header" justify="space-between" align="center" wrap="wrap" gap="sm">
+                <Box className="agendamento-patient-panel-header__copy">
+                  <Text className="agendamento-patient-panel-header__title" fw={700}>Paciente</Text>
+                  <Text className="agendamento-patient-panel-header__description" size="sm" c="dimmed">
+                    {isManualPatientFlow ? 'Preencha os dados mínimos para cadastrar um novo paciente.' : 'Selecione um paciente já cadastrado ou inicie um novo cadastro.'}
+                  </Text>
+                </Box>
+                <Group className="agendamento-patient-panel-header__actions" gap="sm" wrap="wrap">
+                  {isManualPatientFlow ?(
+                    <>
+                      <Badge variant="light" color="blue">Novo paciente</Badge>
+                      <Button variant="default" onClick={handleDisableManualPatientFlow}>
+                        Usar paciente cadastrado
+                      </Button>
+                    </>
+                  ) : (
+                    <Button leftSection={<Plus size={14} />} onClick={handleEnableManualPatientFlow}>
+                      Novo paciente
+                    </Button>
+                  )}
+                </Group>
+              </Group>
               <SimpleGrid className="agendamento-patient-grid" cols={{ base: 1, md: 2 }} spacing="md">
                 <Select
                   className="agendamento-native-field"
@@ -3256,7 +3615,7 @@ export function Agendamento() {
                 </Stack>
               )}
               <Text className="agendamento-form-section-title" fw={600} size="md">Dados do convênio</Text>
-              <SimpleGrid className="agendamento-insurance-grid" cols={{ base: 1, md: 4 }} spacing="md">
+              <SimpleGrid className="agendamento-insurance-grid" cols={{ base: 1, md: 5 }} spacing="md">
                 <Select
                   className="agendamento-native-field"
                   label="Tipo do convênio*"
@@ -3269,6 +3628,7 @@ export function Agendamento() {
                     setNovoAgendamento({
                       ...novoAgendamento,
                       convenio: nextConvenio,
+                      convenioPlano: '',
                       convenioStatus: isParticular
                         ?PARTICULAR_STATUS_LABEL
                         : (novoAgendamento.convenioStatus || 'Ativo'),
@@ -3278,6 +3638,20 @@ export function Agendamento() {
                   clearable
                   disabled={insurancesLoading}
                   nothingFoundMessage="Nenhum convênio encontrado"
+                />
+                <Select
+                  className="agendamento-native-field"
+                  label="Plano"
+                  placeholder={novoAgendamento.convenio && !isParticularInsurance(novoAgendamento.convenio) ? 'Selecione o plano' : 'Não se aplica'}
+                  data={insurancePlanOptions
+                    .filter((option) => option.insuranceName === novoAgendamento.convenio)
+                    .map(({ value, label }) => ({ value, label }))}
+                  value={novoAgendamento.convenioPlano || null}
+                  onChange={(value) => setNovoAgendamento({ ...novoAgendamento, convenioPlano: value || '' })}
+                  searchable
+                  clearable
+                  disabled={!canEditInsuranceFields || isParticularInsurance(novoAgendamento.convenio)}
+                  nothingFoundMessage="Nenhum plano cadastrado para este convênio"
                 />
                 <TextInput
                   className="agendamento-native-field"
@@ -3300,6 +3674,31 @@ export function Agendamento() {
               </SimpleGrid>
               <Text className="agendamento-form-section-title" fw={600} size="md">Dados do agendamento</Text>
               <SimpleGrid className="agendamento-appointment-grid" cols={{ base: 1, md: isExamAppointment ?2 : 3, lg: isExamAppointment ?5 : 3 }} spacing="md">
+                <Select
+                  className="agendamento-native-field"
+                  label="Unidade"
+                  placeholder={branchesQuery.isFetching ? 'Carregando unidades...' : 'Unidade atual'}
+                  data={branchOptions}
+                  value={selectedBranchId}
+                  onChange={(value) => {
+                    setSelectedBranchId(value || null);
+                    setNovoAgendamento((prev) => ({
+                      ...prev,
+                      branchId: value || '',
+                      profissional: '',
+                      roomId: '',
+                      medicalEquipmentId: '',
+                      hora: '',
+                    }));
+                    setManualProcedureSelections([]);
+                    setSuggestedOptions([]);
+                    setSelectedSuggestedOptionId(null);
+                  }}
+                  searchable
+                  clearable
+                  disabled={branchesQuery.isFetching || branchOptions.length === 0}
+                  nothingFoundMessage="Nenhuma unidade encontrada"
+                />
                 <MultiSelect
                   className="agendamento-native-field"
                   label="Procedimento"
@@ -3312,34 +3711,30 @@ export function Agendamento() {
                   disabled={proceduresLoading}
                   nothingFoundMessage="Nenhum procedimento encontrado"
                 />
-                <FloatingDatePicker
-                  label="Data da marcação"
-                  labelPlacement="stacked"
-                  value={novoAgendamento.data ? dayjs(novoAgendamento.data).format('YYYY-MM-DD') : ''}
-                  onChange={(event) => {
-                    const rawDate = event.currentTarget.value ? new Date(`${event.currentTarget.value}T12:00:00`) : null;
-                    const nextDate = rawDate
-                      ?(isPastCalendarDate(rawDate) ?getTodayStart() : rawDate)
-                      : null;
-                    setNovoAgendamento({ ...novoAgendamento, data: nextDate });
-                    setDataHoraFiltro(nextDate);
-                    if (nextDate) setViewedDate(nextDate);
-                  }}
-                  minDate={getTodayStart()}
-                  containerProps={{ className: 'agendamento-native-date-field' }}
-                />
                 {!isExamAppointment && (
                   <Select
                     className="agendamento-native-field"
                     label="Profissional"
                     placeholder={doctorsLoading ?'Carregando médicos...' : 'Selecione se quiser filtrar por um profissional'}
-                    data={filteredDoctorOptions}
+                    data={availableDoctorOptions}
                     value={novoAgendamento.profissional}
                     onChange={(value) => setNovoAgendamento({ ...novoAgendamento, profissional: value || '' })}
                     searchable
                     clearable
                     disabled={doctorsLoading}
                     nothingFoundMessage="Nenhum médico compatível com o procedimento encontrado"
+                  />
+                )}
+                {!isExamAppointment && (
+                  <Select
+                    className="agendamento-native-field"
+                    label="Modalidade"
+                    placeholder="Selecione a modalidade"
+                    data={appointmentModalityOptions}
+                    value={novoAgendamento.modalidadeAtendimento}
+                    onChange={handleModalityChange}
+                    disabled={selectedSpecialties.length === 0}
+                    nothingFoundMessage="Nenhuma modalidade disponível"
                   />
                 )}
                 {isExamAppointment && (
@@ -3385,71 +3780,207 @@ export function Agendamento() {
                 value={novoAgendamento.informacoes}
                 onChange={(e) => setNovoAgendamento({ ...novoAgendamento, informacoes: e.currentTarget.value })}
               />
-              <Group className="agendamento-selection-summary" gap="xs">
-                {selectedProcedureSummary.length > 0 ?(
-                  selectedProcedureSummary.map((item) => (
-                    <Badge key={item} variant="light" color="blue" radius="xl" size="lg">
-                      {item}
-                    </Badge>
-                  ))
-                ) : (
-                  <Text size="sm" c="dimmed">Nenhum procedimento selecionado ainda.</Text>
-                )}
+              </Box>
+              <Group className="agendamento-wizard-actions" justify="space-between" align="center" wrap="wrap">
+                <Button variant="default" onClick={() => resetSchedulingForm(dataHoraFiltro || new Date())}>
+                  Limpar fluxo
+                </Button>
+                <Button
+                  rightSection={<ChevronRight size={16} aria-hidden="true" />}
+                  onClick={handleContinueToAvailability}
+                  disabled={!canAdvanceToAvailability}
+                >
+                  Continuar para horários
+                </Button>
               </Group>
               </Box>
-              <Group className="agendamento-step-heading agendamento-step-heading--schedule" gap="xs">
-                <Badge circle color="blue" variant="filled" size="lg">2</Badge>
-                <Box className="agendamento-step-heading__copy">
-                  <Text fw={700} size="lg">Horários</Text>
-                  <Text size="sm" c="dimmed">Disponibilidade de horários</Text>
-                </Box>
-              </Group>
+              <Box className={`agendamento-wizard-step agendamento-wizard-step--availability${schedulingStep === 1 ? ' is-active' : ''}`}>
               <Box className="agendamento-stage-panel agendamento-stage-panel--availability">
               {selectedProcedureSummary.length > 0 ?(
               <>
-              <Box className="agendamento-step-connector" aria-hidden="true" />
-              <Group className="agendamento-schedule-toolbar" gap="md" wrap="wrap">
-                <Group className="agendamento-schedule-date-nav" gap="sm" wrap="nowrap">
-                  <ActionIcon
-                    variant="light"
-                    onClick={() => goToSchedulingDate(addDays(schedulingDate, -1))}
-                    aria-label="Dia anterior"
-                    disabled={dayjs(schedulingDate).isSame(dayjs(), 'day') || isPastCalendarDate(schedulingDate)}
-                  >
-                    <ChevronLeft size={16} />
-                  </ActionIcon>
-                  <Group className="agendamento-schedule-date-display" gap="xs" wrap="nowrap">
-                    <Calendar size={16} aria-hidden="true" />
-                    <Box>
-                      <Text className="agendamento-schedule-date-label" size="xs" c="dimmed">Data da agenda</Text>
-                      <Text className="agendamento-schedule-date-value" fw={700} size="md">
-                        {dayjs(schedulingDate).format('DD/MM/YYYY')}
-                      </Text>
-                    </Box>
+              <Box className="agendamento-availability-controls">
+                <Group className="agendamento-availability-controls__header" justify="space-between" align="flex-start" gap="md" wrap="wrap">
+                  <Box className="agendamento-availability-controls__intro">
+                    <Text className="agendamento-availability-controls__eyebrow">BUSCA DE DISPONIBILIDADE</Text>
+                    <Text className="agendamento-availability-controls__title" component="h3">Escolha quando realizar o atendimento</Text>
+                    <Text className="agendamento-availability-controls__description">
+                      A grade considera duração, agenda, conflitos e recursos disponíveis para este atendimento.
+                    </Text>
+                  </Box>
+                  <Badge className="agendamento-availability-controls__step" variant="light" color="blue">
+                    Etapa 2 de 3
+                  </Badge>
+                </Group>
+                <Group className="agendamento-availability-modes" justify="space-between" align="center" gap="sm" wrap="wrap">
+                  <Group gap="xs" wrap="wrap">
+                    <Button
+                      size="sm"
+                      variant={availabilityViewMode === 'day' ? 'filled' : 'default'}
+                      leftSection={<Calendar size={15} aria-hidden="true" />}
+                      onClick={() => setAvailabilityViewMode('day')}
+                    >
+                      Dia
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={availabilityViewMode === 'week' ? 'filled' : 'default'}
+                      leftSection={<LayoutGrid size={15} aria-hidden="true" />}
+                      onClick={() => setAvailabilityViewMode('week')}
+                    >
+                      Semana
+                    </Button>
                   </Group>
-                  <ActionIcon variant="light" onClick={() => goToSchedulingDate(addDays(schedulingDate, 1))} aria-label="Próximo dia">
-                    <ChevronRight size={16} />
-                  </ActionIcon>
+                  <Group gap="xs" wrap="wrap">
+                    <Button
+                      size="sm"
+                      variant={simultaneousEnabled ? 'filled' : 'default'}
+                      color={simultaneousEnabled ? 'violet' : undefined}
+                      onClick={() => {
+                        setSimultaneousEnabled((current) => !current);
+                        setSuggestedOptions([]);
+                        setSelectedSuggestedOptionId(null);
+                        setManualProcedureSelections([]);
+                      }}
+                      disabled={selectedProcedureSummary.length < 2}
+                    >
+                      Marcação simultânea
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={recurrenceEnabled ? 'filled' : 'default'}
+                      color={recurrenceEnabled ? 'teal' : undefined}
+                      onClick={() => setRecurrenceEnabled((current) => !current)}
+                      disabled={selectedProcedureSummary.length === 0}
+                    >
+                      Marcação recorrente
+                    </Button>
+                  </Group>
                 </Group>
-                <Group className="agendamento-schedule-filters" gap="md" wrap="wrap">
-                  <Select
-                    className="agendamento-native-field agendamento-schedule-select"
-                    label="Turno"
-                    data={(['Manhã', 'Tarde', 'Noite'] as const).map((turnoLabel) => ({ value: turnoLabel, label: turnoLabel }))}
-                    value={activeSchedulePeriod}
-                    onChange={(value) => setActiveSchedulePeriod((value as 'Manhã' | 'Tarde' | 'Noite') || 'Manhã')}
-                  />
-                  {!isExamAppointment && (
-                    <Select
-                      className="agendamento-native-field agendamento-schedule-select agendamento-schedule-select--professional"
-                      label="Profissional"
-                      data={[{ value: '', label: 'Todos os profissionais' }, ...filteredDoctorOptions]}
-                      value={novoAgendamento.profissional}
-                      onChange={(value) => setNovoAgendamento((prev) => ({ ...prev, profissional: value || '' }))}
+                <Box className="agendamento-availability-controls__body">
+                  <Group className="agendamento-schedule-date-nav" gap="sm" wrap="nowrap">
+                    <Button
+                      className="agendamento-schedule-nav-button"
+                      variant="default"
+                      size="sm"
+                      leftSection={<ChevronLeft size={16} aria-hidden="true" />}
+                      onClick={() => goToSchedulingDate(addDays(schedulingDate, availabilityViewMode === 'week' ? -7 : -1))}
+                      aria-label={availabilityViewMode === 'week' ? 'Ir para a semana anterior' : 'Ir para o dia anterior'}
+                      disabled={dayjs(schedulingDate).isSame(dayjs(), 'day') || isPastCalendarDate(schedulingDate)}
+                    >
+                      {availabilityViewMode === 'week' ? 'Semana anterior' : 'Dia anterior'}
+                    </Button>
+                    <FloatingDatePicker
+                      label="Data da marcação"
+                      labelPlacement="stacked"
+                      value={schedulingDate ? dayjs(schedulingDate).format('YYYY-MM-DD') : ''}
+                      onChange={(event) => {
+                        const rawDate = event.currentTarget.value ? new Date(`${event.currentTarget.value}T12:00:00`) : null;
+                        const nextDate = rawDate
+                          ?(isPastCalendarDate(rawDate) ?getTodayStart() : rawDate)
+                          : null;
+                        setNovoAgendamento((prev) => ({ ...prev, data: nextDate, hora: '' }));
+                        setDataHoraFiltro(nextDate);
+                        if (nextDate) setViewedDate(nextDate);
+                      }}
+                      minDate={getTodayStart()}
+                      containerProps={{ className: 'agendamento-availability-date-field' }}
                     />
+                    <Button
+                      className="agendamento-schedule-nav-button"
+                      variant="default"
+                      size="sm"
+                      rightSection={<ChevronRight size={16} aria-hidden="true" />}
+                      onClick={() => goToSchedulingDate(addDays(schedulingDate, availabilityViewMode === 'week' ? 7 : 1))}
+                      aria-label={availabilityViewMode === 'week' ? 'Ir para a próxima semana' : 'Ir para o próximo dia'}
+                    >
+                      {availabilityViewMode === 'week' ? 'Próxima semana' : 'Próximo dia'}
+                    </Button>
+                  </Group>
+                  <Group className="agendamento-schedule-filters" gap="md" wrap="wrap">
+                    <Select
+                      className="agendamento-native-field agendamento-schedule-select"
+                      label="Turno de atendimento"
+                      data={(['Todos', 'Manhã', 'Tarde', 'Noite'] as const).map((turnoLabel) => ({
+                        value: turnoLabel,
+                        label: turnoLabel === 'Todos' ? 'Todos os turnos' : turnoLabel,
+                      }))}
+                      value={activeSchedulePeriod}
+                      onChange={(value) => setActiveSchedulePeriod((value as 'Todos' | 'Manhã' | 'Tarde' | 'Noite') || 'Todos')}
+                    />
+                    {!isExamAppointment && (
+                      <Select
+                        className="agendamento-native-field agendamento-schedule-select agendamento-schedule-select--professional"
+                        label="Profissional responsável"
+                        data={[{ value: '', label: 'Todos os profissionais' }, ...availableDoctorOptions]}
+                        value={novoAgendamento.profissional}
+                        onChange={(value) => setNovoAgendamento((prev) => ({ ...prev, profissional: value || '' }))}
+                      />
+                    )}
+                    <Select
+                      className="agendamento-native-field agendamento-schedule-select"
+                      label="Sexo do profissional"
+                      placeholder="Todos"
+                      data={[
+                        { value: 'MALE', label: 'Masculino' },
+                        { value: 'FEMALE', label: 'Feminino' },
+                        { value: 'OTHER', label: 'Outro' },
+                      ]}
+                      value={availabilityGenderFilter}
+                      onChange={setAvailabilityGenderFilter}
+                      clearable
+                    />
+                  </Group>
+                  <TextInput
+                    className="agendamento-availability-search"
+                    label="Busca rápida"
+                    placeholder="Procedimento, profissional ou horário"
+                    leftSection={<Search size={16} aria-hidden="true" />}
+                    value={availabilitySearch}
+                    onChange={(event) => setAvailabilitySearch(event.currentTarget.value)}
+                  />
+                  {recurrenceEnabled && (
+                    <Group className="agendamento-recurrence-controls" gap="sm" wrap="wrap">
+                      <Text className="agendamento-recurrence-controls__label" fw={600}>Repetir semanalmente</Text>
+                      <Select
+                        aria-label="Quantidade de ocorrências"
+                        data={['2', '3', '4', '5', '6', '8', '12'].map((value) => ({ value, label: `${value} ocorrências` }))}
+                        value={recurrenceOccurrences}
+                        onChange={(value) => setRecurrenceOccurrences(value || '4')}
+                        allowDeselect={false}
+                        w={150}
+                      />
+                      <Select
+                        aria-label="Intervalo da recorrência"
+                        data={[{ value: '1', label: 'Toda semana' }, { value: '2', label: 'A cada 2 semanas' }, { value: '4', label: 'A cada 4 semanas' }]}
+                        value={recurrenceIntervalWeeks}
+                        onChange={(value) => setRecurrenceIntervalWeeks(value || '1')}
+                        allowDeselect={false}
+                        w={180}
+                      />
+                    </Group>
                   )}
-                </Group>
-              </Group>
+                </Box>
+                <Box className="agendamento-availability-context">
+                  <Text className="agendamento-availability-context__label">Critérios selecionados</Text>
+                  <Group className="agendamento-availability-context__chips" gap="xs" wrap="wrap">
+                    {selectedProcedureSummary.map((procedure) => (
+                      <Badge key={procedure} variant="light" color="blue" radius="xl">{procedure}</Badge>
+                    ))}
+                    <Badge variant="light" color="gray" radius="xl">{isExamAppointment ? 'Exame' : 'Consulta'}</Badge>
+                    {!isExamAppointment && (
+                      <Badge variant="light" color={novoAgendamento.modalidadeAtendimento === 'Teleconsulta' ? 'violet' : 'blue'} radius="xl">
+                        {novoAgendamento.modalidadeAtendimento}
+                      </Badge>
+                    )}
+                    {novoAgendamento.profissional && !isExamAppointment && (
+                      <Badge variant="light" color="violet" radius="xl">{novoAgendamento.profissional}</Badge>
+                    )}
+                    {isExamAppointment && novoAgendamento.roomId && (
+                      <Badge variant="light" color="violet" radius="xl">{roomLabelById[novoAgendamento.roomId] || 'Sala selecionada'}</Badge>
+                    )}
+                  </Group>
+                </Box>
+              </Box>
               {safeSchedulerDoctors.length === 0 ?(
                 <Paper
                   className="agendamento-availability-empty"
@@ -3468,7 +3999,7 @@ export function Agendamento() {
                 </Paper>
               ) : (
                 <Stack className="agendamento-availability-section" gap="md">
-                  {isMultiProcedureFlow && (
+                  {isMultiProcedureFlow && !simultaneousEnabled && (
                     <Paper
                       className="agendamento-suggestion-panel"
                       p="md"
@@ -3601,7 +4132,7 @@ export function Agendamento() {
                       </Text>
                     </Paper>
                   )}
-                  {!schedulingDateHasAvailability && examResourcesSelected && (
+                  {availabilityViewMode === 'day' && !schedulingDateHasAvailability && examResourcesSelected && (
                     <Paper
                       className="agendamento-availability-warning"
                       p="md"
@@ -3622,19 +4153,64 @@ export function Agendamento() {
                       </Group>
                     </Paper>
                   )}
+                  <Box className="agendamento-availability-board">
                   <Group className="agendamento-availability-heading" justify="space-between" align="flex-end" wrap="wrap" gap="sm">
                     <Box>
+                      <Text className="agendamento-availability-heading__eyebrow">GRADE DE HORÁRIOS</Text>
                       <Text className="agendamento-availability-heading__title" fw={700}>Horários disponíveis</Text>
                       <Text className="agendamento-availability-heading__description" size="sm" c="dimmed">
-                        Escolha um horário para continuar a marcação.
+                        Selecione um horário livre. Ao escolher um profissional, a grade mostra a agenda específica dele.
                       </Text>
                     </Box>
-                    <Text className="agendamento-availability-heading__count" size="sm" c="dimmed">
-                      {displayScheduleSlots.length} {displayScheduleSlots.length === 1 ? 'horário encontrado' : 'horários encontrados'}
-                    </Text>
+                    <Badge className="agendamento-availability-heading__count" variant="light" color="blue">
+                      {availabilityViewMode === 'week' ? weekAvailabilityCount : filteredDisplayScheduleSlots.length} {(availabilityViewMode === 'week' ? weekAvailabilityCount : filteredDisplayScheduleSlots.length) === 1 ? 'horário encontrado' : 'horários encontrados'}
+                    </Badge>
                   </Group>
+                  <Group className="agendamento-availability-legend" gap="md" wrap="wrap" aria-label="Legenda dos estados dos horários">
+                    <Text component="span" className="agendamento-availability-legend__item"><span className="agendamento-availability-legend__dot agendamento-availability-legend__dot--available" aria-hidden="true" />Livre</Text>
+                    <Text component="span" className="agendamento-availability-legend__item"><span className="agendamento-availability-legend__dot agendamento-availability-legend__dot--selected" aria-hidden="true" />Selecionado</Text>
+                    <Text component="span" className="agendamento-availability-legend__item"><span className="agendamento-availability-legend__dot agendamento-availability-legend__dot--reserved" aria-hidden="true" />Sugestão ou intervalo</Text>
+                  </Group>
+                  {(availabilityViewMode === 'week' || filteredDisplayScheduleSlots.length > 0) ? (
+                  <Box className="agendamento-availability-grid-shell">
+                  {availabilityViewMode === 'week' ? (
+                    <SimpleGrid className="agendamento-availability-week-grid" cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
+                      {weekDates.map((date) => {
+                        const dateKey = formatDateForApi(date);
+                        const dateSlots = weekAvailabilitySlots[dateKey] || [];
+                        const isSelectedDate = dayjs(date).isSame(dayjs(schedulingDate), 'day');
+                        return (
+                          <Paper className={`agendamento-availability-day${isSelectedDate ? ' is-selected' : ''}`} key={dateKey} p="md" radius="lg">
+                            <Group className="agendamento-availability-day__header" justify="space-between" align="flex-start" wrap="nowrap">
+                              <Box>
+                                <Text className="agendamento-availability-day__weekday" fw={700}>{dayjs(date).format('dddd')}</Text>
+                                <Text className="agendamento-availability-day__date" size="sm" c="dimmed">{dayjs(date).format('DD/MM/YYYY')}</Text>
+                              </Box>
+                              <Badge size="sm" variant="light" color={dateSlots.length ? 'blue' : 'gray'}>{dateSlots.length}</Badge>
+                            </Group>
+                            <Stack className="agendamento-availability-day__slots" gap="xs" mt="sm">
+                              {dateSlots.slice(0, 8).map((slotItem) => (
+                                <Button
+                                  key={slotItem.key}
+                                  variant="light"
+                                  color={isSelectedDate && novoAgendamento.hora === slotItem.slot ? 'teal' : 'blue'}
+                                  justify="space-between"
+                                  onClick={() => handleSelectGridSlot(slotItem, date)}
+                                >
+                                  <span className="agendamento-availability-day__slot-time">{slotItem.slot}</span>
+                                  <span className="agendamento-availability-day__slot-resource">{slotItem.doctorLabel}</span>
+                                </Button>
+                              ))}
+                              {dateSlots.length > 8 && <Text size="xs" c="dimmed">+{dateSlots.length - 8} horários</Text>}
+                              {dateSlots.length === 0 && <Text size="sm" c="dimmed">Sem horários livres</Text>}
+                            </Stack>
+                          </Paper>
+                        );
+                      })}
+                    </SimpleGrid>
+                  ) : (
                   <SimpleGrid className="agendamento-availability-grid" cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
-                    {displayScheduleSlots.map((slotItem) => (
+                    {filteredDisplayScheduleSlots.map((slotItem) => (
                       <UnstyledButton
                         className={[
                           'agendamento-availability-slot',
@@ -3646,6 +4222,9 @@ export function Agendamento() {
                           slotItem.isCoveredBySelectedRange && 'is-selected-covered',
                         ].filter(Boolean).join(' ')}
                         key={slotItem.key}
+                        type="button"
+                        aria-pressed={Boolean(slotItem.isSelected || slotItem.isAnchorStart || slotItem.isSuggestedStart)}
+                        aria-label={`Selecionar ${slotItem.slot}${slotItem.doctorLabel ? ` com ${slotItem.doctorLabel}` : ''}`}
                           onClick={() => {
                             if (slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange) {
                               let reason = 'Esse horário já está comprometido por uma seleção atual.';
@@ -3660,29 +4239,10 @@ export function Agendamento() {
                             }
                             handleSelectGridSlot(slotItem, schedulingDate);
                           }}
-                        style={{
-                          padding: '10px 12px',
-                          borderRadius: 8,
-                          border: `1px solid ${
-                            slotItem.isSelected || slotItem.isCoveredBySelectedRange || slotItem.isAnchorStart || slotItem.isCoveredByAnchorRange || slotItem.isSuggestedStart || slotItem.isCoveredBySuggestedRange
-                              ?(isDarkMode ?'rgba(66, 180, 255, 0.75)' : 'rgba(16, 99, 212, 0.48)')
-                              : (isDarkMode ?'rgba(66, 180, 255, 0.18)' : 'rgba(15, 23, 42, 0.12)')
-                          }`,
-                          background: slotItem.isSelected || slotItem.isCoveredBySelectedRange
-                            ?(isDarkMode ?'rgba(0, 70, 170, 0.45)' : 'rgba(219, 234, 254, 0.95)')
-                            : slotItem.isAnchorStart || slotItem.isCoveredByAnchorRange
-                              ?(isDarkMode ?'rgba(249, 115, 22, 0.18)' : 'rgba(255, 237, 213, 0.95)')
-                            : slotItem.isSuggestedStart || slotItem.isCoveredBySuggestedRange
-                              ?(isDarkMode ?'rgba(18, 184, 134, 0.18)' : 'rgba(209, 250, 229, 0.9)')
-                            : (isDarkMode ?'rgba(0, 70, 170, 0.30)' : '#ffffff'),
-                          cursor: slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange ?'not-allowed' : 'pointer',
-                          opacity: slotItem.isCoveredBySelectedRange || slotItem.isCoveredBySuggestedRange || slotItem.isCoveredByAnchorRange ?0.82 : 1,
-                          boxShadow: isDarkMode ?'none' : '0 1px 2px rgba(15, 23, 42, 0.04)',
-                        }}
                       >
-                        <Group justify="space-between" align="center" wrap="nowrap" mb={6}>
-                          <Group gap={6}>
-                            <Clock3 size={16} />
+                        <Group className="agendamento-availability-slot__header" justify="space-between" align="center" wrap="nowrap">
+                          <Group className="agendamento-availability-slot__time" gap={6} wrap="nowrap">
+                            <Clock3 size={16} aria-hidden="true" />
                             <Text fw={700} size="xl" lh={1}>{slotItem.slot}</Text>
                           </Group>
                                           {slotItem.isSelected ?(
@@ -3735,8 +4295,8 @@ export function Agendamento() {
                                             </Badge>
                                           ) : null}
                         </Group>
-                        <Group gap={6} wrap="nowrap">
-                          <User size={14} />
+                        <Group className="agendamento-availability-slot__resource" gap={6} wrap="nowrap">
+                          <User size={14} aria-hidden="true" />
                           <Text size="sm" c={isDarkMode ?'rgba(255,255,255,0.78)' : 'rgba(15, 23, 42, 0.72)'} truncate>
                             {novoAgendamento.profissional
                               ?(slotItem.doctorLabel || slotItem.doctor)
@@ -3747,7 +4307,7 @@ export function Agendamento() {
                         </Group>
                         {(slotItem.anchorProcedure || slotItem.suggestedProcedure) && (
                           <Text
-                            mt={6}
+                            className="agendamento-availability-slot__procedure"
                             size="xs"
                             fw={600}
                             c={slotItem.anchorProcedure ?'orange.7' : 'green.7'}
@@ -3759,16 +4319,50 @@ export function Agendamento() {
                       </UnstyledButton>
                     ))}
                   </SimpleGrid>
-                  <Group justify="flex-end" mt="md">
-                    <Button
-                      variant="light"
-                      color="red"
-                      onClick={handleClearSelectedSchedules}
-                      disabled={!hasAnySelectedSchedule}
-                    >
-                      Limpar horários
-                    </Button>
-                  </Group>
+                  )}
+                  </Box>
+                  ) : (
+                    <Box className="agendamento-availability-empty-board">
+                      <Box className="agendamento-availability-empty-board__icon" aria-hidden="true">
+                        <Calendar size={20} />
+                      </Box>
+                      <Text className="agendamento-availability-empty-board__title" fw={700}>Nenhum horário livre neste turno</Text>
+                      <Text className="agendamento-availability-empty-board__description" size="sm" c="dimmed">
+                        Troque o turno, escolha outro profissional ou procure a próxima disponibilidade.
+                      </Text>
+                    </Box>
+                  )}
+                  <Box className="agendamento-availability-selection-bar">
+                    <Group className="agendamento-availability-selection-bar__copy" gap="sm" wrap="nowrap">
+                      <Box className="agendamento-availability-selection-bar__icon" aria-hidden="true">
+                        <Check size={16} />
+                      </Box>
+                      <Box>
+                        <Text className="agendamento-availability-selection-bar__label">Seleção atual</Text>
+                        <Text className="agendamento-availability-selection-bar__value" fw={700}>
+                          {selectedScheduleCount > 0
+                            ? `${selectedScheduleCount} ${selectedScheduleCount === 1 ? 'horário selecionado' : 'horários selecionados'}`
+                            : 'Nenhum horário selecionado'}
+                        </Text>
+                        {selectedScheduleCount > 0 && (
+                          <Text className="agendamento-availability-selection-bar__meta" size="sm" c="dimmed">
+                            {selectedScheduleDateLabel}{selectedScheduleTimeLabel ? ` • ${selectedScheduleTimeLabel}` : ''}{reviewProfessionalValue ? ` • ${reviewProfessionalValue}` : ''}
+                          </Text>
+                        )}
+                      </Box>
+                    </Group>
+                    <Group className="agendamento-availability-selection-bar__actions" gap="sm" wrap="wrap">
+                      <Button
+                        variant="light"
+                        color="red"
+                        onClick={handleClearSelectedSchedules}
+                        disabled={!hasAnySelectedSchedule}
+                      >
+                        Limpar seleção
+                      </Button>
+                    </Group>
+                  </Box>
+                  </Box>
                   <Modal
                     opened={professionalSlotModalOpen}
                     onClose={() => {
@@ -3879,14 +4473,24 @@ export function Agendamento() {
                 </Text>
               )}
               </Box>
-              <Box className="agendamento-step-connector" aria-hidden="true" />
-              <Group className="agendamento-step-heading agendamento-step-heading--review" gap="xs">
-                <Badge circle color="blue" variant="filled" size="lg">3</Badge>
-                <Box className="agendamento-step-heading__copy">
-                  <Text fw={700} size="lg">Revisão</Text>
-                  <Text size="sm" c="dimmed">Revisão e confirmação</Text>
-                </Box>
+              <Group className="agendamento-wizard-actions" justify="space-between" align="center" wrap="wrap">
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} aria-hidden="true" />}
+                  onClick={() => goToSchedulingStep(0)}
+                >
+                  Voltar aos dados
+                </Button>
+                <Button
+                  rightSection={<ChevronRight size={16} aria-hidden="true" />}
+                  onClick={handleContinueToReview}
+                  disabled={!canAdvanceToReview}
+                >
+                  Revisar agendamento
+                </Button>
               </Group>
+              </Box>
+              <Box className={`agendamento-wizard-step agendamento-wizard-step--confirmation${schedulingStep === 2 ? ' is-active' : ''}`}>
               <Box className="agendamento-stage-panel agendamento-stage-panel--confirmation">
               <Box className="agendamento-review-summary">
                 <Group className="agendamento-review-summary__header" justify="space-between" align="center" wrap="wrap" gap="md">
@@ -3904,33 +4508,30 @@ export function Agendamento() {
                   <Badge className="agendamento-review-summary__status" variant="light" color="blue">
                     Revisão final
                   </Badge>
+                  <Group className="agendamento-review-summary__flags" gap="xs" wrap="wrap">
+                    {simultaneousEnabled && <Badge variant="light" color="violet">Simultânea</Badge>}
+                    {recurrenceEnabled && <Badge variant="light" color="teal">{recurrenceOccurrences} ocorrências</Badge>}
+                  </Group>
                 </Group>
                 <SimpleGrid className="agendamento-review-grid" cols={{ base: 1, md: 3 }} spacing="md">
               <TextInput className="agendamento-native-field agendamento-review-field" label="Nome completo" value={novoAgendamento.pacienteNome || ''} readOnly />
               <TextInput className="agendamento-native-field agendamento-review-field" label="Convênio" value={novoAgendamento.convenio || ''} readOnly />
+              <TextInput className="agendamento-native-field agendamento-review-field" label="Plano" value={novoAgendamento.convenioPlano || 'Não informado'} readOnly />
               <TextInput className="agendamento-native-field agendamento-review-field" label="Procedimento" value={selectedProcedureSummary.join(', ')} readOnly />
               <TextInput className="agendamento-native-field agendamento-review-field" label="Tipo de agendamento" value={getAppointmentTypeLabel(resolvedAppointmentType)} readOnly />
               {!isExamAppointment && (
-                <Select
+                <TextInput
                   className="agendamento-native-field agendamento-review-field"
                   label="Modalidade"
-                  data={[
-                    { value: 'Presencial', label: 'Presencial' },
-                    ...(canScheduleAsTeleconsultation ? [{ value: 'Teleconsulta', label: 'Teleconsulta' }] : []),
-                  ]}
                   value={novoAgendamento.modalidadeAtendimento}
-                  onChange={(value) => setNovoAgendamento((prev) => ({
-                    ...prev,
-                    modalidadeAtendimento: value === 'Teleconsulta' ? 'Teleconsulta' : 'Presencial',
-                  }))}
-                  disabled={!canScheduleAsTeleconsultation}
-                  description={!canScheduleAsTeleconsultation
-                    ? 'Teleconsulta disponível apenas quando procedimento e médico estão habilitados.'
-                    : undefined}
+                  readOnly
                 />
               )}
               <TextInput className="agendamento-native-field agendamento-review-field" label="Data" value={reviewDateValue ?dayjs(reviewDateValue).format('DD/MM/YYYY') : ''} readOnly />
               <TextInput className="agendamento-native-field agendamento-review-field" label="Horário" value={reviewTimeValue} readOnly />
+              {recurrenceEnabled && (
+                <TextInput className="agendamento-native-field agendamento-review-field" label="Recorrência" value={`${recurrenceOccurrences} ocorrência(s) • a cada ${recurrenceIntervalWeeks} semana(s)`} readOnly />
+              )}
               {!isExamAppointment && (
                 <TextInput className="agendamento-native-field agendamento-review-field" label="Profissional respons." value={reviewProfessionalValue} readOnly />
               )}
@@ -4033,8 +4634,12 @@ export function Agendamento() {
                 </Stack>
               </Paper>
               <Group className="agendamento-form-actions" justify="space-between">
-                <Button variant="default" onClick={() => resetSchedulingForm(dataHoraFiltro || new Date())}>
-                  Limpar fluxo
+                <Button
+                  variant="default"
+                  leftSection={<ChevronLeft size={16} aria-hidden="true" />}
+                  onClick={() => goToSchedulingStep(1)}
+                >
+                  Voltar aos horários
                 </Button>
                 <Button
                   onClick={handleAddAgendamento}
@@ -4044,6 +4649,7 @@ export function Agendamento() {
                   {isEditing ?'Salvar alterações' : 'Confirmar Marcação'}
                 </Button>
               </Group>
+              </Box>
               </Box>
             </Stack>
           </Box>

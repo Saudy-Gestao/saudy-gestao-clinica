@@ -32,6 +32,7 @@ import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { useEspecialidadesAdminQuery } from '../../hooks/useEspecialidadesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 import './CadastroSala.css';
 
 interface BranchOption {
@@ -317,6 +318,7 @@ export function CadastroSala() {
         especialidadeIds: [],
         capacity: '',
       });
+      notifyUnsavedChangesSaved();
     } catch (err: any) {
       showNotification({
         title: 'Erro',

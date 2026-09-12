@@ -72,6 +72,7 @@ import { TermsOfService } from './components/PrivacyPolicy/TermsOfService';
 import { LGPDConsentBanner } from './components/common/LGPDConsentBanner';
 import { PatientQueuePage } from './components/PatientQueue/PatientQueuePage';
 import { TicketFab } from './components/common/TicketFab';
+import { ReleaseNotesModal } from './components/common/ReleaseNotesModal';
 import { UnsavedChangesGuard } from './hooks/useUnsavedChangesGuard';
 import { MyTicketsPage } from './components/Tickets/MyTicketsPage';
 import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
@@ -182,6 +183,7 @@ function App() {
         />
         <LGPDConsentBanner />
         <BrowserRouter>
+          <ReleaseNotesModal enabled={isAuthenticated} />
           <UnsavedChangesGuard />
           <Routes>
           <Route 

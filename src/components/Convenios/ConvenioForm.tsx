@@ -31,6 +31,7 @@ import { useInsuranceDetailQuery } from '../../hooks/useInsuranceDetailQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import './ConvenioForm.css';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -723,8 +724,12 @@ export function ConvenioForm() {
         notifications.show({ title: 'Cadastrado', message: 'Convênio cadastrado com sucesso', color: 'green' });
         await queryClient.invalidateQueries({ queryKey: queryKeys.insurancesAdmin });
         setSavedId(newId);
-        if (newId) navigate(`/convenios/${newId}`, { replace: true });
+        if (newId) {
+          notifyUnsavedChangesSaved();
+          navigate(`/convenios/${newId}`, { replace: true });
+        }
       }
+      if (savedId) notifyUnsavedChangesSaved();
     } catch (err: any) {
       notifications.show({ title: 'Erro', message: resolveApiErrorMessage(err, 'Erro ao salvar convênio'), color: 'red' });
     } finally {

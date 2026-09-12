@@ -36,6 +36,7 @@ import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 import './CadastroProcedimentoHub.css';
 import './CadastroProcedimentoForm.css';
 import './CadastroProcedimentoList.css';
@@ -278,6 +279,7 @@ export function CadastroProcedimento() {
 
         setProcedureQuery('');
       }
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: queryKeys.proceduresAdmin });
     } catch (err: any) {
       const message = resolveApiErrorMessage(err, 'Erro ao salvar procedimento');

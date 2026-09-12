@@ -3,6 +3,13 @@ import { useLocation } from 'react-router-dom';
 import { UnsavedChangesDialog } from '@/components/common/UnsavedChangesDialog';
 
 const UNSAVED_MESSAGE = 'Há alterações não salvas nesta tela.';
+export const UNSAVED_CHANGES_SAVED_EVENT = 'saudy:unsaved-changes-saved';
+
+export function notifyUnsavedChangesSaved() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(UNSAVED_CHANGES_SAVED_EVENT));
+  }
+}
 
 const isProtectedRoute = (pathname: string) => (
   pathname === '/cadastro'
@@ -64,6 +71,10 @@ export function useUnsavedChangesGuard() {
       if (!dirtyRef.current) return;
       event.preventDefault();
       event.returnValue = UNSAVED_MESSAGE;
+    };
+
+    const handleSavedChanges = () => {
+      dirtyRef.current = false;
     };
 
     const originalPushState = window.history.pushState.bind(window.history);
@@ -213,6 +224,7 @@ export function useUnsavedChangesGuard() {
     document.addEventListener('input', handleFieldChange, true);
     document.addEventListener('change', handleFieldChange, true);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener(UNSAVED_CHANGES_SAVED_EVENT, handleSavedChanges);
     window.addEventListener('popstate', handlePopState);
     window.history.pushState = guardedPushState as History['pushState'];
     window.history.replaceState = guardedReplaceState as History['replaceState'];
@@ -221,6 +233,7 @@ export function useUnsavedChangesGuard() {
       document.removeEventListener('input', handleFieldChange, true);
       document.removeEventListener('change', handleFieldChange, true);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener(UNSAVED_CHANGES_SAVED_EVENT, handleSavedChanges);
       window.removeEventListener('popstate', handlePopState);
       window.history.pushState = originalPushState;
       window.history.replaceState = originalReplaceState;

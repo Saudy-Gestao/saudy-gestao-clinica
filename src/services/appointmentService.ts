@@ -1,6 +1,7 @@
 import api from './api';
 
 export interface AppointmentPayload {
+  branchId?: string;
   patientName?: string;
   patientCpf?: string;
   patientId?: string;
@@ -15,6 +16,7 @@ export interface AppointmentPayload {
   convenioStatus?: string;
   insurance?: string;
   healthInsuranceName?: string;
+  insurancePlan?: string;
   date?: string;
   time?: string;
   type?: string;
@@ -24,6 +26,10 @@ export interface AppointmentPayload {
   observations?: string;
   totem?: number;
   rescheduledFromAppointmentId?: string;
+  recurrenceSeriesId?: string;
+  recurrenceIndex?: number;
+  recurrenceTotal?: number;
+  simultaneousGroupId?: string;
 }
 
 export default {
@@ -38,6 +44,7 @@ export default {
     date?: string;
     startDate?: string;
     endDate?: string;
+    branchId?: string;
     limit?: number;
     offset?: number;
   }) {
@@ -48,6 +55,12 @@ export default {
 
   async create(payload: AppointmentPayload) {
     const url = '/care/appointments/';
+    const res = await api.post(url, payload);
+    return res.data;
+  },
+
+  async createBatch(payload: { appointments: AppointmentPayload[] }) {
+    const url = '/care/appointments/batch';
     const res = await api.post(url, payload);
     return res.data;
   },

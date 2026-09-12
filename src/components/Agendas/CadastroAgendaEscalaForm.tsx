@@ -19,6 +19,7 @@ import { showNotification } from '@/components/ui';
 import agendaService from '../../services/agendaService';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { isRoomSector } from '../../utils/sectorClassification';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 import './CadastroAgendas.css';
 
 type Option = { value: string; label: string };
@@ -371,6 +372,7 @@ export function CadastroAgendaEscalaForm({
       return;
     }
     showNotification({ title: 'Escala salva', message: `${successCount} horário(s) de agenda cadastrado(s) com sucesso.`, color: 'green' });
+    notifyUnsavedChangesSaved();
     await onSaved();
   };
 

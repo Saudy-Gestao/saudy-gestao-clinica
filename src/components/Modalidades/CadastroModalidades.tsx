@@ -28,6 +28,7 @@ import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import './CadastroModalidades.css';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: 'Criada',
@@ -169,6 +170,7 @@ export function CadastroModalidades() {
       setModalOpen(false);
       setEditingId(null);
       resetForm();
+      notifyUnsavedChangesSaved();
     } catch (err: any) {
       const errorCode = err?.response?.data?.error;
       if (errorCode === 'DUPLICATE_EXACT') {

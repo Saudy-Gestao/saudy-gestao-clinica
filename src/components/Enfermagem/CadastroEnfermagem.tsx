@@ -35,6 +35,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { PaginatedGrid } from '../common/PaginatedGrid';
 import './CadastroEnfermagem.css';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 type QuestionForm = NursingQuestionPayload & {
   id: string;
@@ -349,6 +350,7 @@ export function CadastroEnfermagem() {
       }
       setModalOpen(false);
       resetForm();
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: queryKeys.nursingTemplates });
     } catch (err: any) {
       showNotification({

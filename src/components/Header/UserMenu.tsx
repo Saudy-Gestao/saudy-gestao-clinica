@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Menu, Avatar, Group, UnstyledButton, Switch, Badge, Modal, Stack, Text, PasswordInput, Button, Alert, Box } from '@/components/ui';
-import { User, Settings, Moon, Sun, LifeBuoy, Trash2, AlertTriangle } from 'lucide-react';
+import { User, Settings, Moon, Sun, LifeBuoy, Trash2, AlertTriangle, Sparkles } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { notifications } from '@/components/ui';
 import { useMyTicketsQuery } from '../../hooks/useMyTicketsQuery';
@@ -10,6 +10,7 @@ import userService from '../../services/userService';
 import { hasModuleAccess, isAdminUser } from '../../utils/userRole';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { APP_COLOR_SCHEME_EVENT, applyAppColorScheme, getAppColorScheme, type AppColorScheme } from '../../utils/appColorScheme';
+import { OPEN_RELEASE_NOTES_EVENT } from '../common/ReleaseNotesModal';
 
 export function UserMenu() {
   const navigate = useNavigate();
@@ -153,6 +154,15 @@ export function UserMenu() {
             Meus Chamados
           </Menu.Item>
         )}
+        <Menu.Item
+          leftSection={<Sparkles size={16} />}
+          onClick={() => {
+            setOpened(false);
+            window.dispatchEvent(new Event(OPEN_RELEASE_NOTES_EVENT));
+          }}
+        >
+          Novidades da versão
+        </Menu.Item>
         <Menu.Item
           className="saudy-account-menu__theme-item"
           leftSection={isDark ? <Moon size={16} /> : <Sun size={16} />}

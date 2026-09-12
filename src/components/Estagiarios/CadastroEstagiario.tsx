@@ -33,6 +33,7 @@ import internService, { type InternPayload } from '../../services/internService'
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import './CadastroEstagiario.css';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 type Intern = InternPayload & {
   id: string;
@@ -137,6 +138,7 @@ export function CadastroEstagiario() {
       if (editing) await internService.updateIntern(editing.id, form);
       else await internService.createIntern(form);
       await queryClient.invalidateQueries({ queryKey: queryKeys.internsAdmin });
+      notifyUnsavedChangesSaved();
       setOpened(false);
       showNotification({ title: editing ? 'Estagiário atualizado' : 'Estagiário cadastrado', message: 'Dados salvos com sucesso.', color: 'green' });
     } catch (error) { showNotification({ title: 'Erro', message: resolveApiErrorMessage(error, 'Não foi possível salvar o estagiário.'), color: 'red' }); }

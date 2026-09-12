@@ -99,11 +99,11 @@ describe('CadastroMedico - novo cadastro', () => {
 
     const genderField = screen.getByText('Gênero', { exact: true }).closest('label');
     fireEvent.click(genderField?.querySelector('button') as HTMLButtonElement);
-    fireEvent.click(screen.getByRole('option', { name: 'Masculino' }));
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Masculino' }));
 
     const stateField = screen.getByText('UF do registro', { exact: true }).closest('label');
     fireEvent.click(stateField?.querySelector('button') as HTMLButtonElement);
-    fireEvent.click(screen.getByRole('option', { name: 'SP' }));
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'SP' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(screen.getByText('Profissional cadastrado', { exact: true })).toBeInTheDocument());

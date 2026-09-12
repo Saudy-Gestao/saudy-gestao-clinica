@@ -38,6 +38,7 @@ import { useRoomsAdminQuery } from '../../hooks/useRoomsAdminQuery';
 import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 import './CadastroEquipamento.css';
 
 interface EquipmentForm {
@@ -421,6 +422,7 @@ export function CadastroEquipamento() {
       setSuccessOpen(true);
       resetForm();
       setActiveTab('lista');
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: queryKeys.medicalEquipments });
     } catch (err: any) {
       setErrorMessage(resolveApiErrorMessage(err, 'Não foi possível salvar o equipamento.'));

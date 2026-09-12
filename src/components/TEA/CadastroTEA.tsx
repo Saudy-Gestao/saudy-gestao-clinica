@@ -41,6 +41,7 @@ import { useTeaPlansQuery } from '../../hooks/useTeaPlansQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import './CadastroTEA.css';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 type Gender = 'MALE' | 'FEMALE' | 'OTHER' | '';
 export type TeaSubmodule = 'cadastro' | 'pacientes' | 'plano' | 'evolucao' | 'relatorios';
@@ -512,6 +513,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
         queryClient.invalidateQueries({ queryKey: queryKeys.teaProfiles }),
       ]);
 
+      notifyUnsavedChangesSaved();
       setCadastroModalOpened(false);
       if (forcedSubmodule !== 'pacientes') {
         navigate('/tea');
@@ -838,6 +840,7 @@ export function CadastroTEA({ forcedSubmodule }: CadastroTEAProps) {
 
       showNotification({ title: 'Sucesso', message: 'Plano terapêutico criado com sucesso', color: 'green' });
       setPlanForm(INITIAL_PLAN_FORM);
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: [...queryKeys.teaPlans, selectedTeaProfileId] });
     } catch (err: any) {
       showNotification({

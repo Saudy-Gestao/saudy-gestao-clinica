@@ -430,8 +430,8 @@ export function TicketFab() {
   return (
     <>
       <Box className="ticket-fab-container">
-        <Paper radius="xl" p={6} className="ticket-fab-trigger-wrap">
-          <ActionIcon size={56} radius="xl" variant="transparent" onClick={open} aria-label="Abrir ajuda" className="ticket-fab-trigger">
+        <Paper radius="xl" className="ticket-fab-trigger-wrap">
+          <ActionIcon size={44} radius="xl" variant="transparent" onClick={open} aria-label="Abrir ajuda" className="ticket-fab-trigger">
             <CircleHelp size={28} />
           </ActionIcon>
         </Paper>

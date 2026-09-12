@@ -29,6 +29,7 @@ import { useModalidadesAdminQuery } from '../../hooks/useModalidadesAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import './CadastroEspecialidades.css';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: 'Criada',
@@ -252,6 +253,7 @@ export function CadastroEspecialidades() {
       showNotification({ title: 'Cadastrado', message: 'Especialidade cadastrada com sucesso', color: 'green' });
       setCreateModalOpen(false);
       resetCreateState();
+      notifyUnsavedChangesSaved();
     } catch (err: any) {
       const errorCode = err?.response?.data?.error;
       if (errorCode === 'DUPLICATE_EXACT') {
@@ -297,6 +299,7 @@ export function CadastroEspecialidades() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.especialidadesAdmin });
       setEditModalOpen(false);
       setEditingItem(null);
+      notifyUnsavedChangesSaved();
     } catch (err: any) {
       const errorCode = err?.response?.data?.error;
       if (errorCode === 'DUPLICATE_EXACT') {

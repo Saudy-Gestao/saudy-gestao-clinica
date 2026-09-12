@@ -12,6 +12,7 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import AuthService from '../../services/authService';
 import { validateCNPJ } from '../../utils/validations';
 import { formatCNPJ, formatCPF, isValidEmail, normalizeEmail } from '../../utils/formatters';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 export function Cadastro() {
   const navigate = useNavigate();
@@ -120,6 +121,7 @@ export function Cadastro() {
         color: 'green',
       });
 
+      notifyUnsavedChangesSaved();
       navigate(isEmpresa ? '/dashboard' : '/login');
     } catch (error: any) {
       console.error('Erro no registro:', error);

@@ -48,6 +48,11 @@ describe('appointmentService', () => {
     await expect(appointmentService.create({ patientName: 'Ana' })).resolves.toEqual(data);
     expect(mockedApi.post).toHaveBeenCalledWith('/care/appointments/', { patientName: 'Ana' });
   });
+  it('createBatch', async () => {
+    const payload = { appointments: [{ patientName: 'Ana', specialty: 'Consulta', date: '2026-09-13', time: '09:00' }] };
+    await expect(appointmentService.createBatch(payload)).resolves.toEqual(data);
+    expect(mockedApi.post).toHaveBeenCalledWith('/care/appointments/batch', payload);
+  });
   it('getById', async () => {
     await expect(appointmentService.getById('a1')).resolves.toEqual(data);
     expect(mockedApi.get).toHaveBeenCalledWith('/care/appointments/a1');

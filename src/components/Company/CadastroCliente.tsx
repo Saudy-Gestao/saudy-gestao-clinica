@@ -22,6 +22,7 @@ import { resolveApiErrorMessage } from '../../lib/apiError';
 import companyService from '../../services/companyService';
 import { formatCNPJ, formatPhone, isValidEmail, normalizeEmail, onlyDigits } from '../../utils/formatters';
 import { Header } from '../Header/Header';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 const COMPANY_PREFILL_STORAGE_KEY = 'settings:company-prefill';
 const BRANCH_QUOTAS_STORAGE_KEY = 'settings:branch-create-quotas';
@@ -192,6 +193,7 @@ export function CadastroCliente() {
         loading: false,
         autoClose: 5000,
       });
+      notifyUnsavedChangesSaved();
       if (isFromAdmHub) {
         navigate('/adm-hub');
       } else {

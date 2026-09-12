@@ -1,20 +1,64 @@
 .ticket-fab-container {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 210;
 }
 
 .ticket-fab-trigger-wrap {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
   border-radius: 999px !important;
-  padding: 6px;
+  padding: .25rem !important;
   border: 1px solid color-mix(in srgb, white 22%, transparent) !important;
   background: linear-gradient(135deg, color-mix(in srgb, var(--ui-primary) 75%, black) 0%, var(--ui-primary) 100%) !important;
-  box-shadow: 0 16px 42px color-mix(in srgb, var(--ui-primary) 40%, transparent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ui-primary) 28%, transparent);
 }
 
 .ticket-fab-trigger {
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  padding: .45rem !important;
   color: #fff !important;
+}
+
+.ticket-fab-trigger svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.ticket-fab-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, white 70%, var(--ui-primary));
+  outline-offset: 2px;
+}
+
+@media (max-width: 799px) {
+  .ticket-fab-container {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .ticket-fab-trigger-wrap {
+    width: 2.9rem;
+    height: 2.9rem;
+  }
+
+  .ticket-fab-trigger {
+    width: 2.4rem !important;
+    min-width: 2.4rem !important;
+    height: 2.4rem !important;
+    min-height: 2.4rem !important;
+    padding: .35rem !important;
+  }
+
+  .ticket-fab-trigger svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
 }
 
 /* ── Help modal shell ─────────────────────────────────────────────── */

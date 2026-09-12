@@ -35,6 +35,7 @@ import { isRoomSector } from '../../utils/sectorClassification';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { CadastroAgendaEscalaForm } from './CadastroAgendaEscalaForm';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 import './CadastroAgendas.css';
 
 const WEEKDAY_OPTIONS = [
@@ -336,6 +337,7 @@ export function CadastroAgendas() {
       if (editingId) {
         await agendaService.updateAgenda(editingId, payload);
         showNotification({ title: 'Atualizada', message: 'Agenda atualizada com sucesso', color: 'green' });
+        notifyUnsavedChangesSaved();
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.agendasAdmin });
       setModalOpen(false);

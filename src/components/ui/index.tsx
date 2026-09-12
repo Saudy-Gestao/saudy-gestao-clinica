@@ -248,7 +248,7 @@ function Field({ label, description, error, withAsterisk, children, className }:
 }
 
 function inputClass(className?: string) { return cn('ui-input', className); }
-const TextInputPrimitive = forwardRef<HTMLInputElement, AnyProps>(({ label, description, error, leftSection, rightSection, withAsterisk, className, value, onChange, ...props }, ref) => <Field label={label} description={description} error={error} withAsterisk={withAsterisk} className={className}><span className="ui-input-wrap">{leftSection}<input ref={ref} className={inputClass()} value={value} onChange={onChange} {...cleanProps(props).domProps} />{rightSection}</span></Field>);
+const TextInputPrimitive = forwardRef<HTMLInputElement, AnyProps>(({ label, description, error, leftSection, rightSection, withAsterisk, className, value, onChange, readOnly, ...props }, ref) => <Field label={label} description={description} error={error} withAsterisk={withAsterisk} className={className}><span className="ui-input-wrap">{leftSection}<input ref={ref} className={inputClass()} value={value} onChange={onChange} readOnly={readOnly} {...cleanProps(props).domProps} />{rightSection}</span></Field>);
 export const TextInput = TextInputPrimitive as unknown as RefComponent<TextFieldProps, HTMLInputElement>;
 export const PasswordInput = TextInput;
 const NumberInputPrimitive = forwardRef<HTMLInputElement, AnyProps>(({ label, description, error, value, onChange, ...props }, ref) => <Field label={label} description={description} error={error}><input ref={ref} type="number" className={inputClass()} value={value ?? ''} onChange={(event) => onChange?.(event.currentTarget.value === '' ? '' : Number(event.currentTarget.value))} {...cleanProps(props).domProps} /></Field>);
@@ -324,9 +324,9 @@ const SelectPrimitive = forwardRef<HTMLButtonElement, AnyProps>(function SelectP
 
   const selectOption = (option: AnyProps) => {
     if (option.disabled) return;
-    onChange?.(option.value || null);
     setOpened(false);
     setSearch('');
+    onChange?.(option.value || null);
   };
 
   const moveHighlight = (direction: 1 | -1) => {
@@ -417,7 +417,7 @@ const SelectPrimitive = forwardRef<HTMLButtonElement, AnyProps>(function SelectP
             )}
             <div className="ui-select-options">
               {(placeholder || clearable) && !search && (
-                <button type="button" className={cn('ui-select-option', !selectedValue && 'ui-select-option-selected')} role="option" aria-selected={!selectedValue} onMouseDown={(event) => event.preventDefault()} onClick={() => selectOption({ value: '', label: resolvePlaceholder(placeholder) })}>
+                <button type="button" className={cn('ui-select-option', !selectedValue && 'ui-select-option-selected')} role="option" aria-selected={!selectedValue} onMouseDown={(event) => { event.preventDefault(); selectOption({ value: '', label: resolvePlaceholder(placeholder) }); }} onClick={(event) => event.preventDefault()}>
                   {resolvePlaceholder(placeholder)}
                 </button>
               )}
@@ -429,8 +429,8 @@ const SelectPrimitive = forwardRef<HTMLButtonElement, AnyProps>(function SelectP
                   role="option"
                   aria-selected={option.value === selectedValue}
                   disabled={option.disabled}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => selectOption(option)}
+                  onMouseDown={(event) => { event.preventDefault(); selectOption(option); }}
+                  onClick={(event) => event.preventDefault()}
                 >
                   <span>{option.label}</span>
                   {option.value === selectedValue && <span className="ui-select-check" aria-hidden="true">✓</span>}

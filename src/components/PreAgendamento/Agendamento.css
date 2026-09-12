@@ -1321,6 +1321,276 @@
   }
 }
 
+/* Wizard de agendamento: uma decisão por vez, com o contexto do fluxo sempre visível. */
+.agendamento-scheduler .agendamento-wizard-progress {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 1.25rem 0 1.5rem;
+  padding: 1rem .7rem .85rem;
+  background: color-mix(in srgb, var(--ui-background) 38%, var(--ui-surface));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 18%, var(--ui-border));
+  border-radius: .85rem;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: .45rem;
+  padding: .2rem .8rem .35rem;
+  color: var(--ui-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: .65rem;
+  font: inherit;
+  text-align: center;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step:not(:last-child)::after {
+  position: absolute;
+  top: calc(.2rem + .9rem - 1px);
+  right: -50%;
+  left: 50%;
+  width: auto;
+  height: 2px;
+  content: '';
+  background: color-mix(in srgb, var(--ui-border) 92%, var(--ui-muted));
+  transform: translateY(-50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step.is-active {
+  color: var(--ui-primary);
+  background: transparent;
+  border-color: transparent;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step.is-complete {
+  color: var(--ui-primary);
+  cursor: pointer;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step.is-complete .agendamento-wizard-progress__label {
+  color: var(--ui-primary);
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step.is-complete:not(:last-child)::after {
+  background: var(--ui-primary);
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step.is-complete:hover,
+.agendamento-scheduler .agendamento-wizard-progress__step.is-complete:focus-visible {
+  background: color-mix(in srgb, var(--ui-primary) 8%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-primary) 24%, var(--ui-border));
+  outline: none;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step:disabled {
+  opacity: 1;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__index {
+  position: relative;
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 1.8rem;
+  place-items: center;
+  color: var(--ui-muted);
+  background: var(--ui-surface);
+  border: 1px solid color-mix(in srgb, var(--ui-muted) 24%, var(--ui-border));
+  border-radius: 50%;
+  font-size: .78rem;
+  font-weight: 800;
+  z-index: 1;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__step.is-active .agendamento-wizard-progress__index,
+.agendamento-scheduler .agendamento-wizard-progress__step.is-complete .agendamento-wizard-progress__index {
+  color: var(--ui-primary-foreground);
+  background: var(--ui-primary);
+  border-color: var(--ui-primary);
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__copy {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: .1rem;
+  text-align: center;
+  z-index: 1;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__label,
+.agendamento-scheduler .agendamento-wizard-progress__description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__label {
+  color: inherit;
+  font-size: .82rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.agendamento-scheduler .agendamento-wizard-progress__description {
+  color: var(--ui-muted);
+  font-size: .7rem;
+  line-height: 1.25;
+}
+
+.agendamento-scheduler .agendamento-wizard-step {
+  display: none;
+  min-width: 0;
+  gap: 1rem;
+}
+
+.agendamento-scheduler .agendamento-wizard-step.is-active {
+  display: grid;
+  animation: agendamento-wizard-step-in 180ms ease-out;
+}
+
+.agendamento-scheduler .agendamento-wizard-step > .agendamento-stage-panel {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-wizard-actions {
+  min-width: 0;
+  gap: .75rem;
+  margin-top: .1rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--ui-primary) 16%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-wizard-actions .ui-button {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-patient-panel-header {
+  min-width: 0;
+  padding-bottom: .15rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-primary) 14%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-patient-panel-header__copy {
+  display: grid;
+  min-width: 0;
+  gap: .2rem;
+}
+
+.agendamento-scheduler .agendamento-patient-panel-header__title {
+  color: var(--ui-foreground);
+  font-size: .95rem;
+  line-height: 1.25;
+}
+
+.agendamento-scheduler .agendamento-patient-panel-header__description {
+  max-width: 52rem;
+  color: var(--ui-muted) !important;
+  font-size: .76rem !important;
+  line-height: 1.4;
+}
+
+.agendamento-scheduler .agendamento-patient-panel-header__actions {
+  min-width: 0;
+  margin-left: auto;
+}
+
+.agendamento-scheduler .agendamento-patient-panel-header__actions .ui-button {
+  min-width: 0;
+}
+
+@keyframes agendamento-wizard-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 620px) {
+  .agendamento-scheduler .agendamento-wizard-progress {
+    grid-template-columns: 1fr;
+    gap: .35rem;
+    margin-top: 1rem;
+    margin-bottom: 1.15rem;
+    padding: .45rem;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-progress__step {
+    flex-direction: row;
+    align-items: center;
+    gap: .7rem;
+    padding: .6rem .7rem;
+    text-align: left;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-progress__step:not(:last-child)::after {
+    top: 50%;
+    right: auto;
+    bottom: calc(-.35rem - 50%);
+    left: calc(.7rem + .9rem - 1px);
+    width: 1px;
+    height: auto;
+    transform: none;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-progress__step.is-complete:not(:last-child)::after {
+    background: var(--ui-primary);
+  }
+
+  .agendamento-scheduler .agendamento-patient-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agendamento-scheduler .agendamento-patient-panel-header__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .agendamento-scheduler .agendamento-patient-panel-header__actions .ui-button {
+    flex: 1 1 auto;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-progress__description {
+    display: none;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-progress__copy {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agendamento-scheduler .agendamento-wizard-actions .ui-button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agendamento-scheduler .agendamento-wizard-step.is-active {
+    animation: none;
+  }
+}
+
 /* Etapa 3: transformar a revisão em uma confirmação operacional, não em uma lista solta. */
 .agendamento-scheduler .agendamento-review-summary {
   display: grid;
@@ -3916,6 +4186,616 @@
 
 @media (prefers-reduced-motion: reduce) {
   .agendamento-online-card {
+    transition: none;
+  }
+}
+
+/* Etapa 2 — busca de disponibilidade inspirada no protótipo, usando os dados
+   e as regras reais do agendamento. O painel concentra contexto, controles e
+   grade sem criar uma segunda linguagem visual dentro do fluxo. */
+.agendamento-scheduler .agendamento-stage-panel--availability {
+  gap: 1.25rem;
+  padding: 1.15rem;
+  background: color-mix(in srgb, var(--ui-background) 34%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-controls {
+  --agendamento-control-height: 3.35rem;
+  display: grid;
+  min-width: 0;
+  gap: .85rem;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--ui-surface) 86%, var(--ui-background));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border));
+  border-radius: .9rem;
+}
+
+.agendamento-scheduler .agendamento-availability-controls__header {
+  min-width: 0;
+  padding-bottom: .8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-primary) 14%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-controls__intro {
+  display: grid;
+  min-width: 0;
+  gap: .22rem;
+}
+
+.agendamento-scheduler .agendamento-availability-controls__eyebrow,
+.agendamento-scheduler .agendamento-availability-heading__eyebrow {
+  color: var(--ui-primary) !important;
+  font-size: .66rem !important;
+  font-weight: 800 !important;
+  letter-spacing: .13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.agendamento-scheduler .agendamento-availability-controls__title {
+  color: var(--ui-foreground) !important;
+  font-size: 1.08rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25;
+}
+
+.agendamento-scheduler .agendamento-availability-controls__description {
+  max-width: 52rem;
+  color: var(--ui-muted) !important;
+  font-size: .78rem !important;
+  line-height: 1.45;
+}
+
+.agendamento-scheduler .agendamento-availability-controls__step {
+  flex: 0 0 auto;
+  padding: .38rem .65rem;
+  font-size: .67rem;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-availability-controls__body {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(25rem, 1.05fr) minmax(18rem, .95fr);
+  align-items: start;
+  gap: .85rem;
+}
+
+.agendamento-scheduler .agendamento-schedule-date-nav {
+  min-width: 0;
+  align-items: flex-end !important;
+}
+
+.agendamento-scheduler .agendamento-schedule-nav-button {
+  height: var(--agendamento-control-height);
+  min-height: var(--agendamento-control-height);
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-availability-date-field {
+  min-width: 9.75rem;
+  flex: 1 1 10.5rem;
+  gap: .45rem;
+}
+
+.agendamento-scheduler .agendamento-availability-date-field .floating-date-picker__stacked-label {
+  color: var(--ui-muted);
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: 1.2;
+}
+
+.agendamento-scheduler .agendamento-availability-date-field .floating-field {
+  box-sizing: border-box;
+  height: var(--agendamento-control-height);
+  min-height: var(--agendamento-control-height);
+  padding: 0;
+  background: color-mix(in srgb, var(--ui-background) 76%, var(--ui-surface));
+  border-color: var(--ui-border);
+  border-radius: .68rem;
+}
+
+.agendamento-scheduler .agendamento-availability-date-field .floating-field:focus-within {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 16%, transparent);
+}
+
+.agendamento-scheduler .agendamento-availability-date-field .floating-field input {
+  height: var(--agendamento-control-height);
+  min-height: var(--agendamento-control-height);
+  padding: .78rem 2.6rem .78rem .85rem;
+  color: var(--ui-foreground);
+  font-size: .9rem;
+}
+
+.agendamento-scheduler .agendamento-availability-date-field .floating-date-picker__trigger {
+  top: 50%;
+  right: .7rem;
+  bottom: auto;
+  color: var(--ui-primary);
+  transform: translateY(-50%);
+}
+
+.agendamento-scheduler .agendamento-schedule-filters {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch !important;
+  gap: .65rem !important;
+}
+
+.agendamento-scheduler .agendamento-schedule-filters > .ui-primitive {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-schedule-filters .agendamento-native-field {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-schedule-filters .ui-select-trigger {
+  height: var(--agendamento-control-height);
+  min-height: var(--agendamento-control-height);
+}
+
+.agendamento-scheduler .agendamento-availability-context {
+  display: grid;
+  min-width: 0;
+  gap: .45rem;
+  padding-top: .75rem;
+  border-top: 1px solid color-mix(in srgb, var(--ui-primary) 14%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-context__label {
+  color: var(--ui-muted) !important;
+  font-size: .68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.agendamento-scheduler .agendamento-availability-context__chips {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-availability-context__chips .ui-badge {
+  max-width: min(100%, 20rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-availability-board {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  padding: 1.1rem;
+  background: color-mix(in srgb, var(--ui-surface) 90%, var(--ui-background));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 17%, var(--ui-border));
+  border-radius: .9rem;
+}
+
+.agendamento-scheduler .agendamento-availability-heading {
+  min-width: 0;
+  padding: 0;
+}
+
+.agendamento-scheduler .agendamento-availability-heading > .ui-primitive:first-child {
+  display: grid;
+  min-width: 0;
+  gap: .2rem;
+}
+
+.agendamento-scheduler .agendamento-availability-heading__title {
+  color: var(--ui-foreground) !important;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25;
+}
+
+.agendamento-scheduler .agendamento-availability-heading__description {
+  max-width: 48rem;
+  color: var(--ui-muted) !important;
+  font-size: .78rem !important;
+  line-height: 1.45;
+}
+
+.agendamento-scheduler .agendamento-availability-heading__count {
+  flex: 0 0 auto;
+  padding: .38rem .65rem;
+  font-size: .67rem;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-availability-legend {
+  min-width: 0;
+  padding-bottom: .85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-primary) 12%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  color: var(--ui-muted) !important;
+  font-size: .72rem !important;
+  line-height: 1.3;
+}
+
+.agendamento-scheduler .agendamento-availability-legend__dot {
+  width: .55rem;
+  height: .55rem;
+  flex: 0 0 .55rem;
+  border-radius: 50%;
+}
+
+.agendamento-scheduler .agendamento-availability-legend__dot--available {
+  background: var(--ui-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 13%, transparent);
+}
+
+.agendamento-scheduler .agendamento-availability-legend__dot--selected {
+  background: var(--ui-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-success) 13%, transparent);
+}
+
+.agendamento-scheduler .agendamento-availability-legend__dot--reserved {
+  background: var(--ui-warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-warning) 13%, transparent);
+}
+
+.agendamento-scheduler .agendamento-availability-grid-shell {
+  min-width: 0;
+  overflow-x: auto;
+  padding: .15rem;
+}
+
+.agendamento-scheduler .agendamento-availability-modes {
+  min-width: 0;
+  padding: .8rem 0 0;
+}
+
+.agendamento-scheduler .agendamento-availability-modes .ui-button {
+  min-height: 2.35rem;
+}
+
+.agendamento-scheduler .agendamento-availability-search {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.agendamento-scheduler .agendamento-availability-search .ui-input {
+  min-height: var(--agendamento-control-height);
+}
+
+.agendamento-scheduler .agendamento-recurrence-controls {
+  grid-column: 1 / -1;
+  align-items: center;
+  padding: .75rem .85rem;
+  background: color-mix(in srgb, var(--ui-primary) 7%, var(--ui-background));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 18%, var(--ui-border));
+  border-radius: .7rem;
+}
+
+.agendamento-scheduler .agendamento-recurrence-controls__label {
+  color: var(--ui-foreground) !important;
+  font-size: .78rem !important;
+}
+
+.agendamento-scheduler .agendamento-availability-week-grid {
+  min-width: 0;
+  gap: .75rem !important;
+}
+
+.agendamento-scheduler .agendamento-availability-day {
+  min-width: 0;
+  min-height: 13rem;
+  background: color-mix(in srgb, var(--ui-background) 42%, var(--ui-surface));
+  border: 1px solid var(--ui-border);
+  box-shadow: none;
+}
+
+.agendamento-scheduler .agendamento-availability-day.is-selected {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary) 12%, transparent);
+}
+
+.agendamento-scheduler .agendamento-availability-day__header {
+  padding-bottom: .65rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-primary) 14%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-day__weekday {
+  color: var(--ui-foreground) !important;
+  font-size: .82rem !important;
+  text-transform: capitalize;
+}
+
+.agendamento-scheduler .agendamento-availability-day__date {
+  font-size: .7rem !important;
+}
+
+.agendamento-scheduler .agendamento-availability-day__slots .ui-button {
+  min-width: 0;
+  justify-content: space-between;
+  gap: .45rem;
+  padding-inline: .65rem;
+  font-size: .73rem;
+}
+
+.agendamento-scheduler .agendamento-availability-day__slots .ui-button {
+  gap: .65rem;
+}
+
+.agendamento-scheduler .agendamento-availability-day__slots .ui-button > span {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+}
+
+.agendamento-scheduler .agendamento-availability-day__slot-time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.agendamento-scheduler .agendamento-availability-day__slot-resource {
+  min-width: 0;
+  margin-left: auto;
+  max-width: 9rem;
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: .66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-availability-grid {
+  min-width: 0;
+  gap: .8rem !important;
+}
+
+.agendamento-scheduler .agendamento-availability-slot {
+  display: flex;
+  min-width: 0;
+  min-height: 6.6rem;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: .8rem;
+  padding: .9rem 1rem !important;
+  overflow: hidden;
+  color: var(--ui-foreground);
+  background: color-mix(in srgb, var(--ui-primary) 9%, var(--ui-background));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 26%, var(--ui-border));
+  border-radius: .78rem;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.agendamento-scheduler .agendamento-availability-slot:hover,
+.agendamento-scheduler .agendamento-availability-slot:focus-visible {
+  background: color-mix(in srgb, var(--ui-primary) 17%, var(--ui-background));
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 14%, transparent);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.agendamento-scheduler .agendamento-availability-slot.is-selected,
+.agendamento-scheduler .agendamento-availability-slot.is-anchor-start,
+.agendamento-scheduler .agendamento-availability-slot.is-suggested-start {
+  background: color-mix(in srgb, var(--ui-primary) 20%, var(--ui-surface));
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary) 16%, transparent);
+}
+
+.agendamento-scheduler .agendamento-availability-slot.is-anchor-start,
+.agendamento-scheduler .agendamento-availability-slot.is-anchor-covered {
+  background: color-mix(in srgb, var(--ui-warning) 12%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-warning) 54%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-slot.is-suggested-start,
+.agendamento-scheduler .agendamento-availability-slot.is-suggested-covered {
+  background: color-mix(in srgb, var(--ui-success) 12%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-success) 54%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-slot.is-selected-covered {
+  cursor: not-allowed;
+  opacity: .68;
+}
+
+.agendamento-scheduler .agendamento-availability-slot__header,
+.agendamento-scheduler .agendamento-availability-slot__resource {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-availability-slot__time {
+  color: var(--ui-foreground);
+}
+
+.agendamento-scheduler .agendamento-availability-slot__time svg {
+  flex: 0 0 auto;
+  color: var(--ui-primary);
+}
+
+.agendamento-scheduler .agendamento-availability-slot__time .ui-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.agendamento-scheduler .agendamento-availability-slot__header .ui-badge {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendamento-scheduler .agendamento-availability-slot__resource {
+  color: var(--ui-muted);
+}
+
+.agendamento-scheduler .agendamento-availability-slot__resource svg {
+  flex: 0 0 auto;
+}
+
+.agendamento-scheduler .agendamento-availability-slot__procedure {
+  max-width: 100%;
+  color: var(--ui-muted) !important;
+  line-height: 1.35;
+}
+
+.agendamento-scheduler .agendamento-availability-empty-board {
+  display: grid;
+  min-height: 13rem;
+  align-content: center;
+  justify-items: center;
+  gap: .45rem;
+  padding: 2rem 1.25rem;
+  border: 1px dashed color-mix(in srgb, var(--ui-primary) 28%, var(--ui-border));
+  border-radius: .78rem;
+  text-align: center;
+}
+
+.agendamento-scheduler .agendamento-availability-empty-board__icon,
+.agendamento-scheduler .agendamento-availability-selection-bar__icon {
+  display: grid;
+  place-items: center;
+  color: var(--ui-primary);
+  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 28%, var(--ui-border));
+}
+
+.agendamento-scheduler .agendamento-availability-empty-board__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: .75rem;
+}
+
+.agendamento-scheduler .agendamento-availability-empty-board__title {
+  color: var(--ui-foreground) !important;
+}
+
+.agendamento-scheduler .agendamento-availability-empty-board__description {
+  max-width: 32rem;
+  color: var(--ui-muted) !important;
+  font-size: .8rem !important;
+  line-height: 1.45;
+}
+
+.agendamento-scheduler .agendamento-availability-selection-bar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .8rem .9rem;
+  background: color-mix(in srgb, var(--ui-primary) 7%, var(--ui-background));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border));
+  border-radius: .75rem;
+}
+
+.agendamento-scheduler .agendamento-availability-selection-bar__copy {
+  min-width: 0;
+}
+
+.agendamento-scheduler .agendamento-availability-selection-bar__icon {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  border-radius: .55rem;
+}
+
+.agendamento-scheduler .agendamento-availability-selection-bar__copy > .ui-primitive:last-child {
+  display: grid;
+  min-width: 0;
+  gap: .12rem;
+}
+
+.agendamento-scheduler .agendamento-availability-selection-bar__label,
+.agendamento-scheduler .agendamento-availability-selection-bar__meta {
+  color: var(--ui-muted) !important;
+  font-size: .7rem !important;
+  line-height: 1.35;
+}
+
+.agendamento-scheduler .agendamento-availability-selection-bar__value {
+  color: var(--ui-foreground) !important;
+  font-size: .84rem !important;
+  line-height: 1.3;
+}
+
+@media (max-width: 960px) {
+  .agendamento-scheduler .agendamento-availability-controls__body {
+    grid-template-columns: 1fr;
+  }
+
+  .agendamento-scheduler .agendamento-schedule-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .agendamento-scheduler .agendamento-step-heading {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .agendamento-scheduler .agendamento-step-heading > .ui-group,
+  .agendamento-scheduler .agendamento-step-heading__copy,
+  .agendamento-scheduler .agendamento-step-actions {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .agendamento-scheduler .agendamento-stage-panel--availability,
+  .agendamento-scheduler .agendamento-availability-controls,
+  .agendamento-scheduler .agendamento-availability-board {
+    padding: .85rem;
+  }
+
+  .agendamento-scheduler .agendamento-availability-controls__body,
+  .agendamento-scheduler .agendamento-schedule-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .agendamento-scheduler .agendamento-schedule-date-nav {
+    align-items: stretch;
+    flex-direction: column;
+    flex-wrap: wrap;
+  }
+
+  .agendamento-scheduler .agendamento-schedule-nav-button,
+  .agendamento-scheduler .agendamento-availability-date-field {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .agendamento-scheduler .agendamento-availability-heading {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .agendamento-scheduler .agendamento-availability-selection-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agendamento-scheduler .agendamento-availability-selection-bar__actions,
+  .agendamento-scheduler .agendamento-availability-selection-bar__actions .ui-button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agendamento-scheduler .agendamento-availability-slot {
     transition: none;
   }
 }

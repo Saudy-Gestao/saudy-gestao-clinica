@@ -48,6 +48,7 @@ import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { getProfessionalProcedureOptions } from '../../utils/professionalProcedureOptions';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 type Gender = 'male' | 'female' | 'other' | '';
 
@@ -1100,6 +1101,7 @@ export function CadastroMedico() {
         setFieldErrors({});
         setShowSuccessModal(true);
       }
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: queryKeys.doctorsAdmin });
     } catch (e: unknown) {
       const err = e as ApiError;

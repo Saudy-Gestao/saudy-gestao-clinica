@@ -519,7 +519,7 @@ describe('hook query key configurations', () => {
   it('useAppointmentsQuery uses correct key and interval', () => {
     useAppointmentsQuery();
     expect(mockedUseQuery).toHaveBeenLastCalledWith(expect.objectContaining({
-      queryKey: queryKeys.appointments,
+      queryKey: [...queryKeys.appointments, 'all', '', '', 'current'],
       refetchInterval: 10_000,
     }));
   });

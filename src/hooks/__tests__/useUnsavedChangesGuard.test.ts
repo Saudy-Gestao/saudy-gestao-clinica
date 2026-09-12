@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { UnsavedChangesGuard, useUnsavedChangesGuard } from '../useUnsavedChangesGuard';
+import { UnsavedChangesGuard, notifyUnsavedChangesSaved, useUnsavedChangesGuard } from '../useUnsavedChangesGuard';
 
 const wrapper = ({ children, path = '/cadastro-cliente' }: { children: React.ReactNode; path?: string }) =>
   createElement(MemoryRouter, { initialEntries: [path] }, children);
@@ -80,6 +80,29 @@ describe('useUnsavedChangesGuard', () => {
 
     document.body.removeChild(searchInput);
     document.body.removeChild(disabledInput);
+  });
+
+  it('clears the dirty state after a successful save signal', () => {
+    window.history.pushState({}, '', '/cadastro-cliente');
+    const { result } = renderHook(() => useUnsavedChangesGuard(), {
+      wrapper: (props) => wrapper({ ...props, path: '/cadastro-cliente' }),
+    });
+
+    const input = document.createElement('input');
+    input.name = 'nome';
+    document.body.appendChild(input);
+    act(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+
+    act(() => notifyUnsavedChangesSaved());
+
+    const beforeUnloadEvent = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    window.dispatchEvent(beforeUnloadEvent);
+    expect(beforeUnloadEvent.defaultPrevented).toBe(false);
+
+    act(() => window.history.pushState({ idx: 1 }, '', '/dashboard'));
+    expect(result.current.pendingNavigation).toBeNull();
+
+    document.body.removeChild(input);
   });
 
   it('does not guard fields outside protected routes', () => {

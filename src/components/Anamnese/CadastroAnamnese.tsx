@@ -34,6 +34,7 @@ import { useProceduresAdminQuery } from '../../hooks/useProceduresAdminQuery';
 import { useAnamnesisTemplatesQuery } from '../../hooks/useAnamnesisTemplatesQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { PaginatedGrid } from '../common/PaginatedGrid';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 type QuestionForm = AnamnesisQuestionPayload & {
   id: string;
@@ -315,6 +316,7 @@ export function CadastroAnamnese() {
 
       setModalOpen(false);
       resetForm();
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: queryKeys.anamnesisTemplates });
     } catch (err: any) {
       showNotification({

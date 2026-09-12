@@ -48,6 +48,7 @@ import { findExistingCpf } from '../../utils/cpfRegistry';
 import { usePatientsAdminQuery } from '../../hooks/usePatientsAdminQuery';
 import { queryKeys } from '../../lib/queryKeys';
 import { resolveApiErrorMessage } from '../../lib/apiError';
+import { notifyUnsavedChangesSaved } from '../../hooks/useUnsavedChangesGuard';
 
 type Gender = 'male' | 'female' | 'other' | '';
 type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed' | '';
@@ -876,6 +877,7 @@ export function CadastroPaciente() {
         setInitialTeaProfileActive(isTeaPatient);
         setShowSuccessModal(true);
       }
+      notifyUnsavedChangesSaved();
       await queryClient.invalidateQueries({ queryKey: queryKeys.patientsAdmin });
     } catch (e: unknown) {
       const err = e as ApiError;
