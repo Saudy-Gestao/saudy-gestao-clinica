@@ -24,7 +24,7 @@ import {
   Divider,
 } from '@/components/ui';
 import { useMediaQuery } from '@/components/ui';
-import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User, Globe, Check, X, ClipboardCheck, Paperclip } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Calendar, LayoutGrid, List, Plus, Clock3, User, Globe, Check, X, ClipboardCheck, Paperclip, Sparkles } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { showNotification } from '@/components/ui';
@@ -49,6 +49,8 @@ import { useMedicalEquipmentsQuery } from '../../hooks/useMedicalEquipmentsQuery
 import { useSettingsBranchesQuery } from '../../hooks/useSettingsBranchesQuery';
 import { isRoomSector } from '../../utils/sectorClassification';
 import { queryKeys } from '../../lib/queryKeys';
+import appointmentAssistantService, { type AppointmentAssistantDraft } from '../../services/appointmentAssistantService';
+import { ScheduleAssistantModal, type ScheduleAssistantPreviewField } from './ScheduleAssistantModal';
 interface Agendamento {
   id: string;
   branchId?: string;
@@ -647,6 +649,10 @@ export function Agendamento() {
   const [professionalSlotModalOpen, setProfessionalSlotModalOpen] = useState(false);
   const [pendingProfessionalSlot, setPendingProfessionalSlot] = useState<PendingProfessionalSlotSelection | null>(null);
   const [suggestionOptionsModalOpen, setSuggestionOptionsModalOpen] = useState(false);
+  const [scheduleAssistantOpen, setScheduleAssistantOpen] = useState(false);
+  const [scheduleAssistantPrompt, setScheduleAssistantPrompt] = useState('');
+  const [scheduleAssistantDraft, setScheduleAssistantDraft] = useState<AppointmentAssistantDraft | null>(null);
+  const [scheduleAssistantLoading, setScheduleAssistantLoading] = useState(false);
   const [reviewAttachments, setReviewAttachments] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AppointmentAttachment[]>([]);
   const [loadingExistingAttachments, setLoadingExistingAttachments] = useState(false);
@@ -1431,6 +1437,212 @@ export function Agendamento() {
       pacienteCPF: p.cpf || prev.pacienteCPF || '',
       ...insuranceFields,
     }));
+  };
+  const findAssistantOption = (
+    query: string | null | undefined,
+    options: { value: string; label: string }[],
+  ) => {
+    const normalizedQuery = normalizeComparableText(query);
+    if (!normalizedQuery) return null;
+    const exactMatches = options.filter((option) => normalizeComparableText(option.label) === normalizedQuery);
+    if (exactMatches.length === 1) return exactMatches[0];
+    if (exactMatches.length > 1) return null;
+    const partialMatches = options.filter((option) => {
+      const normalizedLabel = normalizeComparableText(option.label);
+      return normalizedLabel.includes(normalizedQuery) || normalizedQuery.includes(normalizedLabel);
+    });
+    return partialMatches.length === 1 ? partialMatches[0] : null;
+  };
+  const findAssistantPatientOption = (draft: AppointmentAssistantDraft) => {
+    const cpfDigits = onlyDigits(draft.patientCpf || '');
+    if (cpfDigits) {
+      const patientEntries = Object.entries(patientById).filter(([, patient]) => (
+        onlyDigits(String(patient?.cpf || patient?.patientCpf || '')) === cpfDigits
+      ));
+      if (patientEntries.length === 1) {
+        return patientOptions.find((option) => option.value === patientEntries[0][0]) || null;
+      }
+    }
+    return findAssistantOption(draft.patientName, patientOptions);
+  };
+  const getAssistantProcedureMatches = (draft: AppointmentAssistantDraft) => {
+    const procedureNames = draft.procedureNames.length > 0
+      ? draft.procedureNames
+      : [];
+    return procedureNames
+      .map((name) => findAssistantOption(name, procedureOptions))
+      .filter((option): option is { value: string; label: string } => Boolean(option))
+      .filter((option, index, items) => items.findIndex((item) => item.value === option.value) === index);
+  };
+  const getAssistantPreviewFields = (draft: AppointmentAssistantDraft | null): ScheduleAssistantPreviewField[] => {
+    if (!draft) return [];
+    const patientMatch = findAssistantPatientOption(draft);
+    const procedureMatches = getAssistantProcedureMatches(draft);
+    const professionalMatch = findAssistantOption(draft.professionalName, doctorOptions);
+    const hasScheduleDate = Boolean(draft.date);
+    const hasScheduleTime = Boolean(draft.time);
+    const fields: ScheduleAssistantPreviewField[] = [
+      {
+        label: 'Paciente',
+        value: draft.patientName || draft.patientCpf || 'Não identificado',
+        status: patientMatch ? 'matched' : 'pending',
+      },
+      {
+        label: 'Procedimento(s)',
+        value: draft.procedureNames.length > 0 ? draft.procedureNames.join(', ') : 'Não identificado',
+        status: procedureMatches.length === draft.procedureNames.length && procedureMatches.length > 0 ? 'matched' : 'pending',
+      },
+      {
+        label: 'Data e horário',
+        value: [
+          draft.date ? dayjs(`${draft.date}T12:00:00`).format('DD/MM/YYYY') : 'Data não informada',
+          draft.time || (draft.period ? `Período ${draft.period}` : 'horário não informado'),
+        ].join(' • '),
+        status: hasScheduleDate && hasScheduleTime ? 'matched' : 'pending',
+      },
+      {
+        label: 'Profissional',
+        value: draft.professionalName || (draft.professionalPreference === 'first_available' ? 'Primeiro profissional disponível' : 'Não informado'),
+        status: professionalMatch || draft.professionalPreference === 'first_available' ? 'matched' : 'pending',
+      },
+    ];
+    if (draft.modality) {
+      fields.push({ label: 'Modalidade', value: draft.modality, status: 'matched' });
+    }
+    if (draft.insuranceName) {
+      const insuranceMatch = findAssistantOption(draft.insuranceName, insuranceOptions);
+      fields.push({ label: 'Convênio', value: draft.insuranceName, status: insuranceMatch ? 'matched' : 'pending' });
+    }
+    if (draft.recurrenceOccurrences) {
+      fields.push({
+        label: 'Recorrência',
+        value: `${draft.recurrenceOccurrences} ocorrência(s)${draft.recurrenceIntervalWeeks ? ` • a cada ${draft.recurrenceIntervalWeeks} semana(s)` : ''}`,
+        status: 'matched',
+      });
+    }
+    if (draft.simultaneous) {
+      fields.push({ label: 'Modo', value: 'Marcação simultânea', status: procedureMatches.length > 1 ? 'matched' : 'pending' });
+    }
+    return fields;
+  };
+  const getAssistantUnresolvedFields = (draft: AppointmentAssistantDraft | null) => {
+    if (!draft) return [];
+    const unresolved: string[] = [];
+    if (!findAssistantPatientOption(draft)) unresolved.push('paciente cadastrado');
+    const procedureMatches = getAssistantProcedureMatches(draft);
+    if (procedureMatches.length !== draft.procedureNames.length || procedureMatches.length === 0) unresolved.push('procedimento');
+    if (!draft.date) unresolved.push('data');
+    if (!draft.time) unresolved.push('horário');
+    if (!findAssistantOption(draft.professionalName, doctorOptions) && draft.professionalPreference !== 'first_available') unresolved.push('profissional');
+    if (draft.insuranceName && !findAssistantOption(draft.insuranceName, insuranceOptions)) unresolved.push('convênio');
+    if (draft.simultaneous && procedureMatches.length < 2) unresolved.push('dois procedimentos para marcação simultânea');
+    return unresolved;
+  };
+  const handleAssistantFieldClick = (field: string) => {
+    const normalizedField = normalizeComparableText(field);
+    const isProcedureField = normalizedField.includes('procedimento');
+    const isAvailabilityField = normalizedField.includes('data')
+      || normalizedField.includes('horario')
+      || normalizedField.includes('dois procedimentos');
+    const isProfessionalField = normalizedField.includes('profissional');
+    const isPatientField = normalizedField.includes('paciente');
+    const isInsuranceField = normalizedField.includes('convenio');
+
+    let targetId = '';
+    let targetStep = 0;
+    if (isPatientField) targetId = 'agendamento-field-patient';
+    else if (isProcedureField) targetId = 'agendamento-field-procedure';
+    else if (isProfessionalField) targetId = 'agendamento-field-professional';
+    else if (isInsuranceField) targetId = 'agendamento-field-insurance';
+    else if (isAvailabilityField) {
+      targetStep = 1;
+      targetId = normalizedField.includes('data') ? 'agendamento-field-date' : 'agendamento-field-time';
+      if (normalizedField.includes('dois procedimentos')) targetId = 'agendamento-field-procedure';
+    }
+
+    if (!targetId) return;
+    if (targetStep === 1 && selectedProcedureSummary.length === 0) {
+      targetStep = 0;
+      targetId = 'agendamento-field-procedure';
+    }
+
+    setScheduleAssistantOpen(false);
+    goToSchedulingStep(targetStep);
+    window.setTimeout(() => {
+      const container = document.getElementById(targetId);
+      if (!container) return;
+      const focusable = container.matches('input, button, textarea, select')
+        ? container
+        : container.querySelector<HTMLElement>('input, button, textarea, select');
+      container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      focusable?.focus({ preventScroll: true });
+    }, 180);
+  };
+  const handleParseScheduleAssistant = async () => {
+    const prompt = scheduleAssistantPrompt.trim();
+    if (prompt.length < 3) {
+      showNotification({ title: 'Descreva o agendamento', message: 'Informe pelo menos paciente, procedimento ou data para a IA preparar o rascunho.', color: 'yellow' });
+      return;
+    }
+    setScheduleAssistantLoading(true);
+    try {
+      const response = await appointmentAssistantService.parse(prompt, dayjs().format('YYYY-MM-DD'));
+      setScheduleAssistantDraft(response.draft);
+    } catch (err: any) {
+      showNotification({
+        title: 'Não foi possível interpretar',
+        message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Tente descrever o agendamento de outra forma.',
+        color: 'red',
+      });
+    } finally {
+      setScheduleAssistantLoading(false);
+    }
+  };
+  const handleApplyScheduleAssistant = () => {
+    if (!scheduleAssistantDraft) return;
+    const draft = scheduleAssistantDraft;
+    const patientMatch = findAssistantPatientOption(draft);
+    const procedureMatches = getAssistantProcedureMatches(draft);
+    const professionalMatch = findAssistantOption(draft.professionalName, doctorOptions);
+    const insuranceMatch = findAssistantOption(draft.insuranceName, insuranceOptions);
+    const parsedDate = draft.date ? new Date(`${draft.date}T12:00:00`) : null;
+    const validParsedDate = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null;
+
+    if (patientMatch) handleSelectPatient(patientMatch.value);
+    if (procedureMatches.length > 0) setSelectedSpecialties(procedureMatches.map((option) => option.value));
+    if (validParsedDate) {
+      setViewedDate(validParsedDate);
+      setDataHoraFiltro(validParsedDate);
+    }
+    setActiveSchedulePeriod(draft.period || resolveTurnoFromTime(draft.time || undefined) || 'Todos');
+    setRecurrenceEnabled(Boolean(draft.recurrenceOccurrences));
+    if (draft.recurrenceOccurrences) setRecurrenceOccurrences(String(draft.recurrenceOccurrences));
+    if (draft.recurrenceIntervalWeeks) setRecurrenceIntervalWeeks(String(draft.recurrenceIntervalWeeks));
+    setSimultaneousEnabled(Boolean(draft.simultaneous && procedureMatches.length > 1));
+    setNovoAgendamento((prev) => ({
+      ...prev,
+      pacienteId: patientMatch?.value || prev.pacienteId,
+      pacienteNome: patientMatch?.label || draft.patientName || prev.pacienteNome,
+      pacienteCPF: draft.patientCpf || prev.pacienteCPF,
+      especialidade: procedureMatches.map((option) => option.value).join(', ') || prev.especialidade,
+      profissional: draft.professionalPreference === 'first_available' ? '' : (professionalMatch?.value || prev.profissional),
+      convenio: insuranceMatch?.value || prev.convenio,
+      data: validParsedDate || prev.data,
+      hora: draft.time || prev.hora,
+      modalidadeAtendimento: draft.modality || prev.modalidadeAtendimento,
+      informacoes: draft.observations || prev.informacoes,
+    }));
+    const unresolvedFields = getAssistantUnresolvedFields(draft);
+    setScheduleAssistantOpen(false);
+    setScheduleAssistantDraft(null);
+    setScheduleAssistantPrompt('');
+    showNotification({
+      title: 'Rascunho aplicado',
+      message: unresolvedFields.length > 0
+        ? `Revise no formulário: ${unresolvedFields.join(', ')}.`
+        : 'Confira os dados e avance para escolher uma disponibilidade.',
+      color: 'blue',
+    });
   };
   useEffect(() => {
     if (!selectedPatientId || isManualPatientFlow) return;
@@ -3351,6 +3563,8 @@ export function Agendamento() {
     });
   };
   const schedulingDateHasAvailability = dateHasAvailability(schedulingDate);
+  const scheduleAssistantPreviewFields = getAssistantPreviewFields(scheduleAssistantDraft);
+  const scheduleAssistantUnresolvedFields = getAssistantUnresolvedFields(scheduleAssistantDraft);
   useEffect(() => {
     if (isExamAppointment) return;
     if (!novoAgendamento.profissional) return;
@@ -3451,12 +3665,24 @@ export function Agendamento() {
                   Cadastre o atendimento em três passos claros: paciente, horário e confirmação.
                 </Text>
               </Box>
-              <Group className="agendamento-scheduler-intro__status" gap="xs" wrap="nowrap">
-                <Box className="agendamento-scheduler-intro__status-dot" aria-hidden="true" />
-                <Box>
-                  <Text className="agendamento-scheduler-intro__status-label">Fluxo guiado</Text>
-                  <Text className="agendamento-scheduler-intro__status-value">Etapa {schedulingStep + 1} de 3</Text>
-                </Box>
+              <Group className="agendamento-scheduler-intro__actions" gap="sm" wrap="wrap" justify="flex-end">
+                <Button
+                  className="agendamento-scheduler-intro__assistant"
+                  variant="light"
+                  leftSection={<Sparkles size={16} aria-hidden="true" />}
+                  onClick={() => {
+                    setScheduleAssistantOpen(true);
+                  }}
+                >
+                  Agendar com IA
+                </Button>
+                <Group className="agendamento-scheduler-intro__status" gap="xs" wrap="nowrap">
+                  <Box className="agendamento-scheduler-intro__status-dot" aria-hidden="true" />
+                  <Box>
+                    <Text className="agendamento-scheduler-intro__status-label">Fluxo guiado</Text>
+                    <Text className="agendamento-scheduler-intro__status-value">Etapa {schedulingStep + 1} de 3</Text>
+                  </Box>
+                </Group>
               </Group>
             </Box>
             <Box className="agendamento-wizard-progress" aria-label="Progresso do agendamento">
@@ -3521,6 +3747,7 @@ export function Agendamento() {
               <SimpleGrid className="agendamento-patient-grid" cols={{ base: 1, md: 2 }} spacing="md">
                 <Select
                   className="agendamento-native-field"
+                  id="agendamento-field-patient"
                   label="Nome completo"
                   placeholder={patientsLoading ?'Carregando pacientes...' : 'Selecione o paciente'}
                   data={patientOptions}
@@ -3618,6 +3845,7 @@ export function Agendamento() {
               <SimpleGrid className="agendamento-insurance-grid" cols={{ base: 1, md: 5 }} spacing="md">
                 <Select
                   className="agendamento-native-field"
+                  id="agendamento-field-insurance"
                   label="Tipo do convênio*"
                   placeholder={insuranceSelectPlaceholder}
                   data={insuranceSelectData}
@@ -3701,6 +3929,7 @@ export function Agendamento() {
                 />
                 <MultiSelect
                   className="agendamento-native-field"
+                  id="agendamento-field-procedure"
                   label="Procedimento"
                   placeholder={proceduresLoading ?'Carregando procedimentos...' : 'Selecione os procedimentos'}
                   data={procedureOptions}
@@ -3714,6 +3943,7 @@ export function Agendamento() {
                 {!isExamAppointment && (
                   <Select
                     className="agendamento-native-field"
+                    id="agendamento-field-professional"
                     label="Profissional"
                     placeholder={doctorsLoading ?'Carregando médicos...' : 'Selecione se quiser filtrar por um profissional'}
                     data={availableDoctorOptions}
@@ -3869,8 +4099,8 @@ export function Agendamento() {
                     >
                       {availabilityViewMode === 'week' ? 'Semana anterior' : 'Dia anterior'}
                     </Button>
-                    <FloatingDatePicker
-                      label="Data da marcação"
+                  <FloatingDatePicker
+                    label="Data da marcação"
                       labelPlacement="stacked"
                       value={schedulingDate ? dayjs(schedulingDate).format('YYYY-MM-DD') : ''}
                       onChange={(event) => {
@@ -3883,7 +4113,7 @@ export function Agendamento() {
                         if (nextDate) setViewedDate(nextDate);
                       }}
                       minDate={getTodayStart()}
-                      containerProps={{ className: 'agendamento-availability-date-field' }}
+                    containerProps={{ className: 'agendamento-availability-date-field', id: 'agendamento-field-date' }}
                     />
                     <Button
                       className="agendamento-schedule-nav-button"
@@ -4153,7 +4383,7 @@ export function Agendamento() {
                       </Group>
                     </Paper>
                   )}
-                  <Box className="agendamento-availability-board">
+                  <Box className="agendamento-availability-board" id="agendamento-field-time">
                   <Group className="agendamento-availability-heading" justify="space-between" align="flex-end" wrap="wrap" gap="sm">
                     <Box>
                       <Text className="agendamento-availability-heading__eyebrow">GRADE DE HORÁRIOS</Text>
@@ -5299,6 +5529,24 @@ export function Agendamento() {
             </Group>
           </Stack>
         </Modal>
+
+        <ScheduleAssistantModal
+          opened={scheduleAssistantOpen}
+          prompt={scheduleAssistantPrompt}
+          loading={scheduleAssistantLoading}
+          draft={scheduleAssistantDraft}
+          previewFields={scheduleAssistantPreviewFields}
+          unresolvedFields={scheduleAssistantUnresolvedFields}
+          onPromptChange={setScheduleAssistantPrompt}
+          onParse={handleParseScheduleAssistant}
+          onApply={handleApplyScheduleAssistant}
+          onClose={() => {
+            if (!scheduleAssistantLoading) {
+              setScheduleAssistantOpen(false);
+            }
+          }}
+          onFieldClick={handleAssistantFieldClick}
+        />
 
       </Box>
       <Modal

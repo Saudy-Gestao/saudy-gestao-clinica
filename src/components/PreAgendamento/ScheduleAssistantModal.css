@@ -1,0 +1,205 @@
+.schedule-assistant-modal .ui-modal-body {
+  padding: 1.25rem 1.4rem 1.35rem;
+}
+
+.schedule-assistant-modal__content {
+  min-width: 0;
+}
+
+.schedule-assistant-modal__intro {
+  display: flex;
+  align-items: flex-start;
+  gap: .8rem;
+  padding: .85rem;
+  background: color-mix(in srgb, var(--ui-primary) 8%, var(--ui-surface));
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 22%, var(--ui-border));
+  border-radius: .8rem;
+}
+
+.schedule-assistant-modal__icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 2.35rem;
+  place-items: center;
+  color: var(--ui-primary);
+  background: color-mix(in srgb, var(--ui-primary) 14%, transparent);
+  border-radius: .65rem;
+}
+
+.schedule-assistant-modal__prompt {
+  width: 100%;
+}
+
+.schedule-assistant-modal__prompt-shell {
+  position: relative;
+}
+
+.schedule-assistant-modal__prompt textarea {
+  min-height: 7.5rem;
+  padding-right: 3.25rem;
+  resize: vertical;
+}
+
+.schedule-assistant-modal__voice-button {
+  position: absolute;
+  top: 2rem;
+  right: .7rem;
+  width: 2.25rem;
+  min-height: 2.25rem;
+  padding: .45rem;
+  border-radius: .65rem;
+}
+
+.schedule-assistant-modal__voice-button--listening {
+  border-color: color-mix(in srgb, var(--ui-danger, #dc2626) 34%, var(--ui-border));
+}
+
+.schedule-assistant-modal__voice-status {
+  min-height: 1.1rem;
+  margin-top: .35rem;
+}
+
+.schedule-assistant-modal__voice-status--error {
+  color: var(--ui-danger, #dc2626);
+}
+
+.schedule-assistant-modal__examples {
+  margin-top: .4rem;
+}
+
+.schedule-assistant-modal__hint,
+.schedule-assistant-modal__warning {
+  padding: .75rem .85rem;
+  border-radius: .7rem;
+}
+
+.schedule-assistant-modal__hint {
+  background: color-mix(in srgb, var(--ui-surface) 80%, var(--ui-background));
+  border: 1px solid var(--ui-border);
+}
+
+.schedule-assistant-modal__result {
+  padding-top: 1rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.schedule-assistant-modal__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem;
+}
+
+.schedule-assistant-modal__field {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .65rem .7rem;
+  background: color-mix(in srgb, var(--ui-surface) 84%, var(--ui-background));
+  border: 1px solid var(--ui-border);
+  border-radius: .65rem;
+}
+
+.schedule-assistant-modal__field--action {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.schedule-assistant-modal__field--action:hover {
+  background: color-mix(in srgb, var(--ui-warning, #d97706) 11%, var(--ui-surface));
+  border-color: color-mix(in srgb, var(--ui-warning, #d97706) 48%, var(--ui-border));
+  transform: translateY(-1px);
+}
+
+.schedule-assistant-modal__field--action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ui-primary) 32%, transparent);
+  outline-offset: 2px;
+}
+
+.schedule-assistant-modal__field--matched {
+  border-color: color-mix(in srgb, var(--ui-success, #16a34a) 24%, var(--ui-border));
+}
+
+.schedule-assistant-modal__field--pending {
+  border-color: color-mix(in srgb, var(--ui-warning, #d97706) 30%, var(--ui-border));
+}
+
+.schedule-assistant-modal__field-icon {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 1.35rem;
+  place-items: center;
+  color: var(--ui-primary);
+  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+  border-radius: 50%;
+}
+
+.schedule-assistant-modal__field--pending .schedule-assistant-modal__field-icon {
+  color: var(--ui-warning, #d97706);
+  background: color-mix(in srgb, var(--ui-warning, #d97706) 13%, transparent);
+}
+
+.schedule-assistant-modal__field-label,
+.schedule-assistant-modal__field-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-assistant-modal__field-label {
+  color: var(--ui-muted);
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.schedule-assistant-modal__field-value {
+  color: var(--ui-foreground);
+  line-height: 1.35;
+}
+
+.schedule-assistant-modal__warning {
+  background: color-mix(in srgb, var(--ui-warning, #d97706) 8%, var(--ui-surface));
+  border: 1px solid color-mix(in srgb, var(--ui-warning, #d97706) 28%, var(--ui-border));
+}
+
+.schedule-assistant-modal__warning-fields {
+  margin-top: .35rem;
+}
+
+.schedule-assistant-modal__warning-field {
+  min-height: 1.9rem;
+  padding: .25rem .45rem;
+  color: var(--ui-warning, #d97706);
+  text-decoration: underline;
+  text-underline-offset: .15em;
+}
+
+.schedule-assistant-modal__footer {
+  width: 100%;
+}
+
+@media (max-width: 620px) {
+  .schedule-assistant-modal .ui-modal-body {
+    padding: 1rem;
+  }
+
+  .schedule-assistant-modal__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-assistant-modal__footer,
+  .schedule-assistant-modal__footer > .ui-group {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedule-assistant-modal__footer .ui-button {
+    width: 100%;
+  }
+}

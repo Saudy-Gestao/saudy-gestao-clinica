@@ -1321,6 +1321,27 @@
   }
 }
 
+.agendamento-scheduler-intro__actions {
+  min-width: 0;
+  align-items: stretch;
+}
+
+.agendamento-scheduler-intro__assistant {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  .agendamento-scheduler-intro__actions,
+  .agendamento-scheduler-intro__assistant {
+    width: 100%;
+  }
+
+  .agendamento-scheduler-intro__assistant {
+    justify-content: center;
+  }
+}
+
 /* Wizard de agendamento: uma decisão por vez, com o contexto do fluxo sempre visível. */
 .agendamento-scheduler .agendamento-wizard-progress {
   position: relative;
