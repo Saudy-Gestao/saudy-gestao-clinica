@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Clock3, Search } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import { Header } from '../Header/Header';
-import { useTeaWeeklyAgendaQuery, type TeaAgendaItem } from '../../hooks/useTeaWeeklyAgendaQuery';
+import { useTeaWeeklyAgendaQuery, type TeaAgendaItem, type TeaAgendaResource } from '../../hooks/useTeaWeeklyAgendaQuery';
 import { resolveApiErrorMessage } from '../../lib/apiError';
 import { AGENDA_CARD_DENSITY, formatCardInitials, resolveAgendaCardPresentation, type AgendaCardDetailLevel } from '../../utils/agendaCardDensity';
 import './TeaAgendaSemanal.css';
@@ -80,6 +80,29 @@ const statusColor = (value?: string) => {
   if (['RESERVED', 'RESERVADO'].includes(v)) return 'violet';
   if (['PENDING', 'PENDENTE'].includes(v)) return 'yellow';
   return 'teal';
+};
+
+const itemUnitName = (item: TeaAgendaItem) => item.unitName || roomUnit(item.roomName);
+
+const normalizeAgendaWeekday = (value?: string | null) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase()
+  .replace(/-FEIRA/g, '')
+  .trim();
+
+const dateKey = (value?: string | null) => {
+  const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] || '';
+};
+
+const agendaHasSlot = (agenda: TeaAgendaResource, date: string, time: string) => {
+  const weekdayTokens = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+  const normalizedDate = dateKey(date);
+  if (!normalizedDate || normalizeAgendaWeekday(agenda.weekday) !== weekdayTokens[dayjs(normalizedDate).day()]) return false;
+  if (agenda.startDate && normalizedDate < dateKey(agenda.startDate)) return false;
+  if (agenda.endDate && normalizedDate > dateKey(agenda.endDate)) return false;
+  return (!agenda.shiftStart || time >= agenda.shiftStart) && (!agenda.shiftEnd || time < agenda.shiftEnd);
 };
 
 function AppointmentCard({ item, compact = false, detailLevel = 'minimal', patientOnly = false, showInitials = false, hideContent = false }: { item: TeaAgendaItem; compact?: boolean; detailLevel?: AgendaCardDetailLevel; patientOnly?: boolean; showInitials?: boolean; hideContent?: boolean }) {
@@ -163,7 +186,9 @@ export function TeaAgendaSemanal() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { ref: scheduleRef, width: scheduleWidth } = useElementSize();
-  const { data: apiAppointments = [], isLoading: loading, error } = useTeaWeeklyAgendaQuery();
+  const { data: agendaData = { items: [], agendas: [] }, isLoading: loading, error } = useTeaWeeklyAgendaQuery();
+  const apiAppointments = useMemo(() => agendaData.items || [], [agendaData.items]);
+  const activeAgendas = useMemo(() => agendaData.agendas || [], [agendaData.agendas]);
   const [mode, setMode] = useState<'day' | 'week'>('week');
   const [selectedDate, setSelectedDate] = useState(() => dayjs().format('YYYY-MM-DD'));
   const [weekStart, setWeekStart] = useState(() => toWeekStartMonday(dayjs()));
@@ -177,29 +202,54 @@ export function TeaAgendaSemanal() {
   const weekStartIso = weekStart.format('YYYY-MM-DD');
   const weekEndIso = weekStart.add(4, 'day').format('YYYY-MM-DD');
   const hasRealDataForWeek = apiAppointments.some((item) => item.date >= weekStartIso && item.date <= weekEndIso);
-  const isDemo = import.meta.env.DEV && !loading && !hasRealDataForWeek;
+  const hasConfiguredAgendas = activeAgendas.length > 0;
+  const isDemo = import.meta.env.DEV && !loading && !hasRealDataForWeek && !hasConfiguredAgendas;
   const allAppointments = useMemo(() => (isDemo ? createMockAppointments(weekStart) : apiAppointments), [apiAppointments, isDemo, weekStart]);
   const visibleAppointments = useMemo(() => allAppointments.filter((item) => !isCanceledStatus(item.status)), [allAppointments]);
   const days = useMemo(() => Array.from({ length: 5 }, (_, index) => weekStart.add(index, 'day')), [weekStart]);
 
   const options = useMemo(() => ({
-    units: Array.from(new Set(visibleAppointments.map((item) => roomUnit(item.roomName)).filter(Boolean))).sort(),
-    specialties: Array.from(new Set(visibleAppointments.map((item) => item.specialty).filter(Boolean))).sort(),
-    doctors: Array.from(new Set(visibleAppointments.map((item) => item.doctorName).filter(Boolean))).sort(),
-    rooms: Array.from(new Set(visibleAppointments.map((item) => item.roomName).filter(Boolean))).sort(),
+    units: Array.from(new Set([
+      ...visibleAppointments.map(itemUnitName),
+      ...activeAgendas.map((agenda) => agenda.unitName),
+    ].filter(Boolean))).sort(),
+    specialties: Array.from(new Set([
+      ...visibleAppointments.map((item) => item.specialty),
+      ...activeAgendas.map((agenda) => agenda.specialty),
+    ].filter(Boolean))).sort(),
+    doctors: Array.from(new Set([
+      ...visibleAppointments.map((item) => item.doctorName),
+      ...activeAgendas.map((agenda) => agenda.doctorName),
+    ].filter(Boolean))).sort(),
+    rooms: Array.from(new Set([
+      ...visibleAppointments.map((item) => item.roomName),
+      ...activeAgendas.map((agenda) => agenda.roomName),
+    ].filter(Boolean))).sort(),
     patients: Array.from(new Set(visibleAppointments.map((item) => item.patientName).filter(Boolean))).sort(),
-  }), [visibleAppointments]);
+  }), [activeAgendas, visibleAppointments]);
 
   const filtered = useMemo(() => visibleAppointments.filter((item) => {
     const query = search.trim().toLowerCase();
     const matchesQuery = !query || [item.patientName, item.specialty, item.doctorName, item.roomName, item.time].some((value) => String(value || '').toLowerCase().includes(query));
     return matchesQuery
-      && (!unitFilter.length || unitFilter.includes(roomUnit(item.roomName)))
+      && (!unitFilter.length || unitFilter.includes(itemUnitName(item)))
       && (!specialtyFilter.length || specialtyFilter.includes(item.specialty))
       && (!doctorFilter.length || doctorFilter.includes(item.doctorName))
       && (!roomFilter.length || roomFilter.includes(item.roomName))
       && (!patientFilter.length || patientFilter.includes(item.patientName));
   }), [visibleAppointments, search, unitFilter, specialtyFilter, doctorFilter, roomFilter, patientFilter]);
+
+  const filteredAgendas = useMemo(() => activeAgendas.filter((agenda) => {
+    const query = search.trim().toLowerCase();
+    const matchesQuery = !query || [agenda.unitName, agenda.specialty, agenda.doctorName, agenda.roomName, agenda.shiftStart, agenda.shiftEnd]
+      .some((value) => String(value || '').toLowerCase().includes(query));
+    return matchesQuery
+      && (!unitFilter.length || unitFilter.includes(agenda.unitName))
+      && (!specialtyFilter.length || specialtyFilter.includes(agenda.specialty))
+      && (!doctorFilter.length || doctorFilter.includes(agenda.doctorName))
+      && (!roomFilter.length || roomFilter.includes(agenda.roomName))
+      && !patientFilter.length;
+  }), [activeAgendas, search, unitFilter, specialtyFilter, doctorFilter, roomFilter, patientFilter]);
 
   const bySlot = useMemo(() => {
     const map = new Map<string, TeaAgendaItem[]>();
@@ -210,7 +260,17 @@ export function TeaAgendaSemanal() {
     return map;
   }, [filtered]);
 
-  const rooms = useMemo(() => Array.from(new Set(filtered.map((item) => item.roomName).filter(Boolean))).sort(), [filtered]);
+  const rooms = useMemo(() => Array.from(new Set([
+    ...filtered.map((item) => item.roomName),
+    ...filteredAgendas.map((agenda) => agenda.roomName),
+  ].filter(Boolean))).sort(), [filtered, filteredAgendas]);
+
+  const configuredRoomNames = useMemo(() => new Set(activeAgendas.map((agenda) => agenda.roomName)), [activeAgendas]);
+
+  const isSlotAvailable = (room: string, date: string, time: string) => {
+    if (!configuredRoomNames.has(room)) return true;
+    return filteredAgendas.some((agenda) => agenda.roomName === room && agendaHasSlot(agenda, date, time));
+  };
 
   // A room can have more than one agenda running at the same time slot. Rather than
   // squeezing every concurrent appointment into one crammed cell, each room gets one
@@ -254,8 +314,8 @@ export function TeaAgendaSemanal() {
     return Math.max(40, (gridWidth - timeColumnWidth - columnCount * 6) / columnCount);
   };
 
-  const renderLaneCell = (item: TeaAgendaItem | undefined, compact = false, detailLevel: AgendaCardDetailLevel = 'minimal') => {
-    if (!item) return compact ? null : <Text size="xs" c="dimmed" ta="center" py={14}>Disponível</Text>;
+  const renderLaneCell = (item: TeaAgendaItem | undefined, compact = false, detailLevel: AgendaCardDetailLevel = 'minimal', available = true) => {
+    if (!item) return compact ? null : <Text size="xs" c="dimmed" ta="center" py={14}>{available ? 'Disponível' : '—'}</Text>;
     const cellWidth = getScheduleCellWidth();
     if (!compact) {
       if (!item.patientName) return <AppointmentCard item={item} />;
@@ -282,7 +342,7 @@ export function TeaAgendaSemanal() {
 
   useEffect(() => { dayjs.locale('pt-br'); }, []);
   useEffect(() => {
-    if (error) showNotification({ title: 'Erro', message: resolveApiErrorMessage(error as any, 'Erro ao carregar agenda semanal de Terapias'), color: 'red' });
+    if (error) showNotification({ title: 'Erro', message: resolveApiErrorMessage(error, 'Erro ao carregar agenda semanal de Terapias'), color: 'red' });
   }, [error]);
 
   const moveDay = (amount: number) => {
@@ -441,7 +501,7 @@ export function TeaAgendaSemanal() {
                         </Box>
                         {roomLanes.length ? roomLanes.map((lane) => (
                           <Box key={`${slot}-${lane.room}-${lane.laneIndex}`} className="tea-agenda-cell">
-                            {renderLaneCell(getLaneItem(selectedDate, slot, lane.room, lane.laneIndex))}
+                            {renderLaneCell(getLaneItem(selectedDate, slot, lane.room, lane.laneIndex), false, 'minimal', isSlotAvailable(lane.room, selectedDate, slot))}
                           </Box>
                         )) : (
                           <Box className="tea-agenda-cell"><Text size="xs" c="dimmed">Nenhum resultado</Text></Box>
@@ -483,7 +543,7 @@ export function TeaAgendaSemanal() {
                         {days.flatMap((day) => (
                           roomLanes.length ? roomLanes.map((lane) => (
                             <Box key={`${day.format('YYYY-MM-DD')}-${slot}-${lane.room}-${lane.laneIndex}`} className="tea-agenda-cell">
-                              {renderLaneCell(getLaneItem(day.format('YYYY-MM-DD'), slot, lane.room, lane.laneIndex), true, weeklyDetailLevel)}
+                              {renderLaneCell(getLaneItem(day.format('YYYY-MM-DD'), slot, lane.room, lane.laneIndex), true, weeklyDetailLevel, isSlotAvailable(lane.room, day.format('YYYY-MM-DD'), slot))}
                             </Box>
                           )) : [<Box key={`${day.format('YYYY-MM-DD')}-${slot}-empty`} className="tea-agenda-cell"><Text size="xs" c="dimmed">Nenhum resultado</Text></Box>]
                         ))}
@@ -494,7 +554,8 @@ export function TeaAgendaSemanal() {
               </Box>
             )}
 
-            {!loading && !filtered.length && <Text ta="center" c="dimmed" py="xl">Nenhum atendimento encontrado com os filtros atuais.</Text>}
+            {!loading && !filtered.length && !filteredAgendas.length && <Text ta="center" c="dimmed" py="xl">Nenhum atendimento ou agenda encontrada com os filtros atuais.</Text>}
+            {!loading && !filtered.length && filteredAgendas.length > 0 && <Text ta="center" c="dimmed" py="xl">Agenda configurada. Ainda não há atendimentos reservados neste período.</Text>}
             {!loading && <Text size="xs" c="dimmed">Passe o mouse sobre um atendimento para consultar os detalhes.</Text>}
           </Stack>
         </Paper>

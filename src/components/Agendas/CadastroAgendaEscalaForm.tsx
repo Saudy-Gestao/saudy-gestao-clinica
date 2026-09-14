@@ -330,50 +330,56 @@ export function CadastroAgendaEscalaForm({
 
     setSaving(true);
     setError(null);
-    let successCount = 0;
-    let firstError: string | null = null;
+    const payloads = blocks.flatMap((block) => block.days.flatMap((day) => block.slots.map((slot) => {
+      const selectedEspecialidadeIds = Array.from(new Set(
+        (slot.especialidadeIds.length > 0 ? slot.especialidadeIds : especialidadeIds).filter(Boolean),
+      ));
+      return {
+        branchId,
+        doctorId,
+        weekday: day,
+        shiftStart: slot.shiftStart,
+        shiftEnd: slot.shiftEnd,
+        especialidadeId: selectedEspecialidadeIds[0] || null,
+        especialidadeIds: selectedEspecialidadeIds,
+        roomId: slot.roomId || null,
+        startDate: slot.startDate || null,
+        endDate: slot.endDate || null,
+        status: slot.status,
+      };
+    })));
 
-    for (const block of blocks) {
-      for (const day of block.days) {
-        for (const slot of block.slots) {
-          try {
-            const selectedEspecialidadeIds = Array.from(new Set(
-              (slot.especialidadeIds.length > 0 ? slot.especialidadeIds : especialidadeIds).filter(Boolean),
-            ));
-            await agendaService.createAgenda({
-              branchId,
-              doctorId,
-              weekday: day,
-              shiftStart: slot.shiftStart,
-              shiftEnd: slot.shiftEnd,
-              especialidadeId: selectedEspecialidadeIds[0] || null,
-              especialidadeIds: selectedEspecialidadeIds,
-              roomId: slot.roomId || null,
-              startDate: slot.startDate || null,
-              endDate: slot.endDate || null,
-              status: slot.status,
-            });
-            successCount += 1;
-          } catch (err: unknown) {
-            if (!firstError) {
-              const errorCode = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-              firstError = errorCode === 'AGENDA_OVERLAP'
-                ? 'Existe uma agenda ativa sobrepondo um dos horários informados.'
-                : resolveApiErrorMessage(err, 'Não foi possível salvar a escala.');
-            }
-          }
-        }
+    try {
+      const response = await agendaService.createAgendas(payloads);
+      const savedCount = Array.isArray(response?.items) ? response.items.length : payloads.length;
+      showNotification({ title: 'Escala salva', message: `${savedCount} horário(s) de agenda cadastrado(s) com sucesso.`, color: 'green' });
+      notifyUnsavedChangesSaved();
+      await onSaved();
+    } catch (err: unknown) {
+      const responseData = (err as { response?: { data?: unknown } })?.response?.data;
+      const data = responseData && typeof responseData === 'object' ? responseData as Record<string, unknown> : {};
+      const conflict = data.conflict && typeof data.conflict === 'object' ? data.conflict as Record<string, unknown> : null;
+      const itemIndex = typeof data.itemIndex === 'number' ? data.itemIndex : -1;
+      const requested = itemIndex >= 0 ? payloads[itemIndex] : null;
+      const errorCode = data.error;
+
+      if (errorCode === 'AGENDA_OVERLAP' && requested) {
+        const weekdayLabels: Record<string, string> = {
+          domingo: 'domingo', segunda: 'segunda-feira', terca: 'terça-feira', quarta: 'quarta-feira',
+          quinta: 'quinta-feira', sexta: 'sexta-feira', sabado: 'sábado',
+        };
+        const existingStart = String(conflict?.shiftStart || '');
+        const existingEnd = String(conflict?.shiftEnd || '');
+        const existingText = existingStart && existingEnd
+          ? ` A agenda existente ocupa ${existingStart}–${existingEnd}.`
+          : '';
+        setError(`Conflito no horário ${itemIndex + 1}: ${weekdayLabels[requested.weekday] || requested.weekday}, ${requested.shiftStart}–${requested.shiftEnd}.${existingText} Nenhum horário foi salvo.`);
+      } else {
+        setError(resolveApiErrorMessage(err, 'Não foi possível salvar a escala. Nenhum horário foi salvo.'));
       }
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    if (firstError) {
-      setError(successCount ? `${successCount} horário(s) salvo(s). ${firstError}` : firstError);
-      return;
-    }
-    showNotification({ title: 'Escala salva', message: `${successCount} horário(s) de agenda cadastrado(s) com sucesso.`, color: 'green' });
-    notifyUnsavedChangesSaved();
-    await onSaved();
   };
 
   const renderSlotFields = (slot: ScaleSlot, onChange: (key: keyof ScaleSlot, value: string | string[]) => void, onRemove?: () => void) => (

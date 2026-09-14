@@ -55,7 +55,8 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 799px)');
   const { ref: scheduleRef, width: scheduleWidth } = useElementSize();
-  const { data: allAppointments = [], isLoading: loading, error } = useTeaWeeklyAgendaQuery();
+  const { data: agendaData = { items: [], agendas: [] }, isLoading: loading, error } = useTeaWeeklyAgendaQuery();
+  const allAppointments = agendaData.items || [];
   const agendasQuery = useAgendasAdminQuery();
   const roomsQuery = useRoomsAdminQuery();
   const [view, setView] = useState<'day' | 'week'>('week');

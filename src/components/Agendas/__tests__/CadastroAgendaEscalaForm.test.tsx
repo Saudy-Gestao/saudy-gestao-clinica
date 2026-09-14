@@ -9,6 +9,7 @@ import agendaService from '../../../services/agendaService';
 vi.mock('../../../services/agendaService', () => ({
   default: {
     createAgenda: vi.fn(),
+    createAgendas: vi.fn(),
   },
 }));
 
@@ -86,7 +87,7 @@ describe('CadastroAgendaEscalaForm', () => {
 
   it('envia todas as especialidades selecionadas no mesmo horário', async () => {
     const user = userEvent.setup();
-    vi.mocked(agendaService.createAgenda).mockResolvedValue({});
+    vi.mocked(agendaService.createAgendas).mockResolvedValue({ items: [] });
     render(
       <ThemeProvider>
         <CadastroAgendaEscalaForm {...baseProps} />
@@ -110,9 +111,11 @@ describe('CadastroAgendaEscalaForm', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar bloco', exact: true }));
     await user.click(screen.getByRole('button', { name: 'Salvar escala', exact: true }));
 
-    await waitFor(() => expect(agendaService.createAgenda).toHaveBeenCalledWith(expect.objectContaining({
-      especialidadeId: 'specialty-1',
-      especialidadeIds: ['specialty-1', 'specialty-2'],
-    })));
+    await waitFor(() => expect(agendaService.createAgendas).toHaveBeenCalledWith([
+      expect.objectContaining({
+        especialidadeId: 'specialty-1',
+        especialidadeIds: ['specialty-1', 'specialty-2'],
+      }),
+    ]));
   });
 });

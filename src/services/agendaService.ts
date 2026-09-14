@@ -51,6 +51,11 @@ export default {
     return res.data;
   },
 
+  async createAgendas(payloads: AgendaPayload[]) {
+    const res = await api.post('/care/agendas/bulk', { items: payloads });
+    return res.data;
+  },
+
   async updateAgenda(id: string, payload: Partial<AgendaPayload>) {
     const res = await api.put(`/care/agendas/${id}`, payload);
     return res.data;

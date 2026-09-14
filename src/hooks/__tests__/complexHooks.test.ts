@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import teaPreReservationService from '../../services/teaPreReservationService';
+import agendaService from '../../services/agendaService';
 import doctorService from '../../services/doctorService';
 import sectorService from '../../services/sectorService';
 import convenioAuthorizationService from '../../services/convenioAuthorizationService';
@@ -24,6 +25,7 @@ vi.mock('../../services/teaPreReservationService', () => ({
     list: vi.fn(),
   },
 }));
+vi.mock('../../services/agendaService', () => ({ default: { listAgendas: vi.fn() } }));
 vi.mock('../../services/doctorService', () => ({ default: { listDoctors: vi.fn() } }));
 vi.mock('../../services/sectorService', () => ({ default: { listSectors: vi.fn() } }));
 vi.mock('../../services/convenioAuthorizationService', () => ({ default: { list: vi.fn() } }));
@@ -35,6 +37,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(teaPreReservationService.listPending).mockResolvedValue([] as any);
   vi.mocked(teaPreReservationService.listCreated).mockResolvedValue({ items: [] } as any);
+  vi.mocked(agendaService.listAgendas).mockResolvedValue({ items: [] } as any);
   vi.mocked(teaPreReservationService.list).mockResolvedValue({ items: [] } as any);
   vi.mocked(doctorService.listDoctors).mockResolvedValue([] as any);
   vi.mocked(sectorService.listSectors).mockResolvedValue([] as any);
@@ -44,7 +47,7 @@ beforeEach(() => {
 
 describe('fetchTeaWeeklyAgenda', () => {
   it('returns empty when no reservations', async () => {
-    await expect(fetchTeaWeeklyAgenda()).resolves.toEqual([]);
+    await expect(fetchTeaWeeklyAgenda()).resolves.toEqual({ items: [], agendas: [] });
   });
 
   it('maps created reservations with RESERVED status', async () => {
@@ -64,8 +67,37 @@ describe('fetchTeaWeeklyAgenda', () => {
       { preReservationId: 'r1', pitTherapyId: 't1' },
     ] as any);
     const result = await fetchTeaWeeklyAgenda();
-    expect(result).toHaveLength(1);
-    expect(result[0].status).toBe('RESERVED');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].status).toBe('RESERVED');
+  });
+
+  it('keeps active agendas available even when there are no reservations yet', async () => {
+    vi.mocked(agendaService.listAgendas).mockResolvedValue({
+      items: [{
+        id: 'agenda-1',
+        branchId: 'branch-1',
+        branch: { id: 'branch-1', tradeName: 'Unidade Central' },
+        doctorId: 'doctor-1',
+        doctor: { id: 'doctor-1', name: 'Dra. Ana' },
+        weekday: 'segunda',
+        shiftStart: '08:00',
+        shiftEnd: '12:00',
+        roomId: 'room-1',
+        room: { id: 'room-1', name: 'Sala 1' },
+        status: 'ATIVA',
+      }],
+    } as any);
+
+    const result = await fetchTeaWeeklyAgenda();
+
+    expect(agendaService.listAgendas).toHaveBeenCalledWith({ status: 'ATIVA' });
+    expect(result.items).toEqual([]);
+    expect(result.agendas).toEqual([expect.objectContaining({
+      id: 'agenda-1',
+      unitName: 'Unidade Central',
+      roomName: 'Sala 1 (Unidade Central)',
+      doctorName: 'Dra. Ana',
+    })]);
   });
 
   it('builds roomById map from sectors', async () => {
@@ -82,7 +114,7 @@ describe('fetchTeaWeeklyAgenda', () => {
   it('handles array-wrapped responses', async () => {
     vi.mocked(teaPreReservationService.listPending).mockResolvedValue({ data: { items: [] } } as any);
     vi.mocked(teaPreReservationService.listCreated).mockResolvedValue({ data: { items: [] } } as any);
-    await expect(fetchTeaWeeklyAgenda()).resolves.toEqual([]);
+    await expect(fetchTeaWeeklyAgenda()).resolves.toEqual({ items: [], agendas: [] });
   });
 });
 
