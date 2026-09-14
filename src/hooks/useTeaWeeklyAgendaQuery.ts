@@ -31,6 +31,7 @@ export type TeaAgendaResource = {
   doctorId: string;
   doctorName: string;
   specialty: string;
+  specialties: string[];
   roomId: string;
   roomName: string;
   weekday: string;
@@ -127,6 +128,11 @@ export const fetchTeaWeeklyAgenda = async (): Promise<TeaWeeklyAgendaData> => {
       const displayRoomName = roomName
         ? (unitName ? `${roomName} (${unitName})` : roomName)
         : `Agenda · ${doctorName || 'Profissional não informado'}${unitName ? ` (${unitName})` : ''}`;
+      const specialtyNames: string[] = (Array.isArray(agenda?.especialidades)
+          ? agenda.especialidades.map((especialidade: any) => String(especialidade?.name || '').trim())
+          : [String(agenda?.especialidade?.name || '').trim()]
+        ).filter(Boolean);
+      const specialties = Array.from(new Set<string>(specialtyNames));
 
       return {
         id: String(agenda?.id || '').trim(),
@@ -134,7 +140,8 @@ export const fetchTeaWeeklyAgenda = async (): Promise<TeaWeeklyAgendaData> => {
         unitName,
         doctorId,
         doctorName,
-        specialty: String(agenda?.especialidade?.name || '').trim(),
+        specialty: specialties[0] || '',
+        specialties,
         roomId,
         roomName: displayRoomName,
         weekday: String(agenda?.weekday || '').trim(),

@@ -100,6 +100,33 @@ describe('fetchTeaWeeklyAgenda', () => {
     })]);
   });
 
+  it('keeps every specialty linked to an active agenda', async () => {
+    vi.mocked(agendaService.listAgendas).mockResolvedValue({
+      items: [{
+        id: 'agenda-1',
+        branchId: 'branch-1',
+        branch: { id: 'branch-1', tradeName: 'Unidade Central' },
+        doctorId: 'doctor-1',
+        doctor: { id: 'doctor-1', name: 'Dra. Ana' },
+        weekday: 'segunda',
+        shiftStart: '08:00',
+        shiftEnd: '12:00',
+        especialidadeId: 'specialty-1',
+        especialidadeIds: ['specialty-1', 'specialty-2'],
+        especialidades: [
+          { id: 'specialty-1', name: 'Fisioterapia', modalidadeId: 'm-1' },
+          { id: 'specialty-2', name: 'Psicomotricidade', modalidadeId: 'm-2' },
+        ],
+        status: 'ATIVA',
+      }],
+    } as any);
+
+    const result = await fetchTeaWeeklyAgenda();
+
+    expect(result.agendas[0].specialty).toBe('Fisioterapia');
+    expect(result.agendas[0].specialties).toEqual(['Fisioterapia', 'Psicomotricidade']);
+  });
+
   it('builds roomById map from sectors', async () => {
     vi.mocked(sectorService.listSectors).mockResolvedValue([
       { id: 's1', name: 'Sala 1', branch: { tradeName: 'Centro' } },

@@ -12,6 +12,7 @@ export interface Agenda {
   especialidadeId?: string | null;
   especialidadeIds?: string[];
   especialidade?: { id: string; name: string; modalidadeId: string } | null;
+  especialidades?: { id: string; name: string; modalidadeId: string }[];
   roomId?: string | null;
   room?: { id: string; name: string } | null;
   startDate?: string | null;

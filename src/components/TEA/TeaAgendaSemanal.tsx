@@ -215,7 +215,7 @@ export function TeaAgendaSemanal() {
     ].filter(Boolean))).sort(),
     specialties: Array.from(new Set([
       ...visibleAppointments.map((item) => item.specialty),
-      ...activeAgendas.map((agenda) => agenda.specialty),
+      ...activeAgendas.flatMap((agenda) => agenda.specialties.length ? agenda.specialties : [agenda.specialty]),
     ].filter(Boolean))).sort(),
     doctors: Array.from(new Set([
       ...visibleAppointments.map((item) => item.doctorName),
@@ -241,11 +241,11 @@ export function TeaAgendaSemanal() {
 
   const filteredAgendas = useMemo(() => activeAgendas.filter((agenda) => {
     const query = search.trim().toLowerCase();
-    const matchesQuery = !query || [agenda.unitName, agenda.specialty, agenda.doctorName, agenda.roomName, agenda.shiftStart, agenda.shiftEnd]
+    const matchesQuery = !query || [agenda.unitName, ...agenda.specialties, agenda.specialty, agenda.doctorName, agenda.roomName, agenda.shiftStart, agenda.shiftEnd]
       .some((value) => String(value || '').toLowerCase().includes(query));
     return matchesQuery
       && (!unitFilter.length || unitFilter.includes(agenda.unitName))
-      && (!specialtyFilter.length || specialtyFilter.includes(agenda.specialty))
+      && (!specialtyFilter.length || (agenda.specialties.length ? agenda.specialties : [agenda.specialty]).some((specialty) => specialtyFilter.includes(specialty)))
       && (!doctorFilter.length || doctorFilter.includes(agenda.doctorName))
       && (!roomFilter.length || roomFilter.includes(agenda.roomName))
       && !patientFilter.length;

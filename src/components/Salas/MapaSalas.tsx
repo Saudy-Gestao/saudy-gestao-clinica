@@ -47,6 +47,27 @@ const toWeekStartMonday = (value: dayjs.Dayjs) => value.subtract((value.day() + 
 const normalizeList = (data: any): any[] => Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.data) ? data.data : []));
 type SlotStatus = keyof typeof STATUS_META;
 
+type AgendaSpecialtyRecord = { name?: unknown };
+type AgendaWithSpecialties = {
+  especialidades?: unknown;
+  especialidade?: AgendaSpecialtyRecord | null;
+};
+
+const getAgendaSpecialtyNames = (agenda: AgendaWithSpecialties): string[] => {
+  const names = Array.isArray(agenda.especialidades)
+    ? agenda.especialidades
+      .map((especialidade: unknown) => (
+        especialidade && typeof especialidade === 'object' && 'name' in especialidade
+          ? String((especialidade as AgendaSpecialtyRecord).name || '').trim()
+          : ''
+      ))
+      .filter(Boolean)
+    : [];
+  if (names.length > 0) return Array.from(new Set(names));
+  const legacyName = String(agenda.especialidade?.name || '').trim();
+  return legacyName ? [legacyName] : [];
+};
+
 function StatCard({ label, value, detail, highlight = false }: { label: string; value: number; detail: string; highlight?: boolean }) {
   return <Paper className={`mapa-salas-stat-card${highlight ? ' mapa-salas-stat-card--highlight' : ''}`} withBorder radius="md" p="sm"><Text size="xl" fw={700}>{value}</Text><Text size="sm" fw={600}>{label}</Text><Text size="xs" c="dimmed">{detail}</Text></Paper>;
 }
@@ -208,7 +229,10 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
       && (roomFilter.length === 0 || roomFilter.includes(item.roomName))
       && (unitFilter.length === 0 || unitFilter.includes(getUnitName(item.roomName)));
   }), [agendaAppointments, doctorFilter, roomFilter, search, specialtyFilter, unitFilter]);
-  const specialties = useMemo(() => Array.from(new Set(agendaAppointments.map((item) => item.specialty).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [agendaAppointments]);
+  const specialties = useMemo(() => Array.from(new Set([
+    ...agendaAppointments.map((item) => item.specialty),
+    ...agendaRecords.flatMap(getAgendaSpecialtyNames),
+  ].filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [agendaAppointments, agendaRecords]);
   const doctors = useMemo(() => Array.from(new Set(agendaAppointments.map((item) => item.doctorName).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [agendaAppointments]);
   const units = useMemo(() => Array.from(new Set(roomNames.map(getUnitName))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [roomNames]);
   const visibleRooms = useMemo(() => roomNames.filter((name) => roomFilter.length === 0 || roomFilter.includes(name)), [roomFilter, roomNames]);
@@ -317,7 +341,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
         <Text size="xs" c="dimmed" mb={showFull ? 0 : 6}>{roomName}</Text>
         {!showFull && (
           <Stack gap={3}>
-            <Text size="sm" fw={600}>{agenda.especialidade?.name || 'Especialidade não informada'}</Text>
+            <Text size="sm" fw={600}>{getAgendaSpecialtyNames(agenda).join(', ') || 'Especialidade não informada'}</Text>
             <Text size="xs">Profissional: {agenda.doctor?.name || 'Não informado'}</Text>
           </Stack>
         )}
@@ -343,7 +367,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
           }}
         >
           {showFull && detailLevel === 'full' && <Text size="sm" fw={700} truncate w="100%">{agenda.doctor?.name || 'Agenda da sala'}</Text>}
-          {showFull && <Text size="xs" c="dimmed" truncate w="100%">{isBlocked ? 'Bloqueado' : agenda.especialidade?.name || 'Agenda da sala'}</Text>}
+          {showFull && <Text size="xs" c="dimmed" truncate w="100%">{isBlocked ? 'Bloqueado' : getAgendaSpecialtyNames(agenda).join(', ') || 'Agenda da sala'}</Text>}
           {patientOnly && showInitials && !hideContent && <Text size="sm" fw={700}>{formatCardInitials(agenda.doctor?.name)}</Text>}
           {!hideContent && <Text size={showFull ? 'sm' : 'xs'} fw={700}>{interval}</Text>}
         </Box>

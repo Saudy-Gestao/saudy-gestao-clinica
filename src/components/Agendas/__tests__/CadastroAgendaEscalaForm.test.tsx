@@ -45,7 +45,11 @@ const baseProps = {
     { id: 'specialty-1', name: 'Fonoaudiologia', branchId: null },
     { id: 'specialty-2', name: 'Psicologia', branchId: null },
   ],
-  rooms: [],
+  rooms: [
+    { id: 'room-1', name: 'Sala Fisio', branchId: 'branch-1', modalidadeId: 'modality-1', especialidadeIds: ['specialty-1'] },
+    { id: 'room-2', name: 'Sala Psico', branchId: 'branch-1', modalidadeId: 'modality-2', especialidadeIds: ['specialty-2'] },
+    { id: 'room-3', name: 'Sala Multi', branchId: 'branch-1', modalidadeId: 'modality-1', especialidadeIds: ['specialty-1', 'specialty-2'] },
+  ],
   interns: [],
   isMobile: false,
   onCancel: vi.fn(),
@@ -117,5 +121,32 @@ describe('CadastroAgendaEscalaForm', () => {
         especialidadeIds: ['specialty-1', 'specialty-2'],
       }),
     ]));
+  });
+
+  it('filtra as salas pelas especialidades selecionadas no horário', async () => {
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <CadastroAgendaEscalaForm {...baseProps} />
+      </ThemeProvider>,
+    );
+
+    await user.click(screen.getAllByRole('button', { name: 'Unidade', exact: true })[0]);
+    await user.click(screen.getByRole('option', { name: 'Unidade Central', exact: true }));
+
+    const specialtySelect = screen.getByRole('button', { name: 'Especialidade', exact: true });
+    await user.click(specialtySelect);
+    await user.click(screen.getByRole('option', { name: 'Fonoaudiologia', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Profissional', exact: true }));
+    await user.click(screen.getByRole('option', { name: 'Dra. Ana', exact: true }));
+
+    await user.click(screen.getByRole('button', { name: /Novo bloco/ }));
+    await user.click(screen.getByRole('button', { name: /Segunda-feira/ }));
+    const roomSelect = screen.getByRole('button', { name: 'Sala', exact: true });
+    await user.click(roomSelect);
+
+    expect(screen.getByRole('option', { name: 'Sala Fisio', exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Sala Multi', exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Sala Psico', exact: true })).not.toBeInTheDocument();
   });
 });

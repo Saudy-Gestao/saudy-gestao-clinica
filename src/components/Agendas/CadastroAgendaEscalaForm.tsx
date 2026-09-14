@@ -50,6 +50,8 @@ type AgendaRoom = {
   description?: string | null;
   branchId?: string | null;
   modalidadeId?: string | null;
+  especialidadeId?: string | null;
+  especialidadeIds?: string[];
 };
 
 type AgendaIntern = {
@@ -112,6 +114,11 @@ const getDoctorEspecialidadeIds = (groups: DoctorSpecialtyGroup[] = []) => Array
     ...(Array.isArray(group.especialidadeIds) ? group.especialidadeIds : []),
   ]).map((id) => String(id || '').trim()).filter(Boolean),
 ));
+
+const getRoomEspecialidadeIds = (room: AgendaRoom) => Array.from(new Set([
+  room.especialidadeId,
+  ...(Array.isArray(room.especialidadeIds) ? room.especialidadeIds : []),
+].map((id) => String(id || '').trim()).filter(Boolean)));
 
 const makeSlot = (especialidadeIds: string[] = []): ScaleSlot => ({
   key: makeKey(),
@@ -221,7 +228,7 @@ export function CadastroAgendaEscalaForm({
     setInternIds([]);
   };
 
-  const roomOptions = useMemo(() => {
+  const roomOptionsForSpecialties = (selectedEspecialidadeIds: string[]) => {
     const modalityIds = new Set(
       (Array.isArray(doctor?.especialidadeGroups) ? doctor.especialidadeGroups : [])
         .map((group: DoctorSpecialtyGroup) => group.modalidadeId)
@@ -230,9 +237,15 @@ export function CadastroAgendaEscalaForm({
     return rooms
       .filter((room) => isRoomSector(room))
       .filter((room) => !branchId || room.branchId === branchId)
-      .filter((room) => modalityIds.size === 0 || (room.modalidadeId && modalityIds.has(room.modalidadeId)))
+      .filter((room) => {
+        const roomEspecialidadeIds = getRoomEspecialidadeIds(room);
+        if (selectedEspecialidadeIds.length > 0 && roomEspecialidadeIds.length > 0) {
+          return selectedEspecialidadeIds.every((id) => roomEspecialidadeIds.includes(id));
+        }
+        return modalityIds.size === 0 || (room.modalidadeId && modalityIds.has(room.modalidadeId));
+      })
       .map((room) => ({ value: room.id, label: room.name }));
-  }, [rooms, doctor, branchId]);
+  };
 
   const internOptions = useMemo(() => interns
     .filter((item) => item?.id && item.isActive !== false && (!branchId || item.branchId === branchId))
@@ -244,14 +257,32 @@ export function CadastroAgendaEscalaForm({
   const updateDraftSlot = (slotKey: string, key: keyof ScaleSlot, value: string | string[]) => {
     setDraft((current) => current ? ({
       ...current,
-      slots: current.slots.map((slot) => slot.key === slotKey ? { ...slot, [key]: value } : slot),
+      slots: current.slots.map((slot) => {
+        if (slot.key !== slotKey) return slot;
+        const nextSlot = { ...slot, [key]: value };
+        const selectedIds = key === 'especialidadeIds' && Array.isArray(value)
+          ? value
+          : (slot.especialidadeIds.length > 0 ? slot.especialidadeIds : especialidadeIds);
+        const roomIsCompatible = !nextSlot.roomId
+          || roomOptionsForSpecialties(selectedIds).some((room) => room.value === nextSlot.roomId);
+        return roomIsCompatible ? nextSlot : { ...nextSlot, roomId: '' };
+      }),
     }) : current);
   };
 
   const updateSavedSlot = (blockKey: string, slotKey: string, key: keyof ScaleSlot, value: string | string[]) => {
     setBlocks((current) => current.map((block) => block.key !== blockKey ? block : ({
       ...block,
-      slots: block.slots.map((slot) => slot.key === slotKey ? { ...slot, [key]: value } : slot),
+      slots: block.slots.map((slot) => {
+        if (slot.key !== slotKey) return slot;
+        const nextSlot = { ...slot, [key]: value };
+        const selectedIds = key === 'especialidadeIds' && Array.isArray(value)
+          ? value
+          : (slot.especialidadeIds.length > 0 ? slot.especialidadeIds : especialidadeIds);
+        const roomIsCompatible = !nextSlot.roomId
+          || roomOptionsForSpecialties(selectedIds).some((room) => room.value === nextSlot.roomId);
+        return roomIsCompatible ? nextSlot : { ...nextSlot, roomId: '' };
+      }),
     })));
   };
 
@@ -407,7 +438,15 @@ export function CadastroAgendaEscalaForm({
           searchable
           clearable
         />
-        <Select label="Sala" data={roomOptions} value={slot.roomId || null} onChange={(value) => onChange('roomId', value || '')} placeholder="Sem sala" searchable clearable />
+        <Select
+          label="Sala"
+          data={roomOptionsForSpecialties(slot.especialidadeIds.length > 0 ? slot.especialidadeIds : especialidadeIds)}
+          value={slot.roomId || null}
+          onChange={(value) => onChange('roomId', value || '')}
+          placeholder="Sem sala"
+          searchable
+          clearable
+        />
         <Select label="Tempo" data={DURATION_OPTIONS} value={slot.durationMinutes} onChange={(value) => onChange('durationMinutes', value || '30')} searchable />
       </Box>
     </Box>

@@ -70,6 +70,11 @@ type SpecialtyRecord = {
   name?: string;
 };
 
+const getRoomEspecialidadeIds = (room: { especialidadeId?: unknown; especialidadeIds?: unknown }) => Array.from(new Set([
+  room.especialidadeId,
+  ...(Array.isArray(room.especialidadeIds) ? room.especialidadeIds : []),
+].map((id) => String(id || '').trim()).filter(Boolean)));
+
 const getApiList = (data: any): any[] => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.items)) return data.items;
@@ -187,11 +192,17 @@ export function CadastroAgendas() {
   };
 
   // Only rooms whose modalidade matches one of the professional's registered conjuntos.
-  const roomOptionsForDoctorInBranch = (branchId: string, doctorId: string) => {
+  const roomOptionsForDoctorInBranch = (branchId: string, doctorId: string, selectedEspecialidadeIds: string[] = []) => {
     const modalidadeIds = doctorModalidadeIds(doctorId);
     return roomList
       .filter((r: any) => r.branchId === branchId)
-      .filter((r: any) => r.modalidadeId && modalidadeIds.has(r.modalidadeId))
+      .filter((r: any) => {
+        const roomEspecialidadeIds = getRoomEspecialidadeIds(r);
+        if (selectedEspecialidadeIds.length > 0 && roomEspecialidadeIds.length > 0) {
+          return selectedEspecialidadeIds.every((id) => roomEspecialidadeIds.includes(id));
+        }
+        return r.modalidadeId && modalidadeIds.has(r.modalidadeId);
+      })
       .map((r: any) => ({ value: r.id, label: r.name }));
   };
 
@@ -631,7 +642,14 @@ export function CadastroAgendas() {
             disabled={!form.branchId || !form.doctorId}
             searchable
             clearable
-            onChange={(values) => setForm((prev) => ({ ...prev, especialidadeIds: values, especialidadeId: values[0] || '' }))}
+            onChange={(values) => setForm((prev) => ({
+              ...prev,
+              especialidadeIds: values,
+              especialidadeId: values[0] || '',
+              roomId: prev.roomId && roomOptionsForDoctorInBranch(prev.branchId, prev.doctorId, values).some((room) => room.value === prev.roomId)
+                ? prev.roomId
+                : '',
+            }))}
           />
           <Select
             label="Dia da semana"
@@ -660,7 +678,7 @@ export function CadastroAgendas() {
           <Select
             label="Sala"
             placeholder={form.branchId && form.doctorId ? 'Selecione a sala (opcional)' : 'Selecione unidade e profissional primeiro'}
-            data={roomOptionsForDoctorInBranch(form.branchId, form.doctorId)}
+            data={roomOptionsForDoctorInBranch(form.branchId, form.doctorId, form.especialidadeIds)}
             value={form.roomId || null}
             disabled={!form.branchId || !form.doctorId}
             clearable
