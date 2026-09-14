@@ -43,6 +43,41 @@ describe('apiError utilities', () => {
     }, 'Fallback')).toBe('O servidor encontrou um erro. Tente novamente em instantes.');
   });
 
+  it('prefers the actionable backend message over a generic conflict wrapper', () => {
+    expect(resolveApiErrorMessage({
+      response: {
+        status: 409,
+        data: {
+          error: 'Scheduling conflict',
+          conflictType: 'DOCTOR',
+          message: 'O médico já possui outra consulta nesse horário.',
+          details: 'Conflito com Maria Clara às 14:00.',
+        },
+      },
+    }, 'Fallback')).toBe('O médico já possui outra consulta nesse horário. Conflito com Maria Clara às 14:00.');
+  });
+
+  it('uses details when the route error is only a generic wrapper', () => {
+    expect(resolveApiErrorMessage({
+      response: {
+        status: 409,
+        data: {
+          error: 'Failed to update appointment',
+          details: 'A sala já está ocupada para este horário.',
+        },
+      },
+    }, 'Fallback')).toBe('A sala já está ocupada para este horário.');
+  });
+
+  it('keeps a specific error returned in the error field', () => {
+    expect(resolveApiErrorMessage({
+      response: {
+        status: 400,
+        data: { error: 'O profissional não atende nessa unidade' },
+      },
+    }, 'Fallback')).toBe('O profissional não atende nessa unidade');
+  });
+
   it('prefers actionable field errors over a generic validation envelope', () => {
     expect(resolveApiErrorMessage({
       response: {
