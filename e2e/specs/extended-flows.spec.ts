@@ -18,7 +18,6 @@ type E2EFixture = {
   teaProcedureName: string;
   doctorName: string;
   targetDate: string;
-  apiBaseUrl: string;
 };
 
 const frontDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -64,7 +63,7 @@ test.describe(getFlow('professional.create').title, () => {
 
     const suffix = projectSuffix(testInfo);
     await page.getByLabel('Nome completo').fill(`Profissional Automatizado ${suffix}`);
-    await page.getByLabel('CPF').fill(testInfo.project.name === 'mobile' ? '12345678909' : '93541134780');
+    await page.getByLabel('CPF').fill(testInfo.project.name === 'mobile' ? '15350946056' : '93541134780');
     await selectDoctorBirthDate(page);
     await selectOptionById(page, 'doctor-field-gender', 'Outro');
     await selectOptionById(page, 'doctor-field-crm-state', 'SP');
@@ -221,27 +220,23 @@ test.describe(getFlow('tea.pre-reservation').title, () => {
     await page.getByRole('button', { name: 'Apenas reservar', exact: true }).click();
     await expect(page.getByText('Grade PIT aceita', { exact: false })).toBeVisible();
 
-    const authToken = await page.evaluate(() => localStorage.getItem('token'));
-    const requestHeaders = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
-    const pendingResponse = await page.request.get(`${fixture.apiBaseUrl}/care/tea-pre-reservations/pending`, {
-      headers: requestHeaders,
-    });
-    expect(pendingResponse.ok()).toBeTruthy();
-    const pendingPayload = await pendingResponse.json() as {
-      items?: Array<{ patient?: { name?: string }; preReservationId?: string }>;
-    };
-    const pendingItem = (pendingPayload.items || []).find((item) => (
-      item?.patient?.name === patientName && item?.preReservationId
-    ));
-    expect(pendingItem?.preReservationId).toBeTruthy();
+    // A autorização precisa seguir a mesma jornada de um operador: a reserva
+    // pendente aparece na fila de autorizações e é alterada pela UI.
+    await page.goto('/autorizacao-convenio');
+    const authorizationSearch = page.getByPlaceholder('Buscar por paciente, CPF, procedimento, médico ou sala');
+    await authorizationSearch.fill(patientName);
+    const authorizationRow = page.locator('tbody tr').filter({
+      has: page.getByText(patientName, { exact: true }),
+    }).filter({
+      hasText: fixture.teaProcedureName,
+    }).first();
+    await expect(authorizationRow).toBeVisible();
+    await authorizationRow.locator('.autorizacao-convenio-status-select').locator('button.ui-select-trigger').click();
+    await page.getByRole('option', { name: 'Autorizado', exact: true }).click();
+    await expect(page.getByText('Status atualizado', { exact: true })).toBeVisible();
+    await expect(authorizationRow.locator('.ui-badge').filter({ hasText: 'Autorizado' })).toBeVisible();
 
-    const authorizeResponse = await page.request.patch(
-      `${fixture.apiBaseUrl}/care/tea-pre-reservations/${pendingItem.preReservationId}/status`,
-      { data: { status: 'AUTHORIZED', applySeries: true }, headers: requestHeaders },
-    );
-    expect(authorizeResponse.ok()).toBeTruthy();
-
-    await page.reload();
+    await page.goto('/tea/pre-reserva');
     const authorizedCard = page.locator('.tea-pre-reserva-card').filter({
       has: page.getByText(patientName, { exact: true }),
     }).first();
@@ -282,6 +277,15 @@ test.describe(getFlow('consultation.execute').title, () => {
     await expect(page.getByText('Prontuário sincronizado', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Finalizar atendimento', exact: true }).click();
     await expect(page.getByText(/Atendimento finalizado|Atendimento concluído|concluído/i).first()).toBeVisible();
+
+    await page.goto('/historico');
+    await page.getByPlaceholder('Nome do paciente ou CPF').fill(patientName);
+    const historyRow = page.locator('.historico-table tbody tr:visible, .historico-mobile-card:visible').filter({ hasText: patientName }).first();
+    await expect(historyRow).toBeVisible();
+    await historyRow.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
+    const historyDrawer = page.locator('.ui-modal').filter({ has: page.getByRole('heading', { name: 'Detalhes do atendimento', exact: true }) });
+    await expect(historyDrawer).toBeVisible();
+    await expect(page.getByText('Prontuário clínico', { exact: true })).toBeVisible();
   });
 });
 

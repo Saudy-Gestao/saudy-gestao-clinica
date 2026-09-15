@@ -235,7 +235,11 @@ export function Faturamento() {
     () => new Map(invoices.map((invoice: any) => [String(invoice.id), invoice])),
     [invoices],
   );
-  const filtered = rows.filter((r) => r.codigo.toLowerCase().includes(query.toLowerCase()) || r.convenio.toLowerCase().includes(query.toLowerCase()));
+  const filtered = rows.filter((r) => (
+    String(r.nome || '').toLowerCase().includes(query.toLowerCase())
+    || r.codigo.toLowerCase().includes(query.toLowerCase())
+    || r.convenio.toLowerCase().includes(query.toLowerCase())
+  ));
   const paginatedFiltered = useMemo(
     () => filtered.slice((invoicePage - 1) * invoicePageSize, invoicePage * invoicePageSize),
     [filtered, invoicePage, invoicePageSize],

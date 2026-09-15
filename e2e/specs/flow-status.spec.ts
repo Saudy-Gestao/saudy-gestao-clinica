@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { flowCatalog } from '../../src/lib/e2eFlowCatalog';
 
 type E2EFixture = { loginEmail: string };
 
@@ -21,7 +22,7 @@ test.describe('Painel de cobertura dos fluxos E2E', () => {
 
     await page.goto('/e2e-fluxos');
     await expect(page.getByTestId('e2e-flow-status-page')).toBeVisible();
-    await expect(page.getByTestId('e2e-summary-approved')).toContainText('17');
+    await expect(page.getByTestId('e2e-summary-approved')).toContainText(String(flowCatalog.length));
     await expect(page.getByTestId('e2e-summary-pending')).toContainText('0');
     await expect(page.getByTestId('e2e-summary-rejected')).toContainText('0');
     await expect(page.getByText('Agendamento convencional completo', { exact: true })).toBeVisible();
