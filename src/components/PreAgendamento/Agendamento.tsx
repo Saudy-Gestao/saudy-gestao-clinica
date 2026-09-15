@@ -109,15 +109,13 @@ interface AgendaShiftWindow {
   shiftEnd: string;
   startDate?: string | null;
   endDate?: string | null;
+  specialtyIds: string[];
 }
 interface DoctorScheduleMeta {
   id?: string;
   branchId?: string;
   name: string;
   roomIds: string[];
-  workingDays: string[];
-  workingHoursStart?: string;
-  workingHoursEnd?: string;
   specialties: string[];
   gender?: string;
   agendaByWeekday?: Record<string, AgendaShiftWindow[]>;
@@ -129,14 +127,12 @@ interface ProcedureMeta {
   durationMinutes?: number | null;
   doctorIds: string[];
   doctorNames: string[];
+  specialtyIds: string[];
   supportsTeleconsultation: boolean;
 }
 interface RoomScheduleMeta {
   id: string;
   name: string;
-  workingDays: string[];
-  workingHoursStart?: string;
-  workingHoursEnd?: string;
   agendaByWeekday?: Record<string, AgendaShiftWindow[]>;
 }
 interface SuggestedProcedureSchedule {
@@ -265,11 +261,6 @@ const patientHasRegisteredInsurance = (patient: any): boolean => {
     ?? '',
   ).trim();
   return Boolean(insuranceName) && normalizeComparableText(insuranceName) !== normalizeComparableText(PARTICULAR_INSURANCE_LABEL);
-};
-const TIME_SLOTS = {
-  'Manhã': ['08:00', '08:30', '09:00', '09:30', '10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30', '11:45'],
-  'Tarde': ['13:00', '13:15', '13:30', '13:45', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'],
-  'Noite': ['18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'],
 };
 const PERIOD_RANGES: Record<'Manhã' | 'Tarde' | 'Noite', [number, number]> = {
   'Manhã': [0, 12 * 60],
@@ -455,18 +446,25 @@ const buildSlotsFromAgendaWindows = (
   windows: AgendaShiftWindow[],
   period: 'Manhã' | 'Tarde' | 'Noite',
   date: Date,
+  durationMinutes = 15,
+  specialtyIds: string[] = [],
 ): string[] => {
   const [periodStart, periodEnd] = PERIOD_RANGES[period];
   const slots = new Set<number>();
   windows
-    .filter((window) => isDateWithinAgendaWindow(date, window))
+    .filter((window) => (
+      isDateWithinAgendaWindow(date, window)
+      && (specialtyIds.length === 0
+        || window.specialtyIds.length === 0
+        || specialtyIds.some((id) => window.specialtyIds.includes(id)))
+    ))
     .forEach((window) => {
       const start = parseTimeToMinutes(window.shiftStart);
       const end = parseTimeToMinutes(window.shiftEnd);
       if (start === null || end === null || end <= start) return;
       const rangeStart = Math.max(start, periodStart);
       const rangeEnd = Math.min(end, periodEnd);
-      for (let minute = rangeStart; minute < rangeEnd; minute += 15) {
+      for (let minute = rangeStart; minute + Math.max(15, durationMinutes) <= rangeEnd; minute += 15) {
         slots.add(minute);
       }
     });
@@ -489,6 +487,11 @@ const groupAgendasByKey = (
       shiftEnd: agenda.shiftEnd,
       startDate: agenda.startDate || null,
       endDate: agenda.endDate || null,
+      specialtyIds: Array.from(new Set([
+        ...(Array.isArray(agenda?.especialidadeIds) ? agenda.especialidadeIds : []),
+        agenda?.especialidadeId,
+        ...(Array.isArray(agenda?.especialidades) ? agenda.especialidades.map((item: any) => item?.id) : []),
+      ].map((item: any) => String(item || '').trim()).filter(Boolean))),
     });
     return acc;
   }, {});
@@ -497,65 +500,29 @@ const buildDoctorSlots = (
   doctor: DoctorScheduleMeta | undefined,
   period: 'Manhã' | 'Tarde' | 'Noite',
   date: Date,
+  durationMinutes = 15,
+  specialtyIds: string[] = [],
 ): string[] => {
   const currentWeekday = getBranchWeekdayLabel(date);
   if (hasAnyAgendaWindow(doctor?.agendaByWeekday)) {
     const windows = doctor?.agendaByWeekday?.[currentWeekday] || [];
-    return buildSlotsFromAgendaWindows(windows, period, date);
+    return buildSlotsFromAgendaWindows(windows, period, date, durationMinutes, specialtyIds);
   }
-  if (!doctor?.workingHoursStart || !doctor?.workingHoursEnd) {
-    return TIME_SLOTS[period];
-  }
-  const normalizedDays = (doctor.workingDays || []).map(normalizeWeekdayLabel);
-  if (normalizedDays.length > 0 && !normalizedDays.includes(currentWeekday)) {
-    return [];
-  }
-  const doctorStart = parseTimeToMinutes(doctor.workingHoursStart);
-  const doctorEnd = parseTimeToMinutes(doctor.workingHoursEnd);
-  if (doctorStart === null || doctorEnd === null || doctorEnd <= doctorStart) {
-    return TIME_SLOTS[period];
-  }
-  const [periodStart, periodEnd] = PERIOD_RANGES[period];
-  const rangeStart = Math.max(doctorStart, periodStart);
-  const rangeEnd = Math.min(doctorEnd, periodEnd);
-  if (rangeEnd <= rangeStart) return [];
-  const slots: string[] = [];
-  for (let minute = rangeStart; minute < rangeEnd; minute += 15) {
-    slots.push(formatMinutesToTime(minute));
-  }
-  return slots;
+  return [];
 };
 const buildRoomSlots = (
   room: RoomScheduleMeta | undefined,
   period: 'Manhã' | 'Tarde' | 'Noite',
   date: Date,
+  durationMinutes = 15,
+  specialtyIds: string[] = [],
 ): string[] => {
   const currentWeekday = getBranchWeekdayLabel(date);
   if (hasAnyAgendaWindow(room?.agendaByWeekday)) {
     const windows = room?.agendaByWeekday?.[currentWeekday] || [];
-    return buildSlotsFromAgendaWindows(windows, period, date);
+    return buildSlotsFromAgendaWindows(windows, period, date, durationMinutes, specialtyIds);
   }
-  if (!room?.workingHoursStart || !room?.workingHoursEnd) {
-    return TIME_SLOTS[period];
-  }
-  const normalizedDays = (room.workingDays || []).map(normalizeWeekdayLabel);
-  if (normalizedDays.length > 0 && !normalizedDays.includes(currentWeekday)) {
-    return [];
-  }
-  const roomStart = parseTimeToMinutes(room.workingHoursStart);
-  const roomEnd = parseTimeToMinutes(room.workingHoursEnd);
-  if (roomStart === null || roomEnd === null || roomEnd <= roomStart) {
-    return TIME_SLOTS[period];
-  }
-  const [periodStart, periodEnd] = PERIOD_RANGES[period];
-  const rangeStart = Math.max(roomStart, periodStart);
-  const rangeEnd = Math.min(roomEnd, periodEnd);
-  if (rangeEnd <= rangeStart) return [];
-  const slots: string[] = [];
-  for (let minute = rangeStart; minute < rangeEnd; minute += 15) {
-    slots.push(formatMinutesToTime(minute));
-  }
-  return slots;
+  return [];
 };
 const formatDateForApi = (value: Date | null): string => {
   if (!value) return '';
@@ -1161,9 +1128,6 @@ export function Agendamento() {
           ...(doctor.roomId ?[doctor.roomId] : []),
           ...(Array.isArray(doctor.roomLinks) ?doctor.roomLinks.map((link: any) => link?.roomId) : []),
         ].map((item: any) => String(item || '').trim()).filter(Boolean))),
-        workingDays: Array.isArray(doctor.workingDays) ?doctor.workingDays : [],
-        workingHoursStart: doctor.workingHoursStart || undefined,
-        workingHoursEnd: doctor.workingHoursEnd || undefined,
         specialties: [
           ...(doctor.specialty ?[String(doctor.specialty)] : []),
           ...(Array.isArray(doctor.specialties) ?doctor.specialties.map((item: any) => String(item)) : []),
@@ -1199,6 +1163,14 @@ export function Agendamento() {
         doctorNames: linkedDoctors
           .map((doctor: any) => String(doctor?.doctorName || doctor?.name || '').trim())
           .filter(Boolean),
+        specialtyIds: Array.from(new Set([
+          ...(Array.isArray(item?.especialidadeIds) ? item.especialidadeIds : []),
+          ...(Array.isArray(item?.specialtyIds) ? item.specialtyIds : []),
+          item?.especialidadeId,
+          item?.specialtyId,
+          item?.especialidade?.id,
+          item?.specialty?.id,
+        ].map((id: any) => String(id || '').trim()).filter(Boolean))),
         supportsTeleconsultation:
           normalizeProcedureAppointmentType(item.appointmentType) === 'CONSULTA'
           && (
@@ -1898,6 +1870,8 @@ export function Agendamento() {
           patientName: resolvedPatient.patientName || undefined,
           patientCpf: resolvedPatient.patientCpf || undefined,
           doctorName: novoAgendamento.profissional || undefined,
+          doctorId: doctorMetaByName[novoAgendamento.profissional]?.id || undefined,
+          sourceProcedureId: String(procedureMetaByName[selectedSpecialties[0]]?.id || '').trim() || undefined,
           roomId: isExamAppointment ?(novoAgendamento.roomId || undefined) : undefined,
           medicalEquipmentId: isExamAppointment ?(novoAgendamento.medicalEquipmentId || undefined) : undefined,
           specialty: selectedSpecialties.join(', '),
@@ -2008,6 +1982,8 @@ export function Agendamento() {
               patientName: resolvedPatient.patientName || undefined,
               patientCpf: resolvedPatient.patientCpf || undefined,
               doctorName: scheduleItem.doctorName || undefined,
+              doctorId: doctorMetaByName[scheduleItem.doctorName]?.id || undefined,
+              sourceProcedureId: String(procedureMetaByName[scheduleItem.procedure]?.id || '').trim() || undefined,
               roomId: scheduleResource?.roomId || (isExamAppointment ? novoAgendamento.roomId || undefined : undefined),
               medicalEquipmentId: scheduleResource?.medicalEquipmentId || (isExamAppointment ? novoAgendamento.medicalEquipmentId || undefined : undefined),
               specialty: scheduleItem.procedure,
@@ -2373,11 +2349,6 @@ export function Agendamento() {
     acc[id] = {
       id,
       name: roomLabelById[id] || String(room?.name || '').trim() || `Sala ${id}`,
-      workingDays: Array.isArray(room?.workingDays)
-        ?room.workingDays.map((day: any) => String(day || '').trim()).filter(Boolean)
-        : [],
-      workingHoursStart: String(room?.workingHoursStart || '').trim() || undefined,
-      workingHoursEnd: String(room?.workingHoursEnd || '').trim() || undefined,
       agendaByWeekday: agendaByRoomId[id],
     };
     return acc;
@@ -2500,6 +2471,12 @@ export function Agendamento() {
     ));
   };
   const selectedProcedureSummary = Array.isArray(selectedSpecialties) ?selectedSpecialties : [];
+  const selectedProcedureSpecialtyIds = Array.from(new Set(
+    selectedProcedureSummary
+      .flatMap((name) => procedureMetaByName[name]?.specialtyIds || [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean),
+  ));
   const selectedDayKey = selectedDay ?dayjs(selectedDay).format('YYYY-MM-DD') : null;
   const selectedDayAppointments = selectedDayKey ?(agendamentosByDate[selectedDayKey] || []) : [];
   const selectedDayStatusSummary = getAppointmentStatusSummary(selectedDayAppointments);
@@ -2728,8 +2705,8 @@ export function Agendamento() {
     schedulePeriods
       .flatMap((period) => (
         isExamAppointment
-          ? buildRoomSlots(roomScheduleById[resourceName], period, date)
-          : buildDoctorSlots(doctorMetaByName[resourceName], period, date)
+          ? buildRoomSlots(roomScheduleById[resourceName], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds)
+          : buildDoctorSlots(doctorMetaByName[resourceName], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds)
       ))
       .filter((slot, index, slots) => slots.indexOf(slot) === index)
   );
@@ -2793,18 +2770,8 @@ export function Agendamento() {
     const slotStartMinute = parseTimeToMinutes(slot);
     if (slotStartMinute === null) return false;
     const slotEndMinute = slotStartMinute + durationMinutes;
-    const period = resolveTurnoFromTime(slot) || 'Manhã';
-    const [, periodEnd] = PERIOD_RANGES[period];
-    if (slotEndMinute > periodEnd) return false;
     if (isExamAppointment) {
       if (!novoAgendamento.roomId || !novoAgendamento.medicalEquipmentId) return false;
-      const roomMeta = roomScheduleById[doctorName];
-      const roomEndMinute = parseTimeToMinutes(roomMeta?.workingHoursEnd);
-      if (roomEndMinute !== null && slotEndMinute > roomEndMinute) return false;
-    } else {
-      const doctorMeta = doctorMetaByName[doctorName];
-      const doctorEndMinute = parseTimeToMinutes(doctorMeta?.workingHoursEnd);
-      if (doctorEndMinute !== null && slotEndMinute > doctorEndMinute) return false;
     }
     if (findOverlappingAppointment(doctorName, slotStartMinute, slotEndMinute, date, ignoreAppointmentId)) return false;
     if (patientHasConflict(slotStartMinute, slotEndMinute, date, ignoreAppointmentId)) return false;
@@ -3047,7 +3014,7 @@ export function Agendamento() {
     if (isExamAppointment) {
       if (!examResourcesSelected || !novoAgendamento.roomId) return false;
       const roomSlots = (['Manhã', 'Tarde', 'Noite'] as const).flatMap((period) =>
-        buildRoomSlots(roomScheduleById[novoAgendamento.roomId], period, date),
+        buildRoomSlots(roomScheduleById[novoAgendamento.roomId], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds),
       );
       return roomSlots.some((slot) => slotSupportsDuration(novoAgendamento.roomId, slot, selectedProcedureDuration, date, editingAgendamentoId));
     }
@@ -3069,7 +3036,7 @@ export function Agendamento() {
     if (isExamAppointment) {
       if (!examResourcesSelected || !novoAgendamento.roomId) return null;
       for (const period of periods) {
-        const roomSlots = buildRoomSlots(roomScheduleById[novoAgendamento.roomId], period, date);
+        const roomSlots = buildRoomSlots(roomScheduleById[novoAgendamento.roomId], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds);
         for (const slot of roomSlots) {
           if (slotSupportsDuration(novoAgendamento.roomId, slot, selectedProcedureDuration, date, editingAgendamentoId)) {
             return { period, slot, doctor: roomLabelById[novoAgendamento.roomId] || 'Sala' };
@@ -3080,7 +3047,7 @@ export function Agendamento() {
     }
     for (const period of periods) {
       for (const doctor of schedulerDoctors) {
-        const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], period, date);
+        const doctorSlots = buildDoctorSlots(doctorMetaByName[doctor], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds);
         for (const slot of doctorSlots) {
           const isAvailable = isMultiProcedureFlow
             ?getSelectableProceduresForSlot(doctor, slot, date).some((procedureName) => (
@@ -3120,12 +3087,12 @@ export function Agendamento() {
   const getAllDoctorSlotsForDate = (doctorName: string, date: Date): string[] => {
     if (isExamAppointment) {
       const merged = (['Manhã', 'Tarde', 'Noite'] as const).flatMap((period) =>
-        buildRoomSlots(roomScheduleById[doctorName], period, date),
+        buildRoomSlots(roomScheduleById[doctorName], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds),
       );
       return Array.from(new Set(merged)).sort((a, b) => (parseTimeToMinutes(a) || 0) - (parseTimeToMinutes(b) || 0));
     }
     const merged = (['Manhã', 'Tarde', 'Noite'] as const).flatMap((period) =>
-      buildDoctorSlots(doctorMetaByName[doctorName], period, date),
+      buildDoctorSlots(doctorMetaByName[doctorName], period, date, selectedProcedureDuration, selectedProcedureSpecialtyIds),
     );
     return Array.from(new Set(merged)).sort((a, b) => (parseTimeToMinutes(a) || 0) - (parseTimeToMinutes(b) || 0));
   };

@@ -933,7 +933,9 @@ export function CadastroMedico() {
     if (!data.cellphone || !/^\d{10,11}$/.test(String(data.cellphone))) errors.cellphone = 'Celular inválido';
     if (!isValidCPF(data.cpf)) errors.cpf = 'CPF inválido';
     if (!data.birthDate) errors.birthDate = 'Data de nascimento é obrigatória';
-    if (data.birthDate && data.birthDate > new Date()) errors.birthDate = 'Data de nascimento inválida';
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    if (data.birthDate && data.birthDate > todayEnd) errors.birthDate = 'Data de nascimento inválida';
     if (!data.gender) errors.gender = 'Gênero é obrigatório';
     if (data.procedureDurations.some((item) => !Number.isFinite(item.durationMinutes) || item.durationMinutes <= 0)) {
       errors.procedureDurations = 'Informe o tempo de todos os procedimentos vinculados';
