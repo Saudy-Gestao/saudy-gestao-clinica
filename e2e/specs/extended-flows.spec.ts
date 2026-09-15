@@ -145,6 +145,62 @@ test.describe(getFlow('scheduling.ai-draft').title, () => {
     await expect(page.getByText(fixture.procedureName, { exact: true })).toBeVisible();
     await expect(page.getByText('Pronto para revisar', { exact: true })).toBeVisible();
   });
+
+  test('preserva o pedido ao fechar e reabrir o assistente', async ({ page }) => {
+    await authenticate(page);
+    await page.goto('/agendamento');
+    await page.getByText('Realizar marcação', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'Agendar com IA', exact: true }).click();
+
+    const prompt = `Agendar ${fixture.patientName} para ${fixture.procedureName} amanhã às 10h.`;
+    const promptField = page.getByLabel('Pedido de agendamento');
+    await promptField.fill(prompt);
+    await page.getByLabel('Fechar assistente de agendamento').click();
+    await expect(page.getByRole('heading', { name: 'Agendar com IA', exact: true })).toBeHidden();
+
+    await page.getByRole('button', { name: 'Agendar com IA', exact: true }).click();
+    await expect(page.getByLabel('Pedido de agendamento')).toHaveValue(prompt);
+  });
+
+  test('leva do campo pendente no rascunho ao campo do formulário', async ({ page }) => {
+    await authenticate(page);
+    await page.route('**/care/appointments/assistant/parse', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          draft: {
+            patientName: fixture.patientName,
+            patientCpf: '12345678901',
+            procedureNames: [fixture.procedureName],
+            professionalName: null,
+            professionalPreference: null,
+            date: fixture.targetDate,
+            time: '10:00',
+            period: null,
+            modality: 'Presencial',
+            insuranceName: null,
+            recurrenceOccurrences: null,
+            recurrenceIntervalWeeks: null,
+            simultaneous: false,
+            observations: null,
+          },
+        }),
+      });
+    });
+
+    await page.goto('/agendamento');
+    await page.getByText('Realizar marcação', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'Agendar com IA', exact: true }).click();
+    await page.getByLabel('Pedido de agendamento').fill(`Agendar ${fixture.patientName} para ${fixture.procedureName}.`);
+    await page.getByRole('button', { name: 'Preparar rascunho', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: 'Ir para profissional', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Ir para profissional', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: 'Agendar com IA', exact: true })).toBeHidden();
+    await expect(page.locator('#agendamento-field-professional')).toBeFocused();
+  });
 });
 
 test.describe(getFlow('tea.pre-reservation').title, () => {
@@ -171,8 +227,10 @@ test.describe(getFlow('tea.pre-reservation').title, () => {
       headers: requestHeaders,
     });
     expect(pendingResponse.ok()).toBeTruthy();
-    const pendingPayload = await pendingResponse.json();
-    const pendingItem = (pendingPayload.items || []).find((item: any) => (
+    const pendingPayload = await pendingResponse.json() as {
+      items?: Array<{ patient?: { name?: string }; preReservationId?: string }>;
+    };
+    const pendingItem = (pendingPayload.items || []).find((item) => (
       item?.patient?.name === patientName && item?.preReservationId
     ));
     expect(pendingItem?.preReservationId).toBeTruthy();
