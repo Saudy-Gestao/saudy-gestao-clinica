@@ -102,8 +102,11 @@ const teleconsultationLinkService = {
   },
 
   async resolvePublicToken(token: string) {
-    // Use path param to avoid token appearing in server logs and browser history
-    const response = await publicApi.get(`/care/teleconsultation-links/public/${encodeURIComponent(token)}`);
+    // Keep the public resolver compatible with the API route exposed for signed
+    // tokens. The query variant also avoids router/proxy issues with JWT dots.
+    const response = await publicApi.get('/care/teleconsultation-links/public', {
+      params: { token },
+    });
     return response.data as TeleconsultationPublicTokenMeta;
   },
 

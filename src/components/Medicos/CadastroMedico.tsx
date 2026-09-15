@@ -1312,6 +1312,7 @@ export function CadastroMedico() {
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <DateInput
+                    id="doctor-field-birth-date"
                     label="Data de nascimento"
                     value={form.birthDate}
                     onChange={(value) => { setForm({ ...form, birthDate: value || null }); clearFieldError('birthDate'); }}
@@ -1321,6 +1322,7 @@ export function CadastroMedico() {
                   />
 
                   <Select
+                    id="doctor-field-gender"
                     label="Gênero"
                     data={[{ value: 'male', label: 'Masculino' }, { value: 'female', label: 'Feminino' }, { value: 'other', label: 'Outro' }]}
                     value={form.gender}
@@ -1348,6 +1350,7 @@ export function CadastroMedico() {
                   />
                   <TextInput label={`Número do ${form.crmType || 'registro'}`} value={form.crm} onChange={(e) => { setForm({ ...form, crm: e.currentTarget.value }); clearFieldError('crm'); }} required error={fieldErrors.crm} />
                   <Select
+                    id="doctor-field-crm-state"
                     label="UF do registro"
                     data={statesOptions}
                     value={form.crmState}
@@ -1437,6 +1440,7 @@ export function CadastroMedico() {
                 >
                   <Stack gap={10}>
                     <Select
+                      id="doctor-group-modality"
                       label="Modalidade"
                       required
                       placeholder="Selecione a modalidade"
@@ -1476,6 +1480,7 @@ export function CadastroMedico() {
                       />
                     </SimpleGrid>
                     <MultiSelect
+                      id="doctor-group-specialties"
                       label="Especialidades"
                       placeholder={!groupDraft.modalidadeId ? 'Selecione uma modalidade primeiro' : 'Selecione as especialidades'}
                       data={(groupDraft.modalidadeId ? especialidadesByModalidadeId.get(groupDraft.modalidadeId) || [] : []).map((especialidade: any) => ({

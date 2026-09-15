@@ -14,6 +14,7 @@ import whatsappService from '../whatsappService';
 import preSchedulingService from '../preSchedulingService';
 import inventoryService from '../inventoryService';
 import consultationService from '../consultationService';
+import teleconsultationLinkService from '../teleconsultationLinkService';
 
 const mockPublicApi = vi.hoisted(() => ({
   get: vi.fn(),
@@ -500,6 +501,16 @@ describe('consultationService - remaining', () => {
   it('remove', async () => {
     await consultationService.remove('c1');
     expect(mockedApi.delete).toHaveBeenCalledWith(expect.stringContaining('c1'));
+  });
+});
+
+// ─── teleconsultationLinkService ────────────────────────────────────────────
+describe('teleconsultationLinkService', () => {
+  it('resolves a public token through the query-compatible endpoint', async () => {
+    await teleconsultationLinkService.resolvePublicToken('signed.token');
+    expect(mockPublicApi.get).toHaveBeenCalledWith('/care/teleconsultation-links/public', {
+      params: { token: 'signed.token' },
+    });
   });
 });
 

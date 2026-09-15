@@ -441,7 +441,7 @@ export function CadastroAgendas() {
                     style={{ flex: '1 1 260px', maxWidth: isMobile ? '100%' : 420 }}
                   />
                 </Group>
-                <Button leftSection={<Plus size={16} />} onClick={() => setCreateScaleOpen(true)} fullWidth={isMobile}>
+                <Button data-testid="agenda-new" leftSection={<Plus size={16} />} onClick={() => setCreateScaleOpen(true)} fullWidth={isMobile}>
                   Nova agenda
                 </Button>
               </Group>

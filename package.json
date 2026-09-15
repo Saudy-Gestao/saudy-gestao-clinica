@@ -13,6 +13,11 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
+    "e2e:prepare": "node e2e/prepare-e2e.mjs",
+    "e2e": "yarn e2e:prepare && playwright test -c e2e/playwright.config.ts",
+    "e2e:ui": "yarn e2e:prepare && playwright test -c e2e/playwright.config.ts --ui",
+    "e2e:report": "playwright show-report playwright-report",
+    "e2e:db:down": "node e2e/prepare-e2e.mjs --down",
     "prepare": "husky"
   },
   "dependencies": {
@@ -47,6 +52,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^14.0.0",

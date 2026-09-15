@@ -37,6 +37,7 @@ export function Header({ back, contextLabel }: HeaderProps) {
     const routeLabels: Array<[string, string]> = [
       ['/dashboard', 'Visão geral'],
       ['/bi', 'BI Gestão'],
+      ['/e2e-fluxos', 'Cobertura de fluxos'],
       ['/agendamento', 'Agendamento'],
       ['/pre-atendimento', 'Pré-atendimento'],
       ['/autorizacao-e-recepcao', 'Autorização e recepção'],

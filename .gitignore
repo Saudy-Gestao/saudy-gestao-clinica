@@ -29,3 +29,9 @@ dist-ssr
 coverage
 .vercel
 .env*
+test-results/
+playwright-report/
+blob-report/
+e2e/.runtime/
+e2e/test-results/
+e2e/playwright-report/

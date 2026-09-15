@@ -54,7 +54,46 @@
 .mapa-salas-legend-dot--blocked { background: color-mix(in srgb, var(--ui-hue-orange) 28%, transparent); border-color: color-mix(in srgb, var(--ui-hue-orange) 65%, transparent); }
 
 .mapa-salas-table-wrap {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.mapa-salas-week-scroll {
+  padding-bottom: .25rem;
+  border-radius: .7rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-primary) 55%, var(--ui-border)) transparent;
+}
+
+.mapa-salas-week-track {
+  width: max-content;
+  min-width: 100%;
+}
+
+.mapa-salas-week-scroll-summary {
+  min-height: 1.25rem;
+  padding-inline: .15rem;
+}
+
+.mapa-salas-week-scroll::-webkit-scrollbar {
+  height: .6rem;
+}
+
+.mapa-salas-week-scroll::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--ui-foreground) 5%, transparent);
+  border-radius: 999px;
+}
+
+.mapa-salas-week-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-primary) 55%, var(--ui-border));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 .mapa-salas-hour-header {

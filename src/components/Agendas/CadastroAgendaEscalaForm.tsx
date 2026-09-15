@@ -470,6 +470,7 @@ export function CadastroAgendaEscalaForm({
         </Box>
         <Box className="cadastro-agenda-filter-grid">
           <Select
+            id="agenda-field-branch"
             label="Unidade"
             required
             data={branchOptions}
@@ -479,6 +480,7 @@ export function CadastroAgendaEscalaForm({
             searchable
           />
           <MultiSelect
+            id="agenda-field-specialties"
             label="Especialidade"
             data={specialtyOptions}
             value={especialidadeIds}
@@ -489,6 +491,7 @@ export function CadastroAgendaEscalaForm({
             disabled={!branchId}
           />
           <Select
+            id="agenda-field-doctor"
             label="Profissional"
             required
             data={doctorOptions}
@@ -569,6 +572,7 @@ export function CadastroAgendaEscalaForm({
                 return (
                   <Button
                     key={day.value}
+                    data-testid={`agenda-day-${day.value}`}
                     className={selected ? 'is-selected' : undefined}
                     variant={selected ? 'filled' : 'default'}
                     size="sm"
@@ -588,7 +592,7 @@ export function CadastroAgendaEscalaForm({
               <Button variant="default" size="sm" leftSection={<Plus size={15} />} onClick={addSlot}>Adicionar horário</Button>
               <Group gap="xs">
                 <Button variant="subtle" size="sm" onClick={() => setDraft(null)}>Cancelar bloco</Button>
-                <Button size="sm" onClick={saveDraftBlock}>Salvar bloco</Button>
+                <Button data-testid="agenda-save-block" size="sm" onClick={saveDraftBlock}>Salvar bloco</Button>
               </Group>
             </Group>
           </Paper>
@@ -630,7 +634,7 @@ export function CadastroAgendaEscalaForm({
 
       <Group className="cadastro-agenda-form-actions" justify="space-between" mt="lg" wrap="wrap">
         <Button variant="default" onClick={onCancel} disabled={saving}>Cancelar</Button>
-        <Button onClick={handleSave} loading={saving} disabled={saving}>Salvar escala</Button>
+        <Button data-testid="agenda-save" onClick={handleSave} loading={saving} disabled={saving}>Salvar escala</Button>
       </Group>
     </Box>
   );

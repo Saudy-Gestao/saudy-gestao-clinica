@@ -1020,6 +1020,7 @@ export function CadastroPaciente() {
                   key={card.key}
                   className="cadastro-paciente-hub-card"
                   withBorder
+                  data-testid={`patient-${card.key}-card`}
                   onClick={card.onClick}
                 >
                   <Group justify="space-between" align="center" wrap="nowrap">
@@ -1058,8 +1059,9 @@ export function CadastroPaciente() {
               <Paper className="cadastro-paciente-form-panel" p="md" withBorder radius="md">
                 <SectionTitle>Dados Pessoais</SectionTitle>
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                  <TextInput label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); clearFieldError('name'); }} error={fieldErrors.name} required />
+                  <TextInput id="patient-field-name" label="Nome completo" value={form.name} onChange={(e) => { setForm({ ...form, name: e.currentTarget.value }); clearFieldError('name'); }} error={fieldErrors.name} required />
                   <TextInput
+                    id="patient-field-cpf"
                     label="CPF"
                     value={formatCPF(form.cpf)}
                     onChange={(e) => {
@@ -1085,6 +1087,7 @@ export function CadastroPaciente() {
                   <TextInput label="RG" value={form.rg} onChange={(e) => setForm({ ...form, rg: e.currentTarget.value })} />
 
                   <DateInput
+                    id="patient-field-birth-date"
                     label="Data de nascimento"
                     value={form.birthDate}
                     onChange={(value) => { setForm({ ...form, birthDate: value || null }); clearFieldError('birthDate'); }}
@@ -1094,6 +1097,7 @@ export function CadastroPaciente() {
                   />
 
                   <Select
+                    id="patient-field-gender"
                     label="Gênero"
                     data={genderOptions}
                     value={form.gender}
@@ -1113,7 +1117,7 @@ export function CadastroPaciente() {
 
                   <TextInput label="Email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.currentTarget.value }); clearFieldError('email'); }} error={fieldErrors.email} />
                   <TextInput label="Telefone" value={formatPhone(form.phone)} onChange={(e) => { setForm({ ...form, phone: onlyDigits(e.currentTarget.value) }); clearFieldError('phone'); }} error={fieldErrors.phone} />
-                  <TextInput label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} error={fieldErrors.cellphone} required />
+                  <TextInput id="patient-field-cellphone" label="Celular" value={formatPhone(form.cellphone)} onChange={(e) => { setForm({ ...form, cellphone: onlyDigits(e.currentTarget.value) }); clearFieldError('cellphone'); }} error={fieldErrors.cellphone} required />
                 </SimpleGrid>
 
                 {/* Seção de Reconhecimento Facial */}
@@ -1328,7 +1332,7 @@ export function CadastroPaciente() {
 
               <Group justify="right">
                 <Button variant="default" onClick={handleCancel}>Cancelar</Button>
-                <Button onClick={handleSave} loading={saving} disabled={saving} size="md">
+                <Button data-testid="patient-save" onClick={handleSave} loading={saving} disabled={saving} size="md">
                   {isEditing ? 'Salvar alterações' : 'Salvar'}
                 </Button>
               </Group>

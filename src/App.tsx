@@ -79,6 +79,7 @@ import { MyTicketDetailsPage } from './components/Tickets/MyTicketDetailsPage';
 import { PatientPortalLogin } from './components/PatientPortal/PatientPortalLogin';
 import { PatientPortalDashboard } from './components/PatientPortal/PatientPortalDashboard';
 import { PatientPortalDicomViewer } from './components/PatientPortal/PatientPortalDicomViewer';
+import { E2EFlowStatus } from './components/E2EFlowStatus/E2EFlowStatus';
 import patientPortalAuthService from './services/patientPortalAuthService';
 import { hasModuleAccess, isAdminUser, isDoctorUser } from './utils/userRole';
 import { useCurrentUserProfileQuery } from './hooks/useCurrentUserProfileQuery';
@@ -252,6 +253,10 @@ function App() {
           <Route
             path="/bi"
             element={<ProtectedRoute><BIGestao /></ProtectedRoute>}
+          />
+          <Route
+            path="/e2e-fluxos"
+            element={<ProtectedRoute><E2EFlowStatus /></ProtectedRoute>}
           />
           <Route
             path="/fila-atendimento"

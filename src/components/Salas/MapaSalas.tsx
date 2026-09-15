@@ -38,6 +38,8 @@ const getTimelineOffset = (minute: number, rowHeight: number, rowGap: number) =>
 };
 const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const WEEKDAY_TOKENS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+const WEEKLY_ROOM_SCROLL_LIMIT = 10;
+const WEEKLY_ROOM_COLUMN_WIDTH = 112;
 const STATUS_META = {
   available: { label: 'Disponível' },
   occupied: { label: 'Ocupado' },
@@ -237,6 +239,13 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
   const units = useMemo(() => Array.from(new Set(roomNames.map(getUnitName))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [roomNames]);
   const visibleRooms = useMemo(() => roomNames.filter((name) => roomFilter.length === 0 || roomFilter.includes(name)), [roomFilter, roomNames]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => weekStart.add(index, 'day')), [weekStart]);
+  const weeklyRoomCount = Math.max(visibleRooms.length, 1);
+  const weeklyVisibleRoomCount = Math.min(weeklyRoomCount, WEEKLY_ROOM_SCROLL_LIMIT);
+  const weeklyDayMinWidth = weeklyVisibleRoomCount * WEEKLY_ROOM_COLUMN_WIDTH + 18;
+  const weeklyMapContentMinWidth = Math.max(
+    1120,
+    62 + weekDays.length * (weeklyRoomCount * WEEKLY_ROOM_COLUMN_WIDTH + 18),
+  );
   const getMapCellWidth = () => {
     const roomCount = Math.max(visibleRooms.length, 1);
 
@@ -546,9 +555,24 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
                 </Paper>
               </Box>
             ) : (
-              <Box ref={scheduleRef} className="mapa-salas-table-wrap">
-                <Box style={{ minWidth: Math.max(1120, 62 + weekDays.length * (Math.max(visibleRooms.length, 1) * 112 + 18)) }}>
-                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8, marginBottom: 8 }}>
+              <Box
+                ref={scheduleRef}
+                className="mapa-salas-table-wrap mapa-salas-week-scroll"
+                data-testid="mapa-salas-week-scroll"
+                data-room-count={visibleRooms.length}
+                data-room-scroll-limit={WEEKLY_ROOM_SCROLL_LIMIT}
+                aria-label="Mapa semanal de salas"
+              >
+                <Box className="mapa-salas-week-track" style={{ minWidth: weeklyMapContentMinWidth }}>
+                  <Group className="mapa-salas-week-scroll-summary" justify="space-between" align="center" gap="xs" mb="xs" wrap="wrap">
+                    <Text size="xs" c="dimmed">
+                      {visibleRooms.length > WEEKLY_ROOM_SCROLL_LIMIT
+                        ? `Exibindo ${WEEKLY_ROOM_SCROLL_LIMIT} salas por janela · use a barra horizontal para ver as ${visibleRooms.length} salas`
+                        : `${visibleRooms.length} ${visibleRooms.length === 1 ? 'sala disponível' : 'salas disponíveis'} no mapa`}
+                    </Text>
+                    {visibleRooms.length > WEEKLY_ROOM_SCROLL_LIMIT && <Badge size="xs" variant="light" color="blue">Rolagem horizontal</Badge>}
+                  </Group>
+                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${weeklyDayMinWidth}px, 1fr))`, gap: 8, marginBottom: 8 }}>
                     <Box />
                     {weekDays.map((day) => (
                       <Paper key={day.format('YYYY-MM-DD')} className="mapa-salas-day-header" withBorder radius="md" p="xs">
@@ -562,7 +586,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
                     ))}
                   </Box>
 
-                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8, marginBottom: 8 }}>
+                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${weeklyDayMinWidth}px, 1fr))`, gap: 8, marginBottom: 8 }}>
                     <Box />
                     {weekDays.map((day) => (
                       <Box
@@ -570,7 +594,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
                         className="mapa-salas-day-column"
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: `repeat(${Math.max(visibleRooms.length, 1)}, minmax(100px, 1fr))`,
+                          gridTemplateColumns: `repeat(${weeklyRoomCount}, minmax(100px, 1fr))`,
                           gap: 5,
                           padding: '0 6px 6px',
                         }}
@@ -584,7 +608,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
                     ))}
                   </Box>
 
-                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${Math.max(visibleRooms.length, 1) * 112 + 18}px, 1fr))`, gap: 8 }}>
+                  <Box style={{ display: 'grid', gridTemplateColumns: `62px repeat(${weekDays.length}, minmax(${weeklyDayMinWidth}px, 1fr))`, gap: 8 }}>
                     {renderTimelineMarkers(40, 6)}
                     {weekDays.map((day) => (
                       <Box
@@ -592,7 +616,7 @@ export function MapaSalas({ embedded = false }: { embedded?: boolean } = {}) {
                         className="mapa-salas-day-timeline-column"
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: `repeat(${Math.max(visibleRooms.length, 1)}, minmax(100px, 1fr))`,
+                          gridTemplateColumns: `repeat(${weeklyRoomCount}, minmax(100px, 1fr))`,
                           gap: 5,
                           padding: '0 5px',
                           height: getTimelineHeight(40, 6),

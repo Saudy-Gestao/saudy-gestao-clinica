@@ -3588,6 +3588,7 @@ export function Agendamento() {
               ].map((card) => (
                 <Paper
                   key={card.key}
+                  data-testid={`agendamento-${card.key}-card`}
                   className="agendamento-hub-card"
                   p="lg"
                   withBorder
@@ -3871,6 +3872,7 @@ export function Agendamento() {
               <SimpleGrid className="agendamento-appointment-grid" cols={{ base: 1, md: isExamAppointment ?2 : 3, lg: isExamAppointment ?5 : 3 }} spacing="md">
                 <Select
                   className="agendamento-native-field"
+                  id="agendamento-field-branch"
                   label="Unidade"
                   placeholder={branchesQuery.isFetching ? 'Carregando unidades...' : 'Unidade atual'}
                   data={branchOptions}
@@ -3925,6 +3927,7 @@ export function Agendamento() {
                 {!isExamAppointment && (
                   <Select
                     className="agendamento-native-field"
+                    id="agendamento-field-modality"
                     label="Modalidade"
                     placeholder="Selecione a modalidade"
                     data={appointmentModalityOptions}
@@ -3983,6 +3986,7 @@ export function Agendamento() {
                   Limpar fluxo
                 </Button>
                 <Button
+                  data-testid="agendamento-continue-availability"
                   rightSection={<ChevronRight size={16} aria-hidden="true" />}
                   onClick={handleContinueToAvailability}
                   disabled={!canAdvanceToAvailability}
@@ -4011,6 +4015,7 @@ export function Agendamento() {
                 <Group className="agendamento-availability-modes" justify="space-between" align="center" gap="sm" wrap="wrap">
                   <Group gap="xs" wrap="wrap">
                     <Button
+                      data-testid="agendamento-availability-day"
                       size="sm"
                       variant={availabilityViewMode === 'day' ? 'filled' : 'default'}
                       leftSection={<Calendar size={15} aria-hidden="true" />}
@@ -4019,6 +4024,7 @@ export function Agendamento() {
                       Dia
                     </Button>
                     <Button
+                      data-testid="agendamento-availability-week"
                       size="sm"
                       variant={availabilityViewMode === 'week' ? 'filled' : 'default'}
                       leftSection={<LayoutGrid size={15} aria-hidden="true" />}
@@ -4029,6 +4035,7 @@ export function Agendamento() {
                   </Group>
                   <Group gap="xs" wrap="wrap">
                     <Button
+                      data-testid="agendamento-simultaneous"
                       size="sm"
                       variant={simultaneousEnabled ? 'filled' : 'default'}
                       color={simultaneousEnabled ? 'violet' : undefined}
@@ -4043,6 +4050,7 @@ export function Agendamento() {
                       Marcação simultânea
                     </Button>
                     <Button
+                      data-testid="agendamento-recurrence"
                       size="sm"
                       variant={recurrenceEnabled ? 'filled' : 'default'}
                       color={recurrenceEnabled ? 'teal' : undefined}
@@ -4139,6 +4147,7 @@ export function Agendamento() {
                     <Group className="agendamento-recurrence-controls" gap="sm" wrap="wrap">
                       <Text className="agendamento-recurrence-controls__label" fw={600}>Repetir semanalmente</Text>
                       <Select
+                        id="agendamento-recurrence-occurrences"
                         aria-label="Quantidade de ocorrências"
                         data={['2', '3', '4', '5', '6', '8', '12'].map((value) => ({ value, label: `${value} ocorrências` }))}
                         value={recurrenceOccurrences}
@@ -4147,6 +4156,7 @@ export function Agendamento() {
                         w={150}
                       />
                       <Select
+                        id="agendamento-recurrence-interval"
                         aria-label="Intervalo da recorrência"
                         data={[{ value: '1', label: 'Toda semana' }, { value: '2', label: 'A cada 2 semanas' }, { value: '4', label: 'A cada 4 semanas' }]}
                         value={recurrenceIntervalWeeks}
@@ -4408,7 +4418,8 @@ export function Agendamento() {
                   ) : (
                   <SimpleGrid className="agendamento-availability-grid" cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} spacing="md">
                     {filteredDisplayScheduleSlots.map((slotItem) => (
-                      <UnstyledButton
+                        <UnstyledButton
+                        data-testid={`agendamento-availability-slot-${slotItem.slot}`}
                         className={[
                           'agendamento-availability-slot',
                           slotItem.isSelected && 'is-selected',
@@ -4679,6 +4690,7 @@ export function Agendamento() {
                   Voltar aos dados
                 </Button>
                 <Button
+                  data-testid="agendamento-review"
                   rightSection={<ChevronRight size={16} aria-hidden="true" />}
                   onClick={handleContinueToReview}
                   disabled={!canAdvanceToReview}
@@ -4839,6 +4851,7 @@ export function Agendamento() {
                   Voltar aos horários
                 </Button>
                 <Button
+                  data-testid="agendamento-confirm"
                   onClick={handleAddAgendamento}
                   loading={savingAgendamento}
                   disabled={!schedulingReady || savingAgendamento}
